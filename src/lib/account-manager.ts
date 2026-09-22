@@ -311,9 +311,84 @@ class DeyeAccountManager {
   }
 
   /**
-   * Get sanitized summary of all accounts with their discovered plants and hardware counts
+   * Dynamically synchronize plant names, capacity, addresses, and devices from Deye Cloud OpenAPI
    */
-  public async getAccountsSummary(): Promise<AccountSummary[]> {
+  public async syncDynamicPlantMetadata(
+    acc: DeyeAccountConfig,
+    client: DeyeCloudClient
+  ): Promise<boolean> {
+    try {
+      const discovery = await client.discoverPlantsAndDevices();
+      if (!discovery.isLive || !discovery.plants || discovery.plants.length === 0) {
+        return false;
+      }
+
+      let changed = false;
+      if (!acc.plants) acc.plants = [];
+
+      for (const livePlant of discovery.plants) {
+        const existing = acc.plants.find((p) => p.stationId === livePlant.stationId);
+        if (existing) {
+          if (existing.stationName !== livePlant.stationName) {
+            console.log(
+              `[DeyeAccountManager] Dynamic plant name update: "${existing.stationName}" -> "${livePlant.stationName}" (Station ID: ${livePlant.stationId})`
+            );
+            existing.stationName = livePlant.stationName;
+            changed = true;
+          }
+          if (existing.installedCapacityKw !== livePlant.installedCapacityKw) {
+            existing.installedCapacityKw = livePlant.installedCapacityKw;
+            changed = true;
+          }
+          if (existing.address !== livePlant.address) {
+            existing.address = livePlant.address;
+            changed = true;
+          }
+          if (livePlant.devices && livePlant.devices.length > 0) {
+            existing.devices = livePlant.devices;
+            changed = true;
+          }
+        } else {
+          console.log(
+            `[DeyeAccountManager] Discovered new plant dynamically: "${livePlant.stationName}" (Station ID: ${livePlant.stationId})`
+          );
+          acc.plants.push(livePlant);
+          changed = true;
+        }
+      }
+
+      // If plants on Deye Cloud were deleted or re-assigned
+      const liveIds = new Set(discovery.plants.map((p) => p.stationId));
+      if (acc.plants.length > discovery.plants.length) {
+        acc.plants = acc.plants.filter((p) => liveIds.has(p.stationId));
+        changed = true;
+      }
+
+      acc.lastSyncedAt = new Date().toISOString();
+      acc.autoDiscovered = true;
+
+      // Persist dynamic updates to deye-accounts.json
+      const all = this.getAllRawAccounts(true);
+      const targetIdx = all.findIndex((a) => a.id === acc.id);
+      if (targetIdx >= 0) {
+        all[targetIdx].plants = acc.plants;
+        all[targetIdx].lastSyncedAt = acc.lastSyncedAt;
+        all[targetIdx].autoDiscovered = true;
+        this.saveAccountsToFile(all);
+      }
+
+      return changed;
+    } catch (e) {
+      console.warn(`[DeyeAccountManager] Dynamic plant sync failed for account ${acc.id}:`, e);
+      return false;
+    }
+  }
+
+  /**
+   * Get sanitized summary of all accounts with their discovered plants and hardware counts.
+   * Dynamically synchronizes plant names and devices from live Deye Cloud on a short TTL (30s) or when forced.
+   */
+  public async getAccountsSummary(forceSync = false): Promise<AccountSummary[]> {
     const rawAccounts = this.getAllRawAccounts(true);
     const summaries: AccountSummary[] = [];
 
@@ -323,34 +398,30 @@ class DeyeAccountManager {
       let pingMs = 25;
       let liveKw = 0;
       let dailyYield = 0;
-      let capacity = 0;
-
-      const plants = acc.plants || [];
-
-      // Calculate totals from plants
-      let inverterCount = 0;
-      let loggerCount = 0;
-      const invSns: string[] = [];
-      for (const p of plants) {
-        capacity += p.installedCapacityKw || 0;
-        for (const d of p.devices) {
-          if (d.deviceType === 'INVERTER') {
-            inverterCount++;
-            invSns.push(d.deviceSn);
-          }
-          if (d.deviceType === 'LOGGER') loggerCount++;
-        }
-      }
 
       if (acc.enabled) {
         try {
           const health = await client.getHealth();
           isLive = health.isLive;
           pingMs = health.pingMs;
+
           if (isLive) {
+            // Dynamic auto-sync: refresh plant names & devices every 30s or on forceSync
+            const lastSyncTime = acc.lastSyncedAt ? new Date(acc.lastSyncedAt).getTime() : 0;
+            const needsSync = forceSync || !acc.lastSyncedAt || (Date.now() - lastSyncTime > 30_000);
+            if (needsSync) {
+              await this.syncDynamicPlantMetadata(acc, client);
+            }
+
+            const activePlants = acc.plants || [];
+            const activeInvSns = activePlants
+              .flatMap((p) => p.devices)
+              .filter((d) => d.deviceType === 'INVERTER')
+              .map((d) => d.deviceSn);
+
             const [stSummary, batchDev] = await Promise.all([
               client.getStationSummary(),
-              invSns.length > 0 ? client.getBatchDeviceLatest(invSns) : Promise.resolve(new Map()),
+              activeInvSns.length > 0 ? client.getBatchDeviceLatest(activeInvSns) : Promise.resolve(new Map()),
             ]);
             liveKw = stSummary.data.liveSolarPowerKw;
             // Sum daily yield from real inverter telemetry
@@ -360,6 +431,19 @@ class DeyeAccountManager {
           }
         } catch {
           isLive = false;
+        }
+      }
+
+      const plants = acc.plants || [];
+      let inverterCount = 0;
+      let loggerCount = 0;
+      let capacity = 0;
+
+      for (const p of plants) {
+        capacity += p.installedCapacityKw || 0;
+        for (const d of p.devices) {
+          if (d.deviceType === 'INVERTER') inverterCount++;
+          if (d.deviceType === 'LOGGER') loggerCount++;
         }
       }
 

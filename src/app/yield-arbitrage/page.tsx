@@ -28,7 +28,7 @@ import {
   Legend,
 } from 'recharts';
 import { HourlyEnergyPoint } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -252,9 +252,6 @@ export default function YieldArbitragePage() {
                 <Zap size={18} className="text-amber-500" />
                 <span>Diurnal Curve: Solar Generation vs Industrial Load Profile</span>
               </CardTitle>
-              <CardDescription className="text-xs">
-                Green = Solar PV Production | Yellow = Facility Load Demand | Cyan = Battery ESS Flow
-              </CardDescription>
             </div>
             <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground">
               <span className="flex items-center gap-1.5">

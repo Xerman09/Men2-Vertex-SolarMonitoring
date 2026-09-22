@@ -49,6 +49,8 @@ export function Header({
     isFleetView,
     totalAccounts,
     liveAccountsCount,
+    syncLivePlants,
+    syncing,
   } = useAccount();
   const { toggleMobileOpen } = useSidebar();
 
@@ -319,14 +321,27 @@ export function Header({
                 </div>
 
                 <div className="h-px bg-border/60 my-2" />
-                <Link
-                  href="/accounts"
-                  onClick={() => setShowAccountDropdown(false)}
-                  className="flex items-center justify-center gap-1.5 w-full py-1.5 text-xs text-primary hover:text-primary/80 font-semibold rounded-lg hover:bg-accent transition-colors"
-                >
-                  <Settings size={13} />
-                  <span>Configure Accounts & Inverter Nodes</span>
-                </Link>
+                <div className="space-y-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      syncLivePlants();
+                    }}
+                    disabled={syncing}
+                    className="flex items-center justify-center gap-1.5 w-full py-1.5 px-2.5 text-xs text-primary hover:text-primary/90 font-medium rounded-lg bg-primary/10 hover:bg-primary/15 border border-primary/20 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw size={13} className={syncing ? 'animate-spin text-primary' : 'text-primary'} />
+                    <span>{syncing ? 'Syncing DeyeCloud...' : 'Sync Live Plant Names & Devices'}</span>
+                  </button>
+                  <Link
+                    href="/accounts"
+                    onClick={() => setShowAccountDropdown(false)}
+                    className="flex items-center justify-center gap-1.5 w-full py-1.5 text-xs text-muted-foreground hover:text-foreground font-medium rounded-lg hover:bg-muted/40 transition-colors"
+                  >
+                    <Settings size={13} />
+                    <span>Configure Accounts & Inverter Nodes</span>
+                  </Link>
+                </div>
               </div>
             )}
           </div>
@@ -334,7 +349,7 @@ export function Header({
 
         {/* Right: Telemetry Health, Clock, Theme Mode Toggle, Notifications */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Cloud Bus State Indicator */}
+          {/* Cloud Bus State Indicator & Quick Sync */}
           <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-card border border-border/60 text-xs font-mono">
             <span
               className={`w-2 h-2 rounded-full ${
@@ -349,6 +364,14 @@ export function Header({
             <span className="text-muted-foreground text-[10px]">
               {pingMs}ms
             </span>
+            <button
+              onClick={() => syncLivePlants()}
+              disabled={syncing}
+              title="Sync latest plant names and hardware from DeyeCloud"
+              className="ml-0.5 p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw size={11} className={syncing ? 'animate-spin text-primary' : ''} />
+            </button>
           </div>
 
           {/* UTC Clock */}

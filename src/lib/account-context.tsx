@@ -14,7 +14,9 @@ interface AccountContextType {
   selectAccountAndPlant: (accountId: string, stationId?: string) => void;
   isFleetView: boolean;
   loading: boolean;
-  refreshAccounts: () => Promise<void>;
+  syncing: boolean;
+  refreshAccounts: (forceSync?: boolean) => Promise<void>;
+  syncLivePlants: () => Promise<void>;
   totalAccounts: number;
   liveAccountsCount: number;
 }
@@ -26,10 +28,12 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [selectedAccountId, setSelectedAccountId] = useState<string>('ALL');
   const [selectedStationId, setSelectedStationId] = useState<string>('ALL');
   const [loading, setLoading] = useState<boolean>(true);
+  const [syncing, setSyncing] = useState<boolean>(false);
 
-  const refreshAccounts = useCallback(async () => {
+  const refreshAccounts = useCallback(async (forceSync: boolean = false) => {
     try {
-      const res = await fetch('/api/deye/accounts');
+      const url = forceSync ? '/api/deye/accounts?sync=true' : '/api/deye/accounts';
+      const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
         setAccounts(json.accounts || []);
@@ -40,6 +44,15 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   }, []);
+
+  const syncLivePlants = useCallback(async () => {
+    setSyncing(true);
+    try {
+      await refreshAccounts(true);
+    } finally {
+      setSyncing(false);
+    }
+  }, [refreshAccounts]);
 
   useEffect(() => {
     refreshAccounts();
@@ -87,7 +100,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         selectAccountAndPlant,
         isFleetView,
         loading,
+        syncing,
         refreshAccounts,
+        syncLivePlants,
         totalAccounts,
         liveAccountsCount,
       }}

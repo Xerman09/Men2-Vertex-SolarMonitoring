@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { accountManager } from '@/lib/account-manager';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const accounts = await accountManager.getAccountsSummary();
+    const { searchParams } = new URL(req.url);
+    const forceSync = searchParams.get('sync') === 'true' || searchParams.get('force') === 'true';
+    const accounts = await accountManager.getAccountsSummary(forceSync);
     return NextResponse.json({
       total: accounts.length,
       accounts,

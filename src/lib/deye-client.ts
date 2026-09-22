@@ -300,7 +300,12 @@ export class DeyeCloudClient {
       if (detailRes.ok) {
         const detailData = await detailRes.json();
         if (detailData.station) {
-          stationName = detailData.station.name || stationName;
+          if (detailData.station.name) {
+            stationName = detailData.station.name;
+            if (matchingPlant) {
+              matchingPlant.stationName = stationName;
+            }
+          }
           installedCapacityKw = parseFloat(detailData.station.installedCapacity || String(installedCapacityKw));
           connectionStatus = detailData.station.connectionStatus || 'NORMAL';
         }

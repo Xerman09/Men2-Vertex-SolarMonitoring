@@ -34,7 +34,7 @@ import {
   Radio,
   Clock,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -500,51 +500,46 @@ export function TrigonometricHistoryGraph({
   }, [fourierData]);
 
   return (
-    <Card className="w-full border-border/60 bg-card/80 shadow-xs">
-      <CardHeader className="pb-4 border-b border-border/50">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <Card className={compact ? "w-full border-border/40 bg-card/60 shadow-none" : "w-full border-border/60 bg-card/80 shadow-xs"}>
+      <CardHeader className={compact ? "py-2 px-3 sm:px-3.5 border-b border-border/50" : "py-3 px-4 border-b border-border/50"}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div>
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                <Radio className="h-5 w-5 animate-pulse" />
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                <Radio className="h-4 w-4 animate-pulse" />
               </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <CardTitle className="text-base sm:text-lg font-bold">
-                    5-Minute High-Res Telemetry & Continuous Power Curves
-                  </CardTitle>
-                  <Badge variant="outline" className="border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono text-[11px] flex items-center gap-1.5">
-                    <span className="relative flex h-2 w-2">
-                      {isLiveStreaming && (
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      )}
-                      <span className={`relative inline-flex rounded-full h-2 w-2 ${isLiveStreaming ? 'bg-emerald-500' : 'bg-muted-foreground'}`} />
-                    </span>
-                    {isLiveStreaming ? `DYNAMIC LIVE (${timeResolution}m)` : 'STREAM PAUSED'}
-                  </Badge>
-                </div>
-                <CardDescription className="text-xs mt-0.5">
-                  Exact 5-minute sampling intervals (PV: Green, Consumption: Yellow, Grid: Purple). Unelapsed intervals cleanly stop at current time.
-                </CardDescription>
+              <div className="flex items-center gap-2 flex-wrap">
+                <CardTitle className="text-sm sm:text-base font-bold">
+                  5-Minute Telemetry & Power Curves
+                </CardTitle>
+                <Badge variant="outline" className="border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono text-[10px] px-1.5 py-0 flex items-center gap-1">
+                  <span className="relative flex h-1.5 w-1.5">
+                    {isLiveStreaming && (
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    )}
+                    <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${isLiveStreaming ? 'bg-emerald-500' : 'bg-muted-foreground'}`} />
+                  </span>
+                  {isLiveStreaming ? `LIVE (${timeResolution}m)` : 'PAUSED'}
+                </Badge>
               </div>
             </div>
           </div>
 
           {/* Dynamic Stream & Resolution Controls */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {/* Resolution Selector: 5m, 15m, 1h */}
-            <div className="flex items-center gap-1 p-0.5 bg-muted/50 rounded-lg border border-border/50">
+            <div className="flex items-center gap-0.5 p-0.5 bg-muted/50 rounded-lg border border-border/50">
               {([5, 15, 60] as const).map((mins) => (
                 <button
                   key={mins}
                   onClick={() => handleResolutionChange(mins)}
-                  className={`px-2 py-0.5 rounded text-xs font-semibold transition-all cursor-pointer ${
+                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
                     timeResolution === mins
                       ? 'bg-background text-foreground shadow-xs'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {mins === 5 ? '5-Min (Exact)' : mins === 15 ? '15-Min' : '1-Hour'}
+                  {mins === 5 ? '5m' : mins === 15 ? '15m' : '1h'}
                 </button>
               ))}
             </div>
@@ -553,9 +548,9 @@ export function TrigonometricHistoryGraph({
               variant="outline"
               size="sm"
               onClick={() => setIsLiveStreaming(!isLiveStreaming)}
-              className="gap-1.5 h-8 text-xs font-semibold"
+              className="gap-1 h-7 px-2 text-[11px] font-semibold"
             >
-              {isLiveStreaming ? <Pause className="h-3.5 w-3.5 text-amber-500" /> : <Play className="h-3.5 w-3.5 text-emerald-500" />}
+              {isLiveStreaming ? <Pause className="h-3 w-3 text-amber-500" /> : <Play className="h-3 w-3 text-emerald-500" />}
               <span>{isLiveStreaming ? 'Pause' : 'Resume'}</span>
             </Button>
 
@@ -563,184 +558,180 @@ export function TrigonometricHistoryGraph({
               variant="outline"
               size="sm"
               onClick={handleManualTick}
-              className="gap-1.5 h-8 text-xs font-semibold"
+              className="gap-1 h-7 px-2 text-[11px] font-semibold"
               title="Manually trigger instantaneous 5-minute fluctuation"
             >
-              <RefreshCw className="h-3.5 w-3.5 text-cyan-500" />
+              <RefreshCw className="h-3 w-3 text-cyan-500" />
               <span>Tick</span>
             </Button>
           </div>
         </div>
 
         {/* Subsystem Tabs */}
-        <div className="pt-3">
+        <div className="pt-2">
           <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
-            <TabsList className="bg-muted/50 p-1 rounded-xl h-auto border border-border/50 inline-flex w-fit max-w-full overflow-x-auto">
-              <TabsTrigger value="power" className="text-xs gap-1.5 px-3 py-1.5 font-medium">
+            <TabsList className="bg-muted/50 p-0.5 rounded-lg h-auto border border-border/50 inline-flex w-fit max-w-full overflow-x-auto gap-0.5">
+              <TabsTrigger value="power" className="text-xs gap-1 px-2.5 py-1 font-medium">
                 <Zap className="h-3.5 w-3.5 text-yellow-500" />
-                <span>5-Min Power Curves</span>
+                <span>Power Curves</span>
               </TabsTrigger>
-              <TabsTrigger value="selfconsumption" className="text-xs gap-1.5 px-3 py-1.5 font-medium">
+              <TabsTrigger value="selfconsumption" className="text-xs gap-1 px-2.5 py-1 font-medium">
                 <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
                 <span>Self-Consumption</span>
               </TabsTrigger>
-              <TabsTrigger value="sinusoidal" className="text-xs gap-1.5 px-3 py-1.5 font-medium">
+              <TabsTrigger value="sinusoidal" className="text-xs gap-1 px-2.5 py-1 font-medium">
                 <Sun className="h-3.5 w-3.5 text-amber-500" />
-                <span>Diurnal Model Fit</span>
+                <span>Diurnal Fit</span>
               </TabsTrigger>
-              <TabsTrigger value="fourier" className="text-xs gap-1.5 px-3 py-1.5 font-medium">
+              <TabsTrigger value="fourier" className="text-xs gap-1 px-2.5 py-1 font-medium">
                 <Waves className="h-3.5 w-3.5 text-cyan-500" />
-                <span>Fourier Harmonics</span>
+                <span>Fourier</span>
               </TabsTrigger>
-              <TabsTrigger value="polar" className="text-xs gap-1.5 px-3 py-1.5 font-medium">
+              <TabsTrigger value="polar" className="text-xs gap-1 px-2.5 py-1 font-medium">
                 <Compass className="h-3.5 w-3.5 text-indigo-500" />
-                <span>24h Polar Radar</span>
+                <span>Polar Radar</span>
               </TabsTrigger>
-              <TabsTrigger value="waveform" className="text-xs gap-1.5 px-3 py-1.5 font-medium">
+              <TabsTrigger value="waveform" className="text-xs gap-1 px-2.5 py-1 font-medium">
                 <Activity className="h-3.5 w-3.5 text-emerald-500" />
-                <span>3-Phase AC Phasor</span>
+                <span>3-Phase AC</span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
       </CardHeader>
 
-      <CardContent className="pt-6">
+      <CardContent className={compact ? 'p-3 pt-2.5 space-y-3' : 'p-4 pt-3.5 space-y-4'}>
         {/* ============================================================ */}
         {/* TAB 1: 5-MINUTE POWER CURVES (DYNAMIC LIVE STREAM)          */}
         {/* ============================================================ */}
         {activeTab === 'power' && (
-          <div className="space-y-6">
-            {/* Real-Time Live Telemetry Strip (Current 5-Minute Instantaneous Status) */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="space-y-3.5">
+            {/* Real-Time Live Telemetry Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {/* PV Power (Green) */}
-              <div className="p-3 rounded-xl bg-card border border-emerald-500/30 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/5 rounded-bl-full pointer-events-none" />
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono">
-                    Live PV Power ({currentLivePoint.hour})
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                    PV Power ({currentLivePoint.hour})
                   </span>
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
                 </div>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className="text-2xl font-bold font-mono text-emerald-500">
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="text-lg sm:text-xl font-bold font-mono text-emerald-500">
                     {currentLivePoint.solarYieldKw !== null ? currentLivePoint.solarYieldKw.toFixed(2) : '0.00'}
                   </span>
-                  <span className="text-xs text-muted-foreground font-mono">kW</span>
+                  <span className="text-[10px] text-muted-foreground font-mono">kW</span>
                 </div>
-                <span className="text-[10px] text-emerald-500/80 font-medium block mt-0.5">
-                  Peak Today: {peakPv.toFixed(1)} kW
+                <span className="text-[10px] text-emerald-500/80 font-medium block truncate">
+                  Peak: {peakPv.toFixed(1)} kW
                 </span>
               </div>
 
               {/* Consumption (Yellow) */}
-              <div className="p-3 rounded-xl bg-card border border-yellow-500/30 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-16 h-16 bg-yellow-500/5 rounded-bl-full pointer-events-none" />
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/30">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono">
-                    Live Load ({currentLivePoint.hour})
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                    Load ({currentLivePoint.hour})
                   </span>
-                  <span className="h-2 w-2 rounded-full bg-yellow-500" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
                 </div>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className="text-2xl font-bold font-mono text-yellow-500">
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="text-lg sm:text-xl font-bold font-mono text-yellow-500">
                     {currentLivePoint.loadDemandKw !== null ? currentLivePoint.loadDemandKw.toFixed(2) : '0.00'}
                   </span>
-                  <span className="text-xs text-muted-foreground font-mono">kW</span>
+                  <span className="text-[10px] text-muted-foreground font-mono">kW</span>
                 </div>
-                <span className="text-[10px] text-yellow-500/80 font-medium block mt-0.5">
-                  Peak Load: {peakLoad.toFixed(1)} kW
+                <span className="text-[10px] text-yellow-500/80 font-medium block truncate">
+                  Peak: {peakLoad.toFixed(1)} kW
                 </span>
               </div>
 
               {/* Grid Power (Purple) */}
-              <div className="p-3 rounded-xl bg-card border border-purple-500/30 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/5 rounded-bl-full pointer-events-none" />
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/30">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
                     Grid Flow ({currentLivePoint.hour})
                   </span>
-                  <span className="h-2 w-2 rounded-full bg-purple-500" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
                 </div>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className="text-2xl font-bold font-mono text-purple-500">
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="text-lg sm:text-xl font-bold font-mono text-purple-500">
                     {currentLivePoint.gridExportKw !== null
                       ? `${currentLivePoint.gridExportKw > 0 ? '+' : ''}${currentLivePoint.gridExportKw.toFixed(2)}`
                       : '0.00'}
                   </span>
-                  <span className="text-xs text-muted-foreground font-mono">kW</span>
+                  <span className="text-[10px] text-muted-foreground font-mono">kW</span>
                 </div>
-                <span className="text-[10px] text-purple-500/80 font-medium block mt-0.5">
-                  {(currentLivePoint.gridExportKw ?? 0) >= 0 ? 'Exporting Surplus to Grid' : 'Importing Shortfall from Grid'}
+                <span className="text-[10px] text-purple-500/80 font-medium block truncate">
+                  {(currentLivePoint.gridExportKw ?? 0) >= 0 ? 'Surplus Export' : 'Grid Import'}
                 </span>
               </div>
 
               {/* Battery Flow (Cyan) */}
-              <div className="p-3 rounded-xl bg-card border border-cyan-500/30 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-16 h-16 bg-cyan-500/5 rounded-bl-full pointer-events-none" />
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-cyan-500/30">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono">
-                    Battery ESS ({currentLivePoint.hour})
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                    Battery ({currentLivePoint.hour})
                   </span>
-                  <span className="h-2 w-2 rounded-full bg-cyan-500" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
                 </div>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className="text-2xl font-bold font-mono text-cyan-500">
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="text-lg sm:text-xl font-bold font-mono text-cyan-500">
                     {currentLivePoint.batteryFlowKw !== null
                       ? `${currentLivePoint.batteryFlowKw > 0 ? '+' : ''}${currentLivePoint.batteryFlowKw.toFixed(2)}`
                       : '0.00'}
                   </span>
-                  <span className="text-xs text-muted-foreground font-mono">kW</span>
+                  <span className="text-[10px] text-muted-foreground font-mono">kW</span>
                 </div>
-                <span className="text-[10px] text-cyan-500/80 font-medium block mt-0.5">
-                  {(currentLivePoint.batteryFlowKw ?? 0) >= 0 ? 'Charging ESS Storage' : 'Discharging to Load'}
+                <span className="text-[10px] text-cyan-500/80 font-medium block truncate">
+                  {(currentLivePoint.batteryFlowKw ?? 0) >= 0 ? 'Charging' : 'Discharging'}
                 </span>
               </div>
             </div>
 
             {/* Sub-view selector & Style Toggle */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-              <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-xl border border-border/50 w-fit flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-0.5 p-0.5 bg-muted/50 rounded-lg border border-border/50 w-fit flex-wrap">
                 {(['combined', 'pv', 'consumption', 'grid'] as const).map((v) => (
                   <button
                     key={v}
                     onClick={() => setPowerSubView(v)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
                       powerSubView === v
                         ? 'bg-background text-foreground shadow-xs'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    {v === 'combined' && 'Combined (All 3)'}
-                    {v === 'pv' && 'PV Power (Green)'}
-                    {v === 'consumption' && 'Consumption (Yellow)'}
-                    {v === 'grid' && 'Grid Power (Purple)'}
+                    {v === 'combined' && 'Combined'}
+                    {v === 'pv' && 'PV (Green)'}
+                    {v === 'consumption' && 'Load (Yellow)'}
+                    {v === 'grid' && 'Grid (Purple)'}
                   </button>
                 ))}
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground font-medium">Style:</span>
-                <div className="flex items-center gap-1 p-0.5 bg-muted/50 rounded-lg border border-border/50">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-muted-foreground font-medium">Style:</span>
+                <div className="flex items-center gap-0.5 p-0.5 bg-muted/50 rounded-lg border border-border/50">
                   <button
                     onClick={() => setChartRenderMode('line')}
-                    className={`px-2.5 py-0.5 rounded text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
                       chartRenderMode === 'line'
                         ? 'bg-background text-foreground shadow-xs'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    Continuous Line
+                    Line
                   </button>
                   <button
                     onClick={() => setChartRenderMode('area')}
-                    className={`px-2.5 py-0.5 rounded text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
                       chartRenderMode === 'area'
                         ? 'bg-background text-foreground shadow-xs'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    Filled Area
+                    Area
                   </button>
                 </div>
               </div>
@@ -771,9 +762,9 @@ export function TrigonometricHistoryGraph({
                   </div>
                 </div>
 
-                <div className="h-[360px] w-full">
+                <div className={compact ? 'h-[220px] w-full' : 'h-[280px] w-full'}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={powerSeriesData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <AreaChart data={powerSeriesData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
                       <defs>
                         <linearGradient id="pvGreenGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor={COLOR_PV} stopOpacity={chartRenderMode === 'area' ? 0.35 : 0.08} />
@@ -873,9 +864,9 @@ export function TrigonometricHistoryGraph({
                     Dynamic Scale: {pvYDomain[0]} kW → {pvYDomain[1]} kW (+18% Headroom)
                   </Badge>
                 </div>
-                <div className="h-[340px] w-full">
+                <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={powerSeriesData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <AreaChart data={powerSeriesData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
                       <defs>
                         <linearGradient id="soloPvGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor={COLOR_PV} stopOpacity={chartRenderMode === 'area' ? 0.45 : 0.12} />
@@ -909,15 +900,12 @@ export function TrigonometricHistoryGraph({
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  High-resolution 5-minute solar PV generation. Captures cloud transients, irradiance changes, and MPPT dynamic tracking in real-time.
-                </p>
               </div>
             )}
 
             {/* Individual Consumption (Yellow) */}
             {powerSubView === 'consumption' && (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <span className="text-xs font-semibold text-foreground">
                     Consumption (Yellow) — Continuous 5-Minute Industrial Load Demand Profile
@@ -926,9 +914,9 @@ export function TrigonometricHistoryGraph({
                     Dynamic Scale: {consumptionYDomain[0]} kW → {consumptionYDomain[1]} kW (+18% Headroom)
                   </Badge>
                 </div>
-                <div className="h-[340px] w-full">
+                <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={powerSeriesData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <AreaChart data={powerSeriesData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
                       <defs>
                         <linearGradient id="soloLoadGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor={COLOR_LOAD} stopOpacity={chartRenderMode === 'area' ? 0.45 : 0.12} />
@@ -962,15 +950,12 @@ export function TrigonometricHistoryGraph({
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  5-minute industrial facility load demand telemetry. Reflects machinery stepping and HVAC diurnal cycles.
-                </p>
               </div>
             )}
 
             {/* Individual Grid Power (Purple) */}
             {powerSubView === 'grid' && (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <span className="text-xs font-semibold text-foreground">
                     Grid Power (Purple) — Continuous 5-Minute Net Exchange (+ Export / − Import)
@@ -979,9 +964,9 @@ export function TrigonometricHistoryGraph({
                     Dynamic Scale: {gridYDomain[0]} kW → {gridYDomain[1]} kW (+18% Head / +14% Foot)
                   </Badge>
                 </div>
-                <div className="h-[340px] w-full">
+                <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={powerSeriesData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <AreaChart data={powerSeriesData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
                       <defs>
                         <linearGradient id="soloGridGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor={COLOR_GRID} stopOpacity={chartRenderMode === 'area' ? 0.45 : 0.12} />
@@ -1016,19 +1001,13 @@ export function TrigonometricHistoryGraph({
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 rounded-xl bg-card border border-purple-500/20">
-                    <span className="font-semibold text-purple-400 block font-mono">Positive (+): Clean Solar Feed-in Export</span>
-                    <span className="text-[11px] text-muted-foreground mt-0.5 block">
-                      Excess PV power generated beyond facility consumption and battery charging, exported to utility.
-                    </span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-card border border-purple-500/20">
-                    <span className="font-semibold text-purple-300 block font-mono">Negative (−): Utility Grid Import</span>
-                    <span className="text-[11px] text-muted-foreground mt-0.5 block">
-                      Nighttime or overcast shortfall drawn from utility grid to satisfy industrial loads.
-                    </span>
-                  </div>
+                <div className="flex items-center gap-1.5 text-[10px] flex-wrap">
+                  <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono font-medium text-[9.5px]">
+                    Positive (+): Solar Export
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/20 font-mono font-medium text-[9.5px]">
+                    Negative (−): Grid Import
+                  </span>
                 </div>
               </div>
             )}
@@ -1039,74 +1018,72 @@ export function TrigonometricHistoryGraph({
         {/* TAB 2: SELF-CONSUMPTION RATIO                                */}
         {/* ============================================================ */}
         {activeTab === 'selfconsumption' && (
-          <div className="space-y-6">
+          <div className={compact ? 'space-y-3' : 'space-y-4'}>
             {/* KPI Cards with Green, Yellow, Purple alignment */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3 rounded-xl bg-card border border-emerald-500/30">
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono block">Utilization Rate</span>
-                <span className="text-2xl font-bold font-mono text-emerald-500">{selfConsumptionMetrics.utilizationPct}%</span>
-                <span className="text-[10px] text-muted-foreground block mt-0.5">Load covered by PV</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Utilization Rate</span>
+                <span className="text-lg sm:text-xl font-bold font-mono text-emerald-500">{selfConsumptionMetrics.utilizationPct}%</span>
+                <span className="text-[9.5px] text-muted-foreground block mt-0.5">Load covered by PV</span>
               </div>
-              <div className="p-3 rounded-xl bg-card border border-yellow-500/30">
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono block">Self-Consumption</span>
-                <span className="text-2xl font-bold font-mono text-yellow-500">{selfConsumptionMetrics.productionPct}%</span>
-                <span className="text-[10px] text-muted-foreground block mt-0.5">PV consumed locally</span>
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/30">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Self-Consumption</span>
+                <span className="text-lg sm:text-xl font-bold font-mono text-yellow-500">{selfConsumptionMetrics.productionPct}%</span>
+                <span className="text-[9.5px] text-muted-foreground block mt-0.5">PV consumed locally</span>
               </div>
-              <div className="p-3 rounded-xl bg-card border border-emerald-500/30">
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono block">Self-Consumed kWh</span>
-                <span className="text-2xl font-bold font-mono text-emerald-400">{selfConsumptionMetrics.selfConsumedKwh}</span>
-                <span className="text-[10px] text-muted-foreground block mt-0.5">of {selfConsumptionMetrics.totalPvKwh} kWh PV</span>
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Self-Consumed kWh</span>
+                <span className="text-lg sm:text-xl font-bold font-mono text-emerald-400">{selfConsumptionMetrics.selfConsumedKwh}</span>
+                <span className="text-[9.5px] text-muted-foreground block mt-0.5">of {selfConsumptionMetrics.totalPvKwh} kWh PV</span>
               </div>
-              <div className="p-3 rounded-xl bg-card border border-purple-500/30">
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono block">Grid Import</span>
-                <span className="text-2xl font-bold font-mono text-purple-400">{selfConsumptionMetrics.totalImportKwh}</span>
-                <span className="text-[10px] text-muted-foreground block mt-0.5">of {selfConsumptionMetrics.totalLoadKwh} kWh load</span>
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/30">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Grid Import</span>
+                <span className="text-lg sm:text-xl font-bold font-mono text-purple-400">{selfConsumptionMetrics.totalImportKwh}</span>
+                <span className="text-[9.5px] text-muted-foreground block mt-0.5">of {selfConsumptionMetrics.totalLoadKwh} kWh load</span>
               </div>
             </div>
 
             {/* Ratio definition cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {/* Utilization */}
-              <div className="p-4 rounded-xl bg-card border border-emerald-500/20 space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                    <Zap className="h-4 w-4 text-emerald-500" />
+              <div className="p-2.5 sm:p-3 rounded-lg bg-card border border-emerald-500/20 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="p-1 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                    <Zap className="h-3.5 w-3.5 text-emerald-500" />
                   </div>
                   <div>
-                    <span className="text-sm font-bold text-foreground block">Utilization — PV to Import</span>
-                    <span className="text-[11px] text-muted-foreground">How much of the facility load is served by local PV vs grid import</span>
+                    <span className="text-xs sm:text-sm font-bold text-foreground block">Utilization — PV to Import</span>
                   </div>
                 </div>
-                <div className="w-full bg-muted/50 rounded-full h-2.5 overflow-hidden">
+                <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all"
                     style={{ width: `${Math.min(100, selfConsumptionMetrics.utilizationPct)}%` }}
                   />
                 </div>
-                <div className="flex justify-between text-[11px] text-muted-foreground font-mono">
+                <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
                   <span>PV Covered: <strong className="text-emerald-500">{selfConsumptionMetrics.utilizationPct}%</strong></span>
                   <span>Grid Import: <strong className="text-purple-400">{(100 - selfConsumptionMetrics.utilizationPct).toFixed(1)}%</strong></span>
                 </div>
               </div>
 
               {/* Production self-consumption */}
-              <div className="p-4 rounded-xl bg-card border border-yellow-500/20 space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                    <TrendingUp className="h-4 w-4 text-yellow-500" />
+              <div className="p-2.5 sm:p-3 rounded-lg bg-card border border-yellow-500/20 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="p-1 rounded-md bg-yellow-500/10 border border-yellow-500/20">
+                    <TrendingUp className="h-3.5 w-3.5 text-yellow-500" />
                   </div>
                   <div>
-                    <span className="text-sm font-bold text-foreground block">Production — Consumption to Export</span>
-                    <span className="text-[11px] text-muted-foreground">How much PV production is locally consumed vs exported to grid</span>
+                    <span className="text-xs sm:text-sm font-bold text-foreground block">Production — Consumption to Export</span>
                   </div>
                 </div>
-                <div className="w-full bg-muted/50 rounded-full h-2.5 overflow-hidden">
+                <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-yellow-600 to-yellow-400 rounded-full transition-all"
                     style={{ width: `${Math.min(100, selfConsumptionMetrics.productionPct)}%` }}
                   />
                 </div>
-                <div className="flex justify-between text-[11px] text-muted-foreground font-mono">
+                <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
                   <span>Self-Consumed: <strong className="text-yellow-500">{selfConsumptionMetrics.productionPct}%</strong></span>
                   <span>Exported: <strong className="text-purple-400">{(100 - selfConsumptionMetrics.productionPct).toFixed(1)}%</strong></span>
                 </div>
@@ -1114,11 +1091,11 @@ export function TrigonometricHistoryGraph({
             </div>
 
             {/* Continuous ratios chart */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <span className="text-xs font-semibold text-foreground">5-Minute Continuous Ratios (%)</span>
-              <div className="h-[260px] w-full">
+              <div className={compact ? 'h-[180px] w-full' : 'h-[230px] w-full'}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={selfConsumptionMetrics.hourlyRatios} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <AreaChart data={selfConsumptionMetrics.hourlyRatios} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
                     <defs>
                       <linearGradient id="utilGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor={COLOR_PV} stopOpacity={0.35} />
@@ -1164,60 +1141,60 @@ export function TrigonometricHistoryGraph({
         {/* TAB 3: DIURNAL SINUSOIDAL CURVE FIT (THEORETICAL MODEL)      */}
         {/* ============================================================ */}
         {activeTab === 'sinusoidal' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3 rounded-xl bg-card border border-border/60">
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono block">
+          <div className={compact ? 'space-y-3' : 'space-y-4'}>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
                   Sinusoidal Goodness R²
                 </span>
-                <span className="text-xl font-bold font-mono text-cyan-500">
+                <span className="text-base sm:text-lg font-bold font-mono text-cyan-500">
                   {fitResults.rSquared}
                 </span>
-                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                <span className="text-[9.5px] text-muted-foreground block mt-0.5">
                   Elapsed Correlation
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-card border border-border/60">
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono block">
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
                   Peak Sun Hours (PSH)
                 </span>
-                <span className="text-xl font-bold font-mono text-amber-500">
+                <span className="text-base sm:text-lg font-bold font-mono text-amber-500">
                   {fitResults.peakSunHours} h
                 </span>
-                <span className="text-[10px] text-muted-foreground block mt-0.5">
-                  1 kW/m² Insolation Equivalent
+                <span className="text-[9.5px] text-muted-foreground block mt-0.5">
+                  1 kW/m² Insolation Equiv
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-card border border-border/60">
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono block">
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
                   Solar Noon Phase Shift
                 </span>
-                <span className="text-xl font-bold font-mono text-foreground">
+                <span className="text-base sm:text-lg font-bold font-mono text-foreground">
                   {fitResults.phaseShiftHours > 0 ? `+${fitResults.phaseShiftHours}` : fitResults.phaseShiftHours} h
                 </span>
-                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                <span className="text-[9.5px] text-muted-foreground block mt-0.5">
                   Offset from 12:00 Zenith
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-card border border-border/60">
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono block">
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
                   Harvest Model Efficiency
                 </span>
-                <span className="text-xl font-bold font-mono text-emerald-500">
+                <span className="text-base sm:text-lg font-bold font-mono text-emerald-500">
                   {fitResults.harvestEfficiencyPct}%
                 </span>
-                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                <span className="text-[9.5px] text-muted-foreground block mt-0.5">
                   Of Clear-Sky Integral
                 </span>
               </div>
             </div>
 
-            <div className="h-[320px] w-full pt-2">
+            <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={fitResults.theoreticalPoints} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <AreaChart data={fitResults.theoreticalPoints} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
                   <defs>
                     <linearGradient id="solarActualGreenGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={COLOR_PV} stopOpacity={0.35} />
@@ -1268,9 +1245,6 @@ export function TrigonometricHistoryGraph({
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Note: Actual measured PV only plots for elapsed 5-minute intervals. The dashed cyan line projects theoretical clear-sky insolation.
-            </p>
           </div>
         )}
 
@@ -1278,24 +1252,21 @@ export function TrigonometricHistoryGraph({
         {/* TAB 4: FOURIER HARMONIC DECOMPOSITION                        */}
         {/* ============================================================ */}
         {activeTab === 'fourier' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-card border border-border/60">
+          <div className={compact ? 'space-y-3' : 'space-y-4'}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
               <div>
                 <span className="text-xs font-semibold text-foreground">
                   Discrete Fourier Decomposition of 24-Hour Diurnal Cycle
                 </span>
-                <p className="text-[11px] text-muted-foreground">
-                  Fundamental frequency ω₀ = 2π/24h plus 12-hour (2ω) and 8-hour (3ω) harmonics.
-                </p>
               </div>
-              <Badge variant="outline" className="text-cyan-500 border-cyan-500/30 bg-cyan-500/10 font-mono text-xs w-fit">
+              <Badge variant="outline" className="text-cyan-500 border-cyan-500/30 bg-cyan-500/10 font-mono text-[10px] px-1.5 py-0 w-fit">
                 Harmonics k = 1, 2, 3
               </Badge>
             </div>
 
-            <div className="h-[320px] w-full pt-2">
+            <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={fourierData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <LineChart data={fourierData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
                   <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[10px] opacity-60" />
                   <YAxis domain={fourierYDomain} stroke="currentColor" className="text-[10px] opacity-60" unit="kW" />
@@ -1354,22 +1325,19 @@ export function TrigonometricHistoryGraph({
         {/* TAB 5: 24-HOUR POLAR / RADAR CYCLICAL GRAPH                  */}
         {/* ============================================================ */}
         {activeTab === 'polar' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-card border border-border/60">
+          <div className={compact ? 'space-y-3' : 'space-y-4'}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
               <div>
                 <span className="text-xs font-semibold text-foreground">
                   360-Degree Circular Phasor: Solar Lobe (Green) vs Load (Yellow)
                 </span>
-                <p className="text-[11px] text-muted-foreground">
-                  Top (0°): Midnight | Right (90°): 06:00 Sunrise | Bottom (180°): 12:00 Solar Noon Peak | Left (270°): 18:00 Sunset.
-                </p>
               </div>
-              <Badge variant="outline" className="text-indigo-500 border-indigo-500/30 bg-indigo-500/10 font-mono text-xs w-fit">
+              <Badge variant="outline" className="text-indigo-500 border-indigo-500/30 bg-indigo-500/10 font-mono text-[10px] px-1.5 py-0 w-fit">
                 Polar Coordinates (r, θ)
               </Badge>
             </div>
 
-            <div className="h-[360px] w-full">
+            <div className={compact ? 'h-[240px] w-full' : 'h-[290px] w-full'}>
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart cx="50%" cy="50%" outerRadius="80%" data={polarData.filter((_, idx) => idx % (timeResolution === 5 ? 12 : 1) === 0)}>
                   <PolarGrid stroke="currentColor" className="opacity-20" />
@@ -1415,11 +1383,11 @@ export function TrigonometricHistoryGraph({
         {/* TAB 6: 3-PHASE AC INSTANTANEOUS WAVEFORMS & PHASORS          */}
         {/* ============================================================ */}
         {activeTab === 'waveform' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-card border border-border/60">
+          <div className={compact ? 'space-y-3' : 'space-y-4'}>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-2.5 rounded-lg bg-card border border-border/60">
               <div>
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-                  Grid RMS Phase Voltage: {acVoltage} V
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
+                  Grid RMS Voltage: {acVoltage} V
                 </label>
                 <input
                   type="range"
@@ -1428,12 +1396,12 @@ export function TrigonometricHistoryGraph({
                   step="1"
                   value={acVoltage}
                   onChange={(e) => setAcVoltage(Number(e.target.value))}
-                  className="w-full accent-primary cursor-pointer"
+                  className="w-full accent-primary cursor-pointer h-1.5"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
                   RMS Load Current: {acCurrent} A
                 </label>
                 <input
@@ -1443,13 +1411,13 @@ export function TrigonometricHistoryGraph({
                   step="1"
                   value={acCurrent}
                   onChange={(e) => setAcCurrent(Number(e.target.value))}
-                  className="w-full accent-primary cursor-pointer"
+                  className="w-full accent-primary cursor-pointer h-1.5"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
-                  Power Factor cos(φ): {powerFactor} (Phase: {acResults.metrics.phaseAngleDeg}°)
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
+                  Power Factor cos(φ): {powerFactor} ({acResults.metrics.phaseAngleDeg}°)
                 </label>
                 <input
                   type="range"
@@ -1458,14 +1426,14 @@ export function TrigonometricHistoryGraph({
                   step="0.01"
                   value={powerFactor}
                   onChange={(e) => setPowerFactor(Number(e.target.value))}
-                  className="w-full accent-primary cursor-pointer"
+                  className="w-full accent-primary cursor-pointer h-1.5"
                 />
               </div>
             </div>
 
-            <div className="h-[300px] w-full">
+            <div className={compact ? 'h-[210px] w-full' : 'h-[250px] w-full'}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={acResults.waveform} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <LineChart data={acResults.waveform} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
                   <XAxis dataKey="timeMs" stroke="currentColor" className="text-[10px] opacity-60" unit="ms" />
                   <YAxis stroke="currentColor" className="text-[10px] opacity-60" unit="V" />
@@ -1516,51 +1484,51 @@ export function TrigonometricHistoryGraph({
               </ResponsiveContainer>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3 rounded-xl bg-card border border-border/60">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground block">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+                <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
                   Active Power P
                 </span>
-                <span className="text-lg font-bold font-mono text-emerald-500">
+                <span className="text-base sm:text-lg font-bold font-mono text-emerald-500">
                   {acResults.metrics.activePowerKw} kW
                 </span>
-                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                <span className="text-[9.5px] text-muted-foreground block mt-0.5">
                   P = √3 · V · I · cos(φ)
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-card border border-border/60">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground block">
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+                <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
                   Reactive Power Q
                 </span>
-                <span className="text-lg font-bold font-mono text-amber-500">
+                <span className="text-base sm:text-lg font-bold font-mono text-amber-500">
                   {acResults.metrics.reactivePowerKvar} kVAR
                 </span>
-                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                <span className="text-[9.5px] text-muted-foreground block mt-0.5">
                   Q = √3 · V · I · sin(φ)
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-card border border-border/60">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground block">
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+                <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
                   Apparent Power S
                 </span>
-                <span className="text-lg font-bold font-mono text-cyan-500">
+                <span className="text-base sm:text-lg font-bold font-mono text-cyan-500">
                   {acResults.metrics.apparentPowerKva} kVA
                 </span>
-                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                <span className="text-[9.5px] text-muted-foreground block mt-0.5">
                   S = √(P² + Q²)
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-card border border-border/60">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground block">
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+                <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
                   Grid Synchronicity
                 </span>
-                <span className="text-lg font-bold font-mono text-foreground">
+                <span className="text-base sm:text-lg font-bold font-mono text-foreground">
                   60.00 Hz
                 </span>
-                <span className="text-[10px] text-emerald-500 block mt-0.5">
+                <span className="text-[9.5px] text-emerald-500 block mt-0.5">
                   Phase Locked (0.18% VUF)
                 </span>
               </div>

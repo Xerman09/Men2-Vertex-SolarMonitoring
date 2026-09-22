@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { InverterTelemetry } from '@/lib/types';
 import { useAccount } from '@/lib/account-context';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -376,9 +376,6 @@ export default function HardwareTelemetryPage() {
               <CardTitle className="text-sm sm:text-base font-bold text-foreground">
                 Three-Phase AC Grid Harmonics & Phasor Trigonometry
               </CardTitle>
-              <CardDescription className="text-xs">
-                Real-time phase voltages (L1, L2, L3), line frequencies, and instantaneous sinusoidal waveforms.
-              </CardDescription>
             </div>
           </div>
           <Badge variant="outline" className="text-cyan-500 border-cyan-500/30 bg-cyan-500/10 font-mono text-xs">
