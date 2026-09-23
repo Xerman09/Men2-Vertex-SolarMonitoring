@@ -19,6 +19,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useAccount } from '@/lib/account-context';
+import { useRole } from '@/lib/role-context';
 import { Badge } from '@/components/ui/badge';
 import { useSidebar } from './sidebar-context';
 
@@ -26,6 +27,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { collapsed, setCollapsed, mobileOpen, closeMobile } = useSidebar();
   const { totalAccounts, liveAccountsCount, isFleetView } = useAccount();
+  const { isAdmin, isViewer } = useRole();
 
   const navItems = [
     {
@@ -36,7 +38,7 @@ export function Sidebar() {
       badgeVariant: 'solar' as const,
     },
     {
-      label: 'Accounts & Plants',
+      label: isAdmin ? 'Accounts & Plants' : 'Fleet Directory',
       href: '/accounts',
       icon: Building2,
       badge: `${totalAccounts}`,
@@ -67,7 +69,7 @@ export function Sidebar() {
       label: 'API & Diagnostics',
       href: '/api-diagnostics',
       icon: ShieldCheck,
-      badge: 'Directus',
+      badge: isAdmin ? 'Live' : 'View Only',
       badgeVariant: 'outline' as const,
     },
   ];

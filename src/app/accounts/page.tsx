@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Building2,
   Plus,
@@ -20,16 +20,22 @@ import {
   Power,
   X,
   Server,
+  Database,
+  Lock,
+  User,
 } from 'lucide-react';
 import { AccountSummary, PlantInfo, DeviceInfo } from '@/lib/types';
 import { useAccount } from '@/lib/account-context';
+import { useRole } from '@/lib/role-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 export default function AccountsManagementPage() {
   const { refreshAccounts: refreshContextAccounts } = useAccount();
+  const { isAdmin, isConsumer, isViewer, user, setShowAuthModal } = useRole();
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
+  const [directusInfo, setDirectusInfo] = useState<{ connected: boolean; lastChecked: string; error?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncingId, setSyncingId] = useState<string | null>(null);
 
@@ -70,6 +76,9 @@ export default function AccountsManagementPage() {
       if (res.ok) {
         const json = await res.json();
         setAccounts(json.accounts || []);
+        if (json.directus) {
+          setDirectusInfo(json.directus);
+        }
       }
     } catch (e) {
       console.error('Failed to load accounts:', e);
@@ -260,14 +269,33 @@ export default function AccountsManagementPage() {
     }
   };
 
-  const totalAccountsCount = accounts.length;
-  const activeAccountsCount = accounts.filter((a) => a.status !== 'OFFLINE').length;
+  const displayAccounts = useMemo(() => {
+    if (isConsumer && user) {
+      const userAccId = String(user.accountId || user.id || '').trim();
+      const userEmail = (user.email || '').trim().toLowerCase();
+
+      return accounts.filter((acc) => {
+        const accId = String(acc.id || '');
+        const accDirectusId = acc.directusId ? String(acc.directusId) : '';
+        const accEmail = (acc.email || '').trim().toLowerCase();
+
+        return (
+          (userAccId && (accDirectusId === userAccId || accId === userAccId || accId === `directus-${userAccId}`)) ||
+          (userEmail && accEmail === userEmail)
+        );
+      });
+    }
+    return accounts;
+  }, [accounts, isConsumer, user]);
+
+  const totalAccountsCount = displayAccounts.length;
+  const activeAccountsCount = displayAccounts.filter((a) => a.status !== 'OFFLINE').length;
   let totalPlants = 0;
   let totalInverters = 0;
   let totalLoggers = 0;
   let totalCapacity = 0;
 
-  for (const acc of accounts) {
+  for (const acc of displayAccounts) {
     totalPlants += acc.plants.length;
     totalInverters += acc.inverterCount;
     totalLoggers += acc.loggerCount;
@@ -284,29 +312,74 @@ export default function AccountsManagementPage() {
               <Building2 size={24} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline">
-                  Fleet & Plant Operations Manager
+                  {isAdmin
+                    ? 'Fleet & Plant Operations Manager'
+                    : isConsumer
+                    ? 'Your Solar Plants & Telemetry Directory'
+                    : 'Solar Fleet & Plants Directory'}
                 </h1>
-                <Badge variant="outline" className="border-primary/30 text-primary bg-primary/10 font-mono text-[10px]">
-                  Multi-Site Hub
+                <Badge
+                  variant="outline"
+                  className={`font-mono text-[10px] ${
+                    isAdmin
+                      ? 'border-amber-500/30 text-amber-500 bg-amber-500/10'
+                      : isConsumer
+                      ? 'border-emerald-500/30 text-emerald-500 bg-emerald-500/10'
+                      : 'border-primary/30 text-primary bg-primary/10'
+                  }`}
+                >
+                  {isAdmin
+                    ? 'Admin (Database 2-Way Sync)'
+                    : isConsumer
+                    ? `Consumer Account (${user?.name || user?.email || 'Active'})`
+                    : 'Viewer (Read-Only Mode)'}
                 </Badge>
+                {directusInfo && (
+                  <Badge
+                    variant="outline"
+                    className={`font-mono text-[10px] flex items-center gap-1 ${
+                      directusInfo.connected
+                        ? 'border-cyan-500/30 text-cyan-500 bg-cyan-500/10'
+                        : 'border-amber-500/30 text-amber-500 bg-amber-500/10'
+                    }`}
+                  >
+                    <Database size={10} />
+                    <span>Database: {directusInfo.connected ? 'Live Sync' : 'Cached Fallback'}</span>
+                  </Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Dynamic DeyeCloud account registry, automatic plant discovery, and multi-inverter hierarchy.
+                {isAdmin
+                  ? 'Two-way database account synchronization, credentials management, automatic plant discovery, and inverter hierarchy.'
+                  : isConsumer
+                  ? 'Your registered solar stations, plant telemetry, and inverter hardware configurations.'
+                  : 'Live synoptic overview of registered solar sites, inverters, rated capacities, and operational status.'}
               </p>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <Button
-            onClick={() => setShowAddAccountModal(true)}
-            className="gap-2 h-9 text-xs font-semibold bg-primary text-primary-foreground"
-          >
-            <Plus size={16} />
-            <span>Add Deye Account</span>
-          </Button>
+          {isAdmin ? (
+            <Button
+              onClick={() => setShowAddAccountModal(true)}
+              className="gap-2 h-9 text-xs font-semibold bg-primary text-primary-foreground shadow-sm"
+            >
+              <Plus size={16} />
+              <span>Add Deye Account</span>
+            </Button>
+          ) : !user ? (
+            <Button
+              variant="outline"
+              onClick={() => setShowAuthModal(true)}
+              className="gap-2 h-9 text-xs font-medium border-primary/30 text-primary hover:bg-primary/10"
+            >
+              <User size={14} />
+              <span>Sign In</span>
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -375,7 +448,7 @@ export default function AccountsManagementPage() {
 
       {/* Accounts List & Plants Tree */}
       <div className="flex flex-col gap-6">
-        {accounts.map((account) => {
+        {displayAccounts.map((account) => {
           const isSyncing = syncingId === account.id;
 
           return (
@@ -415,9 +488,20 @@ export default function AccountsManagementPage() {
                           Auto-Discovered
                         </Badge>
                       )}
+                      {account.source === 'directus' || account.directusId ? (
+                        <Badge variant="outline" className="border-cyan-500/30 text-cyan-500 bg-cyan-500/10 text-[10px] font-mono flex items-center gap-1">
+                          <Database size={9} />
+                          <span>DB {account.directusId ? `#${account.directusId}` : 'Synced'}</span>
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="border-border/60 text-muted-foreground text-[10px] font-mono">
+                          Cache
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground flex-wrap font-mono">
                       <span>ID: {account.id}</span>
+                      {account.email && <span>· {account.email}</span>}
                       <span>·</span>
                       <span>Plants: {account.plants.length}</span>
                       <span>·</span>
@@ -430,51 +514,59 @@ export default function AccountsManagementPage() {
                   </div>
                 </div>
 
-                {/* Card Action Buttons */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleSyncAccount(account.id)}
-                    disabled={isSyncing}
-                    className="gap-1.5 text-xs font-semibold"
-                  >
-                    <RefreshCw size={13} className={isSyncing ? 'animate-spin text-primary' : ''} />
-                    <span>{isSyncing ? 'Syncing...' : 'Auto-Discover Plants'}</span>
-                  </Button>
+                {/* Card Action Buttons (Role-guarded: Admin has full CRUD, Viewer is Read-Only) */}
+                {isAdmin ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSyncAccount(account.id)}
+                      disabled={isSyncing}
+                      className="gap-1.5 text-xs font-semibold"
+                    >
+                      <RefreshCw size={13} className={isSyncing ? 'animate-spin text-primary' : ''} />
+                      <span>{isSyncing ? 'Syncing...' : 'Auto-Discover Plants'}</span>
+                    </Button>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedAccountIdForPlant(account.id);
-                      setShowAddPlantModal(true);
-                    }}
-                    className="gap-1.5 text-xs font-semibold text-cyan-500 border-cyan-500/30 hover:bg-cyan-500/10"
-                  >
-                    <Plus size={13} />
-                    <span>Add Plant</span>
-                  </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedAccountIdForPlant(account.id);
+                        setShowAddPlantModal(true);
+                      }}
+                      className="gap-1.5 text-xs font-semibold text-cyan-500 border-cyan-500/30 hover:bg-cyan-500/10"
+                    >
+                      <Plus size={13} />
+                      <span>Add Plant</span>
+                    </Button>
 
-                  <Button
-                    variant={account.status === 'OFFLINE' ? 'outline' : 'secondary'}
-                    size="icon-sm"
-                    onClick={() => handleToggleAccount(account)}
-                    title={account.status === 'OFFLINE' ? 'Enable Account' : 'Disable Account'}
-                  >
-                    <Power size={14} className={account.status === 'OFFLINE' ? 'text-muted-foreground' : 'text-emerald-500'} />
-                  </Button>
+                    <Button
+                      variant={account.status === 'OFFLINE' ? 'outline' : 'secondary'}
+                      size="icon-sm"
+                      onClick={() => handleToggleAccount(account)}
+                      title={account.status === 'OFFLINE' ? 'Enable Account' : 'Disable Account'}
+                    >
+                      <Power size={14} className={account.status === 'OFFLINE' ? 'text-muted-foreground' : 'text-emerald-500'} />
+                    </Button>
 
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    onClick={() => handleDeleteAccount(account.id, account.name)}
-                    title="Delete Account"
-                    className="text-destructive hover:bg-destructive/10 border-destructive/30"
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() => handleDeleteAccount(account.id, account.name)}
+                      title="Delete Account"
+                      className="text-destructive hover:bg-destructive/10 border-destructive/30"
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs font-mono text-muted-foreground bg-muted/30">
+                      Operator Synoptics (Read-Only)
+                    </Badge>
+                  </div>
+                )}
               </div>
 
               {/* Plants & Hardware Under this Account */}
@@ -488,15 +580,21 @@ export default function AccountsManagementPage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       No plants discovered yet for this account.
                     </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSyncAccount(account.id)}
-                      className="gap-1.5 text-xs font-semibold text-primary border-primary/30"
-                    >
-                      <RefreshCw size={13} />
-                      <span>Run Auto-Discovery Now</span>
-                    </Button>
+                    {isAdmin ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSyncAccount(account.id)}
+                        className="gap-1.5 text-xs font-semibold text-primary border-primary/30"
+                      >
+                        <RefreshCw size={13} />
+                        <span>Run Auto-Discovery Now</span>
+                      </Button>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground font-mono">
+                        Awaiting administrator synchronization.
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-4">

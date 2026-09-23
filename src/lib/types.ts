@@ -131,8 +131,10 @@ export interface InverterConfig {
 
 export interface DeyeAccountConfig {
   id: string;
+  directusId?: number | string;
   name: string;
   enabled: boolean;
+  admin?: boolean;
   baseUrl?: string;
   appId: string;
   appSecret: string;
@@ -144,11 +146,16 @@ export interface DeyeAccountConfig {
   lastSyncedAt?: string;
   plants?: PlantInfo[];
   inverters?: InverterConfig[];
+  source?: 'directus' | 'cache' | 'env';
 }
 
 export interface AccountSummary {
   id: string;
+  directusId?: number | string;
   name: string;
+  email?: string;
+  enabled?: boolean;
+  admin?: boolean;
   isLive: boolean;
   stationCount: number;
   deviceCount: number;
@@ -164,6 +171,7 @@ export interface AccountSummary {
   plants: PlantInfo[];
   autoDiscovered?: boolean;
   lastSyncedAt?: string;
+  source?: 'directus' | 'cache' | 'env';
 }
 
 export interface FleetMatrixNode {

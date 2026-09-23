@@ -6,6 +6,8 @@ import { AccountProvider } from '@/lib/account-context';
 import ThemeProvider from '@/components/theme/ThemeProvider';
 
 import { SidebarProvider } from '@/components/layout/sidebar-context';
+import { RoleProvider } from '@/lib/role-context';
+import { AppShell } from '@/components/layout/app-shell';
 
 export const metadata: Metadata = {
   title: 'DeyeCloud Solar Operations | Multi-Account Mission Control',
@@ -29,19 +31,13 @@ export default function RootLayout({
       </head>
       <body className="bg-background text-foreground font-sans antialiased min-h-screen selection:bg-primary/20 selection:text-primary">
         <ThemeProvider>
-          <AccountProvider>
-            <SidebarProvider>
-              <div className="min-h-screen flex w-full bg-background">
-                <Sidebar />
-                <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-                  <Header />
-                  <main className="px-4 sm:px-6 lg:px-8 py-6 w-full max-w-[1680px] mx-auto flex-1">
-                    {children}
-                  </main>
-                </div>
-              </div>
-            </SidebarProvider>
-          </AccountProvider>
+          <RoleProvider>
+            <AccountProvider>
+              <SidebarProvider>
+                <AppShell>{children}</AppShell>
+              </SidebarProvider>
+            </AccountProvider>
+          </RoleProvider>
         </ThemeProvider>
       </body>
     </html>

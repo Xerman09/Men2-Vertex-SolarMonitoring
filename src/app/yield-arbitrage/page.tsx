@@ -95,7 +95,7 @@ export default function YieldArbitragePage() {
                   Yield Analytics & Time-of-Use Arbitrage
                 </h1>
                 <Badge variant="outline" className="border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono text-[10px]">
-                  Directus Ledger
+                  Financial Ledger
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -332,7 +332,7 @@ export default function YieldArbitragePage() {
             Historical Generation & Arbitrage Log
           </CardTitle>
           <span className="text-xs font-mono text-muted-foreground">
-            Exported to Directus ERP Ledger
+            Synchronized to Database Financial Ledger
           </span>
         </CardHeader>
         <CardContent className="p-0">

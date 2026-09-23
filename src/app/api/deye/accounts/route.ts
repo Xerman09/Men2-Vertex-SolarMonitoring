@@ -6,9 +6,11 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const forceSync = searchParams.get('sync') === 'true' || searchParams.get('force') === 'true';
     const accounts = await accountManager.getAccountsSummary(forceSync);
+    const directus = accountManager.getDirectusHealth();
     return NextResponse.json({
       total: accounts.length,
       accounts,
+      directus,
     });
   } catch (error) {
     return NextResponse.json(
@@ -61,6 +63,8 @@ export async function PUT(req: Request) {
     );
   }
 }
+
+export const PATCH = PUT;
 
 export async function DELETE(req: Request) {
   try {

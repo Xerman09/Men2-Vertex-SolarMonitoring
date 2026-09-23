@@ -36,21 +36,30 @@ export class DeyeCloudClient {
   constructor(config?: Partial<DeyeAccountConfig>) {
     this.accountId = config?.id || 'default-site';
     this.accountName = config?.name || 'Primary Facility';
-    this.baseUrl = config?.baseUrl?.trim() || process.env.DEYE_BASE_URL?.trim() || 'https://api.deyecloud.com';
-    this.appId = config?.appId?.trim() || process.env.DEYE_APP_ID?.trim() || '';
-    this.appSecret = config?.appSecret?.trim() || process.env.DEYE_APP_SECRET?.trim() || '';
-    this.email = config?.email?.trim() || process.env.DEYE_EMAIL?.trim() || '';
-    this.passwordRaw = config?.password?.trim() || process.env.DEYE_PASSWORD?.trim() || '';
+    let rawBaseUrl = (config?.baseUrl || '').trim();
+    if (!rawBaseUrl.startsWith('http://') && !rawBaseUrl.startsWith('https://')) {
+      rawBaseUrl = process.env.DEYE_BASE_URL?.trim() || 'https://eu1-developer.deyecloud.com';
+    }
+    this.baseUrl = rawBaseUrl.replace(/\/+$/, '');
+    this.appId = (config?.appId || process.env.DEYE_APP_ID || '').trim();
+    this.appSecret = (config?.appSecret || process.env.DEYE_APP_SECRET || '').trim();
+    this.email = (config?.email || process.env.DEYE_EMAIL || '').trim();
+    this.passwordRaw = (config?.password || process.env.DEYE_PASSWORD || '').trim();
     this.defaultStationId = config?.defaultStationId?.trim() || process.env.DEYE_DEFAULT_STATION_ID?.trim() || 'SP_04';
     this.defaultDeviceSn = config?.defaultDeviceSn?.trim() || process.env.DEYE_DEFAULT_DEVICE_SN?.trim() || '2209X891104';
     this.plants = config?.plants || [];
   }
 
   /**
-   * Has the user configured credentials in environment?
+   * Has the user configured real DeyeCloud API credentials?
+   * Avoids attempting token acquisition for internal admin accounts or dummy '0' placeholders.
    */
   public hasCredentials(): boolean {
-    return Boolean(this.appId && this.appSecret && this.email && this.passwordRaw);
+    const hasValidAppId = Boolean(this.appId && this.appId !== '0' && this.appId.length > 3);
+    const hasValidSecret = Boolean(this.appSecret && this.appSecret !== '0' && this.appSecret.length > 5);
+    const hasValidEmail = Boolean(this.email && this.email !== '0');
+    const hasValidPassword = Boolean(this.passwordRaw && this.passwordRaw !== '0');
+    return Boolean(hasValidAppId && hasValidSecret && hasValidEmail && hasValidPassword);
   }
 
   /**

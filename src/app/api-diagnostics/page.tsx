@@ -14,15 +14,18 @@ import {
   Key,
   Server,
   RefreshCw,
+  Lock,
 } from 'lucide-react';
 import { ApiHealthMetrics } from '@/lib/types';
 import { useAccount } from '@/lib/account-context';
+import { useRole } from '@/lib/role-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 export default function ApiDiagnosticsPage() {
   const { selectedAccountId, selectedAccount, isFleetView, totalAccounts } = useAccount();
+  const { isAdmin, setShowAuthModal } = useRole();
   const [health, setHealth] = useState<ApiHealthMetrics | null>(null);
   const [currentLang, setCurrentLang] = useState<'curl' | 'python' | 'node'>('curl');
   const [currentPreset, setCurrentPreset] = useState<'telemetry' | 'station' | 'workmode'>('telemetry');
@@ -167,7 +170,7 @@ export default function ApiDiagnosticsPage() {
                   API & Diagnostics Console
                 </h1>
                 <Badge variant="outline" className="border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono text-[10px]">
-                  Directus / DeyeCloud
+                  Database / DeyeCloud
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -189,7 +192,7 @@ export default function ApiDiagnosticsPage() {
           </Button>
 
           <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10 font-mono text-xs">
-            Directus Synced
+            Database Synced
           </Badge>
         </div>
       </div>
@@ -330,7 +333,7 @@ export default function ApiDiagnosticsPage() {
 
           <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between">
             <span className="text-[11px] text-muted-foreground font-mono">
-              Directus / DeyeCloud v1.0 REST
+              Database / DeyeCloud OpenAPI
             </span>
             <Button
               onClick={executePlayground}
@@ -412,14 +415,26 @@ export default function ApiDiagnosticsPage() {
               </div>
             )}
 
-            <Button
-              type="submit"
-              disabled={dispatching}
-              className="mt-2 bg-primary text-primary-foreground font-semibold gap-2"
-            >
-              <Send size={14} className={dispatching ? 'animate-spin' : ''} />
-              <span>{dispatching ? 'Dispatching...' : 'Transmit Inverter Control Signal'}</span>
-            </Button>
+            {isAdmin ? (
+              <Button
+                type="submit"
+                disabled={dispatching}
+                className="mt-2 bg-primary text-primary-foreground font-semibold gap-2"
+              >
+                <Send size={14} className={dispatching ? 'animate-spin' : ''} />
+                <span>{dispatching ? 'Dispatching...' : 'Transmit Inverter Control Signal'}</span>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                onClick={() => setShowAuthModal(true)}
+                variant="outline"
+                className="mt-2 border-amber-500/30 text-amber-500 hover:bg-amber-500/10 font-semibold gap-2"
+              >
+                <Lock size={14} />
+                <span>Restricted to Admin (Click to Unlock)</span>
+              </Button>
+            )}
           </form>
         </Card>
       </div>

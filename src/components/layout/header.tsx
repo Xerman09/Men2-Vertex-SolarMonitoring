@@ -18,10 +18,20 @@ import {
   Building2,
   RefreshCw,
   Menu,
+  Shield,
+  Lock,
+  Unlock,
+  KeyRound,
+  Eye,
+  Database,
+  X,
+  Mail,
+  LogOut,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAccount } from '@/lib/account-context';
 import { useSidebar } from './sidebar-context';
+import { useRole } from '@/lib/role-context';
 import { ModeToggle } from '@/components/theme/ModeToggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -51,8 +61,15 @@ export function Header({
     liveAccountsCount,
     syncLivePlants,
     syncing,
+    directusStatus,
   } = useAccount();
   const { toggleMobileOpen } = useSidebar();
+  const { role, isAdmin, isConsumer, isViewer, user, showAuthModal, setShowAuthModal, login, logout } = useRole();
+
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
 
   const [utcTime, setUtcTime] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
@@ -173,7 +190,7 @@ export function Header({
             {showAccountDropdown && (
               <div className="absolute left-0 mt-2 w-88 bg-popover/95 border border-border/70 rounded-2xl shadow-xl p-2.5 z-50 backdrop-blur-md animate-in fade-in-80">
                 <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground border-b border-border/60 mb-2 flex items-center justify-between">
-                  <span>Monitor Accounts & Plants</span>
+                  <span>{isConsumer ? 'Your Solar Plants' : 'Monitor Accounts & Plants'}</span>
                   <div className="flex items-center gap-2">
                     {accounts.some((a) => (a.plants?.length || 0) > 0) && (
                       <button
@@ -184,42 +201,47 @@ export function Header({
                       </button>
                     )}
                     <span className="font-bold text-foreground">
-                      {accounts.length} Site{accounts.length !== 1 ? 's' : ''}
+                      {isConsumer
+                        ? `${accounts[0]?.plants?.length || 0} Plant${(accounts[0]?.plants?.length || 0) !== 1 ? 's' : ''}`
+                        : `${accounts.length} Site${accounts.length !== 1 ? 's' : ''}`}
                     </span>
                   </div>
                 </div>
 
-                {/* Global Fleet View Option */}
-                <button
-                  onClick={() => {
-                    setSelectedAccountId('ALL');
-                    setShowAccountDropdown(false);
-                  }}
-                  className={`w-full flex items-center justify-between p-2.5 rounded-xl transition-all mb-1 cursor-pointer ${
-                    isFleetView
-                      ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-                      : 'hover:bg-accent text-foreground'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Globe size={16} className={isFleetView ? 'text-primary-foreground' : 'text-primary'} />
-                    <div className="text-left">
-                      <div className="text-xs font-semibold">
-                        Global Fleet Aggregate View
+                {/* Global Fleet View Option - Only for Admins / Multi-account Viewers */}
+                {!isConsumer && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setSelectedAccountId('ALL');
+                        setShowAccountDropdown(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-xl transition-all mb-1 cursor-pointer ${
+                        isFleetView
+                          ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                          : 'hover:bg-accent text-foreground'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Globe size={16} className={isFleetView ? 'text-primary-foreground' : 'text-primary'} />
+                        <div className="text-left">
+                          <div className="text-xs font-semibold">
+                            Global Fleet Aggregate View
+                          </div>
+                          <div
+                            className={`text-[10px] ${
+                              isFleetView ? 'text-primary-foreground/80' : 'text-muted-foreground'
+                            }`}
+                          >
+                            All {totalAccounts} accounts combined ({liveAccountsCount} live)
+                          </div>
+                        </div>
                       </div>
-                      <div
-                        className={`text-[10px] ${
-                          isFleetView ? 'text-primary-foreground/80' : 'text-muted-foreground'
-                        }`}
-                      >
-                        All {totalAccounts} accounts combined ({liveAccountsCount} live)
-                      </div>
-                    </div>
-                  </div>
-                  {isFleetView && <Check size={14} />}
-                </button>
-
-                <div className="h-px bg-border/60 my-1" />
+                      {isFleetView && <Check size={14} />}
+                    </button>
+                    <div className="h-px bg-border/60 my-1" />
+                  </>
+                )}
 
                 {/* Account & Plants List */}
                 <div className="max-h-72 overflow-y-auto space-y-1 pr-1">
@@ -347,8 +369,26 @@ export function Header({
           </div>
         </div>
 
-        {/* Right: Telemetry Health, Clock, Theme Mode Toggle, Notifications */}
+        {/* Right: Telemetry Health, Directus Status, Role Toggle, Clock, Theme Mode Toggle, Notifications */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Database Connection Indicator */}
+          {directusStatus && (
+            <div
+              className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-card border border-border/60 text-xs font-mono"
+              title={`Cloud Database: ${directusStatus.connected ? 'Connected (Two-way live sync)' : 'Offline (Using cached fallback)'}`}
+            >
+              <Database size={12} className={directusStatus.connected ? 'text-cyan-500' : 'text-amber-500'} />
+              <span className="text-foreground font-medium">Database</span>
+              <span
+                className={`text-[10px] font-semibold ${
+                  directusStatus.connected ? 'text-cyan-500' : 'text-amber-500'
+                }`}
+              >
+                {directusStatus.connected ? 'Live' : 'Cached'}
+              </span>
+            </div>
+          )}
+
           {/* Cloud Bus State Indicator & Quick Sync */}
           <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-card border border-border/60 text-xs font-mono">
             <span
@@ -373,6 +413,48 @@ export function Header({
               <RefreshCw size={11} className={syncing ? 'animate-spin text-primary' : ''} />
             </button>
           </div>
+
+          {/* Role Mode Toggle Button (Admin vs Consumer vs Sign In) */}
+          {user ? (
+            <div className="flex items-center gap-1.5">
+              <div
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold ${
+                  isAdmin
+                    ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30'
+                    : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30'
+                }`}
+                title={`Logged in as ${user.email} (${isAdmin ? 'Admin' : 'Consumer'})`}
+              >
+                {isAdmin ? <Shield size={13} /> : <User size={13} />}
+                <span className="hidden sm:inline font-mono text-[11px] truncate max-w-[130px]">
+                  {user.name || user.email?.split('@')[0] || (isAdmin ? 'Admin' : 'Consumer')}
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              </div>
+              <button
+                onClick={() => logout()}
+                title="Sign out"
+                className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-rose-500 transition-colors cursor-pointer"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                setLoginEmail('');
+                setLoginPassword('');
+                setLoginError('');
+                setShowAuthModal(true);
+              }}
+              title="Sign in to your solar monitoring account"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60 text-xs font-medium transition-colors cursor-pointer"
+            >
+              <User size={13} className="text-primary" />
+              <span className="hidden sm:inline">Sign In</span>
+              <Lock size={11} className="text-muted-foreground" />
+            </button>
+          )}
 
           {/* UTC Clock */}
           <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/40 border border-border/50 text-[11px] font-mono text-muted-foreground">
@@ -427,6 +509,108 @@ export function Header({
           </div>
         </div>
       </div>
+
+      {/* Administrator Login Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in-50">
+          <div className="bg-card border border-border/80 rounded-2xl shadow-2xl w-full max-w-sm p-6 relative">
+            <button
+              onClick={() => setShowAuthModal(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center text-primary">
+                <User size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-foreground">Sign In</h3>
+                <p className="text-xs text-muted-foreground">Monitor and manage your solar plants</p>
+              </div>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setLoginLoading(true);
+                setLoginError('');
+                const res = await login(loginEmail, loginPassword);
+                setLoginLoading(false);
+                if (!res.success) {
+                  setLoginError(res.error || 'Invalid credentials');
+                }
+              }}
+              className="space-y-3.5"
+            >
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                  Username or Email
+                </label>
+                <div className="relative">
+                  <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    autoFocus
+                    required
+                    placeholder="e.g. hanvinsolar@gmail.com or admin"
+                    value={loginEmail}
+                    onChange={(e) => {
+                      setLoginEmail(e.target.value);
+                      if (loginError) setLoginError('');
+                    }}
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-background border border-border/70 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••••••"
+                    value={loginPassword}
+                    onChange={(e) => {
+                      setLoginPassword(e.target.value);
+                      if (loginError) setLoginError('');
+                    }}
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-background border border-border/70 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  />
+                </div>
+                {loginError && (
+                  <p className="text-xs text-rose-500 font-medium mt-1.5 flex items-center gap-1">
+                    <span>{loginError}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowAuthModal(false)}
+                  className="flex-1 text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={loginLoading || !loginEmail.trim() || !loginPassword}
+                  className="flex-1 text-xs font-semibold bg-primary text-primary-foreground"
+                >
+                  {loginLoading ? 'Signing in...' : 'Sign In'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
