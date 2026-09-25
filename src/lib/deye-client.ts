@@ -50,6 +50,14 @@ export class DeyeCloudClient {
     this.plants = config?.plants || [];
   }
 
+  public getDefaultStationId(): string {
+    return this.defaultStationId;
+  }
+
+  public getDefaultDeviceSn(): string {
+    return this.defaultDeviceSn;
+  }
+
   /**
    * Has the user configured real DeyeCloud API credentials?
    * Avoids attempting token acquisition for internal admin accounts or dummy '0' placeholders.

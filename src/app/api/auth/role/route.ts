@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { accountManager } from '@/lib/account-manager';
+import { accountManager, COLLECTIONS } from '@/lib/account-manager';
+import { SolarUser, SolarUserStationPermission } from '@/lib/types';
 
 export async function POST(req: Request) {
   try {
@@ -16,14 +17,73 @@ export async function POST(req: Request) {
     const inputIdentifier = String(email).trim().toLowerCase();
     const inputPassword = String(password).trim();
 
-    // 1. Fetch live records from the database table (or fallback to cache)
+    // 1. First, check normalized table: iot_solar_users
+    try {
+      const users = await accountManager.fetchCollection<SolarUser>(COLLECTIONS.USERS);
+      if (users && users.length > 0) {
+        const matchedUser = users.find((u) => {
+          const uEmail = (u.email || '').trim().toLowerCase();
+          const uName = (u.username || '').trim().toLowerCase();
+          return (uEmail === inputIdentifier || uName === inputIdentifier) &&
+                 String(u.password_hash || '').trim() === inputPassword;
+        });
+
+        if (matchedUser) {
+          const isAdmin = matchedUser.role === 'admin' || 
+                          matchedUser.email.toLowerCase() === 'admin' || 
+                          matchedUser.username.toLowerCase() === 'admin';
+
+          // Check permissions table for assigned stations
+          let assignedStationId: string | undefined;
+          try {
+            const perms = await accountManager.fetchCollection<SolarUserStationPermission>(
+              COLLECTIONS.PERMISSIONS,
+              `?filter[user_id][_eq]=${matchedUser.id}`
+            );
+            if (perms && perms.length > 0) {
+              assignedStationId = perms[0].station_id;
+            }
+          } catch (e) {
+            // Permissions lookup non-fatal
+          }
+
+          if (isAdmin) {
+            return NextResponse.json({
+              success: true,
+              role: 'admin',
+              user: {
+                id: matchedUser.id,
+                email: matchedUser.email,
+                name: matchedUser.full_name || matchedUser.username || 'Admin',
+                role: 'admin',
+              },
+            });
+          }
+
+          return NextResponse.json({
+            success: true,
+            role: 'consumer',
+            user: {
+              id: matchedUser.id,
+              email: matchedUser.email,
+              name: matchedUser.full_name || matchedUser.username || 'Customer',
+              role: 'consumer',
+              accountId: assignedStationId ? `station-${assignedStationId}` : String(matchedUser.id),
+              stationId: assignedStationId,
+            },
+          });
+        }
+      }
+    } catch (dbErr) {
+      console.warn('[AuthRole] iot_solar_users lookup failed, falling back to legacy accounts:', dbErr);
+    }
+
+    // 2. Fallback to legacy iot_solar_accounts or local cache
     let records: any[] | null = await accountManager.fetchFromDirectus();
     if (!records || records.length === 0) {
-      // Fallback to local accounts cache
       records = accountManager.getAllRawAccounts(true);
     }
 
-    // 2. Find matching account by email or username
     const matched = records.find((row) => {
       const rowEmail = (row.email || '').trim().toLowerCase();
       const rowName = (row.name || '').trim().toLowerCase();
@@ -37,8 +97,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Verify admin privilege
-    // Accepts admin: true/1/'true', is_admin: true/1/'true', or username 'admin'
     const hasAdminPrivilege = Boolean(
       matched.admin === true ||
       matched.admin === 1 ||
@@ -64,7 +122,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // 4. Consumer / Customer Account
     return NextResponse.json({
       success: true,
       role: 'consumer',

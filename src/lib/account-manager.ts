@@ -7,8 +7,27 @@ import {
   FleetMatrixNode,
   PlantInfo,
   DeviceInfo,
+  SolarDeyeCloudConfig,
+  SolarStationRecord,
+  SolarDeviceRecord,
+  SolarUser,
+  SolarInverterControlLog,
+  SolarUserStationPermission,
 } from './types';
 import { DeyeCloudClient } from './deye-client';
+
+export const COLLECTIONS = {
+  USERS: 'iot_solar_users',
+  CONFIGS: 'iot_solar_deye_cloud_configs',
+  STATIONS: 'iot_solar_stations',
+  DEVICES: 'iot_solar_devices',
+  PERMISSIONS: 'iot_solar_user_station_permissions',
+  CONTROL_LOGS: 'iot_solar_inverter_control_logs',
+  ALARMS: 'iot_solar_inverter_alarms',
+  TARIFFS: 'iot_solar_station_tariffs',
+  TELEMETRY: 'iot_solar_telemetry_snapshots',
+  LEGACY_ACCOUNTS: 'iot_solar_accounts',
+} as const;
 
 class DeyeAccountManager {
   private accountsCache: DeyeAccountConfig[] | null = null;
@@ -48,11 +67,11 @@ class DeyeAccountManager {
   }
 
   /**
-   * Query Directus REST API with a resilient timeout
+   * Generic Directus collection reader for the normalized schema
    */
-  public async fetchFromDirectus(): Promise<any[] | null> {
+  public async fetchCollection<T = any>(collection: string, query = '?limit=-1'): Promise<T[] | null> {
     try {
-      const url = `${this.getDirectusBaseUrl()}/items/${this.getDirectusCollection()}?limit=-1`;
+      const url = `${this.getDirectusBaseUrl()}/items/${collection}${query}`;
       const res = await fetch(url, {
         method: 'GET',
         headers: this.getDirectusHeaders(),
@@ -60,6 +79,7 @@ class DeyeAccountManager {
       });
 
       if (!res.ok) {
+        if (res.status === 404) return null; // Collection does not exist yet
         throw new Error(`Directus HTTP status ${res.status}`);
       }
 
@@ -70,7 +90,6 @@ class DeyeAccountManager {
       };
       return Array.isArray(json.data) ? json.data : [];
     } catch (err: any) {
-      console.warn('[DeyeAccountManager] Directus unreachable, falling back to local cache:', err?.message || err);
       this.directusStatus = {
         connected: false,
         lastChecked: new Date().toISOString(),
@@ -81,7 +100,105 @@ class DeyeAccountManager {
   }
 
   /**
-   * Synchronize accounts from Directus into the local accounts list and cache
+   * Generic create helper for any Directus collection
+   */
+  public async createItem<T = any>(collection: string, payload: Record<string, any>): Promise<T | null> {
+    try {
+      const url = `${this.getDirectusBaseUrl()}/items/${collection}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: this.getDirectusHeaders(),
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json.data || null;
+      }
+      return null;
+    } catch (err) {
+      console.warn(`[DeyeAccountManager] Failed to create item in ${collection}:`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Generic update helper for any Directus collection
+   */
+  public async updateItem(collection: string, id: string | number, payload: Record<string, any>): Promise<boolean> {
+    try {
+      const url = `${this.getDirectusBaseUrl()}/items/${collection}/${id}`;
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: this.getDirectusHeaders(),
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(5000),
+      });
+      return res.ok;
+    } catch (err) {
+      console.warn(`[DeyeAccountManager] Failed to update item ${id} in ${collection}:`, err);
+      return false;
+    }
+  }
+
+  /**
+   * Generic delete helper for any Directus collection
+   */
+  public async deleteItem(collection: string, id: string | number): Promise<boolean> {
+    try {
+      const url = `${this.getDirectusBaseUrl()}/items/${collection}/${id}`;
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: this.getDirectusHeaders(),
+        signal: AbortSignal.timeout(5000),
+      });
+      return res.ok;
+    } catch (err) {
+      console.warn(`[DeyeAccountManager] Failed to delete item ${id} from ${collection}:`, err);
+      return false;
+    }
+  }
+
+  /**
+   * Record an immutable audit log when workmode or grid charge controls are dispatched
+   */
+  public async logInverterControl(log: SolarInverterControlLog): Promise<boolean> {
+    try {
+      const payload = {
+        station_id: log.station_id,
+        device_sn: log.device_sn,
+        action: log.action,
+        work_mode: log.work_mode || null,
+        parameters_payload: typeof log.parameters_payload === 'string' 
+          ? JSON.parse(log.parameters_payload) 
+          : log.parameters_payload,
+        status: log.status,
+        upstream_code: log.upstream_code || null,
+        upstream_message: log.upstream_message || null,
+        user_id: log.user_id || null,
+        client_ip: log.client_ip || null,
+      };
+      await this.createItem(COLLECTIONS.CONTROL_LOGS, payload);
+      return true;
+    } catch (e) {
+      console.warn('[DeyeAccountManager] Failed logging inverter control to database:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Query Directus REST API with a resilient timeout (fallback compatibility)
+   */
+  public async fetchFromDirectus(): Promise<any[] | null> {
+    return this.fetchCollection(this.getDirectusCollection());
+  }
+
+  /**
+   * Synchronize accounts from Directus into the local accounts list and cache.
+   * Priority:
+   * 1. Normalized tables: iot_solar_deye_cloud_configs + iot_solar_stations + iot_solar_devices
+   * 2. Legacy collection: iot_solar_accounts
+   * 3. Local disk cache: deye-accounts.json
    */
   public async syncWithDirectus(force = false): Promise<DeyeAccountConfig[]> {
     const now = Date.now();
@@ -89,8 +206,95 @@ class DeyeAccountManager {
       return this.accountsCache;
     }
 
-    const directusRows = await this.fetchFromDirectus();
     const diskAccounts = this.getAllRawAccounts(true);
+
+    // 1. Try reading from the normalized tables (iot_solar_deye_cloud_configs, stations, devices)
+    try {
+      const [configs, stations, devices] = await Promise.all([
+        this.fetchCollection<SolarDeyeCloudConfig>(COLLECTIONS.CONFIGS),
+        this.fetchCollection<SolarStationRecord>(COLLECTIONS.STATIONS),
+        this.fetchCollection<SolarDeviceRecord>(COLLECTIONS.DEVICES),
+      ]);
+
+      if (configs !== null && configs.length > 0) {
+        const mergedAccounts: DeyeAccountConfig[] = [];
+
+        for (const cfg of configs) {
+          const cfgId = String(cfg.id);
+          const existing = diskAccounts.find(
+            (d) => d.directusId === cfgId || d.email.toLowerCase() === cfg.account_email.toLowerCase()
+          );
+
+          // Find stations associated with this config
+          const configStations = Array.isArray(stations)
+            ? stations.filter((s) => s.deye_config_id === cfg.id || (!s.deye_config_id && stations.length === 1))
+            : [];
+
+          const plants: PlantInfo[] = configStations.map((st) => {
+            const stDevices = Array.isArray(devices)
+              ? devices.filter((dev) => dev.station_id === st.station_id)
+              : [];
+
+            const mappedDevices: DeviceInfo[] = stDevices.map((dev) => ({
+              deviceSn: dev.device_sn,
+              deviceType: dev.device_type,
+              name: dev.name || `Device (${dev.device_sn})`,
+              model: dev.model,
+              ratedKw: Number(dev.rated_kw) || 0,
+              loggerSn: dev.logger_sn,
+              status: dev.status,
+              lastSeen: dev.last_seen_at,
+            }));
+
+            return {
+              stationId: st.station_id,
+              stationName: st.name,
+              installedCapacityKw: Number(st.installed_capacity_kw) || 0,
+              address: st.address || '',
+              devices: mappedDevices,
+            };
+          });
+
+          // Fallback to existing plant cache if Directus hasn't discovered devices yet
+          const finalPlants = plants.length > 0 ? plants : (existing?.plants || []);
+          const firstInverter = finalPlants[0]?.devices?.find((d) => d.deviceType === 'INVERTER');
+
+          const accountConfig: DeyeAccountConfig = {
+            id: existing ? existing.id : `deye-cfg-${cfgId}`,
+            directusId: cfgId,
+            name: cfg.profile_name || existing?.name || cfg.account_email,
+            enabled: cfg.status !== 'OFFLINE',
+            admin: true,
+            baseUrl: cfg.base_url || 'https://eu1-developer.deyecloud.com',
+            appId: cfg.app_id || existing?.appId || '',
+            appSecret: cfg.app_secret || existing?.appSecret || '',
+            email: cfg.account_email || existing?.email || '',
+            password: cfg.account_password || existing?.password || '',
+            defaultStationId: finalPlants[0]?.stationId || existing?.defaultStationId || '',
+            defaultDeviceSn: firstInverter?.deviceSn || existing?.defaultDeviceSn || '',
+            autoDiscovered: finalPlants.length > 0,
+            lastSyncedAt: cfg.last_checked_at || new Date().toISOString(),
+            plants: finalPlants,
+            source: 'directus',
+          };
+
+          mergedAccounts.push(accountConfig);
+        }
+
+        if (mergedAccounts.length > 0) {
+          this.saveAccountsToFile(mergedAccounts);
+          this.lastDirectusSyncAt = now;
+          this.accountsCache = mergedAccounts.filter((a) => a.enabled !== false);
+          this.syncClients();
+          return this.accountsCache;
+        }
+      }
+    } catch (err) {
+      console.warn('[DeyeAccountManager] Normalized table sync skipped, trying legacy collection:', err);
+    }
+
+    // 2. Fallback to legacy single collection (iot_solar_accounts)
+    const directusRows = await this.fetchFromDirectus();
 
     if (directusRows !== null && directusRows.length > 0) {
       const mergedAccounts: DeyeAccountConfig[] = [];
@@ -99,7 +303,6 @@ class DeyeAccountManager {
         const rowId = row.id !== undefined && row.id !== null ? String(row.id) : undefined;
         const rowEmail = (row.email || '').trim().toLowerCase();
 
-        // Match existing account by directusId or email to preserve discovered plants
         const existing = diskAccounts.find(
           (d) =>
             (rowId && (d.directusId === rowId || String(d.id) === rowId || String(d.id) === `directus-${rowId}`)) ||
@@ -152,7 +355,6 @@ class DeyeAccountManager {
         mergedAccounts.push(accountConfig);
       }
 
-      // Also preserve any local non-Directus accounts if any exist
       for (const disk of diskAccounts) {
         if (!mergedAccounts.some((m) => m.id === disk.id || m.email.toLowerCase() === disk.email.toLowerCase())) {
           mergedAccounts.push({
@@ -169,7 +371,7 @@ class DeyeAccountManager {
       return this.accountsCache;
     }
 
-    // Directus unreachable or empty: fallback to disk cache
+    // 3. Directus unreachable or empty: fallback to disk cache
     if (diskAccounts.length > 0) {
       this.accountsCache = diskAccounts
         .filter((a) => a.enabled !== false)
@@ -308,29 +510,35 @@ class DeyeAccountManager {
   }> {
     let directusId: string | undefined;
 
-    // 1. Try to create in Directus if available
+    // 1. Try to create in normalized iot_solar_deye_cloud_configs table
     try {
-      const payload = {
-        name: data.name?.trim() || data.email?.trim() || 'New Solar Site',
-        email: data.email?.trim() || '',
-        password: data.password?.trim() || '',
+      const configPayload = {
+        profile_name: data.name?.trim() || data.email?.trim() || 'New Solar Gateway',
+        base_url: data.baseUrl?.trim() || 'https://eu1-developer.deyecloud.com',
         app_id: data.appId?.trim() || '',
         app_secret: data.appSecret?.trim() || '',
-        base_url: data.baseUrl?.trim() || 'https://eu1-developer.deyecloud.com',
-        enabled: data.enabled ?? true,
+        account_email: data.email?.trim() || '',
+        account_password: data.password?.trim() || '',
+        status: (data.enabled ?? true) ? 'OPTIMAL' : 'OFFLINE',
       };
 
-      const res = await fetch(`${this.getDirectusBaseUrl()}/items/${this.getDirectusCollection()}`, {
-        method: 'POST',
-        headers: this.getDirectusHeaders(),
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data?.id !== undefined && json.data?.id !== null) {
-          directusId = String(json.data.id);
+      const createdCfg = await this.createItem(COLLECTIONS.CONFIGS, configPayload);
+      if (createdCfg?.id) {
+        directusId = String(createdCfg.id);
+      } else {
+        // Fallback to legacy single collection if needed
+        const legacyPayload = {
+          name: data.name?.trim() || data.email?.trim() || 'New Solar Site',
+          email: data.email?.trim() || '',
+          password: data.password?.trim() || '',
+          app_id: data.appId?.trim() || '',
+          app_secret: data.appSecret?.trim() || '',
+          base_url: data.baseUrl?.trim() || 'https://eu1-developer.deyecloud.com',
+          enabled: data.enabled ?? true,
+        };
+        const createdLegacy = await this.createItem(this.getDirectusCollection(), legacyPayload);
+        if (createdLegacy?.id) {
+          directusId = String(createdLegacy.id);
         }
       }
     } catch (err) {
@@ -371,6 +579,49 @@ class DeyeAccountManager {
       );
       if (firstInverter && !newAccount.defaultDeviceSn) {
         newAccount.defaultDeviceSn = firstInverter.deviceSn;
+      }
+
+      // Persist discovered stations & devices into iot_solar_stations and iot_solar_devices
+      try {
+        for (const p of newAccount.plants) {
+          await this.createItem(COLLECTIONS.STATIONS, {
+            station_id: p.stationId,
+            name: p.stationName,
+            installed_capacity_kw: p.installedCapacityKw,
+            address: p.address || '',
+            deye_config_id: directusId ? Number(directusId) : null,
+          });
+
+          for (const d of p.devices) {
+            await this.createItem(COLLECTIONS.DEVICES, {
+              device_sn: d.deviceSn,
+              station_id: p.stationId,
+              device_type: d.deviceType,
+              name: d.name,
+              model: d.model || '',
+              rated_kw: d.ratedKw || 0,
+              status: d.status || 'ONLINE',
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[DeyeAccountManager] Non-fatal error saving stations/devices to database:', err);
+      }
+    }
+
+    // Persist registered user into iot_solar_users
+    if (data.email) {
+      try {
+        await this.createItem(COLLECTIONS.USERS, {
+          email: data.email.trim().toLowerCase(),
+          username: data.email.split('@')[0],
+          password_hash: data.password || 'password',
+          full_name: data.name || data.email,
+          role: 'consumer',
+          is_active: 1,
+        });
+      } catch (e) {
+        // User creation non-fatal
       }
     }
 
@@ -418,20 +669,28 @@ class DeyeAccountManager {
     if (directusId) {
       try {
         const patchPayload: Record<string, any> = {};
-        if (updates.name !== undefined) patchPayload.name = updates.name;
-        if (updates.email !== undefined) patchPayload.email = updates.email;
-        if (updates.password !== undefined) patchPayload.password = updates.password;
+        if (updates.name !== undefined) {
+          patchPayload.name = updates.name;
+          patchPayload.profile_name = updates.name;
+        }
+        if (updates.email !== undefined) {
+          patchPayload.email = updates.email;
+          patchPayload.account_email = updates.email;
+        }
+        if (updates.password !== undefined) {
+          patchPayload.password = updates.password;
+          patchPayload.account_password = updates.password;
+        }
         if (updates.appId !== undefined) patchPayload.app_id = updates.appId;
         if (updates.appSecret !== undefined) patchPayload.app_secret = updates.appSecret;
         if (updates.baseUrl !== undefined) patchPayload.base_url = updates.baseUrl;
-        if (updates.enabled !== undefined) patchPayload.enabled = updates.enabled ? 1 : 0;
+        if (updates.enabled !== undefined) {
+          patchPayload.enabled = updates.enabled ? 1 : 0;
+          patchPayload.status = updates.enabled ? 'OPTIMAL' : 'OFFLINE';
+        }
 
-        await fetch(`${this.getDirectusBaseUrl()}/items/${this.getDirectusCollection()}/${directusId}`, {
-          method: 'PATCH',
-          headers: this.getDirectusHeaders(),
-          body: JSON.stringify(patchPayload),
-          signal: AbortSignal.timeout(5000),
-        });
+        await this.updateItem(COLLECTIONS.CONFIGS, directusId, patchPayload);
+        await this.updateItem(this.getDirectusCollection(), directusId, patchPayload);
       } catch (err) {
         console.warn(`[DeyeAccountManager] Failed to patch Directus item ${directusId}:`, err);
       }
@@ -462,11 +721,8 @@ class DeyeAccountManager {
     const directusId = target.directusId || (target.id.startsWith('directus-') ? target.id.replace('directus-', '') : undefined);
     if (directusId) {
       try {
-        await fetch(`${this.getDirectusBaseUrl()}/items/${this.getDirectusCollection()}/${directusId}`, {
-          method: 'DELETE',
-          headers: this.getDirectusHeaders(),
-          signal: AbortSignal.timeout(5000),
-        });
+        await this.deleteItem(COLLECTIONS.CONFIGS, directusId);
+        await this.deleteItem(this.getDirectusCollection(), directusId);
       } catch (err) {
         console.warn(`[DeyeAccountManager] Failed to delete Directus item ${directusId}:`, err);
       }
