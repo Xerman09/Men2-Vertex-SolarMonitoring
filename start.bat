@@ -16,7 +16,9 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo Starting DSM Next.js service on port 3005...
-echo Dashboard URL: http://localhost:3005
+echo   - Localhost:    http://localhost:3005
+echo   - Local Wi-Fi:  http://192.168.1.202:3005
+echo   - Hostname URL: http://%COMPUTERNAME%:3005
 echo.
 
 start "" http://localhost:3005
