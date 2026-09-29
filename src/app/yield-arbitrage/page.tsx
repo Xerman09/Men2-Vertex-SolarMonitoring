@@ -28,13 +28,16 @@ import {
   Legend,
 } from 'recharts';
 import { HourlyEnergyPoint } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useRole } from '@/lib/role-context';
+import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
 
 export default function YieldArbitragePage() {
+  const { isAdmin } = useRole();
   const [timeRange, setTimeRange] = useState<'DAY' | 'WEEK' | 'MONTH' | 'YEAR'>('DAY');
   const [hourlyData, setHourlyData] = useState<HourlyEnergyPoint[]>([]);
   const [viewMode, setViewMode] = useState<'arbitrage' | 'trigonometric'>('arbitrage');
@@ -98,9 +101,11 @@ export default function YieldArbitragePage() {
                   Financial Ledger
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Tariff delta optimization, smart battery peak-shaving, and historical revenue generation.
-              </p>
+              {isAdmin && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Tariff delta optimization, smart battery peak-shaving, and historical revenue generation.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -252,6 +257,11 @@ export default function YieldArbitragePage() {
                 <Zap size={18} className="text-amber-500" />
                 <span>Diurnal Curve: Solar Generation vs Industrial Load Profile</span>
               </CardTitle>
+              {isAdmin && (
+                <CardDescription className="text-xs mt-0.5">
+                  {TELEMETRY_DESCRIPTIONS.yieldArbitrage.diurnalCurveLegend}
+                </CardDescription>
+              )}
             </div>
             <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground">
               <span className="flex items-center gap-1.5">

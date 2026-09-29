@@ -19,14 +19,26 @@ import {
 } from 'lucide-react';
 import { InverterTelemetry } from '@/lib/types';
 import { useAccount } from '@/lib/account-context';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useRole } from '@/lib/role-context';
+import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
 
 export default function HardwareTelemetryPage() {
-  const { selectedAccountId, selectedAccount, selectedStationId, selectedPlant, isFleetView } = useAccount();
+  const {
+    selectedAccountId,
+    selectedAccount,
+    selectedStationId,
+    selectedPlant,
+    isFleetView,
+    isFetchingDeye,
+    fetchingStage,
+    setFetchingDeye,
+  } = useAccount();
+  const { isAdmin } = useRole();
   const [telemetry, setTelemetry] = useState<InverterTelemetry | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -98,8 +110,12 @@ export default function HardwareTelemetryPage() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    setFetchingDeye(true, 'Fetching DeyeCloud Inverter Modbus Telemetry...');
     await fetchTelemetry();
-    setTimeout(() => setRefreshing(false), 800);
+    setTimeout(() => {
+      setRefreshing(false);
+      setFetchingDeye(false, null);
+    }, 800);
   };
 
   const pv1 = telemetry?.mpptStrings[0] || { stringId: 'MPPT-1 String', voltageV: 0, currentA: 0, powerKw: 0 };
@@ -130,11 +146,13 @@ export default function HardwareTelemetryPage() {
                   Direct Modbus / Cloud
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {isFleetView
-                  ? 'Deep component diagnostics, DC MPPT string performance, AC waveforms, and thermal matrices across fleet inverters.'
-                  : `Component diagnostics for ${selectedAccount?.name || 'Selected Site'}.`}
-              </p>
+              {isAdmin && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {isFleetView
+                    ? 'Deep component diagnostics, DC MPPT string performance, AC waveforms, and thermal matrices across fleet inverters.'
+                    : `Component diagnostics for ${selectedAccount?.name || 'Selected Site'}.`}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -169,6 +187,7 @@ export default function HardwareTelemetryPage() {
             variant="outline"
             size="sm"
             onClick={handleRefresh}
+            disabled={refreshing}
             className="gap-2 h-8 text-xs font-semibold"
           >
             <RefreshCw size={14} className={refreshing ? 'animate-spin text-primary' : 'text-muted-foreground'} />
@@ -376,6 +395,11 @@ export default function HardwareTelemetryPage() {
               <CardTitle className="text-sm sm:text-base font-bold text-foreground">
                 Three-Phase AC Grid Harmonics & Phasor Trigonometry
               </CardTitle>
+              {isAdmin && (
+                <CardDescription className="text-xs mt-0.5">
+                  {TELEMETRY_DESCRIPTIONS.hardwareTelemetry.threePhaseAcGrid}
+                </CardDescription>
+              )}
             </div>
           </div>
           <Badge variant="outline" className="text-cyan-500 border-cyan-500/30 bg-cyan-500/10 font-mono text-xs">

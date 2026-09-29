@@ -1,6 +1,6 @@
 # System & Telemetry Descriptions Reference
 
-This file documents descriptions, subtitles, and explanatory notes extracted from the dashboard, telemetry cards, and trigonometric curve views to keep the active user interface clean, compact, and uncluttered.
+This file documents descriptions, subtitles, and explanatory notes defined in `src/lib/descriptions.ts`. To ensure an uncluttered experience for standard viewers and consumers, these long descriptional statements are **only visible when using an admin account** (`isAdmin === true` via `useRole()`).
 
 ---
 

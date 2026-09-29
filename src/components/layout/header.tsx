@@ -61,6 +61,9 @@ export function Header({
     liveAccountsCount,
     syncLivePlants,
     syncing,
+    isFetchingDeye,
+    fetchingStage,
+    lastSyncedAt,
     directusStatus,
   } = useAccount();
   const { toggleMobileOpen } = useSidebar();
@@ -131,7 +134,14 @@ export function Header({
     : selectedAccount?.name || currentStationName || 'Facility Array';
 
   return (
-    <header className="sticky top-0 z-30 h-16 w-full bg-background/85 backdrop-blur-md border-b border-border/60 transition-all">
+    <header className="sticky top-0 z-30 h-16 w-full bg-background/85 backdrop-blur-md border-b border-border/60 transition-all relative">
+      {/* Top-Edge Glowing Cybernetic Data Stream Progress Bar */}
+      {(isFetchingDeye || syncing) && (
+        <div className="absolute top-0 left-0 right-0 h-[2.5px] overflow-hidden z-50 pointer-events-none">
+          <div className="h-full w-full bg-gradient-to-r from-emerald-500 via-cyan-400 to-amber-400 animate-pulse shadow-[0_0_10px_rgba(6,182,212,0.9)]" />
+        </div>
+      )}
+
       <div className="h-16 w-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         {/* Left: Mobile Menu & Dynamic Brand / Workspace Selector */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -188,9 +198,20 @@ export function Header({
 
             {/* Dropdown Menu */}
             {showAccountDropdown && (
-              <div className="absolute left-0 mt-2 w-88 bg-popover/95 border border-border/70 rounded-2xl shadow-xl p-2.5 z-50 backdrop-blur-md animate-in fade-in-80">
-                <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground border-b border-border/60 mb-2 flex items-center justify-between">
-                  <span>{isConsumer ? 'Your Solar Plants' : 'Monitor Accounts & Plants'}</span>
+              <div
+                style={{ maxHeight: 'calc(100dvh - 5rem)' }}
+                className="absolute left-0 mt-2 w-[calc(100vw-2rem)] sm:w-88 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] max-h-[calc(100dvh-5rem)] flex flex-col overflow-hidden bg-popover/95 border border-border/70 rounded-2xl shadow-xl p-2.5 z-50 backdrop-blur-md animate-in fade-in-80"
+              >
+                <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground border-b border-border/60 mb-2 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span>{isConsumer ? 'Your Solar Plants' : 'Monitor Accounts & Plants'}</span>
+                    {(isFetchingDeye || syncing) && (
+                      <span className="flex items-center gap-1 text-[9px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30 font-bold lowercase tracking-normal animate-pulse">
+                        <RefreshCw size={9} className="animate-spin text-cyan-400" />
+                        syncing...
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     {accounts.some((a) => (a.plants?.length || 0) > 0) && (
                       <button
@@ -210,13 +231,13 @@ export function Header({
 
                 {/* Global Fleet View Option - Only for Admins / Multi-account Viewers */}
                 {!isConsumer && (
-                  <>
+                  <div className="shrink-0 mb-1">
                     <button
                       onClick={() => {
                         setSelectedAccountId('ALL');
                         setShowAccountDropdown(false);
                       }}
-                      className={`w-full flex items-center justify-between p-2.5 rounded-xl transition-all mb-1 cursor-pointer ${
+                      className={`w-full flex items-center justify-between p-2.5 rounded-xl transition-all cursor-pointer ${
                         isFleetView
                           ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
                           : 'hover:bg-accent text-foreground'
@@ -239,12 +260,12 @@ export function Header({
                       </div>
                       {isFleetView && <Check size={14} />}
                     </button>
-                    <div className="h-px bg-border/60 my-1" />
-                  </>
+                    <div className="h-px bg-border/60 my-1.5" />
+                  </div>
                 )}
 
-                {/* Account & Plants List */}
-                <div className="max-h-72 overflow-y-auto space-y-1 pr-1">
+                {/* Account & Plants List - Flex 1 Scrollable */}
+                <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1 overscroll-contain">
                   {accounts.map((acc) => {
                     const isSelected = selectedAccountId === acc.id;
                     const plants = acc.plants || [];
@@ -342,18 +363,21 @@ export function Header({
                   })}
                 </div>
 
-                <div className="h-px bg-border/60 my-2" />
-                <div className="space-y-1">
+                <div className="shrink-0 pt-2 border-t border-border/60 mt-1.5 space-y-1">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       syncLivePlants();
                     }}
-                    disabled={syncing}
+                    disabled={syncing || isFetchingDeye}
                     className="flex items-center justify-center gap-1.5 w-full py-1.5 px-2.5 text-xs text-primary hover:text-primary/90 font-medium rounded-lg bg-primary/10 hover:bg-primary/15 border border-primary/20 transition-colors cursor-pointer disabled:opacity-50"
                   >
-                    <RefreshCw size={13} className={syncing ? 'animate-spin text-primary' : 'text-primary'} />
-                    <span>{syncing ? 'Syncing DeyeCloud...' : 'Sync Live Plant Names & Devices'}</span>
+                    <RefreshCw size={13} className={syncing || isFetchingDeye ? 'animate-spin text-primary' : 'text-primary'} />
+                    <span className="truncate">
+                      {syncing || isFetchingDeye
+                        ? (fetchingStage || 'Syncing Accounts & Plants...')
+                        : 'Sync Live Plant Names & Devices'}
+                    </span>
                   </button>
                   <Link
                     href="/accounts"
@@ -371,6 +395,25 @@ export function Header({
 
         {/* Right: Telemetry Health, Directus Status, Role Toggle, Clock, Theme Mode Toggle, Notifications */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Prominent Live Data Fetching Indicator */}
+          {isFetchingDeye || syncing ? (
+            <div
+              className="flex items-center gap-2 px-3 py-1 rounded-xl bg-cyan-500/15 border border-cyan-500/40 text-xs font-mono text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)] animate-pulse"
+              title="Active live data exchange with DeyeCloud OpenAPI"
+            >
+              <RefreshCw size={12} className="animate-spin text-cyan-400 shrink-0" />
+              <span className="font-semibold truncate max-w-[140px] sm:max-w-[240px]">
+                {fetchingStage || 'Fetching DeyeCloud Data...'}
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping shrink-0 hidden sm:inline-block" />
+            </div>
+          ) : lastSyncedAt && Date.now() - lastSyncedAt.getTime() < 4000 ? (
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-mono text-emerald-400 animate-in fade-in duration-300">
+              <CheckCircle2 size={12} className="text-emerald-400" />
+              <span>DeyeCloud Synced</span>
+            </div>
+          ) : null}
+
           {/* Database Connection Indicator */}
           {directusStatus && (
             <div
@@ -393,24 +436,30 @@ export function Header({
           <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-card border border-border/60 text-xs font-mono">
             <span
               className={`w-2 h-2 rounded-full ${
-                isLiveApi || liveAccountsCount > 0
+                isFetchingDeye || syncing
+                  ? 'bg-cyan-400 animate-ping'
+                  : isLiveApi || liveAccountsCount > 0
                   ? 'bg-emerald-500 animate-pulse'
                   : 'bg-amber-500'
               }`}
             />
             <span className="text-foreground font-medium">
-              {isLiveApi || liveAccountsCount > 0 ? 'DeyeCloud Bus' : 'Simulation'}
+              {isFetchingDeye || syncing
+                ? 'Syncing...'
+                : isLiveApi || liveAccountsCount > 0
+                ? 'DeyeCloud Bus'
+                : 'Simulation'}
             </span>
             <span className="text-muted-foreground text-[10px]">
               {pingMs}ms
             </span>
             <button
               onClick={() => syncLivePlants()}
-              disabled={syncing}
+              disabled={syncing || isFetchingDeye}
               title="Sync latest plant names and hardware from DeyeCloud"
               className="ml-0.5 p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-colors cursor-pointer disabled:opacity-50"
             >
-              <RefreshCw size={11} className={syncing ? 'animate-spin text-primary' : ''} />
+              <RefreshCw size={11} className={syncing || isFetchingDeye ? 'animate-spin text-primary' : ''} />
             </button>
           </div>
 

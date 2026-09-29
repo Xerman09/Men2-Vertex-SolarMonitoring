@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
 import { useAccount } from '@/lib/account-context';
+import { useRole } from '@/lib/role-context';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -30,6 +31,7 @@ export default function TrigonometricAnalyticsPage() {
     isFleetView,
     totalAccounts,
   } = useAccount();
+  const { isAdmin } = useRole();
 
   const [dateRange, setDateRange] = useState<'TODAY' | 'YESTERDAY' | 'WEEK' | 'SEASONAL'>('TODAY');
   const [hourlyData, setHourlyData] = useState<HourlySolarPoint[]>([]);
@@ -100,9 +102,11 @@ export default function TrigonometricAnalyticsPage() {
                   Fourier Engine v2.4
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Harmonic series decomposition, theoretical sinusoidal curve fitting ($R^2$), 24-hour polar phasor radar, and instantaneous 3-phase AC waveforms.
-              </p>
+              {isAdmin && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Harmonic series decomposition, theoretical sinusoidal curve fitting ($R^2$), 24-hour polar phasor radar, and instantaneous 3-phase AC waveforms.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -170,45 +174,47 @@ export default function TrigonometricAnalyticsPage() {
       />
 
       {/* Comparative Analytical Notes & Formula Breakdown */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-        <Card className="border-border/60 bg-card/60">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground font-mono">
-              1. 24h Fourier Decomposition
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground space-y-1.5">
-            <p>
-              Transforms the 24-hour cycle into discrete Fourier coefficients:
-            </p>
-            <div className="p-2 rounded-lg bg-muted/50 font-mono text-[11px] text-foreground">
-              P(t) = a0 + Σ [ak·cos(kω0t) + bk·sin(kω0t)]
-            </div>
-            <p>
-              The fundamental $k=1$ wave defines the macro solar curve, while $k=2$ and $k=3$ model steep load ramps.
-            </p>
-          </CardContent>
-        </Card>
+      {isAdmin && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          <Card className="border-border/60 bg-card/60">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground font-mono">
+                1. 24h Fourier Decomposition
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs text-muted-foreground space-y-1.5">
+              <p>
+                Transforms the 24-hour cycle into discrete Fourier coefficients:
+              </p>
+              <div className="p-2 rounded-lg bg-muted/50 font-mono text-[11px] text-foreground">
+                P(t) = a0 + Σ [ak·cos(kω0t) + bk·sin(kω0t)]
+              </div>
+              <p>
+                The fundamental $k=1$ wave defines the macro solar curve, while $k=2$ and $k=3$ model steep load ramps.
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card className="border-border/60 bg-card/60">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground font-mono">
-              2. 3-Phase AC Phasor Vectors
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground space-y-1.5">
-            <p>
-              Simulates high-frequency instantaneous 60Hz waveforms:
-            </p>
-            <div className="p-2 rounded-lg bg-muted/50 font-mono text-[11px] text-foreground">
-              v(t) = Vpeak · sin(2πft ± 120°)
-            </div>
-            <p>
-              Verifies phase angle φ, calculates active power P and reactive power Q (S = √(P² + Q²)).
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          <Card className="border-border/60 bg-card/60">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground font-mono">
+                2. 3-Phase AC Phasor Vectors
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs text-muted-foreground space-y-1.5">
+              <p>
+                Simulates high-frequency instantaneous 60Hz waveforms:
+              </p>
+              <div className="p-2 rounded-lg bg-muted/50 font-mono text-[11px] text-foreground">
+                v(t) = Vpeak · sin(2πft ± 120°)
+              </div>
+              <p>
+                Verifies phase angle φ, calculates active power P and reactive power Q (S = √(P² + Q²)).
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

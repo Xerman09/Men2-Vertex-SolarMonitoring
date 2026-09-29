@@ -256,14 +256,21 @@ class DeyeAccountManager {
             };
           });
 
-          // Fallback to existing plant cache if Directus hasn't discovered devices yet
-          const finalPlants = plants.length > 0 ? plants : (existing?.plants || []);
+          // Merge plants by stationId so no stations are lost
+          const plantMap = new Map<string, PlantInfo>();
+          (existing?.plants || []).forEach((p) => plantMap.set(String(p.stationId), p));
+          plants.forEach((p) => plantMap.set(String(p.stationId), p));
+          const finalPlants = plantMap.size > 0 ? Array.from(plantMap.values()) : [];
           const firstInverter = finalPlants[0]?.devices?.find((d) => d.deviceType === 'INVERTER');
+
+          const accountName = (cfg.profile_name && cfg.profile_name !== 'EU/Asia Developer Gateway' && cfg.profile_name !== 'New Solar Gateway')
+            ? cfg.profile_name
+            : (existing?.name || cfg.profile_name || cfg.account_email);
 
           const accountConfig: DeyeAccountConfig = {
             id: existing ? existing.id : `deye-cfg-${cfgId}`,
             directusId: cfgId,
-            name: cfg.profile_name || existing?.name || cfg.account_email,
+            name: accountName,
             enabled: cfg.status !== 'OFFLINE',
             admin: true,
             baseUrl: cfg.base_url || 'https://eu1-developer.deyecloud.com',
@@ -764,6 +771,37 @@ class DeyeAccountManager {
       if (firstInverter && !target.defaultDeviceSn) {
         target.defaultDeviceSn = firstInverter.deviceSn;
       }
+
+      // Persist discovered stations & devices into iot_solar_stations and iot_solar_devices
+      try {
+        const directusId = target.directusId ? Number(target.directusId) : null;
+        for (const p of discovery.plants) {
+          await this.createItem(COLLECTIONS.STATIONS, {
+            station_id: p.stationId,
+            name: p.stationName,
+            installed_capacity_kw: p.installedCapacityKw,
+            address: p.address || '',
+            deye_config_id: directusId,
+            org_id: 1,
+            grid_type: '3-PHASE',
+            is_active: 1,
+          });
+
+          for (const d of p.devices) {
+            await this.createItem(COLLECTIONS.DEVICES, {
+              device_sn: d.deviceSn,
+              station_id: p.stationId,
+              device_type: d.deviceType,
+              name: d.name,
+              model: d.model || '',
+              rated_kw: d.ratedKw || 0,
+              status: d.status || 'ONLINE',
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[DeyeAccountManager] Non-fatal error saving synced stations to database:', err);
+      }
     }
 
     this.saveAccountsToFile(all);
@@ -981,7 +1019,7 @@ class DeyeAccountManager {
    */
   public async getAggregatedFleetSummary(): Promise<AggregatedFleetSummary> {
     const clients = this.getAllClients().filter((c) => c.hasCredentials());
-    const rawAccounts = this.getAllRawAccounts(true).filter(
+    const rawAccounts = this.loadAccounts(false).filter(
       (a) => a.enabled !== false
     );
 

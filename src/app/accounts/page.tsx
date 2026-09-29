@@ -32,7 +32,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 export default function AccountsManagementPage() {
-  const { refreshAccounts: refreshContextAccounts } = useAccount();
+  const {
+    refreshAccounts: refreshContextAccounts,
+    isFetchingDeye,
+    fetchingStage,
+    setFetchingDeye,
+  } = useAccount();
   const { isAdmin, isConsumer, isViewer, user, setShowAuthModal } = useRole();
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
   const [directusInfo, setDirectusInfo] = useState<{ connected: boolean; lastChecked: string; error?: string } | null>(null);
@@ -70,9 +75,12 @@ export default function AccountsManagementPage() {
   });
   const [savingPlant, setSavingPlant] = useState(false);
 
-  const fetchAccounts = async () => {
+  const fetchAccounts = async (isManualSync = false) => {
+    if (isManualSync) {
+      setFetchingDeye(true, 'Syncing DeyeCloud Accounts & Plants...');
+    }
     try {
-      const res = await fetch('/api/deye/accounts');
+      const res = await fetch(isManualSync ? '/api/deye/accounts?sync=true' : '/api/deye/accounts');
       if (res.ok) {
         const json = await res.json();
         setAccounts(json.accounts || []);
@@ -84,6 +92,11 @@ export default function AccountsManagementPage() {
       console.error('Failed to load accounts:', e);
     } finally {
       setLoading(false);
+      if (isManualSync) {
+        setTimeout(() => {
+          setFetchingDeye(false, null);
+        }, 600);
+      }
     }
   };
 
@@ -93,6 +106,7 @@ export default function AccountsManagementPage() {
 
   const handleSyncAccount = async (accountId: string) => {
     setSyncingId(accountId);
+    setFetchingDeye(true, 'Syncing Account & Auto-Discovering Deye Plants...');
     try {
       const res = await fetch('/api/deye/accounts/sync', {
         method: 'POST',
@@ -100,13 +114,16 @@ export default function AccountsManagementPage() {
         body: JSON.stringify({ accountId }),
       });
       if (res.ok) {
-        await fetchAccounts();
-        await refreshContextAccounts();
+        await fetchAccounts(true);
+        await refreshContextAccounts(true);
       }
     } catch (e) {
       console.error('Sync error:', e);
     } finally {
       setSyncingId(null);
+      setTimeout(() => {
+        setFetchingDeye(false, null);
+      }, 600);
     }
   };
 
@@ -350,18 +367,28 @@ export default function AccountsManagementPage() {
                   </Badge>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {isAdmin
-                  ? 'Two-way database account synchronization, credentials management, automatic plant discovery, and inverter hierarchy.'
-                  : isConsumer
-                  ? 'Your registered solar stations, plant telemetry, and inverter hardware configurations.'
-                  : 'Live synoptic overview of registered solar sites, inverters, rated capacities, and operational status.'}
-              </p>
+              {isAdmin && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Two-way database account synchronization, credentials management, automatic plant discovery, and inverter hierarchy.
+                </p>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchAccounts(true)}
+            disabled={loading || isFetchingDeye}
+            className="gap-2 h-9 text-xs font-semibold border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
+            title="Sync all accounts, registered plants, and inverters from DeyeCloud"
+          >
+            <RefreshCw size={14} className={loading || isFetchingDeye ? 'animate-spin text-cyan-400' : 'text-cyan-400'} />
+            <span>{loading || isFetchingDeye ? 'Syncing Deye...' : 'Sync from DeyeCloud'}</span>
+          </Button>
+
           {isAdmin ? (
             <Button
               onClick={() => setShowAddAccountModal(true)}

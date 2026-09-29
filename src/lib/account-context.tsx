@@ -16,7 +16,11 @@ interface AccountContextType {
   isFleetView: boolean;
   loading: boolean;
   syncing: boolean;
-  refreshAccounts: (forceSync?: boolean) => Promise<void>;
+  isFetchingDeye: boolean;
+  fetchingStage: string | null;
+  lastSyncedAt: Date | null;
+  setFetchingDeye: (fetching: boolean, stage?: string | null) => void;
+  refreshAccounts: (forceSync?: boolean, showIndicator?: boolean) => Promise<void>;
   syncLivePlants: () => Promise<void>;
   totalAccounts: number;
   liveAccountsCount: number;
@@ -32,9 +36,24 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [selectedStationId, setSelectedStationId] = useState<string>('ALL');
   const [loading, setLoading] = useState<boolean>(true);
   const [syncing, setSyncing] = useState<boolean>(false);
+  const [isFetchingDeye, setIsFetchingDeye] = useState<boolean>(false);
+  const [fetchingStage, setFetchingStage] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [directusStatus, setDirectusStatus] = useState<{ connected: boolean; lastChecked: string; error?: string } | undefined>(undefined);
 
-  const refreshAccounts = useCallback(async (forceSync: boolean = false) => {
+  const setFetchingDeye = useCallback((fetching: boolean, stage: string | null = null) => {
+    setIsFetchingDeye(fetching);
+    setFetchingStage(stage);
+    if (!fetching) {
+      setLastSyncedAt(new Date());
+    }
+  }, []);
+
+  const refreshAccounts = useCallback(async (forceSync: boolean = false, showIndicator: boolean = false) => {
+    if (showIndicator || forceSync) {
+      setIsFetchingDeye(true);
+      setFetchingStage(forceSync ? 'Syncing DeyeCloud Accounts & Plants...' : 'Fetching DeyeCloud Accounts...');
+    }
     try {
       const url = forceSync ? '/api/deye/accounts?sync=true' : '/api/deye/accounts';
       const res = await fetch(url);
@@ -44,27 +63,35 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         if (json.directus) {
           setDirectusStatus(json.directus);
         }
+        setLastSyncedAt(new Date());
       }
     } catch (e) {
       console.error('[AccountContext] Failed to load accounts:', e);
     } finally {
       setLoading(false);
+      if (showIndicator || forceSync) {
+        setTimeout(() => {
+          setIsFetchingDeye(false);
+          setFetchingStage(null);
+        }, 800);
+      }
     }
   }, []);
 
   const syncLivePlants = useCallback(async () => {
     setSyncing(true);
+    setIsFetchingDeye(true);
+    setFetchingStage('Syncing Live Plants & Hardware from DeyeCloud...');
     try {
-      await refreshAccounts(true);
+      await refreshAccounts(true, true);
     } finally {
       setSyncing(false);
     }
   }, [refreshAccounts]);
 
   useEffect(() => {
-    refreshAccounts();
-    const interval = setInterval(refreshAccounts, 10000);
-    return () => clearInterval(interval);
+    // Initial silent load of accounts and plants on mount only
+    refreshAccounts(false, false);
   }, [refreshAccounts]);
 
   // If consumer role, strictly filter to their registered account only
@@ -154,6 +181,10 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         isFleetView,
         loading,
         syncing,
+        isFetchingDeye,
+        fetchingStage,
+        lastSyncedAt,
+        setFetchingDeye,
         refreshAccounts,
         syncLivePlants,
         totalAccounts,

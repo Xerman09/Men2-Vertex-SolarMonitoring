@@ -32,6 +32,8 @@ export class DeyeCloudClient {
   private defaultDeviceSn: string;
   public readonly plants: PlantInfo[];
   private cachedToken: DeyeTokenCache | null = null;
+  private cachedStationSummary: Map<string, { result: { data: StationSummary; isLive: boolean; stationDetected: boolean }; timestamp: number }> = new Map();
+  private cachedBatchDevices: { result: Map<string, any>; timestamp: number } | null = null;
 
   constructor(config?: Partial<DeyeAccountConfig>) {
     this.accountId = config?.id || 'default-site';
@@ -369,8 +371,17 @@ export class DeyeCloudClient {
    *   and computes an accurate, combined aggregate summary plus per-plant telemetry!
    */
   public async getStationSummary(stationId?: string): Promise<{ data: StationSummary; isLive: boolean; stationDetected: boolean }> {
+    const cacheKey = stationId || 'ALL';
+    const now = Date.now();
+    const cached = this.cachedStationSummary.get(cacheKey);
+    if (cached && now - cached.timestamp < 4000) {
+      return cached.result;
+    }
+
     if (stationId && stationId !== 'ALL') {
-      return this.getSingleStationSummary(stationId);
+      const res = await this.getSingleStationSummary(stationId);
+      this.cachedStationSummary.set(cacheKey, { result: res, timestamp: Date.now() });
+      return res;
     }
 
     // Multi-plant account aggregation
@@ -442,14 +453,18 @@ export class DeyeCloudClient {
         plantsSummary,
       };
 
-      return {
+      const finalRes = {
         data: aggregated,
         isLive: anyLive,
         stationDetected: true,
       };
+      this.cachedStationSummary.set(cacheKey, { result: finalRes, timestamp: Date.now() });
+      return finalRes;
     }
 
-    return this.getSingleStationSummary(this.defaultStationId);
+    const defaultRes = await this.getSingleStationSummary(this.defaultStationId);
+    this.cachedStationSummary.set(cacheKey, { result: defaultRes, timestamp: Date.now() });
+    return defaultRes;
   }
 
   /**
@@ -458,6 +473,11 @@ export class DeyeCloudClient {
   public async getBatchDeviceLatest(deviceSnList: string[]): Promise<Map<string, Map<string, string>>> {
     const result = new Map<string, Map<string, string>>();
     if (!deviceSnList || deviceSnList.length === 0) return result;
+
+    const now = Date.now();
+    if (this.cachedBatchDevices && now - this.cachedBatchDevices.timestamp < 4000) {
+      return this.cachedBatchDevices.result;
+    }
 
     const token = await this.getAccessToken();
     if (!token) return result;
@@ -501,6 +521,7 @@ export class DeyeCloudClient {
       console.warn(`[DeyeCloud][${this.accountName}] Batch device latest failed:`, e);
     }
 
+    this.cachedBatchDevices = { result, timestamp: Date.now() };
     return result;
   }
 

@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { StationSummary, AggregatedFleetSummary, FleetMatrixNode } from '@/lib/types';
 import { useAccount } from '@/lib/account-context';
+import { useRole } from '@/lib/role-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,7 +45,11 @@ export default function EnergyFlowDashboard() {
     selectedPlant,
     totalAccounts,
     liveAccountsCount,
+    isFetchingDeye,
+    fetchingStage,
+    setFetchingDeye,
   } = useAccount();
+  const { isAdmin } = useRole();
 
   const [station, setStation] = useState<StationSummary | null>(null);
   const [fleetAggregate, setFleetAggregate] = useState<AggregatedFleetSummary | null>(null);
@@ -56,8 +61,11 @@ export default function EnergyFlowDashboard() {
   const [manualPolling, setManualPolling] = useState(false);
   const [isPlantBarCollapsed, setIsPlantBarCollapsed] = useState(false);
   const [mainTab, setMainTab] = useState<'synoptics' | 'trigonometric'>('synoptics');
+  const inFlightRef = React.useRef(false);
 
   const fetchTelemetry = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
       if (isFleetView) {
         const res = await fetch('/api/deye/aggregate');
@@ -176,20 +184,25 @@ export default function EnergyFlowDashboard() {
     } catch (e) {
       console.error('Error fetching telemetry:', e);
     } finally {
+      inFlightRef.current = false;
       setLoading(false);
     }
   }, [isFleetView, selectedAccountId, selectedAccount, selectedStationId]);
 
   useEffect(() => {
     fetchTelemetry();
-    const interval = setInterval(fetchTelemetry, 3500);
+    const interval = setInterval(fetchTelemetry, 6000);
     return () => clearInterval(interval);
   }, [fetchTelemetry]);
 
   const triggerManualPoll = async () => {
     setManualPolling(true);
+    setFetchingDeye(true, isFleetView ? 'Polling DeyeCloud Fleet Telemetry...' : 'Polling Station Telemetry...');
     await fetchTelemetry();
-    setTimeout(() => setManualPolling(false), 800);
+    setTimeout(() => {
+      setManualPolling(false);
+      setFetchingDeye(false, null);
+    }, 800);
   };
 
   // Compute live values depending on fleet vs single-account view
@@ -243,13 +256,15 @@ export default function EnergyFlowDashboard() {
               {isFleetView ? 'Multi-Account Bus' : selectedStationId === 'ALL' ? `All ${selectedAccount?.plants?.length || 1} Plants Bus` : 'Hybrid Plant'}
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            {isFleetView
-              ? `Real-time multi-site energy flow across ${totalAccounts} configured DeyeCloud accounts.`
-              : selectedPlant
-              ? `Real-time hybrid inverter loop for ${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp).`
-              : `Real-time aggregated telemetry across all ${selectedAccount?.plants?.length || 1} plants (${totalCapacity.toFixed(0)} kWp total capacity).`}
-          </p>
+          {isAdmin && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {isFleetView
+                ? `Real-time multi-site energy flow across ${totalAccounts} configured DeyeCloud accounts.`
+                : selectedPlant
+                ? `Real-time hybrid inverter loop for ${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp).`
+                : `Real-time aggregated telemetry across all ${selectedAccount?.plants?.length || 1} plants (${totalCapacity.toFixed(0)} kWp total capacity).`}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -511,9 +526,11 @@ export default function EnergyFlowDashboard() {
                       ? `Energy Flow · ${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp)`
                       : `Energy Flow · ${selectedAccount?.name || 'Inverter Hub'}`}
                   </h2>
-                  <p className="text-xs text-muted-foreground">
-                    Dynamic balance between PV harvest, battery storage, facility load, and grid interconnect.
-                  </p>
+                  {isAdmin && (
+                    <p className="text-xs text-muted-foreground">
+                      Dynamic balance between PV harvest, battery storage, facility load, and grid interconnect.
+                    </p>
+                  )}
                 </div>
               </div>
 

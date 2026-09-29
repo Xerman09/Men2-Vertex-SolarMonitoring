@@ -38,6 +38,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useRole } from '@/lib/role-context';
+import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import {
   HourlySolarPoint,
   calculateSinusoidalFit,
@@ -135,6 +137,7 @@ export function TrigonometricHistoryGraph({
     });
   }, [data, timeResolution]);
 
+  const { isAdmin } = useRole();
   const [activeData, setActiveData] = useState<HourlySolarPoint[]>(initialData);
   const [isLiveStreaming, setIsLiveStreaming] = useState(true);
   const [chartRenderMode, setChartRenderMode] = useState<'line' | 'area'>('line');
@@ -523,6 +526,11 @@ export function TrigonometricHistoryGraph({
                 </Badge>
               </div>
             </div>
+            {isAdmin && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {TELEMETRY_DESCRIPTIONS.trigonometricGraph.header}
+              </p>
+            )}
           </div>
 
           {/* Dynamic Stream & Resolution Controls */}
@@ -864,6 +872,11 @@ export function TrigonometricHistoryGraph({
                     Dynamic Scale: {pvYDomain[0]} kW → {pvYDomain[1]} kW (+18% Headroom)
                   </Badge>
                 </div>
+                {isAdmin && (
+                  <p className="text-xs text-muted-foreground">
+                    {TELEMETRY_DESCRIPTIONS.trigonometricGraph.pvPowerSolo}
+                  </p>
+                )}
                 <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={powerSeriesData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
@@ -914,6 +927,11 @@ export function TrigonometricHistoryGraph({
                     Dynamic Scale: {consumptionYDomain[0]} kW → {consumptionYDomain[1]} kW (+18% Headroom)
                   </Badge>
                 </div>
+                {isAdmin && (
+                  <p className="text-xs text-muted-foreground">
+                    {TELEMETRY_DESCRIPTIONS.trigonometricGraph.consumptionSolo}
+                  </p>
+                )}
                 <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={powerSeriesData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
@@ -1009,6 +1027,22 @@ export function TrigonometricHistoryGraph({
                     Negative (−): Grid Import
                   </span>
                 </div>
+                {isAdmin && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/20">
+                      <span className="font-semibold text-purple-400 block font-mono text-xs">Positive (+): Clean Solar Feed-in Export</span>
+                      <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                        {TELEMETRY_DESCRIPTIONS.trigonometricGraph.gridExportPositive}
+                      </span>
+                    </div>
+                    <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/20">
+                      <span className="font-semibold text-purple-300 block font-mono text-xs">Negative (−): Utility Grid Import</span>
+                      <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                        {TELEMETRY_DESCRIPTIONS.trigonometricGraph.gridImportNegative}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1053,6 +1087,11 @@ export function TrigonometricHistoryGraph({
                   </div>
                   <div>
                     <span className="text-xs sm:text-sm font-bold text-foreground block">Utilization — PV to Import</span>
+                    {isAdmin && (
+                      <span className="text-[11px] text-muted-foreground block mt-0.5">
+                        {TELEMETRY_DESCRIPTIONS.trigonometricGraph.selfConsumptionUtilization}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden">
@@ -1075,6 +1114,11 @@ export function TrigonometricHistoryGraph({
                   </div>
                   <div>
                     <span className="text-xs sm:text-sm font-bold text-foreground block">Production — Consumption to Export</span>
+                    {isAdmin && (
+                      <span className="text-[11px] text-muted-foreground block mt-0.5">
+                        {TELEMETRY_DESCRIPTIONS.trigonometricGraph.selfConsumptionProduction}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden">
@@ -1245,6 +1289,11 @@ export function TrigonometricHistoryGraph({
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+            {isAdmin && (
+              <p className="text-xs text-muted-foreground">
+                {TELEMETRY_DESCRIPTIONS.trigonometricGraph.sinusoidalModelNote}
+              </p>
+            )}
           </div>
         )}
 
@@ -1258,6 +1307,11 @@ export function TrigonometricHistoryGraph({
                 <span className="text-xs font-semibold text-foreground">
                   Discrete Fourier Decomposition of 24-Hour Diurnal Cycle
                 </span>
+                {isAdmin && (
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {TELEMETRY_DESCRIPTIONS.trigonometricGraph.fourierDecomposition}
+                  </p>
+                )}
               </div>
               <Badge variant="outline" className="text-cyan-500 border-cyan-500/30 bg-cyan-500/10 font-mono text-[10px] px-1.5 py-0 w-fit">
                 Harmonics k = 1, 2, 3
@@ -1318,6 +1372,11 @@ export function TrigonometricHistoryGraph({
                 </LineChart>
               </ResponsiveContainer>
             </div>
+            {isAdmin && (
+              <p className="text-[11px] text-muted-foreground">
+                {TELEMETRY_DESCRIPTIONS.trigonometricGraph.fourierHarmonicPhases}
+              </p>
+            )}
           </div>
         )}
 
@@ -1331,6 +1390,11 @@ export function TrigonometricHistoryGraph({
                 <span className="text-xs font-semibold text-foreground">
                   360-Degree Circular Phasor: Solar Lobe (Green) vs Load (Yellow)
                 </span>
+                {isAdmin && (
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {TELEMETRY_DESCRIPTIONS.trigonometricGraph.polarPhasor}
+                  </p>
+                )}
               </div>
               <Badge variant="outline" className="text-indigo-500 border-indigo-500/30 bg-indigo-500/10 font-mono text-[10px] px-1.5 py-0 w-fit">
                 Polar Coordinates (r, θ)

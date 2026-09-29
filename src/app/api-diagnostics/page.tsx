@@ -173,9 +173,11 @@ export default function ApiDiagnosticsPage() {
                   Database / DeyeCloud
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Inspect OAuth token caches, probe latency, send real-time control dispatches, and test REST endpoints.
-              </p>
+              {isAdmin && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Inspect OAuth token caches, probe latency, send real-time control dispatches, and test REST endpoints.
+                </p>
+              )}
             </div>
           </div>
         </div>
