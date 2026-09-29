@@ -171,17 +171,17 @@ export function Header({
                   <Sun size={14} />
                 )}
               </div>
-              <div className="flex flex-col">
-                <span className="font-semibold text-xs text-foreground truncate max-w-[200px] sm:max-w-[280px]">
+              <div className="flex flex-col min-w-0">
+                <span className="font-semibold text-xs text-foreground truncate max-w-[140px] xs:max-w-[180px] sm:max-w-[280px]">
                   {displayTitle}
                 </span>
                 {!isFleetView && selectedPlant && selectedAccount && (
-                  <span className="text-[10px] text-muted-foreground leading-none truncate max-w-[200px] sm:max-w-[280px]">
+                  <span className="text-[10px] text-muted-foreground leading-none truncate max-w-[140px] xs:max-w-[180px] sm:max-w-[280px]">
                     {selectedAccount.name} · {selectedPlant.installedCapacityKw} kWp
                   </span>
                 )}
                 {!isFleetView && !selectedPlant && selectedAccount && (
-                  <span className="text-[10px] text-muted-foreground leading-none truncate max-w-[200px] sm:max-w-[280px]">
+                  <span className="text-[10px] text-muted-foreground leading-none truncate max-w-[140px] xs:max-w-[180px] sm:max-w-[280px]">
                     {selectedAccount.plants?.length
                       ? `${selectedAccount.plants.length} Plants Combined · ${selectedAccount.capacityKw} kWp Total`
                       : `${selectedAccount.capacityKw} kWp Total`}
@@ -196,12 +196,9 @@ export function Header({
               />
             </button>
 
-            {/* Dropdown Menu */}
+            {/* Dropdown Menu - Fully responsive to compressed width and height */}
             {showAccountDropdown && (
-              <div
-                style={{ maxHeight: 'calc(100dvh - 5rem)' }}
-                className="absolute left-0 mt-2 w-[calc(100vw-2rem)] sm:w-88 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] max-h-[calc(100dvh-5rem)] flex flex-col overflow-hidden bg-popover/95 border border-border/70 rounded-2xl shadow-xl p-2.5 z-50 backdrop-blur-md animate-in fade-in-80"
-              >
+              <div className="fixed sm:absolute top-16 sm:top-full left-3 right-3 sm:left-0 sm:right-auto mt-1.5 sm:w-88 max-h-[calc(100dvh-5rem)] flex flex-col overflow-hidden bg-popover/95 border border-border/70 rounded-2xl shadow-2xl p-2.5 z-50 backdrop-blur-md animate-in fade-in-80">
                 <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground border-b border-border/60 mb-2 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2">
                     <span>{isConsumer ? 'Your Solar Plants' : 'Monitor Accounts & Plants'}</span>

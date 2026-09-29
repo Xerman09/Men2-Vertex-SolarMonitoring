@@ -61,11 +61,8 @@ export default function EnergyFlowDashboard() {
   const [manualPolling, setManualPolling] = useState(false);
   const [isPlantBarCollapsed, setIsPlantBarCollapsed] = useState(false);
   const [mainTab, setMainTab] = useState<'synoptics' | 'trigonometric'>('synoptics');
-  const inFlightRef = React.useRef(false);
 
   const fetchTelemetry = useCallback(async () => {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
     try {
       if (isFleetView) {
         const res = await fetch('/api/deye/aggregate');
@@ -184,14 +181,13 @@ export default function EnergyFlowDashboard() {
     } catch (e) {
       console.error('Error fetching telemetry:', e);
     } finally {
-      inFlightRef.current = false;
       setLoading(false);
     }
   }, [isFleetView, selectedAccountId, selectedAccount, selectedStationId]);
 
   useEffect(() => {
     fetchTelemetry();
-    const interval = setInterval(fetchTelemetry, 6000);
+    const interval = setInterval(fetchTelemetry, 3500);
     return () => clearInterval(interval);
   }, [fetchTelemetry]);
 

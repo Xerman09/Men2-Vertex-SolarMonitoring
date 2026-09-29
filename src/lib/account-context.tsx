@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AccountSummary, PlantInfo } from './types';
 import { useRole } from './role-context';
 
@@ -89,8 +89,12 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshAccounts]);
 
+  const hasLoadedRef = useRef(false);
+
   useEffect(() => {
-    // Initial silent load of accounts and plants on mount only
+    // Initial silent load of accounts and plants on mount only (strictly once)
+    if (hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
     refreshAccounts(false, false);
   }, [refreshAccounts]);
 

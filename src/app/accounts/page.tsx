@@ -33,16 +33,30 @@ import { Button } from '@/components/ui/button';
 
 export default function AccountsManagementPage() {
   const {
+    accounts: contextAccounts,
+    directusStatus,
     refreshAccounts: refreshContextAccounts,
     isFetchingDeye,
     fetchingStage,
     setFetchingDeye,
   } = useAccount();
   const { isAdmin, isConsumer, isViewer, user, setShowAuthModal } = useRole();
-  const [accounts, setAccounts] = useState<AccountSummary[]>([]);
-  const [directusInfo, setDirectusInfo] = useState<{ connected: boolean; lastChecked: string; error?: string } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [accounts, setAccounts] = useState<AccountSummary[]>(contextAccounts || []);
+  const [directusInfo, setDirectusInfo] = useState<{ connected: boolean; lastChecked: string; error?: string } | null>(
+    directusStatus || null
+  );
+  const [loading, setLoading] = useState(contextAccounts.length === 0);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (contextAccounts.length > 0) {
+      setAccounts(contextAccounts);
+      setLoading(false);
+    }
+    if (directusStatus) {
+      setDirectusInfo(directusStatus);
+    }
+  }, [contextAccounts, directusStatus]);
 
   // Add Account Modal State
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
@@ -101,8 +115,10 @@ export default function AccountsManagementPage() {
   };
 
   useEffect(() => {
-    fetchAccounts();
-  }, []);
+    if (contextAccounts.length === 0) {
+      fetchAccounts(false);
+    }
+  }, [contextAccounts.length]);
 
   const handleSyncAccount = async (accountId: string) => {
     setSyncingId(accountId);
