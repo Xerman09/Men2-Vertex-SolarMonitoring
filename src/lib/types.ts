@@ -337,4 +337,21 @@ export interface SolarInverterAlarmRecord {
   resolved_at?: string;
 }
 
+export interface SolarStationDailyYield {
+  id: number;
+  station_id: string;
+  yield_date: string;
+  solar_yield_kwh: number;
+  consumed_kwh?: number;
+  grid_export_kwh?: number;
+  grid_import_kwh?: number;
+  battery_charge_kwh?: number;
+  battery_discharge_kwh?: number;
+  peak_power_kw?: number;
+  cost_saved_usd?: number;
+  co2_offset_ton?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 

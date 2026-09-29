@@ -35,6 +35,7 @@ erDiagram
     iot_solar_devices ||--o{ iot_solar_inverter_alarms : "faulted device (1:N)"
 
     iot_solar_stations ||--o{ iot_solar_station_tariffs : "pricing schedule (1:N)"
+    iot_solar_stations ||--o{ iot_solar_station_daily_yields : "daily summary rollups (1:N)"
 
     iot_solar_stations ||--o{ iot_solar_telemetry_snapshots : "plant metrics (1:N)"
     iot_solar_devices ||--o{ iot_solar_telemetry_snapshots : "inverter metrics (1:N)"
@@ -224,7 +225,35 @@ erDiagram
 
 ---
 
-### 10. `iot_solar_telemetry_snapshots`
+### 10. `iot_solar_station_daily_yields`
+* **Purpose:** Daily rollup / historical aggregation table. Stores frozen, end-of-day summary metrics per solar plant for each calendar day (`yield_date`). Powers monthly/yearly generation bar charts, lifetime ROI analysis, and historical reporting without needing to re-aggregate raw 5-minute telemetry streams.
+* **Primary Key:** `id` (BIGINT Auto-Increment)
+* **Key Columns:**
+  * `id`: Internal record ID.
+  * `station_id`: Parent solar station identifier (`VARCHAR(64)`).
+  * `yield_date`: Calendar date for the daily yield report (`DATE`, format `YYYY-MM-DD`).
+  * `solar_yield_kwh`: Total active solar PV electricity generated that day.
+  * `consumed_kwh`: Total facility electricity consumed by machinery and loads.
+  * `grid_export_kwh`: Surplus solar energy exported to utility grid.
+  * `grid_import_kwh`: Nighttime or overcast energy imported from utility grid.
+  * `battery_charge_kwh`: Total energy fed into BESS batteries.
+  * `battery_discharge_kwh`: Total energy extracted from BESS batteries to serve loads.
+  * `peak_power_kw`: Maximum instantaneous peak kW output reached on that day.
+  * `cost_saved_usd`: Total monetary energy bill savings achieved on that day.
+  * `co2_offset_ton`: Environmental equivalent carbon offset metric (tons CO₂).
+  * `created_at`, `updated_at`: Timestamps of row creation/modification.
+* **Relations to Other Tables:**
+  * **Borrowed from `iot_solar_stations`:** `station_id` references `iot_solar_stations.station_id`.
+
+> [!NOTE]
+> **Why is `iot_solar_station_daily_yields` currently empty?**
+> 1. **Live Direct-Fetch Model:** The DSM Next.js application is currently configured in real-time operational mode: it reads live daily yields on-the-fly directly from the Deye Cloud OpenAPI (`/v1.0/station/latest` and `/v1.0/device/batchLatest` register `DailyActiveProduction`).
+> 2. **No Active Midnight Archival Cron:** Populating this table requires an automated end-of-day scheduler (e.g. running daily at 23:59 or 00:05) or a background ingestion worker to query the final daily yield numbers from Deye Cloud or aggregate `iot_solar_telemetry_snapshots` and write the summary record.
+> 3. **Unregistered in Collection Writer:** In the DSM codebase, the API client currently writes newly discovered stations, devices, and control audit logs, but does not yet run an automated end-of-day batch insert into `iot_solar_station_daily_yields`.
+
+---
+
+### 11. `iot_solar_telemetry_snapshots`
 * **Purpose:** High-resolution time-series data table recording 5-minute sampling intervals of solar generation, load consumption, battery charge/discharge, grid import/export, and AC 3-phase voltages. Powers the **Trigonometric History Curves** and **Harmonics Analysis** dashboards.
 * **Primary Key:** `id` (BIGINT Auto-Increment)
 * **Key Columns:**
@@ -246,7 +275,7 @@ erDiagram
 
 ---
 
-### 11. `iot_solar_accounts` (Legacy / Monolithic Collection)
+### 12. `iot_solar_accounts` (Legacy / Monolithic Collection)
 * **Purpose:** Backward-compatibility collection used prior to database normalization. Stores monolithic records containing credentials, API keys, and nested JSON plant arrays.
 * **Role in Current System:** The system operates a seamless fallback mechanism: it first queries the normalized tables (`iot_solar_deye_cloud_configs`, `iot_solar_stations`, `iot_solar_devices`), and if empty, automatically falls back to `iot_solar_accounts` or `deye-accounts.json`.
 
@@ -270,6 +299,7 @@ erDiagram
 | `iot_solar_inverter_alarms` | `station_id` | `iot_solar_stations` | `station_id` | Many-to-One | Identifies plant site of alarm |
 | `iot_solar_inverter_alarms` | `device_sn` | `iot_solar_devices` | `device_sn` | Many-to-One | Identifies specific faulted device |
 | `iot_solar_station_tariffs` | `station_id` | `iot_solar_stations` | `station_id` | Many-to-One | Maps utility pricing structure to a solar plant |
+| `iot_solar_station_daily_yields` | `station_id` | `iot_solar_stations` | `station_id` | Many-to-One | Links daily frozen yield rollup statistics to a solar plant |
 | `iot_solar_telemetry_snapshots` | `station_id` | `iot_solar_stations` | `station_id` | Many-to-One | Groups time-series curves by plant |
 | `iot_solar_telemetry_snapshots` | `device_sn` | `iot_solar_devices` | `device_sn` | Many-to-One | Groups time-series curves by inverter |
 

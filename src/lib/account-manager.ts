@@ -25,6 +25,7 @@ export const COLLECTIONS = {
   CONTROL_LOGS: 'iot_solar_inverter_control_logs',
   ALARMS: 'iot_solar_inverter_alarms',
   TARIFFS: 'iot_solar_station_tariffs',
+  DAILY_YIELDS: 'iot_solar_station_daily_yields',
   TELEMETRY: 'iot_solar_telemetry_snapshots',
   LEGACY_ACCOUNTS: 'iot_solar_accounts',
 } as const;
