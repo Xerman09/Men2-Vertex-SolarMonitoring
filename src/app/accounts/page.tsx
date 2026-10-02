@@ -16,6 +16,7 @@ import {
   Globe,
   Sliders,
   ChevronRight,
+  ChevronDown,
   ExternalLink,
   Power,
   X,
@@ -47,6 +48,27 @@ export default function AccountsManagementPage() {
   );
   const [loading, setLoading] = useState(contextAccounts.length === 0);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  // Collapsed state for registered plants (plant stationId -> boolean)
+  const [collapsedPlants, setCollapsedPlants] = useState<Record<string, boolean>>({});
+
+  const togglePlantCollapse = (stationId: string) => {
+    setCollapsedPlants((prev) => ({
+      ...prev,
+      [stationId]: !prev[stationId],
+    }));
+  };
+
+  const toggleAllPlantsForAccount = (accountPlants: PlantInfo[]) => {
+    const allCollapsed = accountPlants.every((p) => Boolean(collapsedPlants[p.stationId]));
+    setCollapsedPlants((prev) => {
+      const next = { ...prev };
+      accountPlants.forEach((p) => {
+        next[p.stationId] = !allCollapsed;
+      });
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (contextAccounts.length > 0) {
@@ -427,64 +449,64 @@ export default function AccountsManagementPage() {
       </div>
 
       {/* Fleet Overview KPI Ribbon in VOS Format */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 w-full">
-        <Card className="border-border/60 bg-card/80 p-4 shadow-xs">
-          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block mb-1">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 w-full">
+        <Card className="border-border/60 bg-card/80 p-4 shadow-xs min-w-0">
+          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block mb-1 truncate">
             Registered Accounts
           </span>
-          <div className="flex items-baseline gap-1.5">
+          <div className="flex items-baseline gap-1.5 flex-wrap">
             <span className="text-2xl font-bold font-mono text-primary">
               {activeAccountsCount}
             </span>
-            <span className="text-xs text-muted-foreground">/ {totalAccountsCount} Active</span>
+            <span className="text-xs text-muted-foreground truncate">/ {totalAccountsCount} Active</span>
           </div>
         </Card>
 
-        <Card className="border-border/60 bg-card/80 p-4 shadow-xs">
-          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block mb-1">
+        <Card className="border-border/60 bg-card/80 p-4 shadow-xs min-w-0">
+          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block mb-1 truncate">
             Discovered Plants
           </span>
-          <div className="flex items-baseline gap-1.5">
+          <div className="flex items-baseline gap-1.5 flex-wrap">
             <span className="text-2xl font-bold font-mono text-cyan-500">
               {totalPlants}
             </span>
-            <span className="text-xs text-muted-foreground">Solar Arrays</span>
+            <span className="text-xs text-muted-foreground truncate">Solar Arrays</span>
           </div>
         </Card>
 
-        <Card className="border-border/60 bg-card/80 p-4 shadow-xs">
-          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block mb-1">
+        <Card className="border-border/60 bg-card/80 p-4 shadow-xs min-w-0">
+          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block mb-1 truncate">
             Hybrid Inverters
           </span>
-          <div className="flex items-baseline gap-1.5">
+          <div className="flex items-baseline gap-1.5 flex-wrap">
             <span className="text-2xl font-bold font-mono text-emerald-500">
               {totalInverters}
             </span>
-            <span className="text-xs text-muted-foreground">Active Units</span>
+            <span className="text-xs text-muted-foreground truncate">Active Units</span>
           </div>
         </Card>
 
-        <Card className="border-border/60 bg-card/80 p-4 shadow-xs">
-          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block mb-1">
+        <Card className="border-border/60 bg-card/80 p-4 shadow-xs min-w-0">
+          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block mb-1 truncate">
             Data Loggers
           </span>
-          <div className="flex items-baseline gap-1.5">
+          <div className="flex items-baseline gap-1.5 flex-wrap">
             <span className="text-2xl font-bold font-mono text-foreground">
               {totalLoggers}
             </span>
-            <span className="text-xs text-muted-foreground">Gateways</span>
+            <span className="text-xs text-muted-foreground truncate">Gateways</span>
           </div>
         </Card>
 
-        <Card className="border-border/60 bg-card/80 p-4 shadow-xs">
-          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block mb-1">
+        <Card className="border-border/60 bg-card/80 p-4 shadow-xs min-w-0 col-span-2 sm:col-span-1 lg:col-span-1">
+          <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block mb-1 truncate">
             Total Fleet Capacity
           </span>
-          <div className="flex items-baseline gap-1.5">
+          <div className="flex items-baseline gap-1.5 flex-wrap">
             <span className="text-2xl font-bold font-mono text-primary">
               {totalCapacity.toFixed(0)}
             </span>
-            <span className="text-xs text-muted-foreground">kWp</span>
+            <span className="text-xs text-muted-foreground truncate">kWp</span>
           </div>
         </Card>
       </div>
@@ -614,9 +636,22 @@ export default function AccountsManagementPage() {
 
               {/* Plants & Hardware Under this Account */}
               <div className="mt-5 flex flex-col gap-4">
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono font-bold">
-                  Registered Plants & Attached Hardware
-                </span>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono font-bold">
+                    Registered Plants & Attached Hardware ({account.plants.length})
+                  </span>
+                  {account.plants.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => toggleAllPlantsForAccount(account.plants)}
+                      className="text-xs font-mono text-primary hover:underline cursor-pointer"
+                    >
+                      {account.plants.every((p) => Boolean(collapsedPlants[p.stationId]))
+                        ? 'Expand All Plants'
+                        : 'Collapse All Plants'}
+                    </button>
+                  )}
+                </div>
 
                 {account.plants.length === 0 ? (
                   <div className="p-6 bg-muted/20 rounded-xl border border-dashed border-border/60 text-center">
@@ -640,91 +675,129 @@ export default function AccountsManagementPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-4">
-                    {account.plants.map((plant) => (
-                      <div
-                        key={plant.stationId}
-                        className="bg-card/70 p-4 rounded-xl border border-border/60 flex flex-col gap-3"
-                      >
-                        {/* Plant Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div className="flex items-center gap-2.5">
-                            <Zap className="text-amber-500 shrink-0" size={18} />
-                            <div>
-                              <span className="font-bold text-sm text-foreground">
-                                {plant.stationName}
-                              </span>
-                              <span className="font-mono text-xs text-primary ml-2">
-                                ID: {plant.stationId}
-                              </span>
+                  <div className="grid grid-cols-1 gap-3">
+                    {account.plants.map((plant) => {
+                      const isCollapsed = Boolean(collapsedPlants[plant.stationId]);
+                      const invertersCount = plant.devices.filter((d) => d.deviceType === 'INVERTER').length;
+                      const loggersCount = plant.devices.filter((d) => d.deviceType === 'LOGGER').length;
+
+                      return (
+                        <div
+                          key={plant.stationId}
+                          className="bg-card/70 rounded-xl border border-border/60 transition-all overflow-hidden shadow-2xs hover:border-border/90"
+                        >
+                          {/* Collapsible Plant Header */}
+                          <div
+                            onClick={() => togglePlantCollapse(plant.stationId)}
+                            className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 cursor-pointer hover:bg-muted/30 transition-colors select-none"
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                togglePlantCollapse(plant.stationId);
+                              }
+                            }}
+                            aria-expanded={!isCollapsed}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center shrink-0">
+                                <Zap size={16} />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-sm text-foreground truncate">
+                                    {plant.stationName}
+                                  </span>
+                                  <span className="font-mono text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
+                                    ID: {plant.stationId}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-muted-foreground font-mono mt-0.5 truncate">
+                                  {plant.installedCapacityKw} kWp · {plant.devices.length} Devices ({invertersCount} Inverter{invertersCount !== 1 ? 's' : ''}, {loggersCount} Gateway{loggersCount !== 1 ? 's' : ''})
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                              <Badge variant="outline" className="text-xs font-mono">
+                                {plant.installedCapacityKw} kWp
+                              </Badge>
+                              <Badge variant="secondary" className="text-xs font-mono">
+                                {plant.devices.length} Units
+                              </Badge>
+                              <div className="p-1 rounded-md text-muted-foreground hover:text-foreground">
+                                <ChevronDown
+                                  size={16}
+                                  className={`transition-transform duration-200 ${
+                                    isCollapsed ? '' : 'rotate-180'
+                                  }`}
+                                />
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs font-mono">
-                              {plant.installedCapacityKw} kWp Installed
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {plant.devices.length} Devices
-                            </span>
-                          </div>
-                        </div>
 
-                        {/* Devices List Table in VOS format */}
-                        <div className="overflow-x-auto mt-1">
-                          <table className="w-full text-left text-xs">
-                            <thead>
-                              <tr className="border-b border-border/50 text-muted-foreground uppercase text-[10px] font-mono">
-                                <th className="py-2 px-2">Type</th>
-                                <th className="py-2 px-2">Device Name</th>
-                                <th className="py-2 px-2">Serial Number</th>
-                                <th className="py-2 px-2">Model</th>
-                                <th className="py-2 px-2">Rating</th>
-                                <th className="py-2 px-2 text-right">Status</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border/40 font-mono">
-                              {plant.devices.map((device) => {
-                                const isInverter = device.deviceType === 'INVERTER';
-                                return (
-                                  <tr key={device.deviceSn} className="hover:bg-muted/30 transition-colors">
-                                    <td className="py-2.5 px-2">
-                                      <span
-                                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                          isInverter
-                                            ? 'bg-cyan-500/10 text-cyan-500'
-                                            : 'bg-primary/10 text-primary'
-                                        }`}
-                                      >
-                                        {isInverter ? <Cpu size={11} /> : <Radio size={11} />}
-                                        {device.deviceType}
-                                      </span>
-                                    </td>
-                                    <td className="py-2.5 px-2 font-semibold text-foreground font-sans">
-                                      {device.name}
-                                    </td>
-                                    <td className="py-2.5 px-2 text-muted-foreground">
-                                      {device.deviceSn}
-                                    </td>
-                                    <td className="py-2.5 px-2 text-muted-foreground font-sans">
-                                      {device.model || 'Deye Standard'}
-                                    </td>
-                                    <td className="py-2.5 px-2 text-foreground font-mono">
-                                      {isInverter ? `${device.ratedKw || 120} kW` : 'Gateway'}
-                                    </td>
-                                    <td className="py-2.5 px-2 text-right">
-                                      <span className="inline-flex items-center gap-1 text-emerald-500 font-bold text-[11px]">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                        {device.status}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
+                          {/* Devices List Table (Shown when expanded) */}
+                          {!isCollapsed && (
+                            <div className="px-4 pb-4 pt-1 border-t border-border/40 animate-in fade-in-50">
+                              <div className="overflow-x-auto mt-2">
+                                <table className="w-full text-left text-xs">
+                                  <thead>
+                                    <tr className="border-b border-border/50 text-muted-foreground uppercase text-[10px] font-mono">
+                                      <th className="py-2 px-2">Type</th>
+                                      <th className="py-2 px-2">Device Name</th>
+                                      <th className="py-2 px-2">Serial Number</th>
+                                      <th className="py-2 px-2">Model</th>
+                                      <th className="py-2 px-2">Rating</th>
+                                      <th className="py-2 px-2 text-right">Status</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-border/40 font-mono">
+                                    {plant.devices.map((device) => {
+                                      const isInverter = device.deviceType === 'INVERTER';
+                                      return (
+                                        <tr key={device.deviceSn} className="hover:bg-muted/30 transition-colors">
+                                          <td className="py-2.5 px-2">
+                                            <span
+                                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                                isInverter
+                                                  ? 'bg-cyan-500/10 text-cyan-500'
+                                                  : 'bg-primary/10 text-primary'
+                                              }`}
+                                            >
+                                              {isInverter ? <Cpu size={11} /> : <Radio size={11} />}
+                                              {device.deviceType}
+                                            </span>
+                                          </td>
+                                          <td className="py-2.5 px-2 font-semibold text-foreground font-sans">
+                                            {device.name}
+                                          </td>
+                                          <td className="py-2.5 px-2 text-muted-foreground">
+                                            {device.deviceSn}
+                                          </td>
+                                          <td className="py-2.5 px-2 text-muted-foreground font-sans">
+                                            {device.model || 'Deye Standard'}
+                                          </td>
+                                          <td className="py-2.5 px-2 text-foreground font-mono">
+                                            {isInverter ? `${device.ratedKw || 120} kW` : 'Gateway'}
+                                          </td>
+                                          <td className="py-2.5 px-2 text-right">
+                                            <span className="inline-flex items-center gap-1 text-emerald-500 font-bold text-[11px]">
+                                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                              {device.status}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

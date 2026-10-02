@@ -202,73 +202,73 @@ export default function HardwareTelemetryPage() {
 
       {/* Inverter Master Identity Card in VOS layout */}
       <Card className="border-border/60 bg-card/80 p-5 shadow-xs">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div>
-            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="min-w-0">
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block truncate">
               Inverter Model & Plant
             </span>
-            <span className="text-base font-bold text-foreground block mt-1">
+            <span className="text-base font-bold text-foreground block mt-1 truncate">
               {telemetry?.model || currentInvMeta?.model || 'Deye Inverter'}
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground truncate block">
               {currentInvMeta?.stationName || 'Solar Plant Array'}
             </span>
           </div>
 
-          <div>
-            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block">
+          <div className="min-w-0">
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block truncate">
               Connected Data Logger
             </span>
-            <span className="text-sm font-bold font-mono text-cyan-500 block mt-1">
+            <span className="text-sm font-bold font-mono text-cyan-500 block mt-1 truncate">
               {currentInvMeta?.loggerSn ? `SN: ${currentInvMeta.loggerSn}` : 'Collector Gateway'}
             </span>
-            <span className="text-xs text-emerald-500 flex items-center gap-1 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xs text-emerald-500 flex items-center gap-1 mt-0.5 truncate">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               Cloud Link Online
             </span>
           </div>
 
-          <div>
-            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block">
+          <div className="min-w-0">
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block truncate">
               Live Active Power
             </span>
-            <span className="text-lg font-bold font-mono text-amber-500 block mt-1">
+            <span className="text-lg font-bold font-mono text-amber-500 block mt-1 truncate">
               {telemetry?.totalActivePowerKw ? `${telemetry.totalActivePowerKw.toFixed(2)} kW` : '0.00 kW'}
             </span>
-            <span className="text-xs text-muted-foreground font-mono">
+            <span className="text-xs text-muted-foreground font-mono truncate block">
               Today: {telemetry?.todayEnergyKwh ? `${telemetry.todayEnergyKwh.toFixed(1)} kWh` : '0.0 kWh'}
             </span>
           </div>
 
-          <div>
-            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block">
+          <div className="min-w-0">
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block truncate">
               Cumulative Yield
             </span>
-            <span className="text-lg font-bold font-mono text-primary block mt-1">
+            <span className="text-lg font-bold font-mono text-primary block mt-1 truncate">
               {telemetry?.totalEnergyMwh ? `${telemetry.totalEnergyMwh.toFixed(2)} MWh` : '--'}
             </span>
-            <span className="text-xs text-muted-foreground">Lifetime Generated</span>
+            <span className="text-xs text-muted-foreground truncate block">Lifetime Generated</span>
           </div>
 
-          <div>
-            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block">
+          <div className="min-w-0 col-span-2 sm:col-span-1 lg:col-span-1">
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block truncate">
               Operating State
             </span>
-            <div className="flex items-center gap-1.5 mt-1.5">
+            <div className="flex items-center gap-1.5 mt-1.5 truncate">
               <span
-                className={`w-2 h-2 rounded-full ${
+                className={`w-2 h-2 rounded-full shrink-0 ${
                   telemetry?.connectionStatus === 'ONLINE' ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'
                 }`}
               />
               <span
-                className={`text-xs font-bold font-mono ${
+                className={`text-xs font-bold font-mono truncate ${
                   telemetry?.connectionStatus === 'ONLINE' ? 'text-emerald-500' : 'text-muted-foreground'
                 }`}
               >
                 {telemetry?.connectionStatus === 'ONLINE' ? 'ONLINE & SYNCED' : 'STANDBY'}
               </span>
             </div>
-            <span className="text-xs text-muted-foreground font-mono">
+            <span className="text-xs text-muted-foreground font-mono truncate block">
               Grid Linked ({telemetry?.gridFrequencyHz || 60.0} Hz)
             </span>
           </div>

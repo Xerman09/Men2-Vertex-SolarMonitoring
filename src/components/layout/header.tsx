@@ -142,9 +142,9 @@ export function Header({
         </div>
       )}
 
-      <div className="h-16 w-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+      <div className="h-16 w-full px-3 sm:px-5 lg:px-7 flex items-center justify-between gap-2 min-w-0">
         {/* Left: Mobile Menu & Dynamic Brand / Workspace Selector */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink">
           {/* Mobile Drawer Trigger */}
           <Button
             variant="ghost"
@@ -157,10 +157,10 @@ export function Header({
           </Button>
 
           {/* Account Selector Dropdown */}
-          <div className="relative shrink-0" ref={dropdownRef}>
+          <div className="relative min-w-0 shrink" ref={dropdownRef}>
             <button
               onClick={() => setShowAccountDropdown(!showAccountDropdown)}
-              className="flex items-center gap-2.5 px-3 py-1.5 bg-card/80 hover:bg-accent/60 rounded-xl border border-border/60 cursor-pointer transition-colors text-left shadow-2xs"
+              className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 bg-card/80 hover:bg-accent/60 rounded-xl border border-border/60 cursor-pointer transition-colors text-left shadow-2xs min-w-0 max-w-[210px] xs:max-w-[250px] sm:max-w-[300px] md:max-w-[360px]"
             >
               <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
                 {isFleetView ? (
@@ -171,25 +171,25 @@ export function Header({
                   <Sun size={14} />
                 )}
               </div>
-              <div className="flex flex-col min-w-0">
-                <span className="font-semibold text-xs text-foreground truncate max-w-[140px] xs:max-w-[180px] sm:max-w-[280px]">
+              <div className="flex flex-col min-w-0 shrink">
+                <span className="font-semibold text-xs text-foreground truncate block">
                   {displayTitle}
                 </span>
                 {!isFleetView && selectedPlant && selectedAccount && (
-                  <span className="text-[10px] text-muted-foreground leading-none truncate max-w-[140px] xs:max-w-[180px] sm:max-w-[280px]">
+                  <span className="text-[10px] text-muted-foreground leading-none truncate block">
                     {selectedAccount.name} · {selectedPlant.installedCapacityKw} kWp
                   </span>
                 )}
                 {!isFleetView && !selectedPlant && selectedAccount && (
-                  <span className="text-[10px] text-muted-foreground leading-none truncate max-w-[140px] xs:max-w-[180px] sm:max-w-[280px]">
+                  <span className="text-[10px] text-muted-foreground leading-none truncate block">
                     {selectedAccount.plants?.length
-                      ? `${selectedAccount.plants.length} Plants Combined · ${selectedAccount.capacityKw} kWp Total`
+                      ? `${selectedAccount.plants.length} Plants · ${selectedAccount.capacityKw} kWp Total`
                       : `${selectedAccount.capacityKw} kWp Total`}
                   </span>
                 )}
               </div>
               <ChevronDown
-                className={`text-muted-foreground transition-transform duration-200 ml-1 ${
+                className={`text-muted-foreground transition-transform duration-200 ml-1 shrink-0 ${
                   showAccountDropdown ? 'rotate-180' : ''
                 }`}
                 size={14}
@@ -391,30 +391,31 @@ export function Header({
         </div>
 
         {/* Right: Telemetry Health, Directus Status, Role Toggle, Clock, Theme Mode Toggle, Notifications */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Prominent Live Data Fetching Indicator */}
           {isFetchingDeye || syncing ? (
             <div
-              className="flex items-center gap-2 px-3 py-1 rounded-xl bg-cyan-500/15 border border-cyan-500/40 text-xs font-mono text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)] animate-pulse"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 rounded-xl bg-cyan-500/15 border border-cyan-500/40 text-xs font-mono text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)] animate-pulse shrink-0"
               title="Active live data exchange with DeyeCloud OpenAPI"
             >
               <RefreshCw size={12} className="animate-spin text-cyan-400 shrink-0" />
-              <span className="font-semibold truncate max-w-[140px] sm:max-w-[240px]">
-                {fetchingStage || 'Fetching DeyeCloud Data...'}
+              <span className="font-semibold truncate max-w-[90px] sm:max-w-[130px] md:max-w-[170px]">
+                {fetchingStage || 'Syncing Deye...'}
               </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping shrink-0 hidden sm:inline-block" />
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping shrink-0 hidden md:inline-block" />
             </div>
           ) : lastSyncedAt && Date.now() - lastSyncedAt.getTime() < 4000 ? (
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-mono text-emerald-400 animate-in fade-in duration-300">
+            <div className="hidden md:flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-mono text-emerald-400 animate-in fade-in duration-300 shrink-0">
               <CheckCircle2 size={12} className="text-emerald-400" />
-              <span>DeyeCloud Synced</span>
+              <span className="hidden lg:inline">DeyeCloud</span>
+              <span>Synced</span>
             </div>
           ) : null}
 
           {/* Database Connection Indicator */}
           {directusStatus && (
             <div
-              className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-card border border-border/60 text-xs font-mono"
+              className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-card border border-border/60 text-xs font-mono shrink-0"
               title={`Cloud Database: ${directusStatus.connected ? 'Connected (Two-way live sync)' : 'Offline (Using cached fallback)'}`}
             >
               <Database size={12} className={directusStatus.connected ? 'text-cyan-500' : 'text-amber-500'} />
@@ -430,9 +431,9 @@ export function Header({
           )}
 
           {/* Cloud Bus State Indicator & Quick Sync */}
-          <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-card border border-border/60 text-xs font-mono">
+          <div className="hidden md:flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 rounded-xl bg-card border border-border/60 text-xs font-mono shrink-0">
             <span
-              className={`w-2 h-2 rounded-full ${
+              className={`w-2 h-2 rounded-full shrink-0 ${
                 isFetchingDeye || syncing
                   ? 'bg-cyan-400 animate-ping'
                   : isLiveApi || liveAccountsCount > 0
@@ -440,21 +441,21 @@ export function Header({
                   : 'bg-amber-500'
               }`}
             />
-            <span className="text-foreground font-medium">
+            <span className="text-foreground font-medium hidden xl:inline">
               {isFetchingDeye || syncing
                 ? 'Syncing...'
                 : isLiveApi || liveAccountsCount > 0
                 ? 'DeyeCloud Bus'
                 : 'Simulation'}
             </span>
-            <span className="text-muted-foreground text-[10px]">
+            <span className="text-muted-foreground text-[10px] shrink-0 font-mono">
               {pingMs}ms
             </span>
             <button
               onClick={() => syncLivePlants()}
               disabled={syncing || isFetchingDeye}
               title="Sync latest plant names and hardware from DeyeCloud"
-              className="ml-0.5 p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-colors cursor-pointer disabled:opacity-50"
+              className="ml-0.5 p-0.5 sm:p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-colors cursor-pointer disabled:opacity-50 shrink-0"
             >
               <RefreshCw size={11} className={syncing || isFetchingDeye ? 'animate-spin text-primary' : ''} />
             </button>
@@ -462,25 +463,25 @@ export function Header({
 
           {/* Role Mode Toggle Button (Admin vs Consumer vs Sign In) */}
           {user ? (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 shrink-0">
               <div
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold ${
+                className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl text-xs font-semibold shrink-0 ${
                   isAdmin
                     ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30'
                     : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30'
                 }`}
                 title={`Logged in as ${user.email} (${isAdmin ? 'Admin' : 'Consumer'})`}
               >
-                {isAdmin ? <Shield size={13} /> : <User size={13} />}
-                <span className="hidden sm:inline font-mono text-[11px] truncate max-w-[130px]">
+                {isAdmin ? <Shield size={13} className="shrink-0" /> : <User size={13} className="shrink-0" />}
+                <span className="hidden sm:inline font-mono text-[11px] truncate max-w-[80px] md:max-w-[120px]">
                   {user.name || user.email?.split('@')[0] || (isAdmin ? 'Admin' : 'Consumer')}
                 </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
               </div>
               <button
                 onClick={() => logout()}
                 title="Sign out"
-                className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-rose-500 transition-colors cursor-pointer"
+                className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-rose-500 transition-colors cursor-pointer shrink-0"
               >
                 <LogOut size={14} />
               </button>
@@ -494,30 +495,32 @@ export function Header({
                 setShowAuthModal(true);
               }}
               title="Sign in to your solar monitoring account"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60 text-xs font-medium transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60 text-xs font-medium transition-colors cursor-pointer shrink-0"
             >
-              <User size={13} className="text-primary" />
+              <User size={13} className="text-primary shrink-0" />
               <span className="hidden sm:inline">Sign In</span>
-              <Lock size={11} className="text-muted-foreground" />
+              <Lock size={11} className="text-muted-foreground shrink-0" />
             </button>
           )}
 
           {/* UTC Clock */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/40 border border-border/50 text-[11px] font-mono text-muted-foreground">
+          <div className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/40 border border-border/50 text-[11px] font-mono text-muted-foreground shrink-0">
             <Clock size={12} />
             <span>{utcTime || '12:00:00 UTC'}</span>
           </div>
 
           {/* Theme Mode Toggle (Light/Dark/System) */}
-          <ModeToggle />
+          <div className="shrink-0">
+            <ModeToggle />
+          </div>
 
           {/* Notifications / Alarms Button */}
-          <div className="relative">
+          <div className="relative shrink-0">
             <Button
               variant="outline"
               size="icon-sm"
               onClick={() => setShowNotifications(!showNotifications)}
-              className="rounded-xl border-border/60 hover:bg-accent/60 relative"
+              className="rounded-xl border-border/60 hover:bg-accent/60 relative shrink-0"
               title="System Alerts & Diagnostics"
             >
               <Bell size={15} className="text-foreground" />
@@ -600,7 +603,7 @@ export function Header({
                     type="text"
                     autoFocus
                     required
-                    placeholder="e.g. hanvinsolar@gmail.com or admin"
+                    placeholder="Username or email address"
                     value={loginEmail}
                     onChange={(e) => {
                       setLoginEmail(e.target.value);

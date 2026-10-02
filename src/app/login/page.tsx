@@ -7,7 +7,6 @@ import {
   Sun,
   Zap,
   Shield,
-  User,
   Lock,
   Mail,
   Eye,
@@ -50,12 +49,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const fillCredentials = (userVal: string, passVal: string) => {
-    setEmail(userVal);
-    setPassword(passVal);
-    setError('');
   };
 
   return (
@@ -171,7 +164,7 @@ export default function LoginPage() {
                     type="text"
                     required
                     autoFocus
-                    placeholder="e.g. hanvinsolar@gmail.com or admin"
+                    placeholder="Username or email address"
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);
@@ -230,32 +223,6 @@ export default function LoginPage() {
                 </Button>
               </div>
             </form>
-
-            {/* Quick Demo Pre-fill Badges for Testing */}
-            <div className="mt-8 pt-5 border-t border-border/50">
-              <span className="text-[11px] font-mono text-muted-foreground block mb-2.5">
-                Quick Test Credentials (Click to pre-fill):
-              </span>
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => fillCredentials('admin', 'admin')}
-                  className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 text-[11px] font-mono transition-colors cursor-pointer flex items-center gap-1.5"
-                >
-                  <Shield size={11} />
-                  <span>Admin: admin</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => fillCredentials('hanvinsolar@gmail.com', 'Hanvinsolar123')}
-                  className="px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 border border-cyan-500/30 text-[11px] font-mono transition-colors cursor-pointer flex items-center gap-1.5"
-                >
-                  <User size={11} />
-                  <span>Consumer: Hanvin Solar</span>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </div>

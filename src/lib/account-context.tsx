@@ -92,10 +92,10 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
-    // Initial silent load of accounts and plants on mount only (strictly once)
+    // Initial load and sync of accounts and plants on page load/reload (with top panel indicator)
     if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
-    refreshAccounts(false, false);
+    refreshAccounts(false, true);
   }, [refreshAccounts]);
 
   // If consumer role, strictly filter to their registered account only
