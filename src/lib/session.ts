@@ -9,7 +9,20 @@ export interface SessionData {
   exp: number; // Unix timestamp in seconds
 }
 
+export const HOST_SESSION_COOKIE_NAME = '__Host-dsm_session';
 export const SESSION_COOKIE_NAME = 'dsm_session';
+
+/**
+ * Extracts session token checking both secure __Host- prefix and standard cookie name
+ */
+export function extractSessionToken(cookieStore: {
+  get: (name: string) => { value?: string } | undefined;
+}): string | undefined {
+  return (
+    cookieStore.get(HOST_SESSION_COOKIE_NAME)?.value ||
+    cookieStore.get(SESSION_COOKIE_NAME)?.value
+  );
+}
 
 function base64UrlEncode(str: string): string {
   return Buffer.from(str)
@@ -164,3 +177,31 @@ export function enforceTenantAccess(
   }
   return { allowed: true, targetAccountId: undefined };
 }
+
+/**
+ * Standardized authentication requirement helper for API routes.
+ * Enforces that a caller must possess a valid, non-expired session token.
+ */
+export function requireAuthenticatedSession(
+  session: SessionData | null,
+  requiredRole?: 'admin' | 'consumer' | 'viewer'
+): { allowed: boolean; status: number; error?: string } {
+  if (!session) {
+    return {
+      allowed: false,
+      status: 401,
+      error: 'Unauthorized: Authentication required to access solar monitoring resources',
+    };
+  }
+
+  if (requiredRole === 'admin' && session.role !== 'admin') {
+    return {
+      allowed: false,
+      status: 403,
+      error: 'Forbidden: Administrator privileges required',
+    };
+  }
+
+  return { allowed: true, status: 200 };
+}
+

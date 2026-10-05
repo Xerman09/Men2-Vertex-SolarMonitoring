@@ -3,8 +3,34 @@ import { accountManager, COLLECTIONS } from '@/lib/account-manager';
 import { SolarUser, SolarUserStationPermission } from '@/lib/types';
 import { verifyPassword } from '@/lib/auth-crypto';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { createSessionToken, SESSION_COOKIE_NAME, DEFAULT_SESSION_TTL_SECONDS } from '@/lib/session';
+import {
+  createSessionToken,
+  SESSION_COOKIE_NAME,
+  HOST_SESSION_COOKIE_NAME,
+  DEFAULT_SESSION_TTL_SECONDS,
+} from '@/lib/session';
 import { env } from '@/lib/env';
+
+function applySessionCookies(response: NextResponse, token: string, req: Request) {
+  const isHttps =
+    req.headers.get('x-forwarded-proto') === 'https' ||
+    req.url.startsWith('https:') ||
+    env.NODE_ENV === 'production';
+
+  const cookieOptions = {
+    value: token,
+    httpOnly: true,
+    secure: isHttps,
+    sameSite: 'lax' as const,
+    path: '/',
+    maxAge: DEFAULT_SESSION_TTL_SECONDS,
+  };
+
+  response.cookies.set({ name: SESSION_COOKIE_NAME, ...cookieOptions });
+  if (isHttps) {
+    response.cookies.set({ name: HOST_SESSION_COOKIE_NAME, ...cookieOptions });
+  }
+}
 
 export async function POST(req: Request) {
   // IP-based Rate limiting (10 attempts per minute per IP)
@@ -14,7 +40,7 @@ export async function POST(req: Request) {
   if (!rateLimit.success) {
     return NextResponse.json(
       { success: false, error: 'Too many authentication attempts. Please try again later.' },
-      { status: 429 }
+      { status: 429, headers: { 'Retry-After': '60' } }
     );
   }
 
@@ -65,15 +91,7 @@ export async function POST(req: Request) {
         user,
       });
 
-      response.cookies.set({
-        name: SESSION_COOKIE_NAME,
-        value: sessionToken,
-        httpOnly: true,
-        secure: env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: DEFAULT_SESSION_TTL_SECONDS,
-      });
+      applySessionCookies(response, sessionToken, req);
 
       return response;
     }
@@ -99,7 +117,7 @@ export async function POST(req: Request) {
           try {
             const perms = await accountManager.fetchCollection<SolarUserStationPermission>(
               COLLECTIONS.PERMISSIONS,
-              `?filter[user_id][_eq]=${matchedUser.id}`
+              `?filter[user_id][_eq]=${encodeURIComponent(String(matchedUser.id))}`
             );
             if (perms && perms.length > 0) {
               assignedStationId = perms[0].station_id;
@@ -132,15 +150,7 @@ export async function POST(req: Request) {
             user,
           });
 
-          response.cookies.set({
-            name: SESSION_COOKIE_NAME,
-            value: sessionToken,
-            httpOnly: true,
-            secure: env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
-            maxAge: DEFAULT_SESSION_TTL_SECONDS,
-          });
+          applySessionCookies(response, sessionToken, req);
 
           return response;
         }
@@ -204,15 +214,7 @@ export async function POST(req: Request) {
       user,
     });
 
-    response.cookies.set({
-      name: SESSION_COOKIE_NAME,
-      value: sessionToken,
-      httpOnly: true,
-      secure: env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: DEFAULT_SESSION_TTL_SECONDS,
-    });
+    applySessionCookies(response, sessionToken, req);
 
     return response;
   } catch (error) {

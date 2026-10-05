@@ -13,3 +13,5 @@ This directory contains records of significant architectural and security design
 | [ADR-0005](./0005-rate-limiting-and-upstash-roadmap.md) | Sliding-Window Rate Limiting and Upstash Redis Roadmap | Accepted | 2026-10-05 |
 | [ADR-0006](./0006-dual-persistence-and-atomic-storage.md) | Dual Directus Relational Persistence with Atomic File Cache Fallback | Accepted | 2026-10-05 |
 | [ADR-0007](./0007-directus-weak-allowlist-self-hosted-policy.md) | Directus Weak-Allowlist Self-Hosted Policy | Accepted | 2026-10-05 |
+| [ADR-0008](./0008-fleet-endpoints-default-deny-visibility-policy.md) | Fleet Endpoints Default-Deny Visibility Policy | Accepted | 2026-10-05 |
+| [ADR-0009](./0009-cookie-host-prefix-and-proxy-tls-discipline.md) | Cookie Host Prefix and Reverse Proxy TLS Discipline | Accepted | 2026-10-05 |

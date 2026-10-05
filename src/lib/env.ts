@@ -1,7 +1,25 @@
 import { z } from 'zod';
 
-export const DEFAULT_SESSION_SECRET = 'deye_solar_monitoring_session_secret_2026_default';
-export const DEFAULT_ADMIN_PIN = '8888';
+const KNOWN_DEV_SESSION_SECRETS = new Set([
+  'deye_solar_monitoring_session_secret_2026_default',
+  'dev_dsm_session_secret_local_testing_32_chars_ok',
+]);
+
+const WEAK_PINS = new Set(['8888', '0000', '1234', '1111', '123456']);
+
+/**
+ * Dynamic fallback generator for non-production environments.
+ * Prevents hardcoding static secrets in git repository.
+ */
+function getNonProdSessionSecret(): string {
+  if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 16) {
+    return process.env.SESSION_SECRET;
+  }
+  // Generate a random 32-byte hex string in-memory for local dev/test if unset
+  const buf = new Uint8Array(32);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 const envSchema = z
   .object({
@@ -15,17 +33,19 @@ const envSchema = z
     DEYE_DEFAULT_DEVICE_SN: z.string().default('2209X891104'),
     DIRECTUS_BASE_URL: z.string().url().default('http://localhost:8056'),
     DIRECTUS_API_TOKEN: z.string().optional().default(''),
-    DIRECTUS_COLLECTION: z.string().default('iot_solar_accounts'),
-    ADMIN_ACCESS_PIN: z.string().default(DEFAULT_ADMIN_PIN),
-    SESSION_SECRET: z.string().min(16).default(DEFAULT_SESSION_SECRET),
+    DIRECTUS_COLLECTION: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/).default('iot_solar_accounts'),
+    ADMIN_ACCESS_PIN: z.string().default('8888'),
+    SESSION_SECRET: z.string().min(16).default(getNonProdSessionSecret),
     ALLOWED_DEV_ORIGINS: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {
       // 1. Session secret check
       if (
-        data.SESSION_SECRET === DEFAULT_SESSION_SECRET ||
+        !data.SESSION_SECRET ||
+        KNOWN_DEV_SESSION_SECRETS.has(data.SESSION_SECRET) ||
         data.SESSION_SECRET.startsWith('change_me') ||
+        data.SESSION_SECRET.startsWith('dev_') ||
         data.SESSION_SECRET.length < 32
       ) {
         ctx.addIssue({
@@ -37,8 +57,7 @@ const envSchema = z
       }
 
       // 2. Admin access PIN check
-      const weakPins = [DEFAULT_ADMIN_PIN, '0000', '1234', '1111', '123456'];
-      if (!data.ADMIN_ACCESS_PIN || weakPins.includes(data.ADMIN_ACCESS_PIN)) {
+      if (!data.ADMIN_ACCESS_PIN || WEAK_PINS.has(data.ADMIN_ACCESS_PIN)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['ADMIN_ACCESS_PIN'],

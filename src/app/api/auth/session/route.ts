@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/session';
+import {
+  verifySessionToken,
+  SESSION_COOKIE_NAME,
+  HOST_SESSION_COOKIE_NAME,
+  extractSessionToken,
+} from '@/lib/session';
 
 export async function GET() {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const sessionCookie = extractSessionToken(cookieStore);
   const session = await verifySessionToken(sessionCookie);
 
   if (!session) {
@@ -28,17 +33,26 @@ export async function GET() {
   });
 }
 
-export async function POST() {
-  // Logout endpoint: clear session cookie
+export async function POST(req: Request) {
+  // Logout endpoint: clear session cookies
   const response = NextResponse.json({ success: true, message: 'Logged out successfully' });
-  response.cookies.set({
-    name: SESSION_COOKIE_NAME,
+  const isHttps =
+    req.headers.get('x-forwarded-proto') === 'https' ||
+    req.url.startsWith('https:') ||
+    process.env.NODE_ENV === 'production';
+
+  const clearOptions = {
     value: '',
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isHttps,
+    sameSite: 'lax' as const,
     path: '/',
     maxAge: 0,
-  });
+  };
+
+  response.cookies.set({ name: SESSION_COOKIE_NAME, ...clearOptions });
+  if (isHttps) {
+    response.cookies.set({ name: HOST_SESSION_COOKIE_NAME, ...clearOptions });
+  }
   return response;
 }

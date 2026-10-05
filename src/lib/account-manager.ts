@@ -76,7 +76,8 @@ class DeyeAccountManager {
    */
   public async fetchCollection<T = any>(collection: string, query = '?limit=-1'): Promise<T[] | null> {
     try {
-      const url = `${this.getDirectusBaseUrl()}/items/${collection}${query}`;
+      const safeCollection = encodeURIComponent(collection);
+      const url = `${this.getDirectusBaseUrl()}/items/${safeCollection}${query}`;
       const res = await fetch(url, {
         method: 'GET',
         headers: this.getDirectusHeaders(),
@@ -110,7 +111,8 @@ class DeyeAccountManager {
    */
   public async createItem<T = any>(collection: string, payload: Record<string, any>): Promise<T | null> {
     try {
-      const url = `${this.getDirectusBaseUrl()}/items/${collection}`;
+      const safeCollection = encodeURIComponent(collection);
+      const url = `${this.getDirectusBaseUrl()}/items/${safeCollection}`;
       const res = await fetch(url, {
         method: 'POST',
         headers: this.getDirectusHeaders(),
@@ -134,7 +136,9 @@ class DeyeAccountManager {
    */
   public async updateItem(collection: string, id: string | number, payload: Record<string, any>): Promise<boolean> {
     try {
-      const url = `${this.getDirectusBaseUrl()}/items/${collection}/${id}`;
+      const safeCollection = encodeURIComponent(collection);
+      const safeId = encodeURIComponent(String(id));
+      const url = `${this.getDirectusBaseUrl()}/items/${safeCollection}/${safeId}`;
       const res = await fetch(url, {
         method: 'PATCH',
         headers: this.getDirectusHeaders(),
@@ -154,7 +158,9 @@ class DeyeAccountManager {
    */
   public async deleteItem(collection: string, id: string | number): Promise<boolean> {
     try {
-      const url = `${this.getDirectusBaseUrl()}/items/${collection}/${id}`;
+      const safeCollection = encodeURIComponent(collection);
+      const safeId = encodeURIComponent(String(id));
+      const url = `${this.getDirectusBaseUrl()}/items/${safeCollection}/${safeId}`;
       const res = await fetch(url, {
         method: 'DELETE',
         headers: this.getDirectusHeaders(),

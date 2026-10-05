@@ -1,5 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
-import { enforceTenantAccess, SessionData, DEFAULT_SESSION_TTL_SECONDS } from '../session';
+import {
+  enforceTenantAccess,
+  SessionData,
+  DEFAULT_SESSION_TTL_SECONDS,
+  requireAuthenticatedSession,
+  HOST_SESSION_COOKIE_NAME,
+  SESSION_COOKIE_NAME,
+  extractSessionToken,
+} from '../session';
 import { checkRateLimit } from '../rate-limit';
 import { accountManager } from '../account-manager';
 import { z } from 'zod';
@@ -208,7 +216,7 @@ describe('Session TTL & Cookie Hardening Regression', () => {
   });
 });
 
-describe('Directus Client Transport Discipline', () => {
+describe('Directus Client Transport Discipline & Parameter Encoding (X3/X4)', () => {
   it('enforces redirect: "error" on deleteItem to block SSRF redirect-chaining', async () => {
     const originalFetch = global.fetch;
     let interceptedInit: RequestInit | undefined;
@@ -227,5 +235,110 @@ describe('Directus Client Transport Discipline', () => {
       global.fetch = originalFetch;
     }
   });
+
+  it('safely encodes collection and id parameters in Directus requests to prevent path injection', async () => {
+    const originalFetch = global.fetch;
+    const requestedUrls: string[] = [];
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      requestedUrls.push(url);
+      return new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+
+    try {
+      // 1. fetchCollection with special characters in collection
+      await accountManager.fetchCollection('solar/accounts', '?limit=10');
+      expect(requestedUrls[0]).toContain('/items/solar%2Faccounts?limit=10');
+
+      // 2. updateItem with special characters in collection and id
+      await accountManager.updateItem('solar/accounts', 'id/with/slashes', { enabled: true });
+      expect(requestedUrls[1]).toContain('/items/solar%2Faccounts/id%2Fwith%2Fslashes');
+
+      // 3. deleteItem with special characters in collection and id
+      await accountManager.deleteItem('solar/accounts', 'id#hash?query=1');
+      expect(requestedUrls[2]).toContain('/items/solar%2Faccounts/id%23hash%3Fquery%3D1');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });
+
+describe('ADR-08 Fleet Endpoints Default-Deny & Session Requirement', () => {
+  const admin = getMockSession({ role: 'admin' });
+  const viewer = getMockSession({ role: 'viewer' });
+  const consumer = getMockSession({ role: 'consumer', accountId: 'acc-1' });
+
+  it('rejects unauthenticated callers with 401 Unauthorized', () => {
+    const check = requireAuthenticatedSession(null);
+    expect(check.allowed).toBe(false);
+    expect(check.status).toBe(401);
+    expect(check.error).toContain('Authentication required');
+  });
+
+  it('allows authenticated callers when no specific role is mandated', () => {
+    expect(requireAuthenticatedSession(admin).allowed).toBe(true);
+    expect(requireAuthenticatedSession(viewer).allowed).toBe(true);
+    expect(requireAuthenticatedSession(consumer).allowed).toBe(true);
+  });
+
+  it('strictly restricts admin-only actions to admin sessions', () => {
+    expect(requireAuthenticatedSession(admin, 'admin').allowed).toBe(true);
+    const viewerCheck = requireAuthenticatedSession(viewer, 'admin');
+    expect(viewerCheck.allowed).toBe(false);
+    expect(viewerCheck.status).toBe(403);
+
+    const consumerCheck = requireAuthenticatedSession(consumer, 'admin');
+    expect(consumerCheck.allowed).toBe(false);
+    expect(consumerCheck.status).toBe(403);
+  });
+
+  it('validates account ID regex for mutation safety', () => {
+    const ACCOUNT_ID_REGEX = /^[A-Za-z0-9_-]+$/;
+    expect(ACCOUNT_ID_REGEX.test('station-01')).toBe(true);
+    expect(ACCOUNT_ID_REGEX.test('account_alpha_99')).toBe(true);
+    expect(ACCOUNT_ID_REGEX.test('Acc123')).toBe(true);
+
+    // Rejection of path injection and control characters
+    expect(ACCOUNT_ID_REGEX.test('../../etc/passwd')).toBe(false);
+    expect(ACCOUNT_ID_REGEX.test('station;rm -rf /')).toBe(false);
+    expect(ACCOUNT_ID_REGEX.test('station<script>')).toBe(false);
+    expect(ACCOUNT_ID_REGEX.test('station name')).toBe(false);
+    expect(ACCOUNT_ID_REGEX.test('')).toBe(false);
+  });
+});
+
+describe('ADR-0009 Cookie Host Prefix & Extraction Discipline', () => {
+  it('extracts session token from standard cookie name', () => {
+    const mockCookieStore = {
+      get: (name: string) => (name === SESSION_COOKIE_NAME ? { value: 'token-standard' } : undefined),
+    };
+    expect(extractSessionToken(mockCookieStore)).toBe('token-standard');
+  });
+
+  it('extracts session token from __Host- prefixed cookie when present', () => {
+    const mockCookieStore = {
+      get: (name: string) => (name === HOST_SESSION_COOKIE_NAME ? { value: 'token-host' } : undefined),
+    };
+    expect(extractSessionToken(mockCookieStore)).toBe('token-host');
+  });
+
+  it('prioritizes __Host- cookie over standard cookie if both are delivered', () => {
+    const mockCookieStore = {
+      get: (name: string) => {
+        if (name === HOST_SESSION_COOKIE_NAME) return { value: 'token-host-priority' };
+        if (name === SESSION_COOKIE_NAME) return { value: 'token-standard-shadowed' };
+        return undefined;
+      },
+    };
+    expect(extractSessionToken(mockCookieStore)).toBe('token-host-priority');
+  });
+
+  it('returns undefined if neither session cookie is present', () => {
+    const mockCookieStore = {
+      get: () => undefined,
+    };
+    expect(extractSessionToken(mockCookieStore)).toBeUndefined();
+  });
+});
+
+
 

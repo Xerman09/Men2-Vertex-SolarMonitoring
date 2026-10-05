@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { accountManager } from '@/lib/account-manager';
-import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/session';
+import {
+  verifySessionToken,
+  SESSION_COOKIE_NAME,
+  requireAuthenticatedSession,
+} from '@/lib/session';
 import { isValidDeyeBaseUrl } from '@/lib/url-validator';
-
 import { checkRateLimit } from '@/lib/rate-limit';
+
+const ACCOUNT_ID_REGEX = /^[A-Za-z0-9_-]+$/;
 
 async function requireAdminSession(req?: Request) {
   const cookieStore = await cookies();
@@ -28,7 +33,7 @@ async function requireAdminSession(req?: Request) {
         session: null,
         errorResponse: NextResponse.json(
           { error: 'Too many account modification requests. Rate limit is 20 requests per minute.' },
-          { status: 429 }
+          { status: 429, headers: { 'Retry-After': '60' } }
         ),
       };
     }
@@ -38,11 +43,47 @@ async function requireAdminSession(req?: Request) {
 }
 
 export async function GET(req: Request) {
+  // 1. IP Rate Limiting (30 requests per minute)
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const rate = checkRateLimit(`read_accounts_${clientIp}`, 30, 60 * 1000);
+  if (!rate.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded: Maximum 30 account registry queries per minute.' },
+      { status: 429, headers: { 'Retry-After': '60' } }
+    );
+  }
+
+  // 2. Enforce Authenticated Session (ADR-08 Default-Deny)
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const session = await verifySessionToken(token);
+
+  const authCheck = requireAuthenticatedSession(session);
+  if (!authCheck.allowed) {
+    return NextResponse.json(
+      { error: authCheck.error || 'Authentication required to view account registry' },
+      { status: authCheck.status }
+    );
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const forceSync = searchParams.get('sync') === 'true' || searchParams.get('force') === 'true';
     const accounts = await accountManager.getAccountsSummary(forceSync);
     const directus = accountManager.getDirectusHealth();
+
+    // Consumer role is strictly scoped to their assigned account metadata
+    if (session?.role === 'consumer') {
+      const consumerAccounts = session.accountId
+        ? accounts.filter((a) => a.id === session.accountId)
+        : [];
+      return NextResponse.json({
+        total: consumerAccounts.length,
+        accounts: consumerAccounts,
+      });
+    }
+
+    // Admin & Viewer roles receive registered accounts and Directus sync status
     return NextResponse.json({
       total: accounts.length,
       accounts,
@@ -123,9 +164,9 @@ export async function PUT(req: Request) {
 
   const { id, ...updates } = body || {};
 
-  if (!id) {
+  if (!id || typeof id !== 'string' || !ACCOUNT_ID_REGEX.test(id)) {
     return NextResponse.json(
-      { error: 'Field "id" is required to update account' },
+      { error: 'Valid alphanumeric "id" is required to update account' },
       { status: 400 }
     );
   }
@@ -166,9 +207,9 @@ export async function DELETE(req: Request) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
 
-    if (!id) {
+    if (!id || !ACCOUNT_ID_REGEX.test(id)) {
       return NextResponse.json(
-        { error: 'Query parameter "id" is required to delete account' },
+        { error: 'Valid alphanumeric query parameter "id" is required to delete account' },
         { status: 400 }
       );
     }

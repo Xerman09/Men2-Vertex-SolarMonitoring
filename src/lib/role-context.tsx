@@ -29,7 +29,6 @@ interface RoleContextType {
   loginAsAdmin: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   logoutAdmin: () => Promise<void>;
-  setRoleDirectly: (role: UserRole, user?: AuthUser | null) => void;
 }
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
@@ -111,7 +110,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const setRoleDirectly = useCallback((newRole: UserRole, newUser?: AuthUser | null) => {
+  const applyRoleState = useCallback((newRole: UserRole, newUser?: AuthUser | null) => {
     setRole(newRole);
     try {
       localStorage.setItem('dsm_user_role', newRole);
@@ -142,7 +141,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         const data = await res.json();
         if (res.ok && data.success) {
           const detectedRole: UserRole = data.role === 'admin' ? 'admin' : 'consumer';
-          setRoleDirectly(detectedRole, data.user);
+          applyRoleState(detectedRole, data.user);
           setShowAuthModal(false);
           return { success: true, role: detectedRole };
         }
@@ -152,7 +151,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: msg };
       }
     },
-    [setRoleDirectly]
+    [applyRoleState]
   );
 
   const loginAsAdmin = useCallback(
@@ -168,8 +167,8 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Ignore network errors on logout
     }
-    setRoleDirectly('viewer', null);
-  }, [setRoleDirectly]);
+    applyRoleState('viewer', null);
+  }, [applyRoleState]);
 
   const logoutAdmin = useCallback(async () => {
     await logout();
@@ -190,7 +189,6 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       loginAsAdmin,
       logout,
       logoutAdmin,
-      setRoleDirectly,
     }),
     [
       role,
@@ -201,7 +199,6 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       loginAsAdmin,
       logout,
       logoutAdmin,
-      setRoleDirectly,
     ]
   );
 

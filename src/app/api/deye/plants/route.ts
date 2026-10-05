@@ -2,17 +2,42 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { accountManager } from '@/lib/account-manager';
 import { DeyeAccountConfig, PlantInfo } from '@/lib/types';
-import { verifySessionToken, SESSION_COOKIE_NAME, enforceTenantAccess } from '@/lib/session';
+import {
+  verifySessionToken,
+  SESSION_COOKIE_NAME,
+  enforceTenantAccess,
+  requireAuthenticatedSession,
+} from '@/lib/session';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const accountId = searchParams.get('accountId');
 
+  // 1. IP Rate Limiting (60 requests per minute)
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const rate = checkRateLimit(`read_plants_${clientIp}`, 60, 60 * 1000);
+  if (!rate.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded: Maximum 60 plant requests per minute.' },
+      { status: 429, headers: { 'Retry-After': '60' } }
+    );
+  }
+
+  // 2. Enforce Authenticated Session (ADR-08 Default-Deny)
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   const session = await verifySessionToken(token);
 
-  // If consumer role, strictly restrict to their assigned account
+  const authCheck = requireAuthenticatedSession(session);
+  if (!authCheck.allowed) {
+    return NextResponse.json(
+      { error: authCheck.error || 'Authentication required to view plant telemetry' },
+      { status: authCheck.status }
+    );
+  }
+
+  // 3. If consumer role, strictly restrict to their assigned account
   if (session?.role === 'consumer') {
     if (!session.accountId) {
       return NextResponse.json(
@@ -91,6 +116,15 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: 'Unauthorized: Admin privileges required to add plants' },
       { status: 401 }
+    );
+  }
+
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const rate = checkRateLimit(`plant_mutation_${clientIp}_${session.userId}`, 20, 60 * 1000);
+  if (!rate.success) {
+    return NextResponse.json(
+      { error: 'Too many plant modification requests. Rate limit is 20 requests per minute.' },
+      { status: 429, headers: { 'Retry-After': '60' } }
     );
   }
 

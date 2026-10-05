@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifySessionToken, SESSION_COOKIE_NAME } from './lib/session';
+import { verifySessionToken, extractSessionToken } from './lib/session';
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -33,7 +33,7 @@ export async function middleware(req: NextRequest) {
 
   // 2. Control Inverter API Protection
   if (pathname.startsWith('/api/deye/control')) {
-    const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const token = extractSessionToken(req.cookies);
     const session = await verifySessionToken(token);
 
     if (!session || (session.role !== 'admin' && session.role !== 'consumer')) {
@@ -49,7 +49,7 @@ export async function middleware(req: NextRequest) {
     (pathname.startsWith('/api/deye/accounts') && ['POST', 'PUT', 'DELETE'].includes(method)) ||
     pathname.startsWith('/api/deye/accounts/sync')
   ) {
-    const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const token = extractSessionToken(req.cookies);
     const session = await verifySessionToken(token);
 
     if (!session || session.role !== 'admin') {
@@ -62,7 +62,7 @@ export async function middleware(req: NextRequest) {
 
   // 4. Protected Page Routes
   if (pathname.startsWith('/accounts') || pathname.startsWith('/api-diagnostics')) {
-    const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const token = extractSessionToken(req.cookies);
     const session = await verifySessionToken(token);
 
     if (!session) {
