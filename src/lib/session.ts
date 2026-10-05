@@ -38,13 +38,15 @@ async function getHmacKey(secret: string): Promise<CryptoKey> {
   );
 }
 
+export const DEFAULT_SESSION_TTL_SECONDS = 12 * 3600; // 12 hours
+
 /**
  * Sign session data into a compact HMAC-SHA256 token:
  * format: <payload_base64url>.<signature_base64url>
  */
 export async function createSessionToken(
   data: Omit<SessionData, 'exp'>,
-  expiresInSeconds: number = 7 * 24 * 3600
+  expiresInSeconds: number = DEFAULT_SESSION_TTL_SECONDS
 ): Promise<string> {
   const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
   const payload: SessionData = { ...data, exp };

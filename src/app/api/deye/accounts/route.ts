@@ -4,14 +4,37 @@ import { accountManager } from '@/lib/account-manager';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/session';
 import { isValidDeyeBaseUrl } from '@/lib/url-validator';
 
-async function requireAdminSession() {
+import { checkRateLimit } from '@/lib/rate-limit';
+
+async function requireAdminSession(req?: Request) {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   const session = await verifySessionToken(token);
   if (!session || session.role !== 'admin') {
-    return null;
+    return {
+      session: null,
+      errorResponse: NextResponse.json(
+        { error: 'Unauthorized: Administrator privileges required for solar gateway account modifications' },
+        { status: 401 }
+      ),
+    };
   }
-  return session;
+
+  if (req) {
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const rate = checkRateLimit(`account_mutation_${clientIp}_${session.userId}`, 20, 60 * 1000);
+    if (!rate.success) {
+      return {
+        session: null,
+        errorResponse: NextResponse.json(
+          { error: 'Too many account modification requests. Rate limit is 20 requests per minute.' },
+          { status: 429 }
+        ),
+      };
+    }
+  }
+
+  return { session, errorResponse: null };
 }
 
 export async function GET(req: Request) {
@@ -35,12 +58,9 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const session = await requireAdminSession();
-  if (!session) {
-    return NextResponse.json(
-      { error: 'Unauthorized: Admin privileges required to register new solar gateway accounts' },
-      { status: 401 }
-    );
+  const { session, errorResponse } = await requireAdminSession(req);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   let body: any;
@@ -86,12 +106,9 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const session = await requireAdminSession();
-  if (!session) {
-    return NextResponse.json(
-      { error: 'Unauthorized: Admin privileges required to update account' },
-      { status: 401 }
-    );
+  const { session, errorResponse } = await requireAdminSession(req);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   let body: any;
@@ -140,12 +157,9 @@ export async function PUT(req: Request) {
 export const PATCH = PUT;
 
 export async function DELETE(req: Request) {
-  const session = await requireAdminSession();
-  if (!session) {
-    return NextResponse.json(
-      { error: 'Unauthorized: Admin privileges required to delete account' },
-      { status: 401 }
-    );
+  const { session, errorResponse } = await requireAdminSession(req);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   try {

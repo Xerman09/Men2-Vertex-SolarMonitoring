@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { z } from 'zod';
 import { accountManager } from '@/lib/account-manager';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/session';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const VALID_WORK_MODES = [
   'PEAK_SHAVING',
@@ -13,6 +15,18 @@ const VALID_WORK_MODES = [
 ] as const;
 
 type ValidWorkMode = (typeof VALID_WORK_MODES)[number];
+
+const controlBodySchema = z.object({
+  deviceSn: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{6,32}$/, 'Invalid device serial number format')
+    .optional(),
+  mode: z.enum(VALID_WORK_MODES, {
+    message: `Invalid work mode. Allowed modes: ${VALID_WORK_MODES.join(', ')}`,
+  }),
+  gridCharge: z.boolean().default(false),
+  accountId: z.string().optional(),
+});
 
 export async function POST(req: Request) {
   // 1. Authenticate caller session
@@ -27,10 +41,21 @@ export async function POST(req: Request) {
     );
   }
 
-  // 2. Safely parse JSON body
-  let body: any;
+  // 2. Rate limiting (5 hardware commands per minute per user/IP)
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const rateLimitKey = `control_${clientIp}_${session.userId}`;
+  const rateCheck = checkRateLimit(rateLimitKey, 5, 60 * 1000);
+  if (!rateCheck.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded: Maximum 5 inverter control commands per minute.' },
+      { status: 429, headers: { 'Retry-After': '60' } }
+    );
+  }
+
+  // 3. Safely parse JSON body with strict Zod schema
+  let rawBody: unknown;
   try {
-    body = await req.json();
+    rawBody = await req.json();
   } catch {
     return NextResponse.json(
       { error: 'Malformed JSON payload' },
@@ -38,17 +63,18 @@ export async function POST(req: Request) {
     );
   }
 
-  const { deviceSn, mode, gridCharge, accountId } = body || {};
-
-  // 3. Validate mode enum strictly
-  if (!mode || !VALID_WORK_MODES.includes(mode as ValidWorkMode)) {
+  const parseResult = controlBodySchema.safeParse(rawBody);
+  if (!parseResult.success) {
     return NextResponse.json(
       {
-        error: `Invalid work mode "${mode}". Allowed modes: ${VALID_WORK_MODES.join(', ')}`,
+        error: 'Validation failed',
+        details: parseResult.error.flatten().fieldErrors,
       },
       { status: 400 }
     );
   }
+
+  const { deviceSn, mode, gridCharge, accountId } = parseResult.data;
 
   // 4. Tenant isolation check for consumer roles
   let targetAccountId = accountId;
@@ -97,7 +123,7 @@ export async function POST(req: Request) {
         station_id: client.getDefaultStationId() || 'SP_04',
         device_sn: deviceSn || client.getDefaultDeviceSn() || '2209X891104',
         action: `SET_WORK_MODE_${mode}`,
-        work_mode: mode,
+        work_mode: clientMode,
         parameters_payload: { mode, gridCharge: Boolean(gridCharge), accountId: client.accountId },
         status: result.success ? 'SUCCESS' : 'FAILED',
         upstream_code: result.success ? 200 : 502,

@@ -1,0 +1,14 @@
+# Architecture Decision Records (ADRs)
+
+This directory contains records of significant architectural and security design decisions made for the **Deye Solar Monitoring (DSM)** system, formatted using the MADR (Markdown Architectural Decision Records) structure.
+
+## Index of Decisions
+
+| ADR | Title | Status | Date |
+|---|---|---|---|
+| [ADR-0001](./0001-hmac-sha256-session-tokens.md) | HMAC-SHA256 Session Tokens with Web Crypto API | Accepted | 2026-10-05 |
+| [ADR-0002](./0002-ssrf-allowlist-and-timeout-discipline.md) | SSRF Defense, Redirect Error Handling, and Upstream Timeout Discipline | Accepted | 2026-10-05 |
+| [ADR-0003](./0003-honest-telemetry-data-contract.md) | Honest Telemetry Data Contracts and Model-Driven Simulation Flags | Accepted | 2026-10-05 |
+| [ADR-0004](./0004-canonical-tenant-boundary-enforcement.md) | Canonical Tenant Boundary Enforcement (`enforceTenantAccess`) | Accepted | 2026-10-05 |
+| [ADR-0005](./0005-rate-limiting-and-upstash-roadmap.md) | Sliding-Window Rate Limiting and Upstash Redis Roadmap | Accepted | 2026-10-05 |
+| [ADR-0006](./0006-dual-persistence-and-atomic-storage.md) | Dual Directus Relational Persistence with Atomic File Cache Fallback | Accepted | 2026-10-05 |

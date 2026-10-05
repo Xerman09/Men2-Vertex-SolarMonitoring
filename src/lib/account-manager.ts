@@ -15,7 +15,7 @@ import {
   SolarUserStationPermission,
 } from './types';
 import { DeyeCloudClient } from './deye-client';
-import { sanitizeDeyeBaseUrl } from './url-validator';
+import { sanitizeDeyeBaseUrl, sanitizeDirectusBaseUrl } from './url-validator';
 import { hashPassword } from './auth-crypto';
 import { env } from './env';
 
@@ -49,7 +49,7 @@ class DeyeAccountManager {
   }
 
   private getDirectusBaseUrl(): string {
-    return env.DIRECTUS_BASE_URL;
+    return sanitizeDirectusBaseUrl(env.DIRECTUS_BASE_URL, env.NODE_ENV === 'production');
   }
 
   private getDirectusCollection(): string {
@@ -80,6 +80,7 @@ class DeyeAccountManager {
       const res = await fetch(url, {
         method: 'GET',
         headers: this.getDirectusHeaders(),
+        redirect: 'error',
         signal: AbortSignal.timeout(4000),
       });
 
@@ -114,6 +115,7 @@ class DeyeAccountManager {
         method: 'POST',
         headers: this.getDirectusHeaders(),
         body: JSON.stringify(payload),
+        redirect: 'error',
         signal: AbortSignal.timeout(5000),
       });
       if (res.ok) {
@@ -137,6 +139,7 @@ class DeyeAccountManager {
         method: 'PATCH',
         headers: this.getDirectusHeaders(),
         body: JSON.stringify(payload),
+        redirect: 'error',
         signal: AbortSignal.timeout(5000),
       });
       return res.ok;
@@ -1042,10 +1045,14 @@ class DeyeAccountManager {
   }
 
   /**
-   * Poll all accounts, plants, and inverters concurrently to compute fleet aggregate
+   * Poll all accounts (or specific allowed accounts), plants, and inverters concurrently to compute fleet aggregate
    */
-  public async getAggregatedFleetSummary(): Promise<AggregatedFleetSummary> {
-    const clients = this.getAllClients().filter((c) => c.hasCredentials());
+  public async getAggregatedFleetSummary(accountIds?: string[]): Promise<AggregatedFleetSummary> {
+    let clients = this.getAllClients().filter((c) => c.hasCredentials());
+    if (accountIds && accountIds.length > 0) {
+      const allowedSet = new Set(accountIds);
+      clients = clients.filter((c) => allowedSet.has(c.accountId));
+    }
     const rawAccounts = this.loadAccounts(false).filter(
       (a) => a.enabled !== false
     );

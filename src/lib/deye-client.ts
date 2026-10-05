@@ -665,25 +665,34 @@ export class DeyeCloudClient {
         },
       ];
 
+      const rawEfficiency = dataMap.get('InverterEfficiency') || dataMap.get('Efficiency');
+      const rawHeatsink = dataMap.get('RadiatorTemperature') || dataMap.get('DeviceTemperature') || dataMap.get('TempHeatsink');
+      const rawAmbient = dataMap.get('AmbientTemperature') || dataMap.get('EnvTemperature');
+      const rawPF = dataMap.get('PowerFactor') || dataMap.get('PF');
+      const rawTHD = dataMap.get('THD') || dataMap.get('THDu');
+      const rawReactive = dataMap.get('ReactivePower') || dataMap.get('TotalReactivePower');
+      const rawRunningHours = dataMap.get('TotalRunningHours') || dataMap.get('RunningHours');
+      const rawWorkMode = dataMap.get('WorkMode') || dataMap.get('CurrentWorkMode');
+
       const telemetry: InverterTelemetry = {
         deviceSn: sn,
         model: `SUN-${Math.round(ratedW / 1000)}K-SG01HP3-EU-AM2`,
         firmwareVersion: 'Deye Live Protocol',
         connectionStatus: 'ONLINE',
-        efficiencyPct: 98.4,
-        heatsinkTempC: 45.0,
-        ambientTempC: 30.0,
-        powerFactor: 0.99,
-        thdPct: 1.5,
+        efficiencyPct: rawEfficiency ? parseFloat(rawEfficiency) : 98.4,
+        heatsinkTempC: rawHeatsink ? parseFloat(rawHeatsink) : 45.0,
+        ambientTempC: rawAmbient ? parseFloat(rawAmbient) : 30.0,
+        powerFactor: rawPF ? parseFloat(rawPF) : 0.99,
+        thdPct: rawTHD ? parseFloat(rawTHD) : 1.5,
         gridFrequencyHz: freqHz,
         mpptStrings,
         phases,
         totalActivePowerKw: parseFloat((activeW / 1000).toFixed(2)),
-        totalReactivePowerKvar: 0,
+        totalReactivePowerKvar: rawReactive ? parseFloat(rawReactive) : 0,
         todayEnergyKwh: dailyKwh,
         totalEnergyMwh: parseFloat((totalKwh / 1000).toFixed(2)),
-        runningHours: 0,
-        activeWorkMode: 'PEAK_SHAVING',
+        runningHours: rawRunningHours ? parseFloat(rawRunningHours) : 0,
+        activeWorkMode: (rawWorkMode as any) || 'PEAK_SHAVING',
         gridChargeEnabled: true,
         activeFaults: [],
       };

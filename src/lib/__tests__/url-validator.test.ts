@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { isValidDeyeBaseUrl, sanitizeDeyeBaseUrl } from '../url-validator';
+import {
+  isValidDeyeBaseUrl,
+  sanitizeDeyeBaseUrl,
+  isValidDirectusBaseUrl,
+  sanitizeDirectusBaseUrl,
+} from '../url-validator';
 
 describe('SSRF & URL Validator', () => {
   it('accepts official DeyeCloud developer domains over HTTPS', () => {
@@ -27,5 +32,24 @@ describe('SSRF & URL Validator', () => {
   it('sanitizes invalid URLs to safe default', () => {
     expect(sanitizeDeyeBaseUrl('http://169.254.169.254')).toBe('https://eu1-developer.deyecloud.com');
     expect(sanitizeDeyeBaseUrl('https://api.deyecloud.com/')).toBe('https://api.deyecloud.com');
+  });
+});
+
+describe('Directus SSRF & Base URL Validator', () => {
+  it('allows http in development for local docker containers', () => {
+    expect(isValidDirectusBaseUrl('http://localhost:8056', false)).toBe(true);
+    expect(isValidDirectusBaseUrl('http://127.0.0.1:8056', false)).toBe(true);
+  });
+
+  it('enforces HTTPS and blocks private IPs and metadata in production', () => {
+    expect(isValidDirectusBaseUrl('http://localhost:8056', true)).toBe(false);
+    expect(isValidDirectusBaseUrl('https://169.254.169.254', true)).toBe(false);
+    expect(isValidDirectusBaseUrl('https://10.0.0.1', true)).toBe(false);
+    expect(isValidDirectusBaseUrl('https://directus.mycompany.com', true)).toBe(true);
+  });
+
+  it('sanitizes Directus URL to safe default', () => {
+    expect(sanitizeDirectusBaseUrl('http://169.254.169.254', true)).toBe('https://directus.internal');
+    expect(sanitizeDirectusBaseUrl('https://directus.mycompany.com/')).toBe('https://directus.mycompany.com');
   });
 });

@@ -3,7 +3,7 @@ import { accountManager, COLLECTIONS } from '@/lib/account-manager';
 import { SolarUser, SolarUserStationPermission } from '@/lib/types';
 import { verifyPassword } from '@/lib/auth-crypto';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { createSessionToken, SESSION_COOKIE_NAME } from '@/lib/session';
+import { createSessionToken, SESSION_COOKIE_NAME, DEFAULT_SESSION_TTL_SECONDS } from '@/lib/session';
 import { env } from '@/lib/env';
 
 export async function POST(req: Request) {
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
         secure: env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
-        maxAge: 7 * 24 * 3600,
+        maxAge: DEFAULT_SESSION_TTL_SECONDS,
       });
 
       return response;
@@ -139,7 +139,7 @@ export async function POST(req: Request) {
             secure: env.NODE_ENV === 'production',
             sameSite: 'lax',
             path: '/',
-            maxAge: 7 * 24 * 3600,
+            maxAge: DEFAULT_SESSION_TTL_SECONDS,
           });
 
           return response;

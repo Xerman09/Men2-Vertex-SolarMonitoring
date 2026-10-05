@@ -54,3 +54,46 @@ export function sanitizeDeyeBaseUrl(rawUrl?: string): string {
   }
   return 'https://eu1-developer.deyecloud.com';
 }
+
+/**
+ * Validates whether a provided Directus base URL is permitted.
+ * Blocks cloud metadata (169.254.169.254), non-HTTP(S) protocols, and enforces HTTPS in production.
+ */
+export function isValidDirectusBaseUrl(rawUrl: string, isProduction: boolean = false): boolean {
+  if (!rawUrl || typeof rawUrl !== 'string') return false;
+
+  try {
+    const parsed = new URL(rawUrl.trim());
+
+    // In production, enforce HTTPS
+    if (isProduction && parsed.protocol !== 'https:') {
+      return false;
+    }
+
+    // Must be HTTP or HTTPS
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return false;
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+
+    // In production, prohibit private IP ranges and cloud metadata services
+    if (isProduction && PRIVATE_IP_REGEX.test(hostname)) {
+      return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Sanitize Directus base URL, removing trailing slashes
+ */
+export function sanitizeDirectusBaseUrl(rawUrl?: string, isProduction: boolean = false): string {
+  if (rawUrl && isValidDirectusBaseUrl(rawUrl, isProduction)) {
+    return rawUrl.trim().replace(/\/+$/, '');
+  }
+  return isProduction ? 'https://directus.internal' : 'http://localhost:8056';
+}
