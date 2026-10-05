@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { HourlySolarPoint } from '@/lib/trigonometric-math';
+import { HourlyEnergyPoint } from '@/lib/types';
 
 export default function TrigonometricAnalyticsPage() {
   const {
@@ -45,7 +46,7 @@ export default function TrigonometricAnalyticsPage() {
       if (res.ok) {
         const json = await res.json();
         if (json.data && Array.isArray(json.data)) {
-          const mapped: HourlySolarPoint[] = json.data.map((item: any) => {
+          const mapped: HourlySolarPoint[] = json.data.map((item: HourlyEnergyPoint & { gridFlowKw?: number; isElapsed?: boolean }) => {
             const parts = item.hour.split(':');
             const h = parseInt(parts[0], 10) || 0;
             const m = parseInt(parts[1], 10) || 0;
@@ -166,6 +167,13 @@ export default function TrigonometricAnalyticsPage() {
           <span>Harmonic Resolution: <strong className="text-emerald-500">k=1..3</strong></span>
         </div>
       </div>
+
+      {loading && hourlyData.length === 0 && (
+        <div className="flex items-center gap-2 p-3 bg-muted/40 border border-border/60 rounded-xl text-xs text-muted-foreground animate-pulse font-mono">
+          <RefreshCw size={13} className="animate-spin text-primary" />
+          <span>Fitting trigonometric harmonics to historical telemetry series...</span>
+        </div>
+      )}
 
       {/* Main Trigonometric Analytics Visualization Suite */}
       <TrigonometricHistoryGraph

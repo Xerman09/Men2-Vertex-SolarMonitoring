@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 
 interface SidebarContextType {
@@ -25,18 +25,33 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
     setMobileOpen(false);
   }, [pathname]);
 
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((prev) => !prev);
+  }, []);
+
+  const toggleMobileOpen = useCallback(() => {
+    setMobileOpen((prev) => !prev);
+  }, []);
+
+  const closeMobile = useCallback(() => {
+    setMobileOpen(false);
+  }, []);
+
+  const contextValue = useMemo<SidebarContextType>(
+    () => ({
+      collapsed,
+      setCollapsed,
+      toggleCollapsed,
+      mobileOpen,
+      setMobileOpen,
+      toggleMobileOpen,
+      closeMobile,
+    }),
+    [collapsed, toggleCollapsed, mobileOpen, toggleMobileOpen, closeMobile]
+  );
+
   return (
-    <SidebarContext.Provider
-      value={{
-        collapsed,
-        setCollapsed,
-        toggleCollapsed: () => setCollapsed((prev) => !prev),
-        mobileOpen,
-        setMobileOpen,
-        toggleMobileOpen: () => setMobileOpen((prev) => !prev),
-        closeMobile: () => setMobileOpen(false),
-      }}
-    >
+    <SidebarContext.Provider value={contextValue}>
       {children}
     </SidebarContext.Provider>
   );

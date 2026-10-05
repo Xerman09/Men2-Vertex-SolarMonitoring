@@ -182,49 +182,34 @@ export function TrigonometricHistoryGraph({
     }
   };
 
-  // Dynamic live telemetry simulation updating current 5-minute interval
+  // Periodic sync of current elapsed slot without fabricated Math.random jitter
   useEffect(() => {
     if (!isLiveStreaming) return;
 
     const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+
       setActiveData((prev) => {
         const now = new Date();
         const currentTotalMins = now.getHours() * 60 + now.getMinutes();
         const currentSlotIndex = Math.floor(currentTotalMins / timeResolution);
 
         return prev.map((pt, idx) => {
-          if (idx !== currentSlotIndex) return pt;
-
-          const currentH = now.getHours() + now.getMinutes() / 60;
-          const isDaytime = currentH >= 5.75 && currentH <= 18.25;
-          const baseSolar = pt.solarYieldKw !== null ? pt.solarYieldKw : (isDaytime ? 115.0 : 0);
-          const baseLoad = pt.loadDemandKw !== null ? pt.loadDemandKw : 68.0;
-
-          // Natural dynamic jitter
-          const solarJitter = baseSolar > 0 ? (Math.random() - 0.48) * 2.2 : 0;
-          const loadJitter = (Math.random() - 0.5) * 1.8;
-
-          const newSolar = Number(Math.max(0, baseSolar + solarJitter).toFixed(2));
-          const newLoad = Number(Math.max(10, baseLoad + loadJitter).toFixed(2));
-          const newBattery = Number((newSolar > newLoad ? (newSolar - newLoad) * 0.45 : -(newLoad - newSolar) * 0.4).toFixed(2));
-          const newGrid = Number((newSolar - newLoad - newBattery).toFixed(2));
-
-          return {
-            ...pt,
-            solarYieldKw: newSolar,
-            loadDemandKw: newLoad,
-            batteryFlowKw: newBattery,
-            gridExportKw: newGrid,
-            isElapsed: true,
-          };
+          if (idx <= currentSlotIndex && !pt.isElapsed) {
+            return {
+              ...pt,
+              isElapsed: true,
+            };
+          }
+          return pt;
         });
       });
-    }, 3000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [isLiveStreaming, timeResolution]);
 
-  // Manual tick trigger for current 5-minute slot
+  // Manual tick trigger for current slot
   const handleManualTick = () => {
     setActiveData((prev) => {
       const now = new Date();
@@ -232,25 +217,13 @@ export function TrigonometricHistoryGraph({
       const currentSlotIndex = Math.floor(currentTotalMins / timeResolution);
 
       return prev.map((pt, idx) => {
-        if (idx !== currentSlotIndex) return pt;
-        const currentH = now.getHours() + now.getMinutes() / 60;
-        const isDaytime = currentH >= 5.75 && currentH <= 18.25;
-        const baseSolar = pt.solarYieldKw ?? (isDaytime ? 112.0 : 0);
-        const baseLoad = pt.loadDemandKw ?? 66.0;
-        const solarJitter = baseSolar > 0 ? (Math.random() - 0.48) * 3.5 : 0;
-        const loadJitter = (Math.random() - 0.5) * 3.0;
-        const newSolar = Number(Math.max(0, baseSolar + solarJitter).toFixed(2));
-        const newLoad = Number(Math.max(10, baseLoad + loadJitter).toFixed(2));
-        const newBattery = Number((newSolar > newLoad ? (newSolar - newLoad) * 0.45 : -(newLoad - newSolar) * 0.4).toFixed(2));
-        const newGrid = Number((newSolar - newLoad - newBattery).toFixed(2));
-        return {
-          ...pt,
-          solarYieldKw: newSolar,
-          loadDemandKw: newLoad,
-          batteryFlowKw: newBattery,
-          gridExportKw: newGrid,
-          isElapsed: true,
-        };
+        if (idx <= currentSlotIndex) {
+          return {
+            ...pt,
+            isElapsed: true,
+          };
+        }
+        return pt;
       });
     });
   };
@@ -825,7 +798,7 @@ export function TrigonometricHistoryGraph({
                         dot={false}
                         activeDot={{ r: 4.5, stroke: COLOR_PV, strokeWidth: 2, fill: '#fff' }}
                         connectNulls={false}
-                        isAnimationActive={true}
+                        isAnimationActive={false}
                       />
                       <Area
                         type="monotone"
@@ -837,7 +810,7 @@ export function TrigonometricHistoryGraph({
                         dot={false}
                         activeDot={{ r: 4.5, stroke: COLOR_LOAD, strokeWidth: 2, fill: '#fff' }}
                         connectNulls={false}
-                        isAnimationActive={true}
+                        isAnimationActive={false}
                       />
                       <Area
                         type="monotone"
@@ -849,7 +822,7 @@ export function TrigonometricHistoryGraph({
                         dot={false}
                         activeDot={{ r: 4.5, stroke: COLOR_GRID, strokeWidth: 2, fill: '#fff' }}
                         connectNulls={false}
-                        isAnimationActive={true}
+                        isAnimationActive={false}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -908,7 +881,7 @@ export function TrigonometricHistoryGraph({
                         dot={false}
                         activeDot={{ r: 5, stroke: COLOR_PV, strokeWidth: 2, fill: '#fff' }}
                         connectNulls={false}
-                        isAnimationActive={true}
+                        isAnimationActive={false}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -963,7 +936,7 @@ export function TrigonometricHistoryGraph({
                         dot={false}
                         activeDot={{ r: 5, stroke: COLOR_LOAD, strokeWidth: 2, fill: '#fff' }}
                         connectNulls={false}
-                        isAnimationActive={true}
+                        isAnimationActive={false}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -1014,7 +987,7 @@ export function TrigonometricHistoryGraph({
                         dot={false}
                         activeDot={{ r: 5, stroke: COLOR_GRID, strokeWidth: 2, fill: '#fff' }}
                         connectNulls={false}
-                        isAnimationActive={true}
+                        isAnimationActive={false}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -1450,10 +1423,11 @@ export function TrigonometricHistoryGraph({
           <div className={compact ? 'space-y-3' : 'space-y-4'}>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-2.5 rounded-lg bg-card border border-border/60">
               <div>
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
+                <label htmlFor="grid-rms-voltage-range" className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
                   Grid RMS Voltage: {acVoltage} V
                 </label>
                 <input
+                  id="grid-rms-voltage-range"
                   type="range"
                   min="200"
                   max="260"
@@ -1465,10 +1439,11 @@ export function TrigonometricHistoryGraph({
               </div>
 
               <div>
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
+                <label htmlFor="rms-load-current-range" className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
                   RMS Load Current: {acCurrent} A
                 </label>
                 <input
+                  id="rms-load-current-range"
                   type="range"
                   min="20"
                   max="150"
@@ -1480,10 +1455,11 @@ export function TrigonometricHistoryGraph({
               </div>
 
               <div>
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
+                <label htmlFor="power-factor-range" className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
                   Power Factor cos(φ): {powerFactor} ({acResults.metrics.phaseAngleDeg}°)
                 </label>
                 <input
+                  id="power-factor-range"
                   type="range"
                   min="0.80"
                   max="1.00"

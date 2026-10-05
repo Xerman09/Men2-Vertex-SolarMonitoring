@@ -8,6 +8,12 @@ export async function GET(req: Request) {
   try {
     if (accountId) {
       const client = accountManager.getClient(accountId);
+      if (!client) {
+        return NextResponse.json(
+          { error: `Account "${accountId}" not found` },
+          { status: 404 }
+        );
+      }
       const result = await client.getStationList();
       return NextResponse.json({
         ...result,
@@ -33,8 +39,9 @@ export async function GET(req: Request) {
       isLive: lists.some((l) => l.isLive),
     });
   } catch (error) {
+    console.error('[StationsRoute] Error querying stations:', error);
     return NextResponse.json(
-      { error: 'Failed to query registered stations', details: String(error) },
+      { error: 'Failed to query registered stations' },
       { status: 500 }
     );
   }

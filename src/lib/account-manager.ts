@@ -15,6 +15,9 @@ import {
   SolarUserStationPermission,
 } from './types';
 import { DeyeCloudClient } from './deye-client';
+import { sanitizeDeyeBaseUrl } from './url-validator';
+import { hashPassword } from './auth-crypto';
+import { env } from './env';
 
 export const COLLECTIONS = {
   USERS: 'iot_solar_users',
@@ -45,11 +48,11 @@ class DeyeAccountManager {
   }
 
   private getDirectusBaseUrl(): string {
-    return process.env.DIRECTUS_BASE_URL?.trim() || 'http://goatedcodoer:8056';
+    return env.DIRECTUS_BASE_URL;
   }
 
   private getDirectusCollection(): string {
-    return process.env.DIRECTUS_COLLECTION?.trim() || 'iot_solar_accounts';
+    return env.DIRECTUS_COLLECTION;
   }
 
   private getDirectusHeaders(): Record<string, string> {
@@ -57,8 +60,8 @@ class DeyeAccountManager {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
-    if (process.env.DIRECTUS_API_TOKEN) {
-      headers['Authorization'] = `Bearer ${process.env.DIRECTUS_API_TOKEN}`;
+    if (env.DIRECTUS_API_TOKEN) {
+      headers['Authorization'] = `Bearer ${env.DIRECTUS_API_TOKEN}`;
     }
     return headers;
   }
@@ -412,18 +415,23 @@ class DeyeAccountManager {
   }
 
   /**
-   * Save accounts list to deye-accounts.json
+   * Save accounts list to deye-accounts.json with atomic write
    */
   public saveAccountsToFile(accounts: DeyeAccountConfig[]): boolean {
     const configPath = this.getConfigPath();
+    const tempPath = `${configPath}.tmp.${Date.now()}`;
     try {
       const payload = { accounts };
-      fs.writeFileSync(configPath, JSON.stringify(payload, null, 2), 'utf8');
+      fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
+      fs.renameSync(tempPath, configPath);
       this.accountsCache = accounts.filter((acc) => acc.enabled !== false);
       this.lastLoadedAt = Date.now();
       this.syncClients();
       return true;
     } catch (e) {
+      if (fs.existsSync(tempPath)) {
+        try { fs.unlinkSync(tempPath); } catch {}
+      }
       console.error('[DeyeAccountManager] Failed saving accounts to disk:', e);
       return false;
     }
@@ -451,13 +459,13 @@ class DeyeAccountManager {
       id: 'default-site',
       name: 'Primary Facility',
       enabled: true,
-      baseUrl: process.env.DEYE_BASE_URL?.trim() || 'https://api.deyecloud.com',
-      appId: process.env.DEYE_APP_ID?.trim() || '',
-      appSecret: process.env.DEYE_APP_SECRET?.trim() || '',
-      email: process.env.DEYE_EMAIL?.trim() || '',
-      password: process.env.DEYE_PASSWORD?.trim() || '',
-      defaultStationId: process.env.DEYE_DEFAULT_STATION_ID?.trim() || 'SP_04',
-      defaultDeviceSn: process.env.DEYE_DEFAULT_DEVICE_SN?.trim() || '2209X891104',
+      baseUrl: sanitizeDeyeBaseUrl(env.DEYE_BASE_URL),
+      appId: env.DEYE_APP_ID || '',
+      appSecret: env.DEYE_APP_SECRET || '',
+      email: env.DEYE_EMAIL || '',
+      password: env.DEYE_PASSWORD || '',
+      defaultStationId: env.DEYE_DEFAULT_STATION_ID || 'SP_04',
+      defaultDeviceSn: env.DEYE_DEFAULT_DEVICE_SN || '2209X891104',
       plants: [],
     };
 
@@ -469,6 +477,7 @@ class DeyeAccountManager {
 
   /**
    * Synchronize active DeyeCloudClient instances with enabled accounts
+   * Preserves existing instances so in-memory token caches are retained.
    */
   private syncClients() {
     const currentConfigs = this.accountsCache || [];
@@ -481,25 +490,29 @@ class DeyeAccountManager {
       }
     }
 
-    // Add or update clients
+    // Add or update existing clients
     for (const config of currentConfigs) {
-      this.clientMap.set(config.id, new DeyeCloudClient(config));
+      const existing = this.clientMap.get(config.id);
+      if (existing) {
+        existing.updateConfig(config);
+      } else {
+        this.clientMap.set(config.id, new DeyeCloudClient(config));
+      }
     }
   }
 
   /**
-   * Get client for specific account
+   * Get client for specific account.
+   * If accountId is provided, returns that account's client or null if not found (preventing cross-tenant leaks).
+   * If accountId is omitted, returns the primary/first configured client or null.
    */
-  public getClient(accountId?: string): DeyeCloudClient {
+  public getClient(accountId?: string): DeyeCloudClient | null {
     this.loadAccounts();
-    if (accountId && this.clientMap.has(accountId)) {
-      return this.clientMap.get(accountId)!;
+    if (accountId) {
+      return this.clientMap.get(accountId) || null;
     }
     const firstClient = this.clientMap.values().next().value;
-    if (firstClient) {
-      return firstClient;
-    }
-    return new DeyeCloudClient();
+    return firstClient || null;
   }
 
   public getAllClients(): DeyeCloudClient[] {
@@ -517,12 +530,13 @@ class DeyeAccountManager {
     devicesDiscovered: number;
   }> {
     let directusId: string | undefined;
+    const safeBaseUrl = sanitizeDeyeBaseUrl(data.baseUrl);
 
     // 1. Try to create in normalized iot_solar_deye_cloud_configs table
     try {
       const configPayload = {
         profile_name: data.name?.trim() || data.email?.trim() || 'New Solar Gateway',
-        base_url: data.baseUrl?.trim() || 'https://eu1-developer.deyecloud.com',
+        base_url: safeBaseUrl,
         app_id: data.appId?.trim() || '',
         app_secret: data.appSecret?.trim() || '',
         account_email: data.email?.trim() || '',
@@ -541,7 +555,7 @@ class DeyeAccountManager {
           password: data.password?.trim() || '',
           app_id: data.appId?.trim() || '',
           app_secret: data.appSecret?.trim() || '',
-          base_url: data.baseUrl?.trim() || 'https://eu1-developer.deyecloud.com',
+          base_url: safeBaseUrl,
           enabled: data.enabled ?? true,
         };
         const createdLegacy = await this.createItem(this.getDirectusCollection(), legacyPayload);
@@ -559,7 +573,7 @@ class DeyeAccountManager {
       directusId,
       name: data.name?.trim() || 'New Deye Site',
       enabled: data.enabled ?? true,
-      baseUrl: data.baseUrl?.trim() || 'https://eu1-developer.deyecloud.com',
+      baseUrl: safeBaseUrl,
       appId: data.appId?.trim() || '',
       appSecret: data.appSecret?.trim() || '',
       email: data.email?.trim() || '',
@@ -617,13 +631,13 @@ class DeyeAccountManager {
       }
     }
 
-    // Persist registered user into iot_solar_users
+    // Persist registered user into iot_solar_users with hashed password
     if (data.email) {
       try {
         await this.createItem(COLLECTIONS.USERS, {
           email: data.email.trim().toLowerCase(),
           username: data.email.split('@')[0],
-          password_hash: data.password || 'password',
+          password_hash: hashPassword(data.password || 'password'),
           full_name: data.name || data.email,
           role: 'consumer',
           is_active: 1,
@@ -658,7 +672,7 @@ class DeyeAccountManager {
   }
 
   /**
-   * Update an existing account (e.g. toggle enabled, edit name)
+   * Update an existing account with mass-assignment protection
    */
   public async updateAccount(
     id: string,
@@ -673,28 +687,40 @@ class DeyeAccountManager {
     const target = all[index];
     const directusId = target.directusId || (target.id.startsWith('directus-') ? target.id.replace('directus-', '') : undefined);
 
+    // Filter allowed fields to prevent mass-assignment privilege escalation
+    const safeUpdates: Partial<DeyeAccountConfig> = {};
+    if (updates.name !== undefined) safeUpdates.name = updates.name.trim();
+    if (updates.email !== undefined) safeUpdates.email = updates.email.trim();
+    if (updates.password !== undefined) safeUpdates.password = updates.password.trim();
+    if (updates.baseUrl !== undefined) safeUpdates.baseUrl = sanitizeDeyeBaseUrl(updates.baseUrl);
+    if (updates.appId !== undefined) safeUpdates.appId = updates.appId.trim();
+    if (updates.appSecret !== undefined) safeUpdates.appSecret = updates.appSecret.trim();
+    if (updates.enabled !== undefined) safeUpdates.enabled = Boolean(updates.enabled);
+    if (updates.defaultStationId !== undefined) safeUpdates.defaultStationId = updates.defaultStationId.trim();
+    if (updates.defaultDeviceSn !== undefined) safeUpdates.defaultDeviceSn = updates.defaultDeviceSn.trim();
+
     // Sync update to Directus
     if (directusId) {
       try {
         const patchPayload: Record<string, any> = {};
-        if (updates.name !== undefined) {
-          patchPayload.name = updates.name;
-          patchPayload.profile_name = updates.name;
+        if (safeUpdates.name !== undefined) {
+          patchPayload.name = safeUpdates.name;
+          patchPayload.profile_name = safeUpdates.name;
         }
-        if (updates.email !== undefined) {
-          patchPayload.email = updates.email;
-          patchPayload.account_email = updates.email;
+        if (safeUpdates.email !== undefined) {
+          patchPayload.email = safeUpdates.email;
+          patchPayload.account_email = safeUpdates.email;
         }
-        if (updates.password !== undefined) {
-          patchPayload.password = updates.password;
-          patchPayload.account_password = updates.password;
+        if (safeUpdates.password !== undefined) {
+          patchPayload.password = safeUpdates.password;
+          patchPayload.account_password = safeUpdates.password;
         }
-        if (updates.appId !== undefined) patchPayload.app_id = updates.appId;
-        if (updates.appSecret !== undefined) patchPayload.app_secret = updates.appSecret;
-        if (updates.baseUrl !== undefined) patchPayload.base_url = updates.baseUrl;
-        if (updates.enabled !== undefined) {
-          patchPayload.enabled = updates.enabled ? 1 : 0;
-          patchPayload.status = updates.enabled ? 'OPTIMAL' : 'OFFLINE';
+        if (safeUpdates.appId !== undefined) patchPayload.app_id = safeUpdates.appId;
+        if (safeUpdates.appSecret !== undefined) patchPayload.app_secret = safeUpdates.appSecret;
+        if (safeUpdates.baseUrl !== undefined) patchPayload.base_url = safeUpdates.baseUrl;
+        if (safeUpdates.enabled !== undefined) {
+          patchPayload.enabled = safeUpdates.enabled ? 1 : 0;
+          patchPayload.status = safeUpdates.enabled ? 'OPTIMAL' : 'OFFLINE';
         }
 
         await this.updateItem(COLLECTIONS.CONFIGS, directusId, patchPayload);
@@ -706,7 +732,7 @@ class DeyeAccountManager {
 
     const updated: DeyeAccountConfig = {
       ...all[index],
-      ...updates,
+      ...safeUpdates,
     };
     all[index] = updated;
 

@@ -152,7 +152,7 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1.5">
+                <label htmlFor="login-username" className="block text-xs font-semibold text-foreground mb-1.5">
                   Username or Email
                 </label>
                 <div className="relative">
@@ -161,6 +161,7 @@ export default function LoginPage() {
                     className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
                   />
                   <input
+                    id="login-username"
                     type="text"
                     required
                     autoFocus
@@ -176,7 +177,7 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1.5">
+                <label htmlFor="login-password" className="block text-xs font-semibold text-foreground mb-1.5">
                   Password
                 </label>
                 <div className="relative">
@@ -185,6 +186,7 @@ export default function LoginPage() {
                     className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
                   />
                   <input
+                    id="login-password"
                     type={showPassword ? 'text' : 'password'}
                     required
                     placeholder="••••••••••••"
@@ -198,8 +200,8 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0.5"
-                    tabIndex={-1}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>

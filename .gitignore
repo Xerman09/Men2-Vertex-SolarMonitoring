@@ -12,9 +12,17 @@ build/
 dist/
 
 # Environment Variables & Account Credentials
-.env*.local
-.env
+.env*
+!.env.example
 deye-accounts.json
+
+# Java & compiled binaries
+*.class
+org/
+
+# Testing & Coverage
+coverage/
+.vitest/
 
 # Debug
 npm-debug.log*

@@ -14,6 +14,8 @@ import {
   getMockHourlyEnergyPoints,
   getMockApiHealth,
 } from './mock-telemetry';
+import { sanitizeDeyeBaseUrl } from './url-validator';
+import { env } from './env';
 
 interface DeyeTokenCache {
   token: string;
@@ -30,26 +32,34 @@ export class DeyeCloudClient {
   private passwordRaw: string;
   private defaultStationId: string;
   private defaultDeviceSn: string;
-  public readonly plants: PlantInfo[];
+  public plants: PlantInfo[];
   private cachedToken: DeyeTokenCache | null = null;
+  private tokenFetchPromise: Promise<string | null> | null = null;
   private cachedStationSummary: Map<string, { result: { data: StationSummary; isLive: boolean; stationDetected: boolean }; timestamp: number }> = new Map();
-  private cachedBatchDevices: { result: Map<string, any>; timestamp: number } | null = null;
+  private cachedBatchDevices: { result: Map<string, Map<string, string>>; timestamp: number } | null = null;
 
   constructor(config?: Partial<DeyeAccountConfig>) {
     this.accountId = config?.id || 'default-site';
     this.accountName = config?.name || 'Primary Facility';
-    let rawBaseUrl = (config?.baseUrl || '').trim();
-    if (!rawBaseUrl.startsWith('http://') && !rawBaseUrl.startsWith('https://')) {
-      rawBaseUrl = process.env.DEYE_BASE_URL?.trim() || 'https://eu1-developer.deyecloud.com';
-    }
-    this.baseUrl = rawBaseUrl.replace(/\/+$/, '');
-    this.appId = (config?.appId || process.env.DEYE_APP_ID || '').trim();
-    this.appSecret = (config?.appSecret || process.env.DEYE_APP_SECRET || '').trim();
-    this.email = (config?.email || process.env.DEYE_EMAIL || '').trim();
-    this.passwordRaw = (config?.password || process.env.DEYE_PASSWORD || '').trim();
-    this.defaultStationId = config?.defaultStationId?.trim() || process.env.DEYE_DEFAULT_STATION_ID?.trim() || 'SP_04';
-    this.defaultDeviceSn = config?.defaultDeviceSn?.trim() || process.env.DEYE_DEFAULT_DEVICE_SN?.trim() || '2209X891104';
+    this.baseUrl = sanitizeDeyeBaseUrl(config?.baseUrl || env.DEYE_BASE_URL);
+    this.appId = (config?.appId || env.DEYE_APP_ID || '').trim();
+    this.appSecret = (config?.appSecret || env.DEYE_APP_SECRET || '').trim();
+    this.email = (config?.email || env.DEYE_EMAIL || '').trim();
+    this.passwordRaw = (config?.password || env.DEYE_PASSWORD || '').trim();
+    this.defaultStationId = config?.defaultStationId?.trim() || env.DEYE_DEFAULT_STATION_ID || 'SP_04';
+    this.defaultDeviceSn = config?.defaultDeviceSn?.trim() || env.DEYE_DEFAULT_DEVICE_SN || '2209X891104';
     this.plants = config?.plants || [];
+  }
+
+  public updateConfig(config: Partial<DeyeAccountConfig>): void {
+    if (config.baseUrl) this.baseUrl = sanitizeDeyeBaseUrl(config.baseUrl);
+    if (config.appId !== undefined) this.appId = config.appId.trim();
+    if (config.appSecret !== undefined) this.appSecret = config.appSecret.trim();
+    if (config.email !== undefined) this.email = config.email.trim();
+    if (config.password !== undefined) this.passwordRaw = config.password.trim();
+    if (config.defaultStationId !== undefined) this.defaultStationId = config.defaultStationId.trim();
+    if (config.defaultDeviceSn !== undefined) this.defaultDeviceSn = config.defaultDeviceSn.trim();
+    if (config.plants !== undefined) this.plants = config.plants;
   }
 
   public getDefaultStationId(): string {
@@ -58,6 +68,10 @@ export class DeyeCloudClient {
 
   public getDefaultDeviceSn(): string {
     return this.defaultDeviceSn;
+  }
+
+  public invalidateToken(): void {
+    this.cachedToken = null;
   }
 
   /**
@@ -80,7 +94,7 @@ export class DeyeCloudClient {
   }
 
   /**
-   * Retrieves or refreshes the 60-day DeyeCloud Bearer Token
+   * Retrieves or refreshes the 60-day DeyeCloud Bearer Token with a concurrency lock.
    */
   public async getAccessToken(): Promise<string | null> {
     if (!this.hasCredentials()) {
@@ -92,6 +106,19 @@ export class DeyeCloudClient {
       return this.cachedToken.token;
     }
 
+    // Reuse existing in-flight token request if active
+    if (this.tokenFetchPromise) {
+      return this.tokenFetchPromise;
+    }
+
+    this.tokenFetchPromise = this.performTokenFetch().finally(() => {
+      this.tokenFetchPromise = null;
+    });
+
+    return this.tokenFetchPromise;
+  }
+
+  private async performTokenFetch(): Promise<string | null> {
     try {
       const url = `${this.baseUrl}/v1.0/account/token?appId=${encodeURIComponent(this.appId)}`;
       const sha256Password = this.hashPassword(this.passwordRaw);
@@ -107,10 +134,12 @@ export class DeyeCloudClient {
           email: this.email,
           password: sha256Password,
         }),
+        redirect: 'error',
+        signal: AbortSignal.timeout(8000),
       });
 
       if (!res.ok) {
-        console.warn(`[DeyeCloud][${this.accountName}] Auth failed with status ${res.status}: ${await res.text()}`);
+        console.warn(`[DeyeCloud][${this.accountName}] Auth failed with status ${res.status}`);
         return null;
       }
 
@@ -120,7 +149,7 @@ export class DeyeCloudClient {
         const expiresInMs = (parseInt(data.expiresIn || data.data?.expiresIn || '5184000', 10)) * 1000;
         this.cachedToken = {
           token,
-          expiresAt: now + expiresInMs,
+          expiresAt: Date.now() + expiresInMs,
         };
         return this.cachedToken.token;
       }
@@ -134,67 +163,87 @@ export class DeyeCloudClient {
   }
 
   /**
+   * Resilient HTTP client wrapper for Deye OpenAPI:
+   * - Injects Bearer token
+   * - Enforces 8s timeout
+   * - Blocks redirects
+   * - Automatically invalidates token and retries once on 401
+   */
+  private async fetchWithAuth(endpoint: string, init: RequestInit = {}): Promise<Response | null> {
+    const token = await this.getAccessToken();
+    if (!token) return null;
+
+    const url = `${this.baseUrl}${endpoint}`;
+    const makeReq = async (currentToken: string) => {
+      const headers = new Headers(init.headers || {});
+      headers.set('Authorization', `Bearer ${currentToken}`);
+      headers.set('Content-Type', 'application/json');
+      headers.set('Accept', 'application/json');
+
+      return fetch(url, {
+        ...init,
+        headers,
+        redirect: 'error',
+        signal: AbortSignal.timeout(8000),
+      });
+    };
+
+    try {
+      let res = await makeReq(token);
+
+      // Invalidate and retry once if token expired
+      if (res.status === 401) {
+        this.invalidateToken();
+        const freshToken = await this.getAccessToken();
+        if (freshToken) {
+          res = await makeReq(freshToken);
+        }
+      }
+
+      return res;
+    } catch (err) {
+      console.warn(`[DeyeCloud][${this.accountName}] Fetch error for ${endpoint}:`, err);
+      return null;
+    }
+  }
+
+  /**
    * Fetch list of registered stations/plants under this DeyeCloud account
    */
   public async getStationList(): Promise<{ total: number; stations: any[]; isLive: boolean }> {
-    const token = await this.getAccessToken();
-    if (!token) {
-      return { total: 0, stations: [], isLive: false };
-    }
+    const res = await this.fetchWithAuth('/v1.0/station/listWithDevice', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
 
-    try {
-      const url = `${this.baseUrl}/v1.0/station/listWithDevice`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({}),
-      });
-
-      if (res.ok) {
+    if (res && res.ok) {
+      try {
         const body = await res.json();
-        const stationList = body.stationList || [];
+        const stationList = body.stationList || body.data?.stationList || [];
         return {
           total: body.stationTotal || body.total || stationList.length,
           stations: stationList,
           isLive: true,
         };
+      } catch (e) {
+        console.warn('[DeyeCloud] Failed to parse station list:', e);
       }
-    } catch (e) {
-      console.warn('[DeyeCloud] Failed to fetch station list:', e);
     }
-    return { total: 0, stations: [], isLive: true };
+
+    return { total: 0, stations: [], isLive: false };
   }
 
   /**
    * Auto-discover all plants and hardware (inverters and loggers) registered under this DeyeCloud account
    */
   public async discoverPlantsAndDevices(): Promise<{ plants: PlantInfo[]; isLive: boolean }> {
-    const token = await this.getAccessToken();
+    const res = await this.fetchWithAuth('/v1.0/station/listWithDevice', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
 
-    if (!token) {
-      return {
-        plants: this.getSimulatedPlants(),
-        isLive: false,
-      };
-    }
-
-    try {
-      const url = `${this.baseUrl}/v1.0/station/listWithDevice`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({}),
-      });
-
-      if (res.ok) {
+    if (res && res.ok) {
+      try {
         const body = await res.json();
         const stationList = body.stationList || body.data?.stationList || [];
 
@@ -246,16 +295,16 @@ export class DeyeCloudClient {
 
           return { plants, isLive: true };
         }
+      } catch (err) {
+        console.warn(`[DeyeCloud][${this.accountName}] Auto-discovery parse error:`, err);
       }
-    } catch (err) {
-      console.warn(`[DeyeCloud][${this.accountName}] Auto-discovery network error:`, err);
     }
 
     return { plants: this.getSimulatedPlants(), isLive: false };
   }
 
   /**
-   * Fallback plants structure (returns empty or zeroed data without fabricated numbers)
+   * Fallback plants structure
    */
   public getSimulatedPlants(): PlantInfo[] {
     return [];
@@ -266,8 +315,6 @@ export class DeyeCloudClient {
    */
   public async getSingleStationSummary(stationId?: string): Promise<{ data: StationSummary; isLive: boolean; stationDetected: boolean }> {
     const id = stationId || this.defaultStationId;
-    const token = await this.getAccessToken();
-
     const matchingPlant = this.plants.find((p) => String(p.stationId) === String(id));
 
     const emptySummary: StationSummary = {
@@ -285,29 +332,19 @@ export class DeyeCloudClient {
       lastUpdated: new Date().toISOString(),
     };
 
-    if (!token || !id) {
+    if (!id) {
       return { data: emptySummary, isLive: false, stationDetected: false };
     }
 
     try {
       const numStationId = parseInt(id, 10) || id;
       const [latestRes, detailRes] = await Promise.all([
-        fetch(`${this.baseUrl}/v1.0/station/latest`, {
+        this.fetchWithAuth('/v1.0/station/latest', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
           body: JSON.stringify({ stationId: numStationId }),
         }),
-        fetch(`${this.baseUrl}/v1.0/station/detail`, {
+        this.fetchWithAuth('/v1.0/station/detail', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
           body: JSON.stringify({ stationId: numStationId }),
         }),
       ]);
@@ -316,7 +353,7 @@ export class DeyeCloudClient {
       let installedCapacityKw = matchingPlant?.installedCapacityKw || 0;
       let connectionStatus = 'NORMAL';
 
-      if (detailRes.ok) {
+      if (detailRes && detailRes.ok) {
         const detailData = await detailRes.json();
         if (detailData.station) {
           if (detailData.station.name) {
@@ -330,7 +367,7 @@ export class DeyeCloudClient {
         }
       }
 
-      if (latestRes.ok) {
+      if (latestRes && latestRes.ok) {
         const latestData = await latestRes.json();
         if (latestData.code === '1000000' || latestData.success === true) {
           const genW = latestData.generationPower != null ? Number(latestData.generationPower) : 0;
@@ -365,10 +402,7 @@ export class DeyeCloudClient {
   }
 
   /**
-   * Fetch Station Summary:
-   * - If stationId is provided and != 'ALL', returns that specific plant.
-   * - If stationId is omitted or == 'ALL', queries ALL plants in the account concurrently
-   *   and computes an accurate, combined aggregate summary plus per-plant telemetry!
+   * Fetch Station Summary (Single or Multi-Plant Aggregation)
    */
   public async getStationSummary(stationId?: string): Promise<{ data: StationSummary; isLive: boolean; stationDetected: boolean }> {
     const cacheKey = stationId || 'ALL';
@@ -469,6 +503,7 @@ export class DeyeCloudClient {
 
   /**
    * Batch fetch raw device telemetry from DeyeCloud OpenAPI (/v1.0/device/latest)
+   * Uses Promise.allSettled to ensure that one failing device chunk does not discard good data
    */
   public async getBatchDeviceLatest(deviceSnList: string[]): Promise<Map<string, Map<string, string>>> {
     const result = new Map<string, Map<string, string>>();
@@ -479,9 +514,6 @@ export class DeyeCloudClient {
       return this.cachedBatchDevices.result;
     }
 
-    const token = await this.getAccessToken();
-    if (!token) return result;
-
     const chunkSize = 8;
     const chunks: string[][] = [];
     for (let i = 0; i < deviceSnList.length; i += chunkSize) {
@@ -490,17 +522,12 @@ export class DeyeCloudClient {
 
     try {
       const promises = chunks.map(async (chunk) => {
-        const res = await fetch(`${this.baseUrl}/v1.0/device/latest`, {
+        const res = await this.fetchWithAuth('/v1.0/device/latest', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
           body: JSON.stringify({ deviceList: chunk }),
         });
 
-        if (res.ok) {
+        if (res && res.ok) {
           const body = await res.json();
           if (body.code === '1000000' && Array.isArray(body.deviceDataList)) {
             for (const item of body.deviceDataList) {
@@ -516,9 +543,9 @@ export class DeyeCloudClient {
         }
       });
 
-      await Promise.all(promises);
+      await Promise.allSettled(promises);
     } catch (e) {
-      console.warn(`[DeyeCloud][${this.accountName}] Batch device latest failed:`, e);
+      console.warn(`[DeyeCloud][${this.accountName}] Batch device latest error:`, e);
     }
 
     this.cachedBatchDevices = { result, timestamp: Date.now() };
@@ -526,7 +553,7 @@ export class DeyeCloudClient {
   }
 
   /**
-   * Fetch Inverter Telemetry (Voltages, currents, temperatures, MPPT, errors from real DeyeCloud OpenAPI)
+   * Fetch Inverter Telemetry
    */
   public async getInverterTelemetry(deviceSn?: string): Promise<{ data: InverterTelemetry; isLive: boolean }> {
     const sn = deviceSn || this.defaultDeviceSn;
@@ -645,39 +672,41 @@ export class DeyeCloudClient {
   }
 
   /**
-   * Dispatch Work Mode control command
+   * Dispatch Work Mode control command to physical inverter via OpenAPI
    */
   public async setWorkMode(params: {
     deviceSn?: string;
     mode: 'PEAK_SHAVING' | 'BATTERY_FIRST' | 'LOAD_FIRST' | 'SELLING_FIRST';
     gridCharge: boolean;
   }): Promise<{ success: boolean; message: string; isLive: boolean }> {
-    const token = await this.getAccessToken();
     const sn = params.deviceSn || this.defaultDeviceSn;
 
-    if (!token) {
+    if (!this.hasCredentials()) {
       return {
-        success: true,
-        message: `[Simulated Mode] Inverter ${sn} workmode successfully switched to ${params.mode} (Grid Charge: ${params.gridCharge ? 'ON' : 'OFF'}).`,
+        success: false,
+        message: `Authentication credentials not configured for account "${this.accountName}". Configure credentials before dispatching inverter commands.`,
+        isLive: false,
+      };
+    }
+
+    const res = await this.fetchWithAuth('/v1.0/control/workmode', {
+      method: 'POST',
+      body: JSON.stringify({
+        device_sn: sn,
+        mode: params.mode,
+        grid_charge: params.gridCharge,
+      }),
+    });
+
+    if (!res) {
+      return {
+        success: false,
+        message: `Network failure connecting to DeyeCloud API for account "${this.accountName}"`,
         isLive: false,
       };
     }
 
     try {
-      const url = `${this.baseUrl}/v1.0/control/workmode`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          device_sn: sn,
-          mode: params.mode,
-          grid_charge: params.gridCharge,
-        }),
-      });
-
       const body = await res.json();
       if (res.ok && body.code === '0') {
         return {
@@ -688,13 +717,13 @@ export class DeyeCloudClient {
       }
       return {
         success: false,
-        message: `[DeyeCloud Live Error] ${body.msg || 'Command rejected by hardware'}`,
+        message: `[DeyeCloud Live Error] ${body.msg || body.message || 'Command rejected by hardware'}`,
         isLive: true,
       };
     } catch (err) {
       return {
         success: false,
-        message: `Network failure connecting to DeyeCloud: ${String(err)}`,
+        message: `Failed to parse inverter control response: ${String(err)}`,
         isLive: false,
       };
     }
@@ -709,9 +738,15 @@ export class DeyeCloudClient {
 
     if (!isConfigured) {
       return {
-        ...getMockApiHealth(),
         gatewayUrl: this.baseUrl,
+        region: 'Unconfigured Developer Gateway',
         isLive: false,
+        status: 'OFFLINE',
+        pingMs: 0,
+        rateLimitUsed: 0,
+        rateLimitMax: 10000,
+        tokenExpiresAt: null,
+        lastChecked: new Date().toISOString(),
       };
     }
 
@@ -725,23 +760,28 @@ export class DeyeCloudClient {
         isLive: Boolean(token),
         status: token ? 'OPTIMAL' : 'DEGRADED',
         pingMs: Math.max(1, pingMs),
-        rateLimitUsed: 142,
+        rateLimitUsed: token ? 1 : 0,
         rateLimitMax: 10000,
         tokenExpiresAt: this.cachedToken ? new Date(this.cachedToken.expiresAt).toISOString() : null,
         lastChecked: new Date().toISOString(),
       };
     } catch {
       return {
-        ...getMockApiHealth(),
         gatewayUrl: this.baseUrl,
+        region: 'Configured Developer Gateway',
         status: 'DEGRADED',
         isLive: false,
+        pingMs: 0,
+        rateLimitUsed: 0,
+        rateLimitMax: 10000,
+        tokenExpiresAt: null,
+        lastChecked: new Date().toISOString(),
       };
     }
   }
 
   /**
-   * Hourly curves
+   * Hourly curves (Returns model-driven diurnal curves)
    */
   public getHourlyEnergy(range: string = 'TODAY', stepMinutes: number = 5): HourlyEnergyPoint[] {
     return getMockHourlyEnergyPoints(range, undefined, stepMinutes);

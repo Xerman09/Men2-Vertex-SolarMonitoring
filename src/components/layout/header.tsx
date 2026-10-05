@@ -45,7 +45,7 @@ interface HeaderProps {
 export function Header({
   currentStationName,
   isLiveApi = false,
-  pingMs = 14,
+  pingMs,
 }: HeaderProps) {
   const {
     accounts,
@@ -74,7 +74,6 @@ export function Header({
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
-  const [utcTime, setUtcTime] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
@@ -103,16 +102,6 @@ export function Header({
     });
     setExpandedAccounts(nextState);
   };
-
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setUtcTime(now.toISOString().substring(11, 19) + ' UTC');
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -160,6 +149,9 @@ export function Header({
           <div className="relative min-w-0 shrink" ref={dropdownRef}>
             <button
               onClick={() => setShowAccountDropdown(!showAccountDropdown)}
+              aria-haspopup="listbox"
+              aria-expanded={showAccountDropdown}
+              aria-label="Select solar account or plant"
               className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 bg-card/80 hover:bg-accent/60 rounded-xl border border-border/60 cursor-pointer transition-colors text-left shadow-2xs min-w-0 max-w-[210px] xs:max-w-[250px] sm:max-w-[300px] md:max-w-[360px]"
             >
               <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
@@ -279,10 +271,19 @@ export function Header({
                         }`}
                       >
                         <div
-                          className="flex items-center justify-between p-2 cursor-pointer"
+                          role="button"
+                          tabIndex={0}
+                          className="flex items-center justify-between p-2 cursor-pointer focus:outline-none focus:bg-accent/50 rounded-lg"
                           onClick={() => {
                             selectAccountAndPlant(acc.id, 'ALL');
                             setShowAccountDropdown(false);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              selectAccountAndPlant(acc.id, 'ALL');
+                              setShowAccountDropdown(false);
+                            }
                           }}
                         >
                           <div className="flex items-center gap-2 min-w-0">
@@ -303,6 +304,7 @@ export function Header({
                           <div className="flex items-center gap-1.5 shrink-0">
                             {hasPlants && (
                               <button
+                                aria-label={`Toggle plants for ${acc.name}`}
                                 onClick={(e) => toggleAccountExpand(acc.id, e)}
                                 className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                               >
@@ -329,12 +331,22 @@ export function Header({
                               return (
                                 <div
                                   key={plant.stationId}
+                                  role="button"
+                                  tabIndex={0}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     selectAccountAndPlant(acc.id, plant.stationId);
                                     setShowAccountDropdown(false);
                                   }}
-                                  className={`flex items-center justify-between p-1.5 rounded-lg text-left cursor-pointer transition-all ${
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      selectAccountAndPlant(acc.id, plant.stationId);
+                                      setShowAccountDropdown(false);
+                                    }
+                                  }}
+                                  className={`flex items-center justify-between p-1.5 rounded-lg text-left cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-primary ${
                                     isPlantActive
                                       ? 'bg-primary/15 text-primary font-semibold'
                                       : 'hover:bg-accent text-foreground/85'
@@ -504,10 +516,7 @@ export function Header({
           )}
 
           {/* UTC Clock */}
-          <div className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/40 border border-border/50 text-[11px] font-mono text-muted-foreground shrink-0">
-            <Clock size={12} />
-            <span>{utcTime || '12:00:00 UTC'}</span>
-          </div>
+          <UtcClock />
 
           {/* Theme Mode Toggle (Light/Dark/System) */}
           <div className="shrink-0">
@@ -561,10 +570,16 @@ export function Header({
 
       {/* Administrator Login Modal */}
       {showAuthModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in-50">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="auth-modal-title"
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in-50"
+        >
           <div className="bg-card border border-border/80 rounded-2xl shadow-2xl w-full max-w-sm p-6 relative">
             <button
               onClick={() => setShowAuthModal(false)}
+              aria-label="Close authentication modal"
               className="absolute top-4 right-4 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
             >
               <X size={16} />
@@ -575,7 +590,7 @@ export function Header({
                 <User size={20} />
               </div>
               <div>
-                <h3 className="text-base font-bold text-foreground">Sign In</h3>
+                <h3 id="auth-modal-title" className="text-base font-bold text-foreground">Sign In</h3>
                 <p className="text-xs text-muted-foreground">Monitor and manage your solar plants</p>
               </div>
             </div>
@@ -594,12 +609,13 @@ export function Header({
               className="space-y-3.5"
             >
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                <label htmlFor="header-login-email" className="block text-xs font-semibold text-muted-foreground mb-1">
                   Username or Email
                 </label>
                 <div className="relative">
                   <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
+                    id="header-login-email"
                     type="text"
                     autoFocus
                     required
@@ -615,12 +631,13 @@ export function Header({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                <label htmlFor="header-login-password" className="block text-xs font-semibold text-muted-foreground mb-1">
                   Password
                 </label>
                 <div className="relative">
                   <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
+                    id="header-login-password"
                     type="password"
                     required
                     placeholder="••••••••••••"
@@ -661,5 +678,26 @@ export function Header({
         </div>
       )}
     </header>
+  );
+}
+
+function UtcClock() {
+  const [utcTime, setUtcTime] = useState('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setUtcTime(now.toUTCString().slice(17, 25) + ' UTC');
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/40 border border-border/50 text-[11px] font-mono text-muted-foreground shrink-0">
+      <Clock size={12} />
+      <span>{utcTime || '12:00:00 UTC'}</span>
+    </div>
   );
 }

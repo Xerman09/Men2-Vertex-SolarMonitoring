@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Building2,
   Plus,
@@ -48,6 +48,19 @@ export default function AccountsManagementPage() {
   );
   const [loading, setLoading] = useState(contextAccounts.length === 0);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
+  const safeTimeout = useCallback((fn: () => void, ms: number) => {
+    const id = setTimeout(fn, ms);
+    timeoutsRef.current.push(id);
+    return id;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      timeoutsRef.current.forEach(clearTimeout);
+    };
+  }, []);
 
   // Collapsed state for registered plants (plant stationId -> boolean)
   const [collapsedPlants, setCollapsedPlants] = useState<Record<string, boolean>>({});
@@ -129,7 +142,7 @@ export default function AccountsManagementPage() {
     } finally {
       setLoading(false);
       if (isManualSync) {
-        setTimeout(() => {
+        safeTimeout(() => {
           setFetchingDeye(false, null);
         }, 600);
       }
@@ -159,7 +172,7 @@ export default function AccountsManagementPage() {
       console.error('Sync error:', e);
     } finally {
       setSyncingId(null);
-      setTimeout(() => {
+      safeTimeout(() => {
         setFetchingDeye(false, null);
       }, 600);
     }
@@ -225,7 +238,7 @@ export default function AccountsManagementPage() {
 
       await fetchAccounts();
       await refreshContextAccounts();
-      setTimeout(() => {
+      safeTimeout(() => {
         setShowAddAccountModal(false);
         setAddForm({
           name: '',
@@ -808,10 +821,16 @@ export default function AccountsManagementPage() {
 
       {/* MODAL: Add DeyeCloud Account in VOS Modal Format */}
       {showAddAccountModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in-50">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-account-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in-50"
+        >
           <Card className="max-w-xl w-full p-6 shadow-2xl relative border-border/80 bg-popover/95">
             <button
               onClick={() => setShowAddAccountModal(false)}
+              aria-label="Close dialog"
               className="absolute top-4 right-4 text-muted-foreground hover:text-foreground p-1 rounded-lg cursor-pointer"
             >
               <X size={18} />
@@ -819,7 +838,7 @@ export default function AccountsManagementPage() {
 
             <div className="flex items-center gap-2.5 mb-1">
               <Building2 className="text-primary" size={22} />
-              <h3 className="text-lg font-bold text-foreground font-headline">
+              <h3 id="add-account-dialog-title" className="text-lg font-bold text-foreground font-headline">
                 Add DeyeCloud Account
               </h3>
             </div>
@@ -829,10 +848,11 @@ export default function AccountsManagementPage() {
 
             <form onSubmit={handleAddAccountSubmit} className="flex flex-col gap-3.5">
               <div>
-                <label className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
+                <label htmlFor="add-account-name" className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
                   Account Display Name
                 </label>
                 <input
+                  id="add-account-name"
                   type="text"
                   required
                   placeholder="e.g. Acme Industrial Solar Fleet"
@@ -843,10 +863,11 @@ export default function AccountsManagementPage() {
               </div>
 
               <div>
-                <label className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
+                <label htmlFor="add-account-base-url" className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
                   API Regional Base URL
                 </label>
                 <input
+                  id="add-account-base-url"
                   type="text"
                   required
                   value={addForm.baseUrl}
@@ -857,10 +878,11 @@ export default function AccountsManagementPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
+                  <label htmlFor="add-account-app-id" className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
                     App ID
                   </label>
                   <input
+                    id="add-account-app-id"
                     type="text"
                     required
                     placeholder="e.g. 20240901..."
@@ -870,10 +892,11 @@ export default function AccountsManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
+                  <label htmlFor="add-account-app-secret" className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
                     App Secret
                   </label>
                   <input
+                    id="add-account-app-secret"
                     type="password"
                     required
                     placeholder="••••••••••••"
@@ -886,10 +909,11 @@ export default function AccountsManagementPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
+                  <label htmlFor="add-account-email" className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
                     DeyeCloud Login Email
                   </label>
                   <input
+                    id="add-account-email"
                     type="email"
                     required
                     placeholder="user@domain.com"
@@ -899,10 +923,11 @@ export default function AccountsManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
+                  <label htmlFor="add-account-password" className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
                     Password (SHA-256 Hashed)
                   </label>
                   <input
+                    id="add-account-password"
                     type="password"
                     required
                     placeholder="••••••••••••"
@@ -952,10 +977,16 @@ export default function AccountsManagementPage() {
 
       {/* MODAL: Add Solar Plant in VOS Modal Format */}
       {showAddPlantModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in-50">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-plant-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in-50"
+        >
           <Card className="max-w-xl w-full p-6 shadow-2xl relative border-border/80 bg-popover/95 max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setShowAddPlantModal(false)}
+              aria-label="Close dialog"
               className="absolute top-4 right-4 text-muted-foreground hover:text-foreground p-1 rounded-lg cursor-pointer"
             >
               <X size={18} />
@@ -963,7 +994,7 @@ export default function AccountsManagementPage() {
 
             <div className="flex items-center gap-2.5 mb-1">
               <Zap className="text-primary" size={22} />
-              <h3 className="text-lg font-bold text-foreground font-headline">
+              <h3 id="add-plant-dialog-title" className="text-lg font-bold text-foreground font-headline">
                 Add Solar Plant Station
               </h3>
             </div>
@@ -974,10 +1005,11 @@ export default function AccountsManagementPage() {
             <form onSubmit={handleAddPlantSubmit} className="flex flex-col gap-3.5">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
+                  <label htmlFor="add-plant-station-name" className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
                     Station Name
                   </label>
                   <input
+                    id="add-plant-station-name"
                     type="text"
                     required
                     placeholder="e.g. North Warehouse Array"
@@ -987,10 +1019,11 @@ export default function AccountsManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
+                  <label htmlFor="add-plant-station-id" className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
                     Station ID (Cloud/Local)
                   </label>
                   <input
+                    id="add-plant-station-id"
                     type="text"
                     required
                     placeholder="e.g. PLANT-003"
@@ -1003,10 +1036,11 @@ export default function AccountsManagementPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
+                  <label htmlFor="add-plant-capacity" className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
                     Installed Capacity (kWp)
                   </label>
                   <input
+                    id="add-plant-capacity"
                     type="number"
                     required
                     value={plantForm.installedCapacityKw}
@@ -1015,10 +1049,11 @@ export default function AccountsManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
+                  <label htmlFor="add-plant-address" className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground block mb-1">
                     Facility Location / Address
                   </label>
                   <input
+                    id="add-plant-address"
                     type="text"
                     placeholder="e.g. Building B, Main Industrial Park"
                     value={plantForm.address}
@@ -1035,6 +1070,8 @@ export default function AccountsManagementPage() {
                 </span>
                 <div className="grid grid-cols-2 gap-2">
                   <input
+                    id="add-plant-inv-sn"
+                    aria-label="Inverter Serial Number"
                     type="text"
                     required
                     placeholder="Serial Number (e.g. 2408124366)"
@@ -1043,6 +1080,8 @@ export default function AccountsManagementPage() {
                     className="w-full px-3 py-1.5 rounded-lg bg-card border border-border/60 text-foreground text-xs font-mono"
                   />
                   <input
+                    id="add-plant-inv-model"
+                    aria-label="Inverter Model"
                     type="text"
                     placeholder="Model (e.g. SUN-120K-SG01HP3-EU-AM2)"
                     value={plantForm.inverterModel1}
@@ -1058,6 +1097,8 @@ export default function AccountsManagementPage() {
                   Data Logger (Optional)
                 </span>
                 <input
+                  id="add-plant-logger-sn"
+                  aria-label="Data Logger Serial Number"
                   type="text"
                   placeholder="Logger SN (e.g. 2309811002)"
                   value={plantForm.loggerSn}

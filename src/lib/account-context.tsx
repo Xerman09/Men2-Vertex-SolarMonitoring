@@ -129,20 +129,23 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isConsumer, accounts, selectedAccountId]);
 
-  const selectedAccount =
-    isConsumer
-      ? (accounts.find((acc) => acc.id === selectedAccountId) || accounts[0] || null)
-      : (selectedAccountId === 'ALL' || selectedAccountId === 'ALL_FLEET'
-          ? null
-          : accounts.find((acc) => acc.id === selectedAccountId) || null);
+  const selectedAccount = useMemo(() => {
+    if (isConsumer) {
+      return accounts.find((acc) => acc.id === selectedAccountId) || accounts[0] || null;
+    }
+    if (selectedAccountId === 'ALL' || selectedAccountId === 'ALL_FLEET') {
+      return null;
+    }
+    return accounts.find((acc) => acc.id === selectedAccountId) || null;
+  }, [isConsumer, accounts, selectedAccountId]);
 
   // Find plant if specific station is chosen
-  const selectedPlant =
-    selectedAccount && selectedStationId !== 'ALL'
-      ? selectedAccount.plants?.find((p) => p.stationId === selectedStationId) || null
-      : null;
+  const selectedPlant = useMemo(() => {
+    if (!selectedAccount || selectedStationId === 'ALL') return null;
+    return selectedAccount.plants?.find((p) => p.stationId === selectedStationId) || null;
+  }, [selectedAccount, selectedStationId]);
 
-  const handleSetSelectedAccountId = (id: string) => {
+  const handleSetSelectedAccountId = useCallback((id: string) => {
     if (isConsumer) {
       if (accounts.length > 0) {
         setSelectedAccountId(accounts[0].id);
@@ -153,9 +156,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     const normalized = id === 'ALL_FLEET' ? 'ALL' : id;
     setSelectedAccountId(normalized);
     setSelectedStationId('ALL');
-  };
+  }, [isConsumer, accounts]);
 
-  const selectAccountAndPlant = (accountId: string, stationId: string = 'ALL') => {
+  const selectAccountAndPlant = useCallback((accountId: string, stationId: string = 'ALL') => {
     if (isConsumer && accounts.length > 0) {
       setSelectedAccountId(accounts[0].id);
       setSelectedStationId(stationId);
@@ -164,38 +167,58 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     const normalized = accountId === 'ALL_FLEET' ? 'ALL' : accountId;
     setSelectedAccountId(normalized);
     setSelectedStationId(stationId);
-  };
+  }, [isConsumer, accounts]);
 
   // Fleet view is NEVER active for consumer accounts
   const isFleetView = !isConsumer && (selectedAccountId === 'ALL' || selectedAccountId === 'ALL_FLEET');
   const totalAccounts = accounts.length;
-  const liveAccountsCount = accounts.filter((a) => a.isLive).length;
+  const liveAccountsCount = useMemo(() => accounts.filter((a) => a.isLive).length, [accounts]);
+
+  const contextValue = useMemo(() => ({
+    accounts,
+    selectedAccountId,
+    setSelectedAccountId: handleSetSelectedAccountId,
+    selectedAccount,
+    selectedStationId,
+    setSelectedStationId,
+    selectedPlant,
+    selectAccountAndPlant,
+    isFleetView,
+    loading,
+    syncing,
+    isFetchingDeye,
+    fetchingStage,
+    lastSyncedAt,
+    setFetchingDeye,
+    refreshAccounts,
+    syncLivePlants,
+    totalAccounts,
+    liveAccountsCount,
+    directusStatus,
+  }), [
+    accounts,
+    selectedAccountId,
+    handleSetSelectedAccountId,
+    selectedAccount,
+    selectedStationId,
+    selectedPlant,
+    selectAccountAndPlant,
+    isFleetView,
+    loading,
+    syncing,
+    isFetchingDeye,
+    fetchingStage,
+    lastSyncedAt,
+    setFetchingDeye,
+    refreshAccounts,
+    syncLivePlants,
+    totalAccounts,
+    liveAccountsCount,
+    directusStatus,
+  ]);
 
   return (
-    <AccountContext.Provider
-      value={{
-        accounts,
-        selectedAccountId,
-        setSelectedAccountId: handleSetSelectedAccountId,
-        selectedAccount,
-        selectedStationId,
-        setSelectedStationId,
-        selectedPlant,
-        selectAccountAndPlant,
-        isFleetView,
-        loading,
-        syncing,
-        isFetchingDeye,
-        fetchingStage,
-        lastSyncedAt,
-        setFetchingDeye,
-        refreshAccounts,
-        syncLivePlants,
-        totalAccounts,
-        liveAccountsCount,
-        directusStatus,
-      }}
-    >
+    <AccountContext.Provider value={contextValue}>
       {children}
     </AccountContext.Provider>
   );

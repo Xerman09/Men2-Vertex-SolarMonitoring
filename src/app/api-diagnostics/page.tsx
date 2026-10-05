@@ -34,6 +34,7 @@ export default function ApiDiagnosticsPage() {
   // Playground Execution State
   const [executing, setExecuting] = useState(false);
   const [responseOutput, setResponseOutput] = useState<string | null>(null);
+  const [responseStatus, setResponseStatus] = useState<{ code: number; text: string; ok: boolean } | null>(null);
 
   // Workmode Command Form State
   const [selectedMode, setSelectedMode] = useState<'PEAK_SHAVING' | 'BATTERY_FIRST' | 'LOAD_FIRST' | 'SELLING_FIRST'>('PEAK_SHAVING');
@@ -108,8 +109,18 @@ export default function ApiDiagnosticsPage() {
       });
 
       const json = await res.json();
+      setResponseStatus({
+        code: res.status,
+        text: res.statusText || (res.ok ? 'OK' : 'Error'),
+        ok: res.ok,
+      });
       setResponseOutput(JSON.stringify(json, null, 2));
     } catch (err) {
+      setResponseStatus({
+        code: 500,
+        text: 'Client Network Error',
+        ok: false,
+      });
       setResponseOutput(JSON.stringify({ error: String(err) }, null, 2));
     } finally {
       setExecuting(false);
@@ -445,8 +456,8 @@ export default function ApiDiagnosticsPage() {
       {responseOutput && (
         <Card className="border-border/60 bg-card/80 p-5 shadow-xs">
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-border/50">
-            <span className="text-xs font-bold font-mono text-emerald-500">
-              HTTP 200 OK — Telemetry Response Payload
+            <span className={`text-xs font-bold font-mono ${responseStatus?.ok ? 'text-emerald-500' : 'text-rose-500'}`}>
+              HTTP {responseStatus?.code ?? 200} {responseStatus?.text ?? 'Response'} — Telemetry Response Payload
             </span>
             <Button
               variant="outline"

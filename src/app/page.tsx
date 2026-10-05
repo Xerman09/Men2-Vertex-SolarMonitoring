@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   Sun,
@@ -56,6 +56,7 @@ export default function EnergyFlowDashboard() {
   const [nodes, setNodes] = useState<FleetMatrixNode[]>([]);
   const [isLive, setIsLive] = useState(false);
   const [loading, setLoading] = useState(true);
+  const inFlightRef = useRef(false);
   const [forceCharge, setForceCharge] = useState(false);
   const [exportLimiter, setExportLimiter] = useState(false);
   const [manualPolling, setManualPolling] = useState(false);
@@ -63,6 +64,9 @@ export default function EnergyFlowDashboard() {
   const [mainTab, setMainTab] = useState<'synoptics' | 'trigonometric'>('synoptics');
 
   const fetchTelemetry = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+
     try {
       if (isFleetView) {
         const res = await fetch('/api/deye/aggregate');
@@ -181,14 +185,30 @@ export default function EnergyFlowDashboard() {
     } catch (e) {
       console.error('Error fetching telemetry:', e);
     } finally {
+      inFlightRef.current = false;
       setLoading(false);
     }
-  }, [isFleetView, selectedAccountId, selectedAccount, selectedStationId]);
+  }, [isFleetView, selectedAccountId, selectedStationId]);
 
   useEffect(() => {
     fetchTelemetry();
-    const interval = setInterval(fetchTelemetry, 3500);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'hidden') {
+        fetchTelemetry();
+      }
+    }, 3500);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchTelemetry();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchTelemetry]);
 
   const triggerManualPoll = async () => {

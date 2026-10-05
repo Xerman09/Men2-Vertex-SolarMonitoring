@@ -90,8 +90,8 @@ export default function HardwareTelemetryPage() {
             setTelemetry(json.data);
           }
         }
-      } catch (e: any) {
-        // Suppress rapid refresh errors
+      } catch (e: unknown) {
+        console.error('[HardwareTelemetry] Telemetry fetch error:', e);
       } finally {
         inFlightRef.current = false;
         setLoading(false);
@@ -103,9 +103,22 @@ export default function HardwareTelemetryPage() {
   useEffect(() => {
     fetchTelemetry();
     const interval = setInterval(() => {
-      fetchTelemetry();
+      if (typeof document !== 'undefined' && document.visibilityState !== 'hidden') {
+        fetchTelemetry();
+      }
     }, 5000);
-    return () => clearInterval(interval);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchTelemetry();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchTelemetry]);
 
   const handleRefresh = async () => {
@@ -199,6 +212,14 @@ export default function HardwareTelemetryPage() {
           </Badge>
         </div>
       </div>
+
+      {/* Loading state indicator */}
+      {loading && !telemetry && (
+        <div className="flex items-center gap-2 p-3 bg-muted/40 border border-border/60 rounded-xl text-xs text-muted-foreground animate-pulse font-mono">
+          <RefreshCw size={13} className="animate-spin text-cyan-500" />
+          <span>Polling hardware bus and Modbus registers for inverter telemetry...</span>
+        </div>
+      )}
 
       {/* Inverter Master Identity Card in VOS layout */}
       <Card className="border-border/60 bg-card/80 p-5 shadow-xs">

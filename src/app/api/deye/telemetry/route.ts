@@ -8,6 +8,13 @@ export async function GET(req: Request) {
 
   try {
     const client = accountManager.getClient(accountId);
+    if (!client) {
+      return NextResponse.json(
+        { error: accountId ? `Account "${accountId}" not found` : 'No configured solar gateway account found' },
+        { status: 404 }
+      );
+    }
+
     const result = await client.getInverterTelemetry(deviceSn);
     return NextResponse.json({
       ...result,
@@ -15,8 +22,9 @@ export async function GET(req: Request) {
       accountName: client.accountName,
     });
   } catch (error) {
+    console.error('[TelemetryRoute] Error fetching telemetry:', error);
     return NextResponse.json(
-      { error: 'Failed to retrieve inverter telemetry', details: String(error) },
+      { error: 'Failed to retrieve inverter telemetry' },
       { status: 500 }
     );
   }

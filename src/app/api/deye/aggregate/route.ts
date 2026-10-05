@@ -6,8 +6,9 @@ export async function GET() {
     const aggregate = await accountManager.getAggregatedFleetSummary();
     return NextResponse.json(aggregate);
   } catch (error) {
+    console.error('[AggregateRoute] Error aggregating fleet:', error);
     return NextResponse.json(
-      { error: 'Failed to aggregate fleet telemetry', details: String(error) },
+      { error: 'Failed to aggregate fleet telemetry' },
       { status: 500 }
     );
   }

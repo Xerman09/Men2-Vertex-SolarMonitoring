@@ -52,7 +52,7 @@ export default function YieldArbitragePage() {
   }, []);
 
   const historyRows = [
-    { date: 'Today (Live)', yieldKwh: 486.2, selfConsPct: 82.4, gridExportKwh: 85.5, peakSavedUsd: 184.20, roiScore: '+24.2%' },
+    { date: 'Today (Modeled)', yieldKwh: 486.2, selfConsPct: 82.4, gridExportKwh: 85.5, peakSavedUsd: 184.20, roiScore: '+24.2%' },
     { date: 'Yesterday', yieldKwh: 512.4, selfConsPct: 78.9, gridExportKwh: 108.2, peakSavedUsd: 198.50, roiScore: '+26.1%' },
     { date: 'Sep 13, 2026', yieldKwh: 479.8, selfConsPct: 84.1, gridExportKwh: 76.2, peakSavedUsd: 176.40, roiScore: '+22.8%' },
     { date: 'Sep 12, 2026', yieldKwh: 520.1, selfConsPct: 80.5, gridExportKwh: 101.4, peakSavedUsd: 204.80, roiScore: '+27.4%' },
@@ -97,8 +97,8 @@ export default function YieldArbitragePage() {
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline">
                   Yield Analytics & Time-of-Use Arbitrage
                 </h1>
-                <Badge variant="outline" className="border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono text-[10px]">
-                  Financial Ledger
+                <Badge variant="outline" className="border-amber-500/30 text-amber-500 bg-amber-500/10 font-mono text-[10px]">
+                  Modeled Financial Ledger
                 </Badge>
               </div>
               {isAdmin && (

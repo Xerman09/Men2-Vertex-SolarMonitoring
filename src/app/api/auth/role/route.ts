@@ -1,39 +1,100 @@
 import { NextResponse } from 'next/server';
 import { accountManager, COLLECTIONS } from '@/lib/account-manager';
 import { SolarUser, SolarUserStationPermission } from '@/lib/types';
+import { verifyPassword } from '@/lib/auth-crypto';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { createSessionToken, SESSION_COOKIE_NAME } from '@/lib/session';
+import { env } from '@/lib/env';
 
 export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const { email, password } = body;
+  // IP-based Rate limiting (10 attempts per minute per IP)
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const rateLimitKey = `auth_login_${clientIp}`;
+  const rateLimit = checkRateLimit(rateLimitKey, 10, 60 * 1000);
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { success: false, error: 'Too many authentication attempts. Please try again later.' },
+      { status: 429 }
+    );
+  }
 
-    if (!email || !password) {
-      return NextResponse.json(
-        { success: false, error: 'Username/Email and password are required' },
-        { status: 400 }
-      );
+  let body: { email?: string; password?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { success: false, error: 'Malformed JSON payload' },
+      { status: 400 }
+    );
+  }
+
+  const { email, password } = body;
+  if (!email || !password) {
+    return NextResponse.json(
+      { success: false, error: 'Username/Email and password are required' },
+      { status: 400 }
+    );
+  }
+
+  const inputIdentifier = String(email).trim().toLowerCase();
+  const inputPassword = String(password).trim();
+
+  try {
+    // 0. Check Master Admin PIN override if configured
+    if (
+      (inputIdentifier === 'admin' || inputIdentifier === 'root') &&
+      env.ADMIN_ACCESS_PIN &&
+      verifyPassword(inputPassword, env.ADMIN_ACCESS_PIN)
+    ) {
+      const user = {
+        id: 'master-admin',
+        email: 'admin@solar.local',
+        name: 'Master Operations Administrator',
+        role: 'admin' as const,
+      };
+      const sessionToken = await createSessionToken({
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        role: 'admin',
+      });
+
+      const response = NextResponse.json({
+        success: true,
+        role: 'admin',
+        user,
+      });
+
+      response.cookies.set({
+        name: SESSION_COOKIE_NAME,
+        value: sessionToken,
+        httpOnly: true,
+        secure: env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 3600,
+      });
+
+      return response;
     }
 
-    const inputIdentifier = String(email).trim().toLowerCase();
-    const inputPassword = String(password).trim();
-
-    // 1. First, check normalized table: iot_solar_users
+    // 1. Check normalized table: iot_solar_users
     try {
       const users = await accountManager.fetchCollection<SolarUser>(COLLECTIONS.USERS);
       if (users && users.length > 0) {
         const matchedUser = users.find((u) => {
           const uEmail = (u.email || '').trim().toLowerCase();
           const uName = (u.username || '').trim().toLowerCase();
-          return (uEmail === inputIdentifier || uName === inputIdentifier) &&
-                 String(u.password_hash || '').trim() === inputPassword;
+          const matchesIdent = uEmail === inputIdentifier || uName === inputIdentifier;
+          return matchesIdent && verifyPassword(inputPassword, u.password_hash || '');
         });
 
         if (matchedUser) {
-          const isAdmin = matchedUser.role === 'admin' || 
-                          matchedUser.email.toLowerCase() === 'admin' || 
-                          matchedUser.username.toLowerCase() === 'admin';
+          const isAdmin =
+            matchedUser.role === 'admin' ||
+            matchedUser.email.toLowerCase() === 'admin' ||
+            matchedUser.username.toLowerCase() === 'admin';
 
-          // Check permissions table for assigned stations
           let assignedStationId: string | undefined;
           try {
             const perms = await accountManager.fetchCollection<SolarUserStationPermission>(
@@ -43,35 +104,45 @@ export async function POST(req: Request) {
             if (perms && perms.length > 0) {
               assignedStationId = perms[0].station_id;
             }
-          } catch (e) {
+          } catch {
             // Permissions lookup non-fatal
           }
 
-          if (isAdmin) {
-            return NextResponse.json({
-              success: true,
-              role: 'admin',
-              user: {
-                id: matchedUser.id,
-                email: matchedUser.email,
-                name: matchedUser.full_name || matchedUser.username || 'Admin',
-                role: 'admin',
-              },
-            });
-          }
+          const role = isAdmin ? ('admin' as const) : ('consumer' as const);
+          const user = {
+            id: matchedUser.id,
+            email: matchedUser.email,
+            name: matchedUser.full_name || matchedUser.username || (isAdmin ? 'Admin' : 'Customer'),
+            role,
+            accountId: assignedStationId ? `station-${assignedStationId}` : String(matchedUser.id),
+            stationId: assignedStationId,
+          };
 
-          return NextResponse.json({
-            success: true,
-            role: 'consumer',
-            user: {
-              id: matchedUser.id,
-              email: matchedUser.email,
-              name: matchedUser.full_name || matchedUser.username || 'Customer',
-              role: 'consumer',
-              accountId: assignedStationId ? `station-${assignedStationId}` : String(matchedUser.id),
-              stationId: assignedStationId,
-            },
+          const sessionToken = await createSessionToken({
+            userId: user.id,
+            email: user.email,
+            name: user.name,
+            role,
+            accountId: user.accountId,
           });
+
+          const response = NextResponse.json({
+            success: true,
+            role,
+            user,
+          });
+
+          response.cookies.set({
+            name: SESSION_COOKIE_NAME,
+            value: sessionToken,
+            httpOnly: true,
+            secure: env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 7 * 24 * 3600,
+          });
+
+          return response;
         }
       }
     } catch (dbErr) {
@@ -79,7 +150,7 @@ export async function POST(req: Request) {
     }
 
     // 2. Fallback to legacy iot_solar_accounts or local cache
-    let records: any[] | null = await accountManager.fetchFromDirectus();
+    let records = await accountManager.fetchFromDirectus();
     if (!records || records.length === 0) {
       records = accountManager.getAllRawAccounts(true);
     }
@@ -87,7 +158,8 @@ export async function POST(req: Request) {
     const matched = records.find((row) => {
       const rowEmail = (row.email || '').trim().toLowerCase();
       const rowName = (row.name || '').trim().toLowerCase();
-      return (rowEmail === inputIdentifier || rowName === inputIdentifier) && String(row.password || '').trim() === inputPassword;
+      const matchesIdent = rowEmail === inputIdentifier || rowName === inputIdentifier;
+      return matchesIdent && verifyPassword(inputPassword, row.password || '');
     });
 
     if (!matched) {
@@ -109,32 +181,42 @@ export async function POST(req: Request) {
       (matched.email && matched.email.trim().toLowerCase() === 'admin')
     );
 
-    if (hasAdminPrivilege) {
-      return NextResponse.json({
-        success: true,
-        role: 'admin',
-        user: {
-          id: matched.id,
-          email: matched.email || matched.name,
-          name: matched.name || matched.email || 'Admin',
-          role: 'admin',
-        },
-      });
-    }
+    const role = hasAdminPrivilege ? ('admin' as const) : ('consumer' as const);
+    const user = {
+      id: matched.id,
+      email: matched.email || matched.name,
+      name: matched.name || matched.email || (hasAdminPrivilege ? 'Admin' : 'Customer'),
+      role,
+      accountId: String(matched.id),
+    };
 
-    return NextResponse.json({
-      success: true,
-      role: 'consumer',
-      user: {
-        id: matched.id,
-        email: matched.email || matched.name,
-        name: matched.name || matched.email || 'Customer',
-        role: 'consumer',
-        accountId: String(matched.id),
-      },
+    const sessionToken = await createSessionToken({
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      role,
+      accountId: user.accountId,
     });
-  } catch (error: any) {
-    console.error('[AuthRole] Database authentication error:', error);
+
+    const response = NextResponse.json({
+      success: true,
+      role,
+      user,
+    });
+
+    response.cookies.set({
+      name: SESSION_COOKIE_NAME,
+      value: sessionToken,
+      httpOnly: true,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 3600,
+    });
+
+    return response;
+  } catch (error) {
+    console.error('[AuthRole] Authentication error:', error);
     return NextResponse.json(
       { success: false, error: 'Authentication service error. Please try again.' },
       { status: 500 }

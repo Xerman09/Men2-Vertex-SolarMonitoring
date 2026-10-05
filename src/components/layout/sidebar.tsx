@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -28,6 +28,17 @@ export function Sidebar() {
   const { collapsed, setCollapsed, mobileOpen, closeMobile } = useSidebar();
   const { totalAccounts, liveAccountsCount, isFleetView } = useAccount();
   const { isAdmin, isViewer } = useRole();
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeMobile();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileOpen, closeMobile]);
 
   const navItems = [
     {
@@ -78,14 +89,18 @@ export function Sidebar() {
     <>
       {/* Mobile Drawer Overlay Backdrop */}
       {mobileOpen && (
-        <div
+        <button
+          type="button"
           onClick={closeMobile}
-          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden animate-in fade-in-50"
-          aria-hidden="true"
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden animate-in fade-in-50 cursor-default"
+          aria-label="Close navigation sidebar overlay"
         />
       )}
 
       <aside
+        role={mobileOpen ? 'dialog' : 'complementary'}
+        aria-modal={mobileOpen ? 'true' : undefined}
+        aria-label="Navigation sidebar"
         className={`fixed left-0 top-0 h-full bg-sidebar text-sidebar-foreground z-50 flex flex-col justify-between border-r border-sidebar-border shadow-sm transition-all duration-300 ${
           collapsed ? 'w-20' : 'w-72'
         } ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}

@@ -3,10 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0 --port 3005",
+    "dev": "next dev --port 3005",
+    "dev:lan": "next dev -H 0.0.0.0 --port 3005",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 --port 3005",
-    "typecheck": "tsc --noEmit"
+    "start": "next start --port 3005",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "format:check": "prettier --check .",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -22,7 +26,8 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^2.15.4",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -30,7 +35,10 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "postcss": "^8",
+    "prettier": "^3.9.9",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
   }
 }
