@@ -34,7 +34,7 @@ const envSchema = z
     DIRECTUS_BASE_URL: z.string().url().default('http://localhost:8056'),
     DIRECTUS_API_TOKEN: z.string().optional().default(''),
     DIRECTUS_COLLECTION: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/).default('iot_solar_accounts'),
-    ADMIN_ACCESS_PIN: z.string().default('8888'),
+    ADMIN_ACCESS_PIN: z.string().optional(),
     SESSION_SECRET: z.string().min(16).default(getNonProdSessionSecret),
     ALLOWED_DEV_ORIGINS: z.string().optional(),
   })
