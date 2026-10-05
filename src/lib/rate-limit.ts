@@ -5,9 +5,9 @@ interface RateLimitRecord {
 
 const rateLimitStore = new Map<string, RateLimitRecord>();
 
-// Clean up expired records every 5 minutes
+// Clean up expired records every 5 minutes without holding event loop open
 if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
+  const timer = setInterval(() => {
     const now = Date.now();
     for (const [key, record] of rateLimitStore.entries()) {
       if (record.resetAt <= now) {
@@ -15,6 +15,11 @@ if (typeof setInterval !== 'undefined') {
       }
     }
   }, 5 * 60 * 1000);
+  timer.unref?.();
+}
+
+export function _resetRateLimitStoreForTesting(): void {
+  rateLimitStore.clear();
 }
 
 /**

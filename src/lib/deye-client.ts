@@ -420,9 +420,32 @@ export class DeyeCloudClient {
 
     // Multi-plant account aggregation
     if (this.plants && this.plants.length > 0) {
-      const results = await Promise.all(
+      const settled = await Promise.allSettled(
         this.plants.map((p) => this.getSingleStationSummary(p.stationId))
       );
+
+      const results = settled.map((s, i) => {
+        if (s.status === 'fulfilled') return s.value;
+        const p = this.plants[i];
+        console.warn(`[DeyeClient] Failed getting summary for plant ${p?.stationId}:`, s.reason);
+        return {
+          isLive: false,
+          data: {
+            stationId: p?.stationId || 'UNKNOWN',
+            name: p?.stationName || 'Offline Plant',
+            status: 'OFFLINE' as const,
+            capacityKw: p?.installedCapacityKw || 0,
+            liveSolarPowerKw: 0,
+            dailyYieldKwh: 0,
+            totalYieldMwh: 0,
+            batteryPowerKw: 0,
+            gridPowerKw: 0,
+            loadPowerKw: 0,
+            batterySoc: 0,
+            lastUpdated: new Date().toISOString(),
+          },
+        };
+      });
 
       let totalCapacityKw = 0;
       let totalLiveSolarPowerKw = 0;

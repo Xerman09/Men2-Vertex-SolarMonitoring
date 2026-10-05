@@ -101,3 +101,64 @@ export async function verifySessionToken(token?: string | null): Promise<Session
     return null;
   }
 }
+
+export interface TenantAccessResult {
+  allowed: boolean;
+  targetAccountId?: string;
+  status?: number;
+  error?: string;
+}
+
+/**
+ * Enforces tenant boundary isolation between Admin, Consumer, and Viewer roles.
+ */
+export function enforceTenantAccess(
+  session: SessionData | null,
+  requestedAccountId?: string | null
+): TenantAccessResult {
+  // 1. Unauthenticated requests
+  if (!session) {
+    if (requestedAccountId) {
+      return {
+        allowed: false,
+        status: 401,
+        error: 'Authentication required to access account-specific telemetry',
+      };
+    }
+    return { allowed: true, targetAccountId: undefined };
+  }
+
+  // 2. Admin role has unrestricted access across all accounts
+  if (session.role === 'admin') {
+    return { allowed: true, targetAccountId: requestedAccountId || undefined };
+  }
+
+  // 3. Consumer role is strictly locked to their assigned account
+  if (session.role === 'consumer') {
+    if (!session.accountId) {
+      return {
+        allowed: false,
+        status: 403,
+        error: 'Forbidden: Consumer account is not assigned to any solar station',
+      };
+    }
+    if (requestedAccountId && requestedAccountId !== session.accountId) {
+      return {
+        allowed: false,
+        status: 403,
+        error: 'Forbidden: You do not have permission to access telemetry for this account',
+      };
+    }
+    return { allowed: true, targetAccountId: session.accountId };
+  }
+
+  // 4. Viewer role can only view public/fleet default summary, cannot target specific accounts
+  if (requestedAccountId) {
+    return {
+      allowed: false,
+      status: 403,
+      error: 'Forbidden: Viewer role cannot query account-specific telemetry',
+    };
+  }
+  return { allowed: true, targetAccountId: undefined };
+}

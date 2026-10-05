@@ -5,3 +5,4 @@ coverage/
 .omo/
 *.class
 package-lock.json
+AGENTS.md

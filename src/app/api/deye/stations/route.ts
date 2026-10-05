@@ -1,16 +1,59 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { accountManager } from '@/lib/account-manager';
+import { verifySessionToken, SESSION_COOKIE_NAME, enforceTenantAccess } from '@/lib/session';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const accountId = searchParams.get('accountId') || undefined;
 
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const session = await verifySessionToken(token);
+
+  // If consumer role, strictly restrict to their assigned account
+  if (session?.role === 'consumer') {
+    if (!session.accountId) {
+      return NextResponse.json(
+        { error: 'Forbidden: Consumer account is not assigned to any solar station' },
+        { status: 403 }
+      );
+    }
+    if (accountId && accountId !== session.accountId) {
+      return NextResponse.json(
+        { error: 'Forbidden: You do not have permission to view stations for this account' },
+        { status: 403 }
+      );
+    }
+    const client = accountManager.getClient(session.accountId);
+    if (!client) {
+      return NextResponse.json(
+        { error: `Assigned account "${session.accountId}" not found` },
+        { status: 404 }
+      );
+    }
+    const result = await client.getStationList();
+    return NextResponse.json({
+      ...result,
+      accountId: client.accountId,
+      accountName: client.accountName,
+    });
+  }
+
   try {
     if (accountId) {
-      const client = accountManager.getClient(accountId);
+      const tenantCheck = enforceTenantAccess(session, accountId);
+      if (!tenantCheck.allowed) {
+        return NextResponse.json(
+          { error: tenantCheck.error || 'Access denied' },
+          { status: tenantCheck.status || 403 }
+        );
+      }
+
+      const client = accountManager.getClient(tenantCheck.targetAccountId);
       if (!client) {
         return NextResponse.json(
-          { error: `Account "${accountId}" not found` },
+          { error: `Account "${tenantCheck.targetAccountId}" not found` },
           { status: 404 }
         );
       }
@@ -22,21 +65,32 @@ export async function GET(req: Request) {
       });
     }
 
-    // Query all accounts
+    // Query all accounts with Promise.allSettled for fault tolerance
     const clients = accountManager.getAllClients();
-    const lists = await Promise.all(clients.map((c) => c.getStationList()));
-    const allStations = lists.flatMap((l, idx) =>
-      l.stations.map((s) => ({
-        ...s,
-        accountId: clients[idx].accountId,
-        accountName: clients[idx].accountName,
-      }))
-    );
+    const settled = await Promise.allSettled(clients.map((c) => c.getStationList()));
+    const allStations: Array<Record<string, any>> = [];
+    let anyLive = false;
+
+    settled.forEach((res, idx) => {
+      if (res.status === 'fulfilled') {
+        const l = res.value;
+        if (l.isLive) anyLive = true;
+        l.stations.forEach((s) => {
+          allStations.push({
+            ...s,
+            accountId: clients[idx].accountId,
+            accountName: clients[idx].accountName,
+          });
+        });
+      } else {
+        console.warn(`[StationsRoute] Failed querying station list for account ${clients[idx].accountId}:`, res.reason);
+      }
+    });
 
     return NextResponse.json({
       total: allStations.length,
       stations: allStations,
-      isLive: lists.some((l) => l.isLive),
+      isLive: anyLive,
     });
   } catch (error) {
     console.error('[StationsRoute] Error querying stations:', error);

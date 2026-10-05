@@ -44,7 +44,8 @@ class DeyeAccountManager {
   };
 
   private getConfigPath(): string {
-    return path.resolve(process.cwd(), 'deye-accounts.json');
+    const dataDir = process.env.DSM_DATA_DIR || process.cwd();
+    return path.resolve(dataDir, 'deye-accounts.json');
   }
 
   private getDirectusBaseUrl(): string {

@@ -51,18 +51,28 @@ export async function POST(req: Request) {
   }
 
   // 4. Tenant isolation check for consumer roles
-  if (session.role === 'consumer' && session.accountId && accountId && session.accountId !== accountId) {
-    return NextResponse.json(
-      { error: 'Forbidden: You do not have permission to control hardware for this account' },
-      { status: 403 }
-    );
+  let targetAccountId = accountId;
+  if (session.role === 'consumer') {
+    if (!session.accountId) {
+      return NextResponse.json(
+        { error: 'Forbidden: Consumer account is not assigned to any solar station' },
+        { status: 403 }
+      );
+    }
+    if (accountId && session.accountId !== accountId) {
+      return NextResponse.json(
+        { error: 'Forbidden: You do not have permission to control hardware for this account' },
+        { status: 403 }
+      );
+    }
+    targetAccountId = session.accountId;
   }
 
   // 5. Retrieve target DeyeCloud client
-  const client = accountManager.getClient(accountId);
+  const client = accountManager.getClient(targetAccountId);
   if (!client) {
     return NextResponse.json(
-      { error: `Account with ID "${accountId}" not found` },
+      { error: `Account with ID "${targetAccountId || 'default'}" not found` },
       { status: 404 }
     );
   }

@@ -2,25 +2,60 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { accountManager } from '@/lib/account-manager';
 import { DeyeAccountConfig, PlantInfo } from '@/lib/types';
-import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/session';
+import { verifySessionToken, SESSION_COOKIE_NAME, enforceTenantAccess } from '@/lib/session';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const accountId = searchParams.get('accountId');
 
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const session = await verifySessionToken(token);
+
+  // If consumer role, strictly restrict to their assigned account
+  if (session?.role === 'consumer') {
+    if (!session.accountId) {
+      return NextResponse.json(
+        { error: 'Forbidden: Consumer account is not assigned to any solar station' },
+        { status: 403 }
+      );
+    }
+    if (accountId && accountId !== session.accountId) {
+      return NextResponse.json(
+        { error: 'Forbidden: You do not have permission to view plants for this account' },
+        { status: 403 }
+      );
+    }
+    const rawAccounts: DeyeAccountConfig[] = accountManager.getAllRawAccounts();
+    const target = rawAccounts.find((a) => a.id === session.accountId);
+    return NextResponse.json({
+      accountId: session.accountId,
+      plants: target?.plants || [],
+      total: target?.plants?.length || 0,
+    });
+  }
+
   try {
     const rawAccounts: DeyeAccountConfig[] = accountManager.getAllRawAccounts();
 
     if (accountId) {
-      const target = rawAccounts.find((a) => a.id === accountId);
+      const tenantCheck = enforceTenantAccess(session, accountId);
+      if (!tenantCheck.allowed) {
+        return NextResponse.json(
+          { error: tenantCheck.error || 'Access denied' },
+          { status: tenantCheck.status || 403 }
+        );
+      }
+
+      const target = rawAccounts.find((a) => a.id === tenantCheck.targetAccountId);
       if (!target) {
         return NextResponse.json(
-          { error: `Account "${accountId}" not found` },
+          { error: `Account "${tenantCheck.targetAccountId}" not found` },
           { status: 404 }
         );
       }
       return NextResponse.json({
-        accountId,
+        accountId: target.id,
         plants: target.plants || [],
         total: target.plants?.length || 0,
       });

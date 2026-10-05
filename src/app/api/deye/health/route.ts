@@ -1,16 +1,30 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { accountManager } from '@/lib/account-manager';
+import { verifySessionToken, SESSION_COOKIE_NAME, enforceTenantAccess } from '@/lib/session';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const accountId = searchParams.get('accountId') || undefined;
 
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const session = await verifySessionToken(token);
+
+  const tenantCheck = enforceTenantAccess(session, accountId);
+  if (!tenantCheck.allowed) {
+    return NextResponse.json(
+      { error: tenantCheck.error || 'Access denied' },
+      { status: tenantCheck.status || 403 }
+    );
+  }
+
   try {
-    if (accountId) {
-      const client = accountManager.getClient(accountId);
+    if (tenantCheck.targetAccountId) {
+      const client = accountManager.getClient(tenantCheck.targetAccountId);
       if (!client) {
         return NextResponse.json(
-          { error: `Account "${accountId}" not found` },
+          { error: `Account "${tenantCheck.targetAccountId}" not found` },
           { status: 404 }
         );
       }
