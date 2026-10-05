@@ -12,3 +12,4 @@ This directory contains records of significant architectural and security design
 | [ADR-0004](./0004-canonical-tenant-boundary-enforcement.md) | Canonical Tenant Boundary Enforcement (`enforceTenantAccess`) | Accepted | 2026-10-05 |
 | [ADR-0005](./0005-rate-limiting-and-upstash-roadmap.md) | Sliding-Window Rate Limiting and Upstash Redis Roadmap | Accepted | 2026-10-05 |
 | [ADR-0006](./0006-dual-persistence-and-atomic-storage.md) | Dual Directus Relational Persistence with Atomic File Cache Fallback | Accepted | 2026-10-05 |
+| [ADR-0007](./0007-directus-weak-allowlist-self-hosted-policy.md) | Directus Weak-Allowlist Self-Hosted Policy | Accepted | 2026-10-05 |

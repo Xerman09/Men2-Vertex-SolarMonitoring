@@ -5,7 +5,7 @@ import { accountManager } from '@/lib/account-manager';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/session';
 import { checkRateLimit } from '@/lib/rate-limit';
 
-const VALID_WORK_MODES = [
+export const VALID_WORK_MODES = [
   'PEAK_SHAVING',
   'BATTERY_FIRST',
   'LOAD_FIRST',
@@ -14,9 +14,9 @@ const VALID_WORK_MODES = [
   'ZERO_EXPORT_TO_CT',
 ] as const;
 
-type ValidWorkMode = (typeof VALID_WORK_MODES)[number];
+export type ValidWorkMode = (typeof VALID_WORK_MODES)[number];
 
-const controlBodySchema = z.object({
+export const controlBodySchema = z.object({
   deviceSn: z
     .string()
     .regex(/^[A-Za-z0-9_-]{6,32}$/, 'Invalid device serial number format')
@@ -25,7 +25,12 @@ const controlBodySchema = z.object({
     message: `Invalid work mode. Allowed modes: ${VALID_WORK_MODES.join(', ')}`,
   }),
   gridCharge: z.boolean().default(false),
-  accountId: z.string().optional(),
+  accountId: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[A-Za-z0-9_-]+$/, 'Invalid account ID format')
+    .optional(),
 });
 
 export async function POST(req: Request) {

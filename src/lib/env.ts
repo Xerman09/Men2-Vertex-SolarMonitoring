@@ -78,12 +78,16 @@ function getValidatedEnv(): Env {
   const result = envSchema.safeParse(process.env);
   if (!result.success) {
     const errorDetails = result.error.format();
-    console.error('Invalid environment variables:', errorDetails);
 
     if (process.env.NODE_ENV === 'production' && !isBuildPhase) {
+      console.error('Invalid environment variables:', errorDetails);
       throw new Error(
         `[Fatal] Invalid production environment configuration: ${JSON.stringify(errorDetails)}`
       );
+    }
+
+    if (!isBuildPhase) {
+      console.error('Invalid environment variables:', errorDetails);
     }
 
     // In dev/test or during build phase, fallback with defaults

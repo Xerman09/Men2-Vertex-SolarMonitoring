@@ -29,8 +29,13 @@ export function isValidDeyeBaseUrl(rawUrl: string): boolean {
 
     const hostname = parsed.hostname.toLowerCase();
 
-    // Check against allowed host allowlist or *.deyecloud.com domain
-    if (ALLOWED_DEYE_HOSTS.has(hostname) || hostname.endsWith('.deyecloud.com')) {
+    // Check against allowed host allowlist or *.deyecloud.com domain with audit log
+    if (ALLOWED_DEYE_HOSTS.has(hostname)) {
+      return true;
+    }
+
+    if (hostname.endsWith('.deyecloud.com')) {
+      console.info(`[SSRF Validator] Domain matched via *.deyecloud.com suffix fallback: ${hostname}`);
       return true;
     }
 

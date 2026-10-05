@@ -40,7 +40,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Synchronize initial session state from server cookie
+  // Synchronize initial session state from server cookie (server-authoritative)
   useEffect(() => {
     let mounted = true;
 
@@ -49,20 +49,33 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         const res = await fetch('/api/auth/session');
         if (res.ok) {
           const data = await res.json();
-          if (mounted && data.authenticated && data.user) {
-            setRole(data.role);
-            setUser(data.user);
-            try {
-              localStorage.setItem('dsm_user_role', data.role);
-              localStorage.setItem('dsm_auth_user', JSON.stringify(data.user));
-            } catch {
-              // Ignore storage errors
+          if (mounted) {
+            if (data.authenticated && data.user) {
+              setRole(data.role);
+              setUser(data.user);
+              try {
+                localStorage.setItem('dsm_user_role', data.role);
+                localStorage.setItem('dsm_auth_user', JSON.stringify(data.user));
+              } catch {
+                // Ignore storage errors
+              }
+            } else {
+              // Server explicitly reports unauthenticated: purge cached hints
+              setRole('viewer');
+              setUser(null);
+              try {
+                localStorage.removeItem('dsm_user_role');
+                localStorage.removeItem('dsm_auth_user');
+                localStorage.removeItem('dsm_admin_user');
+              } catch {
+                // Ignore storage errors
+              }
             }
-            return;
           }
+          return;
         }
 
-        // Fallback to localStorage if offline
+        // Only on non-200 network error (e.g. offline gateway), use localStorage as read-only UX hint
         const savedRole = localStorage.getItem('dsm_user_role') as UserRole | null;
         const savedUser = localStorage.getItem('dsm_auth_user') || localStorage.getItem('dsm_admin_user');
         if (mounted) {
@@ -70,11 +83,13 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
             setRole(savedRole);
           }
           if (savedUser) {
-            setUser(JSON.parse(savedUser));
+            try {
+              setUser(JSON.parse(savedUser));
+            } catch {}
           }
         }
       } catch (err) {
-        console.warn('[RoleProvider] Session check fallback:', err);
+        console.warn('[RoleProvider] Offline session check fallback:', err);
       } finally {
         if (mounted) {
           setIsInitialized(true);
@@ -84,8 +99,15 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
 
     initSession();
 
+    // Revalidate session on window focus
+    const handleFocus = () => {
+      initSession();
+    };
+    window.addEventListener('focus', handleFocus);
+
     return () => {
       mounted = false;
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 

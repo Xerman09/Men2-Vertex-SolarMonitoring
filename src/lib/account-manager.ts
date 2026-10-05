@@ -158,6 +158,7 @@ class DeyeAccountManager {
       const res = await fetch(url, {
         method: 'DELETE',
         headers: this.getDirectusHeaders(),
+        redirect: 'error',
         signal: AbortSignal.timeout(5000),
       });
       return res.ok;
@@ -280,7 +281,7 @@ class DeyeAccountManager {
             name: accountName,
             enabled: cfg.status !== 'OFFLINE',
             admin: true,
-            baseUrl: cfg.base_url || 'https://eu1-developer.deyecloud.com',
+            baseUrl: sanitizeDeyeBaseUrl(cfg.base_url),
             appId: cfg.app_id || existing?.appId || '',
             appSecret: cfg.app_secret || existing?.appSecret || '',
             email: cfg.account_email || existing?.email || '',
@@ -326,10 +327,7 @@ class DeyeAccountManager {
 
         const appId = String(row.app_id || row.appId || existing?.appId || '').trim();
         const appSecret = String(row.app_secret || row.appSecret || existing?.appSecret || '').trim();
-        let baseUrl = String(row.base_url || row.baseUrl || existing?.baseUrl || 'https://eu1-developer.deyecloud.com').trim();
-        if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
-          baseUrl = 'https://eu1-developer.deyecloud.com';
-        }
+        const baseUrl = sanitizeDeyeBaseUrl(String(row.base_url || row.baseUrl || existing?.baseUrl || ''));
         const isEnabled =
           row.enabled !== undefined
             ? Boolean(row.enabled !== false && row.enabled !== 0 && row.enabled !== 'false' && row.enabled !== '0')
