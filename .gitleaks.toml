@@ -3,8 +3,12 @@
 
 title = "DSM Gitleaks Profile"
 
-[allowlist]
-description = "Allow synthetic test fixtures, documentation examples, and CI mock tokens"
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Path-scoped allowlist for historic synthetic test fixtures, CI mock tokens, and documentation"
+condition = "AND"
 paths = [
     '''\.env\.example$''',
     '''\.github/workflows/ci\.yml$''',
@@ -12,9 +16,19 @@ paths = [
     '''docs/.*''',
     '''opencodeRecs.*\.md$''',
 ]
-
 regexes = [
     '''ci_production_build_test_secret_32_characters_long''',
     '''test_secret_key_at_least_32_bytes_long_12345''',
     '''deye_solar_monitoring_session_secret_2026_default''',
 ]
+
+[[allowlists]]
+description = "Path-scoped allowlist for mock bearer token in UI API diagnostics snippet examples"
+condition = "AND"
+paths = [
+    '''src/app/api-diagnostics/page\.tsx$''',
+]
+regexes = [
+    '''deye_live_token_77a988d''',
+]
+
