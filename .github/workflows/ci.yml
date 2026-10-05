@@ -18,9 +18,9 @@ jobs:
 
       - name: Run Gitleaks secret scan
         uses: gitleaks/gitleaks-action@v2
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

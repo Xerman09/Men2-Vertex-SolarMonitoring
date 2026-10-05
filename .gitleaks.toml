@@ -1,0 +1,20 @@
+# Gitleaks configuration for Deye Solar Monitoring (DSM)
+# https://github.com/gitleaks/gitleaks
+
+title = "DSM Gitleaks Profile"
+
+[allowlist]
+description = "Allow synthetic test fixtures, documentation examples, and CI mock tokens"
+paths = [
+    '''\.env\.example$''',
+    '''\.github/workflows/ci\.yml$''',
+    '''src/lib/__tests__/.*''',
+    '''docs/.*''',
+    '''opencodeRecs.*\.md$''',
+]
+
+regexes = [
+    '''ci_production_build_test_secret_32_characters_long''',
+    '''test_secret_key_at_least_32_bytes_long_12345''',
+    '''deye_solar_monitoring_session_secret_2026_default''',
+]
