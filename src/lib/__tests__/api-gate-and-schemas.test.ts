@@ -212,5 +212,26 @@ describe('API Gate & Schemas Validation Suite', () => {
       }
     });
   });
+
+  describe('DirectusTransport Seam & Graceful Degradation', () => {
+    it('initializes with health status and headers', async () => {
+      const { directusTransport } = await import('../directus-transport');
+      const health = directusTransport.getHealth();
+      expect(typeof health.connected).toBe('boolean');
+      const headers = directusTransport.getDirectusHeaders();
+      expect(headers['Content-Type']).toBe('application/json');
+      expect(headers['Accept']).toBe('application/json');
+    });
+
+    it('returns null on unreachable endpoint without throwing uncaught exceptions', async () => {
+      const { DirectusTransport } = await import('../directus-transport');
+      const transport = new DirectusTransport();
+      // Overwrite base url to unroutable port
+      vi.spyOn(transport, 'getDirectusBaseUrl').mockReturnValue('http://127.0.0.1:59999');
+      const result = await transport.fetchCollection('test_collection');
+      expect(result).toBeNull();
+      expect(transport.getHealth().connected).toBe(false);
+    });
+  });
 });
 

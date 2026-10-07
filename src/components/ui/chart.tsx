@@ -58,13 +58,31 @@ export const ChartContainer = React.forwardRef<
 });
 ChartContainer.displayName = "ChartContainer";
 
+export interface ChartTooltipPayloadItem {
+  name?: string;
+  dataKey?: string | number;
+  value?: string | number;
+  color?: string;
+  fill?: string;
+  stroke?: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface ChartTooltipContentProps {
+  active?: boolean;
+  payload?: ChartTooltipPayloadItem[];
+  label?: string | number;
+  formatter?: (value: unknown, name?: string | number, item?: ChartTooltipPayloadItem) => React.ReactNode;
+  hideLabel?: boolean;
+}
+
 export function ChartTooltipContent({
   active,
   payload,
   label,
   formatter,
   hideLabel = false,
-}: any) {
+}: ChartTooltipContentProps) {
   if (!active || !payload?.length) {
     return null;
   }
@@ -77,7 +95,7 @@ export function ChartTooltipContent({
         </div>
       )}
       <div className="flex flex-col gap-1">
-        {payload.map((item: any, index: number) => {
+        {payload.map((item: ChartTooltipPayloadItem, index: number) => {
           const name = item.name || item.dataKey;
           const val = formatter ? formatter(item.value, name, item) : item.value;
           return (

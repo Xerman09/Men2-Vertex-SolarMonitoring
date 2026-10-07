@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { createLogger } from './logger';
+
+const log = createLogger('Env');
 
 const KNOWN_DEV_SESSION_SECRETS = new Set([
   'deye_solar_monitoring_session_secret_2026_default',
@@ -100,14 +103,14 @@ function getValidatedEnv(): Env {
     const errorDetails = result.error.format();
 
     if (process.env.NODE_ENV === 'production' && !isBuildPhase) {
-      console.error('Invalid environment variables:', errorDetails);
+      log.error('Invalid environment variables', errorDetails);
       throw new Error(
         `[Fatal] Invalid production environment configuration: ${JSON.stringify(errorDetails)}`
       );
     }
 
     if (!isBuildPhase) {
-      console.error('Invalid environment variables:', errorDetails);
+      log.error('Invalid environment variables', errorDetails);
     }
 
     // In dev/test or during build phase, fallback with defaults

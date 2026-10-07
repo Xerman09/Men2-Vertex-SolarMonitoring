@@ -740,7 +740,7 @@ export class DeyeCloudClient {
         todayEnergyKwh: dailyKwh,
         totalEnergyMwh: parseFloat((totalKwh / 1000).toFixed(2)),
         runningHours: rawRunningHours ? parseFloat(rawRunningHours) : 0,
-        activeWorkMode: (rawWorkMode as any) || 'PEAK_SHAVING',
+        activeWorkMode: (rawWorkMode as InverterTelemetry['activeWorkMode']) || 'PEAK_SHAVING',
         gridChargeEnabled: true,
         activeFaults: [],
       };

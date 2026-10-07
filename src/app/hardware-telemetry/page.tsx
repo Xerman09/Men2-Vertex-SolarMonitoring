@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
+import { usePolling } from '@/lib/usePolling';
 
 export default function HardwareTelemetryPage() {
   const {
@@ -102,24 +103,13 @@ export default function HardwareTelemetryPage() {
 
   useEffect(() => {
     fetchTelemetry();
-    const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState !== 'hidden') {
-        fetchTelemetry();
-      }
-    }, 5000);
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchTelemetry();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
   }, [fetchTelemetry]);
+
+  usePolling(fetchTelemetry, {
+    intervalMs: 5000,
+    enabled: true,
+    pauseOnHidden: true,
+  });
 
   const handleRefresh = async () => {
     setRefreshing(true);

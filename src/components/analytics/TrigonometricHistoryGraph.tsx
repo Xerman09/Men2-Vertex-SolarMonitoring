@@ -49,6 +49,7 @@ import {
 } from '@/lib/trigonometric-math';
 import { getMockHourlyEnergyPoints } from '@/lib/mock-telemetry';
 import { CustomExactTooltip } from './GraphTooltip';
+import { usePolling } from '@/lib/usePolling';
 
 interface TrigonometricHistoryGraphProps {
   data?: HourlySolarPoint[];
@@ -129,12 +130,8 @@ export function TrigonometricHistoryGraph({
   };
 
   // Periodic sync of current elapsed slot without fabricated Math.random jitter
-  useEffect(() => {
-    if (!isLiveStreaming) return;
-
-    const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-
+  usePolling(
+    () => {
       setActiveData((prev) => {
         const now = new Date();
         const currentTotalMins = now.getHours() * 60 + now.getMinutes();
@@ -150,10 +147,13 @@ export function TrigonometricHistoryGraph({
           return pt;
         });
       });
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [isLiveStreaming, timeResolution]);
+    },
+    {
+      intervalMs: 5000,
+      enabled: isLiveStreaming,
+      pauseOnHidden: true,
+    }
+  );
 
   // Manual tick trigger for current slot
   const handleManualTick = () => {
@@ -496,7 +496,7 @@ export function TrigonometricHistoryGraph({
 
         {/* Subsystem Tabs */}
         <div className="pt-2">
-          <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as any)} className="w-full">
+          <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as typeof activeTab)} className="w-full">
             <TabsList className="bg-muted/50 p-0.5 rounded-lg h-auto border border-border/50 inline-flex w-fit max-w-full overflow-x-auto gap-0.5">
               <TabsTrigger value="power" className="text-xs gap-1 px-2.5 py-1 font-medium">
                 <Zap className="h-3.5 w-3.5 text-yellow-500" />

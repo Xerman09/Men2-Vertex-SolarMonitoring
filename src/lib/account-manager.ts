@@ -20,196 +20,71 @@ import { hashPassword } from './auth-crypto';
 import { env } from './env';
 import { createLogger } from './logger';
 import { FileAccountCache } from './file-account-cache';
+import { directusTransport, DirectusTransport, DIRECTUS_COLLECTIONS as COLLECTIONS } from './directus-transport';
+
+export { COLLECTIONS };
 
 const log = createLogger('DeyeAccountManager');
-
-export const COLLECTIONS = {
-  USERS: 'iot_solar_users',
-  CONFIGS: 'iot_solar_deye_cloud_configs',
-  STATIONS: 'iot_solar_stations',
-  DEVICES: 'iot_solar_devices',
-  PERMISSIONS: 'iot_solar_user_station_permissions',
-  CONTROL_LOGS: 'iot_solar_inverter_control_logs',
-  ALARMS: 'iot_solar_inverter_alarms',
-  TARIFFS: 'iot_solar_station_tariffs',
-  DAILY_YIELDS: 'iot_solar_station_daily_yields',
-  TELEMETRY: 'iot_solar_telemetry_snapshots',
-  LEGACY_ACCOUNTS: 'iot_solar_accounts',
-} as const;
 
 class DeyeAccountManager {
   private accountsCache: DeyeAccountConfig[] | null = null;
   private clientMap: Map<string, DeyeCloudClient> = new Map();
   private lastLoadedAt: number = 0;
   private lastDirectusSyncAt: number = 0;
-  private directusStatus: { connected: boolean; lastChecked: string; error?: string } = {
-    connected: false,
-    lastChecked: '',
-  };
+  private directusTransport: DirectusTransport = directusTransport;
 
   private getConfigPath(): string {
     return FileAccountCache.getConfigPath();
   }
 
-  private getDirectusBaseUrl(): string {
-    return sanitizeDirectusBaseUrl(env.DIRECTUS_BASE_URL, env.NODE_ENV === 'production');
+  public getDirectusHealth() {
+    return this.directusTransport.getHealth();
   }
 
-  private getDirectusCollection(): string {
-    return env.DIRECTUS_COLLECTION;
-  }
-
-  private getDirectusHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    };
-    if (env.DIRECTUS_API_TOKEN) {
-      headers['Authorization'] = `Bearer ${env.DIRECTUS_API_TOKEN}`;
-    }
-    return headers;
-  }
-
-  public getDirectusHealth(): { connected: boolean; lastChecked: string; error?: string } {
-    return this.directusStatus;
+  public getDirectusCollection(): string {
+    return this.directusTransport.getDirectusCollection();
   }
 
   /**
    * Generic Directus collection reader for the normalized schema
    */
   public async fetchCollection<T = any>(collection: string, query = '?limit=-1'): Promise<T[] | null> {
-    try {
-      const safeCollection = encodeURIComponent(collection);
-      const url = `${this.getDirectusBaseUrl()}/items/${safeCollection}${query}`;
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: this.getDirectusHeaders(),
-        redirect: 'error',
-        signal: AbortSignal.timeout(4000),
-      });
-
-      if (!res.ok) {
-        if (res.status === 404) return null; // Collection does not exist yet
-        throw new Error(`Directus HTTP status ${res.status}`);
-      }
-
-      const json = await res.json();
-      this.directusStatus = {
-        connected: true,
-        lastChecked: new Date().toISOString(),
-      };
-      return Array.isArray(json.data) ? json.data : [];
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      this.directusStatus = {
-        connected: false,
-        lastChecked: new Date().toISOString(),
-        error: errorMsg || 'Unreachable',
-      };
-      return null;
-    }
+    return this.directusTransport.fetchCollection<T>(collection, query);
   }
 
   /**
    * Generic create helper for any Directus collection
    */
   public async createItem<T = Record<string, any>>(collection: string, payload: Record<string, any>): Promise<T | null> {
-    try {
-      const safeCollection = encodeURIComponent(collection);
-      const url = `${this.getDirectusBaseUrl()}/items/${safeCollection}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: this.getDirectusHeaders(),
-        body: JSON.stringify(payload),
-        redirect: 'error',
-        signal: AbortSignal.timeout(5000),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        return json.data || null;
-      }
-      return null;
-    } catch (err) {
-      log.warn(`Failed to create item in ${collection}`, { collection }, err);
-      return null;
-    }
+    return this.directusTransport.createItem<T>(collection, payload);
   }
 
   /**
    * Generic update helper for any Directus collection
    */
   public async updateItem(collection: string, id: string | number, payload: Record<string, unknown>): Promise<boolean> {
-    try {
-      const safeCollection = encodeURIComponent(collection);
-      const safeId = encodeURIComponent(String(id));
-      const url = `${this.getDirectusBaseUrl()}/items/${safeCollection}/${safeId}`;
-      const res = await fetch(url, {
-        method: 'PATCH',
-        headers: this.getDirectusHeaders(),
-        body: JSON.stringify(payload),
-        redirect: 'error',
-        signal: AbortSignal.timeout(5000),
-      });
-      return res.ok;
-    } catch (err) {
-      log.warn(`Failed to update item ${id} in ${collection}`, { collection, id }, err);
-      return false;
-    }
+    return this.directusTransport.updateItem(collection, id, payload);
   }
 
   /**
    * Generic delete helper for any Directus collection
    */
   public async deleteItem(collection: string, id: string | number): Promise<boolean> {
-    try {
-      const safeCollection = encodeURIComponent(collection);
-      const safeId = encodeURIComponent(String(id));
-      const url = `${this.getDirectusBaseUrl()}/items/${safeCollection}/${safeId}`;
-      const res = await fetch(url, {
-        method: 'DELETE',
-        headers: this.getDirectusHeaders(),
-        redirect: 'error',
-        signal: AbortSignal.timeout(5000),
-      });
-      return res.ok;
-    } catch (err) {
-      log.warn(`Failed to delete item ${id} from ${collection}`, { collection, id }, err);
-      return false;
-    }
+    return this.directusTransport.deleteItem(collection, id);
   }
 
   /**
    * Record an immutable audit log when workmode or grid charge controls are dispatched
    */
   public async logInverterControl(logEntry: SolarInverterControlLog): Promise<boolean> {
-    try {
-      const payload: Record<string, unknown> = {
-        station_id: logEntry.station_id,
-        device_sn: logEntry.device_sn,
-        action: logEntry.action,
-        work_mode: logEntry.work_mode || null,
-        parameters_payload: typeof logEntry.parameters_payload === 'string' 
-          ? JSON.parse(logEntry.parameters_payload) 
-          : logEntry.parameters_payload,
-        status: logEntry.status,
-        upstream_code: logEntry.upstream_code || null,
-        upstream_message: logEntry.upstream_message || null,
-        user_id: logEntry.user_id || null,
-        client_ip: logEntry.client_ip || null,
-      };
-      await this.createItem(COLLECTIONS.CONTROL_LOGS, payload);
-      return true;
-    } catch (e) {
-      log.warn('Failed logging inverter control to database', {}, e);
-      return false;
-    }
+    return this.directusTransport.logInverterControl(logEntry);
   }
 
   /**
    * Query Directus REST API with a resilient timeout (fallback compatibility)
    */
   public async fetchFromDirectus(): Promise<Record<string, any>[] | null> {
-    return this.fetchCollection(this.getDirectusCollection());
+    return this.directusTransport.fetchFromDirectus();
   }
 
   /**

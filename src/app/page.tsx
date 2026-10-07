@@ -34,6 +34,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
+import { usePolling } from '@/lib/usePolling';
 
 export default function EnergyFlowDashboard() {
   const {
@@ -102,7 +103,8 @@ export default function EnergyFlowDashboard() {
 
               // Match plant against multi-plant aggregated breakdown
               const plantSummary = json.data?.plantsSummary?.find(
-                (ps: any) => String(ps.stationId) === String(plant.stationId)
+                (ps: { stationId?: string | number; liveSolarPowerKw?: number; dailyYieldKwh?: number; gridPowerKw?: number; loadPowerKw?: number; batterySoc?: number }) =>
+                  String(ps.stationId) === String(plant.stationId)
               );
 
               const plantSolarKw = plantSummary
@@ -192,24 +194,13 @@ export default function EnergyFlowDashboard() {
 
   useEffect(() => {
     fetchTelemetry();
-    const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState !== 'hidden') {
-        fetchTelemetry();
-      }
-    }, 3500);
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchTelemetry();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
   }, [fetchTelemetry]);
+
+  usePolling(fetchTelemetry, {
+    intervalMs: 3500,
+    enabled: true,
+    pauseOnHidden: true,
+  });
 
   const triggerManualPoll = async () => {
     setManualPolling(true);
@@ -498,7 +489,7 @@ export default function EnergyFlowDashboard() {
       </div>
 
       {/* Main Subsystem View Switcher (Synoptic Flow vs Trigonometric Analytics) */}
-      <Tabs value={mainTab} onValueChange={(v: any) => setMainTab(v)} className="w-full space-y-6">
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as 'synoptics' | 'trigonometric')} className="w-full space-y-6">
         <TabsList className="bg-muted/60 p-1 rounded-xl h-auto border border-border/50 gap-1 inline-flex w-fit max-w-full overflow-x-auto">
           <TabsTrigger
             value="synoptics"

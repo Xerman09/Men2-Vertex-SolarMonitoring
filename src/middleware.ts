@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifySessionToken, extractSessionToken } from './lib/session';
+import { createLogger } from './lib/logger';
+
+const log = createLogger('Middleware');
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -16,7 +19,10 @@ export async function middleware(req: NextRequest) {
         const originUrl = new URL(origin);
         // Compare origin host to host header
         if (originUrl.host !== host) {
-          console.warn(`[Middleware CSRF Block] Origin mismatch: ${originUrl.host} vs ${host}`);
+          log.warn(`[CSRF Block] Origin mismatch: ${originUrl.host} vs ${host}`, {
+            originHost: originUrl.host,
+            reqHost: host,
+          });
           return NextResponse.json(
             { error: 'Cross-origin request blocked' },
             { status: 403 }

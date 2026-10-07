@@ -122,19 +122,32 @@ export async function requireAdminSession(req?: Request): Promise<{
  * Higher-order function wrapping API route handlers with unified rate limiting,
  * __Host- cookie session verification, and role-based access checks.
  */
-export function withGate<
-  O extends GateOptions = GateOptions,
-  TArgs extends unknown[] = unknown[]
->(
-  options: O,
+export function withGate<TArgs extends unknown[] = unknown[]>(
+  options: GateOptions & { allowUnauthenticated: true },
   handler: (
     req: Request,
-    ctx: O extends { allowUnauthenticated: true }
-      ? GateContext<SessionData | null>
-      : GateContext<SessionData>,
+    ctx: GateContext<SessionData | null>,
     ...args: TArgs
   ) => Promise<Response> | Response
-) {
+): (req: Request, ...args: TArgs) => Promise<Response>;
+
+export function withGate<TArgs extends unknown[] = unknown[]>(
+  options: GateOptions,
+  handler: (
+    req: Request,
+    ctx: GateContext<SessionData>,
+    ...args: TArgs
+  ) => Promise<Response> | Response
+): (req: Request, ...args: TArgs) => Promise<Response>;
+
+export function withGate<TArgs extends unknown[] = unknown[]>(
+  options: GateOptions,
+  handler: (
+    req: Request,
+    ctx: GateContext<any>,
+    ...args: TArgs
+  ) => Promise<Response> | Response
+): (req: Request, ...args: TArgs) => Promise<Response> {
   return async (req: Request, ...args: TArgs): Promise<Response> => {
     const clientIp = getClientIp(req);
 
@@ -166,9 +179,9 @@ export function withGate<
         );
       }
 
-      return handler(req, { session, clientIp } as any, ...args);
+      return handler(req, { session, clientIp }, ...args);
     }
 
-    return handler(req, { session, clientIp } as any, ...args);
+    return handler(req, { session, clientIp }, ...args);
   };
 }
