@@ -3,6 +3,9 @@ import { accountManager } from '@/lib/account-manager';
 import { enforceTenantAccess } from '@/lib/session';
 import { withGate } from '@/lib/gate';
 import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('StationsRoute');
 
 export const GET = withGate(
   {
@@ -88,7 +91,7 @@ export const GET = withGate(
             });
           });
         } else {
-          console.warn(`[StationsRoute] Failed querying station list for account ${clients[idx].accountId}:`, res.reason);
+          log.warn(`Failed querying station list for account ${clients[idx].accountId}`, { route: 'stations', accountId: clients[idx].accountId }, res.reason);
         }
       });
 
@@ -98,7 +101,7 @@ export const GET = withGate(
         isLive: anyLive,
       });
     } catch (error) {
-      console.error('[StationsRoute] Error querying stations:', error);
+      log.error('Error querying stations', error, { route: 'stations' });
       return NextResponse.json(
         { error: 'Failed to query registered stations' },
         { status: 500 }

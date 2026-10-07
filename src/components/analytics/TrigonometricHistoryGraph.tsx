@@ -48,67 +48,13 @@ import {
   generateThreePhaseACWaveforms,
 } from '@/lib/trigonometric-math';
 import { getMockHourlyEnergyPoints } from '@/lib/mock-telemetry';
+import { CustomExactTooltip } from './GraphTooltip';
 
 interface TrigonometricHistoryGraphProps {
   data?: HourlySolarPoint[];
   installedCapacityKw?: number;
   compact?: boolean;
 }
-
-// Custom tooltip for exact 5-minute continuous data with elapsed & unelapsed distinction
-const CustomExactTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload || !payload.length) return null;
-  const point = payload[0]?.payload;
-  const isElapsed = point?.isElapsed !== false && point?.pvPowerKw !== null;
-
-  return (
-    <div className="rounded-xl border border-border/80 bg-background/95 p-3 shadow-xl backdrop-blur-md text-xs space-y-2 min-w-[220px]">
-      <div className="flex items-center justify-between border-b border-border/50 pb-1.5 font-mono">
-        <div className="flex items-center gap-1.5">
-          <Clock className="h-3 w-3 text-muted-foreground" />
-          <span className="font-bold text-foreground">{label}</span>
-        </div>
-        {isElapsed ? (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500 font-semibold flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
-            5-Min Telemetry
-          </span>
-        ) : (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-semibold">
-            Unelapsed (Pending)
-          </span>
-        )}
-      </div>
-
-      {isElapsed ? (
-        <div className="space-y-1.5 font-mono">
-          {payload.map((entry: any, i: number) => {
-            if (entry.value === null || entry.value === undefined) return null;
-            const valNum = Number(entry.value);
-            return (
-              <div key={i} className="flex items-center justify-between gap-3">
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <span
-                    className="h-2 w-2 rounded-full inline-block shrink-0"
-                    style={{ backgroundColor: entry.color || entry.stroke }}
-                  />
-                  {entry.name}:
-                </span>
-                <span className="font-bold text-foreground">
-                  {valNum > 0 && entry.dataKey === 'gridPowerKw' ? `+${valNum.toFixed(2)}` : valNum.toFixed(2)} kW
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="text-[11px] text-muted-foreground italic py-1">
-          Future 5-minute interval. The line stops at the current elapsed time.
-        </div>
-      )}
-    </div>
-  );
-};
 
 export function TrigonometricHistoryGraph({
   data,
@@ -482,7 +428,7 @@ export function TrigonometricHistoryGraph({
           <div>
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                <Radio className="h-4 w-4 animate-pulse" />
+                <Radio className="h-4 w-4 motion-safe:animate-pulse" />
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <CardTitle className="text-sm sm:text-base font-bold">
@@ -550,7 +496,7 @@ export function TrigonometricHistoryGraph({
 
         {/* Subsystem Tabs */}
         <div className="pt-2">
-          <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
+          <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as any)} className="w-full">
             <TabsList className="bg-muted/50 p-0.5 rounded-lg h-auto border border-border/50 inline-flex w-fit max-w-full overflow-x-auto gap-0.5">
               <TabsTrigger value="power" className="text-xs gap-1 px-2.5 py-1 font-medium">
                 <Zap className="h-3.5 w-3.5 text-yellow-500" />

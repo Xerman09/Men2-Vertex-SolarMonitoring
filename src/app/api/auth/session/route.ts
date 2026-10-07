@@ -7,31 +7,34 @@ import {
   extractSessionToken,
 } from '@/lib/session';
 
-export async function GET() {
-  const cookieStore = await cookies();
-  const sessionCookie = extractSessionToken(cookieStore);
-  const session = await verifySessionToken(sessionCookie);
+import { withGate } from '@/lib/gate';
 
-  if (!session) {
+export const GET = withGate(
+  {
+    allowUnauthenticated: true,
+  },
+  async (_req, { session }) => {
+    if (!session) {
+      return NextResponse.json({
+        authenticated: false,
+        role: 'viewer',
+        user: null,
+      });
+    }
+
     return NextResponse.json({
-      authenticated: false,
-      role: 'viewer',
-      user: null,
+      authenticated: true,
+      role: session.role,
+      user: {
+        id: session.userId,
+        email: session.email,
+        name: session.name,
+        role: session.role,
+        accountId: session.accountId,
+      },
     });
   }
-
-  return NextResponse.json({
-    authenticated: true,
-    role: session.role,
-    user: {
-      id: session.userId,
-      email: session.email,
-      name: session.name,
-      role: session.role,
-      accountId: session.accountId,
-    },
-  });
-}
+);
 
 export async function POST(req: Request) {
   // Logout endpoint: clear session cookies

@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import { accountManager, COLLECTIONS } from '@/lib/account-manager';
 import { SolarUser, SolarUserStationPermission } from '@/lib/types';
 import { verifyPassword } from '@/lib/auth-crypto';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
+import { withGate, parseJsonBody } from '@/lib/gate';
+import { createLogger } from '@/lib/logger';
 import {
   createSessionToken,
   SESSION_COOKIE_NAME,
@@ -10,6 +12,8 @@ import {
   DEFAULT_SESSION_TTL_SECONDS,
 } from '@/lib/session';
 import { env } from '@/lib/env';
+
+const log = createLogger('AuthRole');
 
 function applySessionCookies(response: NextResponse, token: string, req: Request) {
   const isHttps =
@@ -32,35 +36,31 @@ function applySessionCookies(response: NextResponse, token: string, req: Request
   }
 }
 
-export async function POST(req: Request) {
-  // IP-based Rate limiting (10 attempts per minute per IP)
-  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  const rateLimitKey = `auth_login_${clientIp}`;
-  const rateLimit = checkRateLimit(rateLimitKey, 10, 60 * 1000);
-  if (!rateLimit.success) {
-    return NextResponse.json(
-      { success: false, error: 'Too many authentication attempts. Please try again later.' },
-      { status: 429, headers: { 'Retry-After': '60' } }
-    );
-  }
+export const POST = withGate(
+  {
+    allowUnauthenticated: true,
+    rateLimit: {
+      keyPrefix: 'auth_login',
+      maxRequests: RATE_LIMIT_CONFIGS.AUTH_LOGIN.maxRequests,
+      windowMs: RATE_LIMIT_CONFIGS.AUTH_LOGIN.windowMs,
+    },
+  },
+  async (req) => {
+    const jsonParsed = await parseJsonBody<{ email?: string; password?: string }>(req);
+    if (!jsonParsed.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Malformed JSON payload' },
+        { status: 400 }
+      );
+    }
 
-  let body: { email?: string; password?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json(
-      { success: false, error: 'Malformed JSON payload' },
-      { status: 400 }
-    );
-  }
-
-  const { email, password } = body;
-  if (!email || !password) {
-    return NextResponse.json(
-      { success: false, error: 'Username/Email and password are required' },
-      { status: 400 }
-    );
-  }
+    const { email, password } = jsonParsed.data || {};
+    if (!email || !password) {
+      return NextResponse.json(
+        { success: false, error: 'Username/Email and password are required' },
+        { status: 400 }
+      );
+    }
 
   const inputIdentifier = String(email).trim().toLowerCase();
   const inputPassword = String(password).trim();
@@ -122,8 +122,8 @@ export async function POST(req: Request) {
             if (perms && perms.length > 0) {
               assignedStationId = perms[0].station_id;
             }
-          } catch {
-            // Permissions lookup non-fatal
+          } catch (permErr) {
+            log.warn('Permissions lookup non-fatal', { userId: matchedUser.id }, permErr);
           }
 
           const role = isAdmin ? ('admin' as const) : ('consumer' as const);
@@ -156,7 +156,7 @@ export async function POST(req: Request) {
         }
       }
     } catch (dbErr) {
-      console.warn('[AuthRole] iot_solar_users lookup failed, falling back to legacy accounts:', dbErr);
+      log.warn('iot_solar_users lookup failed, falling back to legacy accounts', {}, dbErr);
     }
 
     // 2. Fallback to legacy iot_solar_accounts or local cache
@@ -218,10 +218,11 @@ export async function POST(req: Request) {
 
     return response;
   } catch (error) {
-    console.error('[AuthRole] Authentication error:', error);
+    log.error('Authentication error', error, { route: 'auth/role' });
     return NextResponse.json(
       { success: false, error: 'Authentication service error. Please try again.' },
       { status: 500 }
     );
   }
 }
+);

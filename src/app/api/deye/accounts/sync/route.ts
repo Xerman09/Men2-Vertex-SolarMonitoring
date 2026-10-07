@@ -1,47 +1,44 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { accountManager } from '@/lib/account-manager';
-import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/session';
+import { withGate, parseJsonBody } from '@/lib/gate';
+import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
+import { createLogger } from '@/lib/logger';
 
-export async function POST(req: Request) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  const session = await verifySessionToken(token);
+const log = createLogger('SyncRoute');
 
-  if (!session || session.role !== 'admin') {
-    return NextResponse.json(
-      { error: 'Unauthorized: Admin privileges required to sync accounts' },
-      { status: 401 }
-    );
+export const POST = withGate(
+  {
+    requireRole: 'admin',
+    rateLimit: {
+      keyPrefix: 'sync_account',
+      maxRequests: RATE_LIMIT_CONFIGS.SYNC_ACCOUNT.maxRequests,
+      windowMs: RATE_LIMIT_CONFIGS.SYNC_ACCOUNT.windowMs,
+    },
+  },
+  async (req) => {
+    const jsonParsed = await parseJsonBody<{ accountId?: string }>(req);
+    if (!jsonParsed.ok) {
+      return jsonParsed.errorResponse;
+    }
+
+    const { accountId } = jsonParsed.data || {};
+
+    if (!accountId || typeof accountId !== 'string') {
+      return NextResponse.json(
+        { error: 'Field "accountId" is required' },
+        { status: 400 }
+      );
+    }
+
+    try {
+      const result = await accountManager.syncAccount(accountId);
+      return NextResponse.json(result);
+    } catch (error) {
+      log.error('Failed syncing account', error, { route: 'sync', accountId });
+      return NextResponse.json(
+        { error: 'Failed to sync account plants' },
+        { status: 500 }
+      );
+    }
   }
-
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json(
-      { error: 'Malformed JSON payload' },
-      { status: 400 }
-    );
-  }
-
-  const { accountId } = body || {};
-
-  if (!accountId) {
-    return NextResponse.json(
-      { error: 'Field "accountId" is required' },
-      { status: 400 }
-    );
-  }
-
-  try {
-    const result = await accountManager.syncAccount(accountId);
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error('[SyncRoute] Failed syncing account:', error);
-    return NextResponse.json(
-      { error: 'Failed to sync account plants' },
-      { status: 500 }
-    );
-  }
-}
+);

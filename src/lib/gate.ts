@@ -6,7 +6,9 @@ import {
   SessionData,
   requireAuthenticatedSession,
 } from './session';
-import { checkRateLimit, RATE_LIMIT_CONFIGS } from './rate-limit';
+import { checkRateLimit, RATE_LIMIT_CONFIGS, RATE_LIMIT_WINDOW_S } from './rate-limit';
+
+export { RATE_LIMIT_WINDOW_S };
 
 export interface GateRateLimitOptions {
   keyPrefix: string;
@@ -18,15 +20,53 @@ export interface GateOptions {
   rateLimit?: GateRateLimitOptions;
   roles?: ('admin' | 'consumer' | 'viewer')[];
   requireRole?: 'admin' | 'consumer' | 'viewer';
+  allowUnauthenticated?: boolean;
 }
 
-export interface GateContext {
-  session: SessionData;
+export interface GateContext<S = SessionData> {
+  session: S;
   clientIp: string;
 }
 
 export function getClientIp(req: Request): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+}
+
+/**
+ * Standardized 429 response helper with Retry-After header
+ */
+export function standard429(
+  maxRequests: number = 60,
+  resetAt?: number,
+  customMessage?: string
+): NextResponse {
+  const retryAfter = resetAt
+    ? Math.max(1, Math.ceil((resetAt - Date.now()) / 1000))
+    : RATE_LIMIT_WINDOW_S;
+  return NextResponse.json(
+    { error: customMessage || `Rate limit exceeded: Maximum ${maxRequests} requests per minute.` },
+    { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+  );
+}
+
+/**
+ * Safe JSON body extraction with uniform 400 error response on parse failure
+ */
+export async function parseJsonBody<T = unknown>(
+  req: Request
+): Promise<{ ok: true; data: T } | { ok: false; errorResponse: NextResponse }> {
+  try {
+    const data = (await req.json()) as T;
+    return { ok: true, data };
+  } catch {
+    return {
+      ok: false,
+      errorResponse: NextResponse.json(
+        { error: 'Malformed JSON payload' },
+        { status: 400 }
+      ),
+    };
+  }
 }
 
 /**
@@ -66,9 +106,10 @@ export async function requireAdminSession(req?: Request): Promise<{
     if (!rate.success) {
       return {
         session: null,
-        errorResponse: NextResponse.json(
-          { error: 'Too many account modification requests. Rate limit is 20 requests per minute.' },
-          { status: 429, headers: { 'Retry-After': '60' } }
+        errorResponse: standard429(
+          RATE_LIMIT_CONFIGS.ACCOUNT_MUTATION.maxRequests,
+          rate.resetAt,
+          'Too many account modification requests. Rate limit is 20 requests per minute.'
         ),
       };
     }
@@ -81,9 +122,18 @@ export async function requireAdminSession(req?: Request): Promise<{
  * Higher-order function wrapping API route handlers with unified rate limiting,
  * __Host- cookie session verification, and role-based access checks.
  */
-export function withGate<TArgs extends any[] = any[]>(
-  options: GateOptions,
-  handler: (req: Request, ctx: GateContext, ...args: TArgs) => Promise<Response> | Response
+export function withGate<
+  O extends GateOptions = GateOptions,
+  TArgs extends unknown[] = unknown[]
+>(
+  options: O,
+  handler: (
+    req: Request,
+    ctx: O extends { allowUnauthenticated: true }
+      ? GateContext<SessionData | null>
+      : GateContext<SessionData>,
+    ...args: TArgs
+  ) => Promise<Response> | Response
 ) {
   return async (req: Request, ...args: TArgs): Promise<Response> => {
     const clientIp = getClientIp(req);
@@ -93,31 +143,32 @@ export function withGate<TArgs extends any[] = any[]>(
       const { keyPrefix, maxRequests, windowMs = 60 * 1000 } = options.rateLimit;
       const rate = checkRateLimit(`${keyPrefix}_${clientIp}`, maxRequests, windowMs);
       if (!rate.success) {
-        return NextResponse.json(
-          { error: `Rate limit exceeded: Maximum ${maxRequests} requests per minute.` },
-          { status: 429, headers: { 'Retry-After': '60' } }
-        );
+        return standard429(maxRequests, rate.resetAt);
       }
     }
 
     // 2. Session verification
     const session = await getSessionFromCookies();
-    const authCheck = requireAuthenticatedSession(session, options.requireRole);
-    if (!authCheck.allowed || !session) {
-      return NextResponse.json(
-        { error: authCheck.error || 'Authentication required to access solar monitoring resources' },
-        { status: authCheck.status }
-      );
+    if (!options.allowUnauthenticated) {
+      const authCheck = requireAuthenticatedSession(session, options.requireRole);
+      if (!authCheck.allowed || !session) {
+        return NextResponse.json(
+          { error: authCheck.error || 'Authentication required to access solar monitoring resources' },
+          { status: authCheck.status }
+        );
+      }
+
+      // 3. Optional multi-role filtering
+      if (options.roles && !options.roles.includes(session.role)) {
+        return NextResponse.json(
+          { error: `Forbidden: Access restricted to [${options.roles.join(', ')}] roles` },
+          { status: 403 }
+        );
+      }
+
+      return handler(req, { session, clientIp } as any, ...args);
     }
 
-    // 3. Optional multi-role filtering
-    if (options.roles && !options.roles.includes(session.role)) {
-      return NextResponse.json(
-        { error: `Forbidden: Access restricted to [${options.roles.join(', ')}] roles` },
-        { status: 403 }
-      );
-    }
-
-    return handler(req, { session, clientIp }, ...args);
+    return handler(req, { session, clientIp } as any, ...args);
   };
 }

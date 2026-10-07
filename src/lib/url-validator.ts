@@ -1,3 +1,7 @@
+import { createLogger } from './logger';
+
+const log = createLogger('UrlValidator');
+
 /**
  * SSRF Protection and Base URL validation for external DeyeCloud endpoints
  */
@@ -35,7 +39,7 @@ export function isValidDeyeBaseUrl(rawUrl: string): boolean {
     }
 
     if (hostname.endsWith('.deyecloud.com')) {
-      console.info(`[SSRF Validator] Domain matched via *.deyecloud.com suffix fallback: ${hostname}`);
+      log.info(`Domain matched via *.deyecloud.com suffix fallback: ${hostname}`);
       return true;
     }
 

@@ -827,7 +827,7 @@ export default function EnergyFlowDashboard() {
                       </td>
                       <td className="text-right">
                         <span className="inline-flex items-center gap-1.5 text-emerald-500 font-mono text-xs font-bold">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
                           {node.isLive ? 'Live Cloud' : 'Online'}
                         </span>
                       </td>

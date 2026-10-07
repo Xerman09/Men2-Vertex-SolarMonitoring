@@ -138,4 +138,79 @@ describe('API Gate & Schemas Validation Suite', () => {
       }).not.toThrow();
     });
   });
+
+  describe('Gate Helpers & Utilities', () => {
+    it('parseJsonBody successfully extracts parsed JSON from valid Request', async () => {
+      const { parseJsonBody } = await import('../gate');
+      const req = new Request('http://localhost/api/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId: 'INV-01', enabled: true }),
+      });
+
+      const res = await parseJsonBody<{ deviceId: string; enabled: boolean }>(req);
+      expect(res.ok).toBe(true);
+      if (res.ok) {
+        expect(res.data.deviceId).toBe('INV-01');
+        expect(res.data.enabled).toBe(true);
+      }
+    });
+
+    it('parseJsonBody returns 400 NextResponse on malformed JSON payload', async () => {
+      const { parseJsonBody } = await import('../gate');
+      const req = new Request('http://localhost/api/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{ malformed: json, missing quotes',
+      });
+
+      const res = await parseJsonBody(req);
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.errorResponse.status).toBe(400);
+        const data = await res.errorResponse.json();
+        expect(data.error).toBe('Malformed JSON payload');
+      }
+    });
+
+    it('standard429 constructs compliant 429 response with Retry-After header', async () => {
+      const { standard429 } = await import('../gate');
+      const futureReset = Date.now() + 45000; // 45s from now
+      const res = standard429(30, futureReset, 'Custom throttle exceeded');
+
+      expect(res.status).toBe(429);
+      expect(res.headers.get('Retry-After')).toBe('45');
+      const body = await res.json();
+      expect(body.error).toBe('Custom throttle exceeded');
+    });
+
+    it('rateLimitKey builds normalized rate limit cache keys', async () => {
+      const { rateLimitKey } = await import('../rate-limit');
+      expect(rateLimitKey('RL_TEST', '192.168.1.50')).toBe('RL_TEST_192.168.1.50');
+      expect(rateLimitKey('RL_TEST', ' 192.168.1.50 ', 'user-123')).toBe('RL_TEST_192.168.1.50_user-123');
+      expect(rateLimitKey('RL_TEST', '')).toBe('RL_TEST_unknown');
+    });
+  });
+
+  describe('FileAccountCache Seam & Fallbacks', () => {
+    it('resolves correct config path using cwd or DSM_DATA_DIR', async () => {
+      const { FileAccountCache } = await import('../file-account-cache');
+      const cfgPath = FileAccountCache.getConfigPath();
+      expect(cfgPath.endsWith('deye-accounts.json')).toBe(true);
+    });
+
+    it('returns empty array when file does not exist or fails parsing gracefully', async () => {
+      const { FileAccountCache } = await import('../file-account-cache');
+      const originalEnv = process.env.DSM_DATA_DIR;
+      process.env.DSM_DATA_DIR = './non-existent-subpath-for-testing';
+      try {
+        const accounts = FileAccountCache.getAllRawAccounts();
+        expect(Array.isArray(accounts)).toBe(true);
+        expect(accounts.length).toBe(0);
+      } finally {
+        process.env.DSM_DATA_DIR = originalEnv;
+      }
+    });
+  });
 });
+

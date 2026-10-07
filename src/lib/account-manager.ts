@@ -18,6 +18,10 @@ import { DeyeCloudClient } from './deye-client';
 import { sanitizeDeyeBaseUrl, sanitizeDirectusBaseUrl } from './url-validator';
 import { hashPassword } from './auth-crypto';
 import { env } from './env';
+import { createLogger } from './logger';
+import { FileAccountCache } from './file-account-cache';
+
+const log = createLogger('DeyeAccountManager');
 
 export const COLLECTIONS = {
   USERS: 'iot_solar_users',
@@ -44,8 +48,7 @@ class DeyeAccountManager {
   };
 
   private getConfigPath(): string {
-    const dataDir = process.env.DSM_DATA_DIR || process.cwd();
-    return path.resolve(dataDir, 'deye-accounts.json');
+    return FileAccountCache.getConfigPath();
   }
 
   private getDirectusBaseUrl(): string {
@@ -96,11 +99,12 @@ class DeyeAccountManager {
         lastChecked: new Date().toISOString(),
       };
       return Array.isArray(json.data) ? json.data : [];
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
       this.directusStatus = {
         connected: false,
         lastChecked: new Date().toISOString(),
-        error: err?.message || 'Unreachable',
+        error: errorMsg || 'Unreachable',
       };
       return null;
     }
@@ -109,7 +113,7 @@ class DeyeAccountManager {
   /**
    * Generic create helper for any Directus collection
    */
-  public async createItem<T = any>(collection: string, payload: Record<string, any>): Promise<T | null> {
+  public async createItem<T = Record<string, any>>(collection: string, payload: Record<string, any>): Promise<T | null> {
     try {
       const safeCollection = encodeURIComponent(collection);
       const url = `${this.getDirectusBaseUrl()}/items/${safeCollection}`;
@@ -126,7 +130,7 @@ class DeyeAccountManager {
       }
       return null;
     } catch (err) {
-      console.warn(`[DeyeAccountManager] Failed to create item in ${collection}:`, err);
+      log.warn(`Failed to create item in ${collection}`, { collection }, err);
       return null;
     }
   }
@@ -134,7 +138,7 @@ class DeyeAccountManager {
   /**
    * Generic update helper for any Directus collection
    */
-  public async updateItem(collection: string, id: string | number, payload: Record<string, any>): Promise<boolean> {
+  public async updateItem(collection: string, id: string | number, payload: Record<string, unknown>): Promise<boolean> {
     try {
       const safeCollection = encodeURIComponent(collection);
       const safeId = encodeURIComponent(String(id));
@@ -148,7 +152,7 @@ class DeyeAccountManager {
       });
       return res.ok;
     } catch (err) {
-      console.warn(`[DeyeAccountManager] Failed to update item ${id} in ${collection}:`, err);
+      log.warn(`Failed to update item ${id} in ${collection}`, { collection, id }, err);
       return false;
     }
   }
@@ -169,7 +173,7 @@ class DeyeAccountManager {
       });
       return res.ok;
     } catch (err) {
-      console.warn(`[DeyeAccountManager] Failed to delete item ${id} from ${collection}:`, err);
+      log.warn(`Failed to delete item ${id} from ${collection}`, { collection, id }, err);
       return false;
     }
   }
@@ -177,26 +181,26 @@ class DeyeAccountManager {
   /**
    * Record an immutable audit log when workmode or grid charge controls are dispatched
    */
-  public async logInverterControl(log: SolarInverterControlLog): Promise<boolean> {
+  public async logInverterControl(logEntry: SolarInverterControlLog): Promise<boolean> {
     try {
-      const payload = {
-        station_id: log.station_id,
-        device_sn: log.device_sn,
-        action: log.action,
-        work_mode: log.work_mode || null,
-        parameters_payload: typeof log.parameters_payload === 'string' 
-          ? JSON.parse(log.parameters_payload) 
-          : log.parameters_payload,
-        status: log.status,
-        upstream_code: log.upstream_code || null,
-        upstream_message: log.upstream_message || null,
-        user_id: log.user_id || null,
-        client_ip: log.client_ip || null,
+      const payload: Record<string, unknown> = {
+        station_id: logEntry.station_id,
+        device_sn: logEntry.device_sn,
+        action: logEntry.action,
+        work_mode: logEntry.work_mode || null,
+        parameters_payload: typeof logEntry.parameters_payload === 'string' 
+          ? JSON.parse(logEntry.parameters_payload) 
+          : logEntry.parameters_payload,
+        status: logEntry.status,
+        upstream_code: logEntry.upstream_code || null,
+        upstream_message: logEntry.upstream_message || null,
+        user_id: logEntry.user_id || null,
+        client_ip: logEntry.client_ip || null,
       };
       await this.createItem(COLLECTIONS.CONTROL_LOGS, payload);
       return true;
     } catch (e) {
-      console.warn('[DeyeAccountManager] Failed logging inverter control to database:', e);
+      log.warn('Failed logging inverter control to database', {}, e);
       return false;
     }
   }
@@ -204,7 +208,7 @@ class DeyeAccountManager {
   /**
    * Query Directus REST API with a resilient timeout (fallback compatibility)
    */
-  public async fetchFromDirectus(): Promise<any[] | null> {
+  public async fetchFromDirectus(): Promise<Record<string, any>[] | null> {
     return this.fetchCollection(this.getDirectusCollection());
   }
 
@@ -312,7 +316,7 @@ class DeyeAccountManager {
         }
       }
     } catch (err) {
-      console.warn('[DeyeAccountManager] Normalized table sync skipped, trying legacy collection:', err);
+      log.warn('Normalized table sync skipped, trying legacy collection', {}, err);
     }
 
     // 2. Fallback to legacy single collection (iot_solar_accounts)
@@ -407,46 +411,20 @@ class DeyeAccountManager {
    * Return ALL accounts from file, including enabled and disabled
    */
   public getAllRawAccounts(forceReload = false): DeyeAccountConfig[] {
-    const configPath = this.getConfigPath();
-    try {
-      if (fs.existsSync(configPath)) {
-        const raw = fs.readFileSync(configPath, 'utf8');
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed.accounts)) {
-          return parsed.accounts;
-        }
-      }
-    } catch (e) {
-      console.warn('[DeyeAccountManager] Failed reading raw deye-accounts.json:', e);
-    }
-    return [];
+    return FileAccountCache.getAllRawAccounts(forceReload);
   }
 
   /**
    * Save accounts list to deye-accounts.json with atomic write
    */
   public saveAccountsToFile(accounts: DeyeAccountConfig[]): boolean {
-    const configPath = this.getConfigPath();
-    const tempPath = `${configPath}.tmp.${Date.now()}`;
-    try {
-      const payload = { accounts };
-      fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
-      fs.renameSync(tempPath, configPath);
+    const success = FileAccountCache.saveAccountsToFile(accounts);
+    if (success) {
       this.accountsCache = accounts.filter((acc) => acc.enabled !== false);
       this.lastLoadedAt = Date.now();
       this.syncClients();
-      return true;
-    } catch (e) {
-      if (fs.existsSync(tempPath)) {
-        try {
-          fs.unlinkSync(tempPath);
-        } catch (unlinkErr) {
-          console.warn('[DeyeAccountManager] Failed cleaning up temporary accounts file:', unlinkErr);
-        }
-      }
-      console.error('[DeyeAccountManager] Failed saving accounts to disk:', e);
-      return false;
     }
+    return success;
   }
 
   /**
@@ -576,7 +554,7 @@ class DeyeAccountManager {
         }
       }
     } catch (err) {
-      console.warn('[DeyeAccountManager] Failed to post new account to Directus, caching locally:', err);
+      log.warn('Failed to post new account to Directus, caching locally', {}, err);
     }
 
     const id = directusId ? `directus-${directusId}` : (data.id?.trim() || `acc-${Date.now().toString(36)}`);
@@ -639,7 +617,7 @@ class DeyeAccountManager {
           }
         }
       } catch (err) {
-        console.warn('[DeyeAccountManager] Non-fatal error saving stations/devices to database:', err);
+        log.warn('Non-fatal error saving stations/devices to database', {}, err);
       }
     }
 
@@ -738,7 +716,7 @@ class DeyeAccountManager {
         await this.updateItem(COLLECTIONS.CONFIGS, directusId, patchPayload);
         await this.updateItem(this.getDirectusCollection(), directusId, patchPayload);
       } catch (err) {
-        console.warn(`[DeyeAccountManager] Failed to patch Directus item ${directusId}:`, err);
+        log.warn(`Failed to patch Directus item ${directusId}`, { directusId }, err);
       }
     }
 
@@ -770,7 +748,7 @@ class DeyeAccountManager {
         await this.deleteItem(COLLECTIONS.CONFIGS, directusId);
         await this.deleteItem(this.getDirectusCollection(), directusId);
       } catch (err) {
-        console.warn(`[DeyeAccountManager] Failed to delete Directus item ${directusId}:`, err);
+        log.warn(`Failed to delete Directus item ${directusId}`, { directusId }, err);
       }
     }
 
@@ -838,7 +816,7 @@ class DeyeAccountManager {
           }
         }
       } catch (err) {
-        console.warn('[DeyeAccountManager] Non-fatal error saving synced stations to database:', err);
+        log.warn('Non-fatal error saving synced stations to database', {}, err);
       }
     }
 
@@ -901,8 +879,9 @@ class DeyeAccountManager {
         const existing = acc.plants.find((p) => p.stationId === livePlant.stationId);
         if (existing) {
           if (existing.stationName !== livePlant.stationName) {
-            console.log(
-              `[DeyeAccountManager] Dynamic plant name update: "${existing.stationName}" -> "${livePlant.stationName}" (Station ID: ${livePlant.stationId})`
+            log.info(
+              `Dynamic plant name update: "${existing.stationName}" -> "${livePlant.stationName}" (Station ID: ${livePlant.stationId})`,
+              { stationId: livePlant.stationId }
             );
             existing.stationName = livePlant.stationName;
             changed = true;
@@ -920,8 +899,9 @@ class DeyeAccountManager {
             changed = true;
           }
         } else {
-          console.log(
-            `[DeyeAccountManager] Discovered new plant dynamically: "${livePlant.stationName}" (Station ID: ${livePlant.stationId})`
+          log.info(
+            `Discovered new plant dynamically: "${livePlant.stationName}" (Station ID: ${livePlant.stationId})`,
+            { stationId: livePlant.stationId }
           );
           acc.plants.push(livePlant);
           changed = true;
@@ -950,7 +930,7 @@ class DeyeAccountManager {
 
       return changed;
     } catch (e) {
-      console.warn(`[DeyeAccountManager] Dynamic plant sync failed for account ${acc.id}:`, e);
+      log.warn(`Dynamic plant sync failed for account ${acc.id}`, { accountId: acc.id }, e);
       return false;
     }
   }

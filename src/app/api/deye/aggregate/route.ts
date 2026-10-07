@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { accountManager } from '@/lib/account-manager';
 import { withGate } from '@/lib/gate';
 import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('AggregateRoute');
 
 export const GET = withGate(
   {
@@ -29,7 +32,7 @@ export const GET = withGate(
       const aggregate = await accountManager.getAggregatedFleetSummary();
       return NextResponse.json(aggregate);
     } catch (error) {
-      console.error('[AggregateRoute] Error aggregating fleet:', error);
+      log.error('Error aggregating fleet', error, { route: 'aggregate' });
       return NextResponse.json(
         { error: 'Failed to aggregate fleet telemetry' },
         { status: 500 }

@@ -127,7 +127,7 @@ export function Header({
       {/* Top-Edge Glowing Cybernetic Data Stream Progress Bar */}
       {(isFetchingDeye || syncing) && (
         <div className="absolute top-0 left-0 right-0 h-[2.5px] overflow-hidden z-50 pointer-events-none">
-          <div className="h-full w-full bg-gradient-to-r from-emerald-500 via-cyan-400 to-amber-400 animate-pulse shadow-[0_0_10px_rgba(6,182,212,0.9)]" />
+          <div className="h-full w-full bg-gradient-to-r from-emerald-500 via-cyan-400 to-amber-400 motion-safe:animate-pulse shadow-[0_0_10px_rgba(6,182,212,0.9)]" />
         </div>
       )}
 
@@ -195,7 +195,7 @@ export function Header({
                   <div className="flex items-center gap-2">
                     <span>{isConsumer ? 'Your Solar Plants' : 'Monitor Accounts & Plants'}</span>
                     {(isFetchingDeye || syncing) && (
-                      <span className="flex items-center gap-1 text-[9px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30 font-bold lowercase tracking-normal animate-pulse">
+                      <span className="flex items-center gap-1 text-[9px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30 font-bold lowercase tracking-normal motion-safe:animate-pulse">
                         <RefreshCw size={9} className="animate-spin text-cyan-400" />
                         syncing...
                       </span>
@@ -407,7 +407,7 @@ export function Header({
           {/* Prominent Live Data Fetching Indicator */}
           {isFetchingDeye || syncing ? (
             <div
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 rounded-xl bg-cyan-500/15 border border-cyan-500/40 text-xs font-mono text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)] animate-pulse shrink-0"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 rounded-xl bg-cyan-500/15 border border-cyan-500/40 text-xs font-mono text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)] motion-safe:animate-pulse shrink-0"
               title="Active live data exchange with DeyeCloud OpenAPI"
             >
               <RefreshCw size={12} className="animate-spin text-cyan-400 shrink-0" />
@@ -449,7 +449,7 @@ export function Header({
                 isFetchingDeye || syncing
                   ? 'bg-cyan-400 animate-ping'
                   : isLiveApi || liveAccountsCount > 0
-                  ? 'bg-emerald-500 animate-pulse'
+                  ? 'bg-emerald-500 motion-safe:animate-pulse'
                   : 'bg-amber-500'
               }`}
             />

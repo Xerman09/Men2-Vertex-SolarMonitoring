@@ -3,8 +3,11 @@ import { z } from 'zod';
 import { accountManager } from '@/lib/account-manager';
 import { ACCOUNT_ID_REGEX } from '@/lib/session';
 import { isValidDeyeBaseUrl } from '@/lib/url-validator';
-import { withGate, requireAdminSession } from '@/lib/gate';
+import { withGate, requireAdminSession, parseJsonBody } from '@/lib/gate';
 import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('AccountsRoute');
 
 export const addAccountSchema = z.object({
   name: z.string().min(1, 'Field "name" is required'),
@@ -64,7 +67,7 @@ export const GET = withGate(
         directus,
       });
     } catch (error) {
-      console.error('[AccountsRoute] Failed getting accounts summary:', error);
+      log.error('Failed getting accounts summary', error, { route: 'accounts' });
       return NextResponse.json(
         { error: 'Failed to retrieve multi-account status' },
         { status: 500 }
@@ -79,17 +82,12 @@ export async function POST(req: Request) {
     return errorResponse;
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json(
-      { error: 'Malformed JSON payload' },
-      { status: 400 }
-    );
+  const jsonParsed = await parseJsonBody(req);
+  if (!jsonParsed.ok) {
+    return jsonParsed.errorResponse;
   }
 
-  const parsed = addAccountSchema.safeParse(rawBody);
+  const parsed = addAccountSchema.safeParse(jsonParsed.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
@@ -114,7 +112,7 @@ export async function POST(req: Request) {
     const result = await accountManager.addAccount(data);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    console.error('[AccountsRoute] Failed adding account:', error);
+    log.error('Failed adding account', error, { route: 'accounts' });
     return NextResponse.json(
       { error: 'Failed to add account and discover plants' },
       { status: 500 }
@@ -128,17 +126,12 @@ export async function PUT(req: Request) {
     return errorResponse;
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json(
-      { error: 'Malformed JSON payload' },
-      { status: 400 }
-    );
+  const jsonParsed = await parseJsonBody(req);
+  if (!jsonParsed.ok) {
+    return jsonParsed.errorResponse;
   }
 
-  const parsed = updateAccountSchema.safeParse(rawBody);
+  const parsed = updateAccountSchema.safeParse(jsonParsed.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
@@ -164,7 +157,7 @@ export async function PUT(req: Request) {
     }
     return NextResponse.json(result);
   } catch (error) {
-    console.error('[AccountsRoute] Failed updating account:', error);
+    log.error('Failed updating account', error, { route: 'accounts', id });
     return NextResponse.json(
       { error: 'Failed to update account' },
       { status: 500 }
@@ -197,7 +190,7 @@ export async function DELETE(req: Request) {
     }
     return NextResponse.json(result);
   } catch (error) {
-    console.error('[AccountsRoute] Failed deleting account:', error);
+    log.error('Failed deleting account', error, { route: 'accounts' });
     return NextResponse.json(
       { error: 'Failed to delete account' },
       { status: 500 }

@@ -1,45 +1,59 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { accountManager } from '@/lib/account-manager';
-import { verifySessionToken, SESSION_COOKIE_NAME, enforceTenantAccess } from '@/lib/session';
+import { enforceTenantAccess } from '@/lib/session';
+import { withGate } from '@/lib/gate';
+import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
+import { createLogger } from '@/lib/logger';
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const deviceSn = searchParams.get('device_sn') || undefined;
-  const accountId = searchParams.get('accountId') || undefined;
+const log = createLogger('TelemetryRoute');
 
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  const session = await verifySessionToken(token);
+export const GET = withGate(
+  {
+    allowUnauthenticated: true,
+    rateLimit: {
+      keyPrefix: 'read_telemetry',
+      maxRequests: RATE_LIMIT_CONFIGS.READ_TELEMETRY.maxRequests,
+      windowMs: RATE_LIMIT_CONFIGS.READ_TELEMETRY.windowMs,
+    },
+  },
+  async (req, { session }) => {
+    const { searchParams } = new URL(req.url);
+    const deviceSn = searchParams.get('device_sn') || undefined;
+    const accountId = searchParams.get('accountId') || undefined;
 
-  const tenantCheck = enforceTenantAccess(session, accountId);
-  if (!tenantCheck.allowed) {
-    return NextResponse.json(
-      { error: tenantCheck.error || 'Access denied' },
-      { status: tenantCheck.status || 403 }
-    );
-  }
-
-  try {
-    const client = accountManager.getClient(tenantCheck.targetAccountId);
-    if (!client) {
+    const tenantCheck = enforceTenantAccess(session, accountId);
+    if (!tenantCheck.allowed) {
       return NextResponse.json(
-        { error: tenantCheck.targetAccountId ? `Account "${tenantCheck.targetAccountId}" not found` : 'No configured solar gateway account found' },
-        { status: 404 }
+        { error: tenantCheck.error || 'Access denied' },
+        { status: tenantCheck.status || 403 }
       );
     }
 
-    const result = await client.getInverterTelemetry(deviceSn);
-    return NextResponse.json({
-      ...result,
-      accountId: client.accountId,
-      accountName: client.accountName,
-    });
-  } catch (error) {
-    console.error('[TelemetryRoute] Error fetching telemetry:', error);
-    return NextResponse.json(
-      { error: 'Failed to retrieve inverter telemetry' },
-      { status: 500 }
-    );
+    try {
+      const client = accountManager.getClient(tenantCheck.targetAccountId);
+      if (!client) {
+        return NextResponse.json(
+          {
+            error: tenantCheck.targetAccountId
+              ? `Account "${tenantCheck.targetAccountId}" not found`
+              : 'No configured solar gateway account found',
+          },
+          { status: 404 }
+        );
+      }
+
+      const result = await client.getInverterTelemetry(deviceSn);
+      return NextResponse.json({
+        ...result,
+        accountId: client.accountId,
+        accountName: client.accountName,
+      });
+    } catch (error) {
+      log.error('Error fetching telemetry', error, { route: 'telemetry', deviceSn });
+      return NextResponse.json(
+        { error: 'Failed to retrieve inverter telemetry' },
+        { status: 500 }
+      );
+    }
   }
-}
+);

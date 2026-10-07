@@ -205,7 +205,7 @@ export function Sidebar() {
           <div className="p-3.5 m-3 rounded-2xl bg-card/60 border border-sidebar-border shadow-xs">
             <div className="flex items-center justify-between pb-2 mb-2 border-b border-border/50">
               <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                <Radio size={12} className="text-emerald-500 animate-pulse" /> Edge Bus Sync
+                <Radio size={12} className="text-emerald-500 motion-safe:animate-pulse" /> Edge Bus Sync
               </span>
               <span className="text-[10px] font-mono text-emerald-500 font-bold">
                 {liveAccountsCount > 0 ? `${liveAccountsCount}/${totalAccounts} Live` : 'Local Sim'}

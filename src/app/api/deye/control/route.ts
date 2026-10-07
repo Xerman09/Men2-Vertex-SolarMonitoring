@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { accountManager } from '@/lib/account-manager';
-import { verifySessionToken, SESSION_COOKIE_NAME, ACCOUNT_ID_REGEX } from '@/lib/session';
-import { checkRateLimit, RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
+import { ACCOUNT_ID_REGEX } from '@/lib/session';
+import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
+import { withGate, parseJsonBody } from '@/lib/gate';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('ControlRoute');
 
 export const VALID_WORK_MODES = [
   'PEAK_SHAVING',
@@ -33,141 +36,123 @@ export const controlBodySchema = z.object({
     .optional(),
 });
 
-
-export async function POST(req: Request) {
-  // 1. Authenticate caller session
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  const session = await verifySessionToken(sessionToken);
-
-  if (!session || (session.role !== 'admin' && session.role !== 'consumer')) {
-    return NextResponse.json(
-      { error: 'Unauthorized: Authentication required to execute inverter hardware commands' },
-      { status: 401 }
-    );
-  }
-
-  // 2. Rate limiting (5 hardware commands per minute per user/IP)
-  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  const rateLimitKey = `control_${clientIp}_${session.userId}`;
-  const rateCheck = checkRateLimit(
-    rateLimitKey,
-    RATE_LIMIT_CONFIGS.CONTROL.maxRequests,
-    RATE_LIMIT_CONFIGS.CONTROL.windowMs
-  );
-  if (!rateCheck.success) {
-    return NextResponse.json(
-      { error: `Rate limit exceeded: Maximum ${RATE_LIMIT_CONFIGS.CONTROL.maxRequests} inverter control commands per minute.` },
-      { status: 429, headers: { 'Retry-After': '60' } }
-    );
-  }
-
-  // 3. Safely parse JSON body with strict Zod schema
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json(
-      { error: 'Malformed JSON payload' },
-      { status: 400 }
-    );
-  }
-
-  const parseResult = controlBodySchema.safeParse(rawBody);
-  if (!parseResult.success) {
-    return NextResponse.json(
-      {
-        error: 'Validation failed',
-        details: parseResult.error.flatten().fieldErrors,
-      },
-      { status: 400 }
-    );
-  }
-
-  const { deviceSn, mode, gridCharge, accountId } = parseResult.data;
-
-  // 4. Tenant isolation check for consumer roles
-  let targetAccountId = accountId;
-  if (session.role === 'consumer') {
-    if (!session.accountId) {
-      return NextResponse.json(
-        { error: 'Forbidden: Consumer account is not assigned to any solar station' },
-        { status: 403 }
-      );
-    }
-    if (accountId && session.accountId !== accountId) {
-      return NextResponse.json(
-        { error: 'Forbidden: You do not have permission to control hardware for this account' },
-        { status: 403 }
-      );
-    }
-    targetAccountId = session.accountId;
-  }
-
-  // 5. Retrieve target DeyeCloud client
-  const client = accountManager.getClient(targetAccountId);
-  if (!client) {
-    return NextResponse.json(
-      { error: `Account with ID "${targetAccountId || 'default'}" not found` },
-      { status: 404 }
-    );
-  }
-
-  // Map to client supported mode
-  const clientMode = (
-    mode === 'ZERO_EXPORT_TO_LOAD' ? 'LOAD_FIRST' :
-    mode === 'ZERO_EXPORT_TO_CT' ? 'SELLING_FIRST' :
-    mode
-  ) as 'PEAK_SHAVING' | 'BATTERY_FIRST' | 'LOAD_FIRST' | 'SELLING_FIRST';
-
-  try {
-    const result = await client.setWorkMode({
-      deviceSn: deviceSn ? String(deviceSn).trim() : undefined,
-      mode: clientMode,
-      gridCharge: Boolean(gridCharge),
-    });
-
-    // 6. Record audit trail in database with caller identity
-    try {
-      await accountManager.logInverterControl({
-        station_id: client.getDefaultStationId() || 'SP_04',
-        device_sn: deviceSn || client.getDefaultDeviceSn() || '2209X891104',
-        action: `SET_WORK_MODE_${mode}`,
-        work_mode: clientMode,
-        parameters_payload: { mode, gridCharge: Boolean(gridCharge), accountId: client.accountId },
-        status: result.success ? 'SUCCESS' : 'FAILED',
-        upstream_code: result.success ? 200 : 502,
-        upstream_message: result.message || 'Workmode dispatch acknowledged',
-        user_id: typeof session.userId === 'number' ? session.userId : (parseInt(String(session.userId), 10) || null),
-        client_ip: req.headers.get('x-forwarded-for') || null,
-      });
-    } catch (logErr) {
-      console.warn('[ControlRoute] Failed recording command audit:', logErr);
+export const POST = withGate(
+  {
+    roles: ['admin', 'consumer'],
+    rateLimit: {
+      keyPrefix: 'control',
+      maxRequests: RATE_LIMIT_CONFIGS.CONTROL.maxRequests,
+      windowMs: RATE_LIMIT_CONFIGS.CONTROL.windowMs,
+    },
+  },
+  async (req, { session, clientIp }) => {
+    // 1. Safely parse JSON body with uniform error handling
+    const jsonParsed = await parseJsonBody(req);
+    if (!jsonParsed.ok) {
+      return jsonParsed.errorResponse;
     }
 
-    // 7. Return proper HTTP status code: 200 on success, 502 Bad Gateway on upstream error
-    if (!result.success) {
+    const parseResult = controlBodySchema.safeParse(jsonParsed.data);
+    if (!parseResult.success) {
       return NextResponse.json(
         {
-          success: false,
-          error: result.message || 'Upstream inverter controller rejected command',
-          isLive: result.isLive,
-          accountId: client.accountId,
+          error: 'Validation failed',
+          details: parseResult.error.flatten().fieldErrors,
         },
-        { status: 502 }
+        { status: 400 }
       );
     }
 
-    return NextResponse.json({
-      ...result,
-      accountId: client.accountId,
-      accountName: client.accountName,
-    });
-  } catch (error) {
-    console.error('[ControlRoute] Hardware dispatch failed:', error);
-    return NextResponse.json(
-      { error: 'Failed to dispatch workmode control command to inverter' },
-      { status: 500 }
-    );
+    const { deviceSn, mode, gridCharge, accountId } = parseResult.data;
+
+    // 2. Tenant isolation check for consumer roles
+    let targetAccountId = accountId;
+    if (session.role === 'consumer') {
+      if (!session.accountId) {
+        return NextResponse.json(
+          { error: 'Forbidden: Consumer account is not assigned to any solar station' },
+          { status: 403 }
+        );
+      }
+      if (accountId && session.accountId !== accountId) {
+        return NextResponse.json(
+          { error: 'Forbidden: You do not have permission to control hardware for this account' },
+          { status: 403 }
+        );
+      }
+      targetAccountId = session.accountId;
+    }
+
+    // 3. Retrieve target DeyeCloud client
+    const client = accountManager.getClient(targetAccountId);
+    if (!client) {
+      return NextResponse.json(
+        { error: `Account with ID "${targetAccountId || 'default'}" not found` },
+        { status: 404 }
+      );
+    }
+
+    // Map to client supported mode
+    const clientMode = (
+      mode === 'ZERO_EXPORT_TO_LOAD'
+        ? 'LOAD_FIRST'
+        : mode === 'ZERO_EXPORT_TO_CT'
+        ? 'SELLING_FIRST'
+        : mode
+    ) as 'PEAK_SHAVING' | 'BATTERY_FIRST' | 'LOAD_FIRST' | 'SELLING_FIRST';
+
+    try {
+      const result = await client.setWorkMode({
+        deviceSn: deviceSn ? String(deviceSn).trim() : undefined,
+        mode: clientMode,
+        gridCharge: Boolean(gridCharge),
+      });
+
+      // 4. Record audit trail in database with caller identity
+      try {
+        await accountManager.logInverterControl({
+          station_id: client.getDefaultStationId() || 'SP_04',
+          device_sn: deviceSn || client.getDefaultDeviceSn() || '2209X891104',
+          action: `SET_WORK_MODE_${mode}`,
+          work_mode: clientMode,
+          parameters_payload: { mode, gridCharge: Boolean(gridCharge), accountId: client.accountId },
+          status: result.success ? 'SUCCESS' : 'FAILED',
+          upstream_code: result.success ? 200 : 502,
+          upstream_message: result.message || 'Workmode dispatch acknowledged',
+          user_id:
+            typeof session.userId === 'number'
+              ? session.userId
+              : parseInt(String(session.userId), 10) || null,
+          client_ip: clientIp || null,
+        });
+      } catch (logErr) {
+        log.warn('Failed recording command audit', { route: 'control' }, logErr);
+      }
+
+      // 5. Return proper HTTP status code: 200 on success, 502 Bad Gateway on upstream error
+      if (!result.success) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: result.message || 'Upstream inverter controller rejected command',
+            isLive: result.isLive,
+            accountId: client.accountId,
+          },
+          { status: 502 }
+        );
+      }
+
+      return NextResponse.json({
+        ...result,
+        accountId: client.accountId,
+        accountName: client.accountName,
+      });
+    } catch (error) {
+      log.error('Hardware dispatch failed', error, { route: 'control', targetAccountId });
+      return NextResponse.json(
+        { error: 'Failed to dispatch workmode control command to inverter' },
+        { status: 500 }
+      );
+    }
   }
-}
+);

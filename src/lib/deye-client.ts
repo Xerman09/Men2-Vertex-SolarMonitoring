@@ -16,6 +16,9 @@ import {
 } from './mock-telemetry';
 import { sanitizeDeyeBaseUrl } from './url-validator';
 import { env } from './env';
+import { createLogger } from './logger';
+
+const log = createLogger('DeyeClient');
 
 interface DeyeTokenCache {
   token: string;
@@ -140,7 +143,7 @@ export class DeyeCloudClient {
       });
 
       if (!res.ok) {
-        console.warn(`[DeyeCloud][${this.accountName}] Auth failed with status ${res.status}`);
+        log.warn('Auth failed with status', { accountName: this.accountName, status: res.status });
         return null;
       }
 
@@ -155,19 +158,19 @@ export class DeyeCloudClient {
         return this.cachedToken.token;
       }
 
-      console.warn(`[DeyeCloud][${this.accountName}] Auth response did not return token:`, data);
+      log.warn('Auth response did not return token', { accountName: this.accountName, data });
       return null;
     } catch (err: unknown) {
       const isTimeout =
         (err instanceof Error && err.name === 'TimeoutError') ||
         (typeof err === 'object' && err !== null && (err as { code?: number }).code === 23);
       if (isTimeout) {
-        console.warn(
-          `[DeyeCloud][${this.accountName}] Auth token request timed out after ${env.DEYE_API_TIMEOUT_MS ?? 15000}ms`
-        );
+        log.warn('Auth token request timed out', {
+          accountName: this.accountName,
+          timeoutMs: env.DEYE_API_TIMEOUT_MS ?? 15000,
+        });
       } else {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        console.error(`[DeyeCloud][${this.accountName}] Network error during token acquisition: ${errorMsg}`);
+        log.error('Network error during token acquisition', err, { accountName: this.accountName });
       }
       return null;
     }
@@ -219,12 +222,13 @@ export class DeyeCloudClient {
         (typeof err === 'object' && err !== null && (err as { code?: number }).code === 23);
 
       if (isTimeout) {
-        console.warn(
-          `[DeyeCloud][${this.accountName}] Request to ${endpoint} timed out after ${timeoutMs}ms (upstream cloud latency)`
-        );
+        log.warn('Request timed out (upstream cloud latency)', {
+          accountName: this.accountName,
+          endpoint,
+          timeoutMs,
+        });
       } else {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        console.warn(`[DeyeCloud][${this.accountName}] Fetch error for ${endpoint}: ${errorMsg}`);
+        log.warn('Fetch error', { accountName: this.accountName, endpoint }, err);
       }
       return null;
     }
@@ -233,7 +237,7 @@ export class DeyeCloudClient {
   /**
    * Fetch list of registered stations/plants under this DeyeCloud account
    */
-  public async getStationList(): Promise<{ total: number; stations: any[]; isLive: boolean }> {
+  public async getStationList(): Promise<{ total: number; stations: Record<string, unknown>[]; isLive: boolean }> {
     const res = await this.fetchWithAuth('/v1.0/station/listWithDevice', {
       method: 'POST',
       body: JSON.stringify({}),
@@ -249,7 +253,7 @@ export class DeyeCloudClient {
           isLive: true,
         };
       } catch (e) {
-        console.warn('[DeyeCloud] Failed to parse station list:', e);
+        log.warn('Failed to parse station list', { accountName: this.accountName }, e);
       }
     }
 
@@ -271,9 +275,9 @@ export class DeyeCloudClient {
         const stationList = body.stationList || body.data?.stationList || [];
 
         if (Array.isArray(stationList) && stationList.length > 0) {
-          const plants: PlantInfo[] = stationList.map((st: any) => {
-            const rawDevices = st.deviceListItems || st.deviceList || st.devices || [];
-            const devices: DeviceInfo[] = rawDevices.map((d: any) => {
+          const plants: PlantInfo[] = stationList.map((st: Record<string, any>) => {
+            const rawDevices = (st.deviceListItems || st.deviceList || st.devices || []) as Record<string, any>[];
+            const devices: DeviceInfo[] = rawDevices.map((d: Record<string, any>) => {
               const isLogger =
                 d.deviceType === 'LOGGER' ||
                 d.deviceType === 'COLLECTOR' ||
@@ -319,7 +323,7 @@ export class DeyeCloudClient {
           return { plants, isLive: true };
         }
       } catch (err) {
-        console.warn(`[DeyeCloud][${this.accountName}] Auto-discovery parse error:`, err);
+        log.warn('Auto-discovery parse error', { accountName: this.accountName }, err);
       }
     }
 
@@ -418,7 +422,7 @@ export class DeyeCloudClient {
         }
       }
     } catch (err) {
-      console.warn(`[DeyeCloud][${this.accountName}] Station summary fetch failed for station ${id}:`, err);
+      log.warn('Station summary fetch failed', { accountName: this.accountName, stationId: id }, err);
     }
 
     return { data: emptySummary, isLive: false, stationDetected: false };
@@ -453,7 +457,7 @@ export class DeyeCloudClient {
       const results = settled.map((s, i) => {
         if (s.status === 'fulfilled') return s.value;
         const p = this.plants[i];
-        console.warn(`[DeyeClient] Failed getting summary for plant ${p?.stationId}:`, s.reason);
+        log.warn('Failed getting summary for plant', { stationId: p?.stationId }, s.reason);
         return {
           isLive: false,
           data: {
@@ -601,8 +605,7 @@ export class DeyeCloudClient {
 
       await Promise.allSettled(promises);
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
-      console.warn(`[DeyeCloud][${this.accountName}] Batch device latest error: ${errorMsg}`);
+      log.warn('Batch device latest error', { accountName: this.accountName }, e);
     }
 
     if (result.size > 0) {

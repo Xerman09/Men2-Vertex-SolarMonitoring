@@ -4,6 +4,9 @@ import { deyeClient } from '@/lib/deye-client';
 import { withGate } from '@/lib/gate';
 import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
 import { ACCOUNT_ID_REGEX } from '@/lib/session';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('HistoryRoute');
 
 export const historyQuerySchema = z.object({
   accountId: z
@@ -78,7 +81,7 @@ export const GET = withGate(
           'Historical interval data is synthesized via sinusoidal clear-sky model until Deye historical telemetry aggregation tier is activated.',
       });
     } catch (error) {
-      console.error('[HistoryRoute] Error retrieving hourly history:', error);
+      log.error('Error retrieving hourly history', error, { route: 'history', range, step });
       return NextResponse.json(
         { error: 'Failed to retrieve hourly history' },
         { status: 500 }

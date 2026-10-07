@@ -3,8 +3,11 @@ import { z } from 'zod';
 import { accountManager } from '@/lib/account-manager';
 import { DeyeAccountConfig, PlantInfo, DeviceInfo } from '@/lib/types';
 import { enforceTenantAccess, ACCOUNT_ID_REGEX } from '@/lib/session';
-import { withGate, requireAdminSession } from '@/lib/gate';
+import { withGate, requireAdminSession, parseJsonBody } from '@/lib/gate';
 import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('PlantsRoute');
 
 export const deviceInfoSchema = z.object({
   deviceSn: z.string(),
@@ -106,7 +109,7 @@ export const GET = withGate(
         plants: allPlants,
       });
     } catch (error) {
-      console.error('[PlantsRoute] Error getting plants:', error);
+      log.error('Error getting plants', error, { route: 'plants' });
       return NextResponse.json(
         { error: 'Failed to retrieve plants' },
         { status: 500 }
@@ -121,17 +124,12 @@ export async function POST(req: Request) {
     return errorResponse;
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json(
-      { error: 'Malformed JSON payload' },
-      { status: 400 }
-    );
+  const jsonParsed = await parseJsonBody(req);
+  if (!jsonParsed.ok) {
+    return jsonParsed.errorResponse;
   }
 
-  const parsed = addPlantBodySchema.safeParse(rawBody);
+  const parsed = addPlantBodySchema.safeParse(jsonParsed.data);
   if (!parsed.success) {
     return NextResponse.json(
       {
@@ -159,7 +157,7 @@ export async function POST(req: Request) {
     const result = await accountManager.addPlant(accountId, plantInfo);
     return NextResponse.json(result);
   } catch (error) {
-    console.error('[PlantsRoute] Error adding plant:', error);
+    log.error('Error adding plant', error, { route: 'plants', accountId });
     return NextResponse.json(
       { error: 'Failed to add plant' },
       { status: 500 }
