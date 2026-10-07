@@ -18,9 +18,20 @@ if (typeof setInterval !== 'undefined') {
   timer.unref?.();
 }
 
+export const RATE_LIMIT_CONFIGS = {
+  CONTROL: { maxRequests: 5, windowMs: 60 * 1000 },
+  ACCOUNT_MUTATION: { maxRequests: 20, windowMs: 60 * 1000 },
+  READ_HISTORY: { maxRequests: 30, windowMs: 60 * 1000 },
+  READ_ACCOUNTS: { maxRequests: 30, windowMs: 60 * 1000 },
+  READ_STATIONS: { maxRequests: 60, windowMs: 60 * 1000 },
+  READ_PLANTS: { maxRequests: 60, windowMs: 60 * 1000 },
+  READ_AGGREGATE: { maxRequests: 60, windowMs: 60 * 1000 },
+} as const;
+
 export function _resetRateLimitStoreForTesting(): void {
   rateLimitStore.clear();
 }
+
 
 /**
  * Basic in-memory rate limiter for sensitive endpoints

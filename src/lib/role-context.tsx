@@ -84,7 +84,9 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
           if (savedUser) {
             try {
               setUser(JSON.parse(savedUser));
-            } catch {}
+            } catch (parseErr) {
+              console.warn('[RoleProvider] Failed parsing cached user from localStorage:', parseErr);
+            }
           }
         }
       } catch (err) {

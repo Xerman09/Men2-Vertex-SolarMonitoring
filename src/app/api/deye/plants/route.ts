@@ -1,136 +1,129 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { z } from 'zod';
 import { accountManager } from '@/lib/account-manager';
-import { DeyeAccountConfig, PlantInfo } from '@/lib/types';
-import {
-  verifySessionToken,
-  SESSION_COOKIE_NAME,
-  enforceTenantAccess,
-  requireAuthenticatedSession,
-} from '@/lib/session';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { DeyeAccountConfig, PlantInfo, DeviceInfo } from '@/lib/types';
+import { enforceTenantAccess, ACCOUNT_ID_REGEX } from '@/lib/session';
+import { withGate, requireAdminSession } from '@/lib/gate';
+import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const accountId = searchParams.get('accountId');
+export const deviceInfoSchema = z.object({
+  deviceSn: z.string(),
+  deviceType: z.enum(['INVERTER', 'LOGGER', 'METER', 'BATTERY']).default('INVERTER'),
+  name: z.string().default('Inverter Unit'),
+  model: z.string().optional(),
+  ratedKw: z.number().optional(),
+  loggerSn: z.string().optional(),
+  status: z.enum(['ONLINE', 'STANDBY', 'FAULT', 'OFFLINE']).default('ONLINE'),
+  lastSeen: z.string().optional(),
+});
 
-  // 1. IP Rate Limiting (60 requests per minute)
-  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  const rate = checkRateLimit(`read_plants_${clientIp}`, 60, 60 * 1000);
-  if (!rate.success) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded: Maximum 60 plant requests per minute.' },
-      { status: 429, headers: { 'Retry-After': '60' } }
-    );
-  }
+export const addPlantBodySchema = z.object({
+  accountId: z.string().regex(ACCOUNT_ID_REGEX, 'Invalid account ID format'),
+  plant: z.object({
+    stationId: z.union([z.string(), z.number()]).transform(String),
+    stationName: z.string().min(1, 'Field "stationName" is required'),
+    installedCapacityKw: z.number().default(0),
+    address: z.string().optional(),
+    liveSolarPowerKw: z.number().optional(),
+    dailyYieldKwh: z.number().optional(),
+    gridPowerKw: z.number().optional(),
+    consumptionPowerKw: z.number().optional(),
+    devices: z.array(deviceInfoSchema).default([]),
+  }),
+});
 
-  // 2. Enforce Authenticated Session (ADR-08 Default-Deny)
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  const session = await verifySessionToken(token);
+export const GET = withGate(
+  {
+    rateLimit: {
+      keyPrefix: 'read_plants',
+      maxRequests: RATE_LIMIT_CONFIGS.READ_PLANTS.maxRequests,
+      windowMs: RATE_LIMIT_CONFIGS.READ_PLANTS.windowMs,
+    },
+  },
+  async (req, { session }) => {
+    const { searchParams } = new URL(req.url);
+    const accountId = searchParams.get('accountId');
 
-  const authCheck = requireAuthenticatedSession(session);
-  if (!authCheck.allowed) {
-    return NextResponse.json(
-      { error: authCheck.error || 'Authentication required to view plant telemetry' },
-      { status: authCheck.status }
-    );
-  }
-
-  // 3. If consumer role, strictly restrict to their assigned account
-  if (session?.role === 'consumer') {
-    if (!session.accountId) {
-      return NextResponse.json(
-        { error: 'Forbidden: Consumer account is not assigned to any solar station' },
-        { status: 403 }
-      );
-    }
-    if (accountId && accountId !== session.accountId) {
-      return NextResponse.json(
-        { error: 'Forbidden: You do not have permission to view plants for this account' },
-        { status: 403 }
-      );
-    }
-    const rawAccounts: DeyeAccountConfig[] = accountManager.getAllRawAccounts();
-    const target = rawAccounts.find((a) => a.id === session.accountId);
-    return NextResponse.json({
-      accountId: session.accountId,
-      plants: target?.plants || [],
-      total: target?.plants?.length || 0,
-    });
-  }
-
-  try {
-    const rawAccounts: DeyeAccountConfig[] = accountManager.getAllRawAccounts();
-
-    if (accountId) {
-      const tenantCheck = enforceTenantAccess(session, accountId);
-      if (!tenantCheck.allowed) {
+    // Consumer role is strictly restricted to their assigned account
+    if (session.role === 'consumer') {
+      if (!session.accountId) {
         return NextResponse.json(
-          { error: tenantCheck.error || 'Access denied' },
-          { status: tenantCheck.status || 403 }
+          { error: 'Forbidden: Consumer account is not assigned to any solar station' },
+          { status: 403 }
         );
       }
-
-      const target = rawAccounts.find((a) => a.id === tenantCheck.targetAccountId);
-      if (!target) {
+      if (accountId && accountId !== session.accountId) {
         return NextResponse.json(
-          { error: `Account "${tenantCheck.targetAccountId}" not found` },
-          { status: 404 }
+          { error: 'Forbidden: You do not have permission to view plants for this account' },
+          { status: 403 }
         );
       }
+      const rawAccounts: DeyeAccountConfig[] = accountManager.getAllRawAccounts();
+      const target = rawAccounts.find((a) => a.id === session.accountId);
       return NextResponse.json({
-        accountId: target.id,
-        plants: target.plants || [],
-        total: target.plants?.length || 0,
+        accountId: session.accountId,
+        plants: target?.plants || [],
+        total: target?.plants?.length || 0,
       });
     }
 
-    const allPlants = rawAccounts.flatMap((a: DeyeAccountConfig) =>
-      (a.plants || []).map((p: PlantInfo) => ({
-        ...p,
-        accountId: a.id,
-        accountName: a.name,
-      }))
-    );
+    try {
+      const rawAccounts: DeyeAccountConfig[] = accountManager.getAllRawAccounts();
 
-    return NextResponse.json({
-      total: allPlants.length,
-      plants: allPlants,
-    });
-  } catch (error) {
-    console.error('[PlantsRoute] Error getting plants:', error);
-    return NextResponse.json(
-      { error: 'Failed to retrieve plants' },
-      { status: 500 }
-    );
+      if (accountId) {
+        const tenantCheck = enforceTenantAccess(session, accountId);
+        if (!tenantCheck.allowed) {
+          return NextResponse.json(
+            { error: tenantCheck.error || 'Access denied' },
+            { status: tenantCheck.status || 403 }
+          );
+        }
+
+        const target = rawAccounts.find((a) => a.id === tenantCheck.targetAccountId);
+        if (!target) {
+          return NextResponse.json(
+            { error: `Account "${tenantCheck.targetAccountId}" not found` },
+            { status: 404 }
+          );
+        }
+        return NextResponse.json({
+          accountId: target.id,
+          plants: target.plants || [],
+          total: target.plants?.length || 0,
+        });
+      }
+
+      const allPlants = rawAccounts.flatMap((a: DeyeAccountConfig) =>
+        (a.plants || []).map((p: PlantInfo) => ({
+          ...p,
+          accountId: a.id,
+          accountName: a.name,
+        }))
+      );
+
+      return NextResponse.json({
+        total: allPlants.length,
+        plants: allPlants,
+      });
+    } catch (error) {
+      console.error('[PlantsRoute] Error getting plants:', error);
+      return NextResponse.json(
+        { error: 'Failed to retrieve plants' },
+        { status: 500 }
+      );
+    }
   }
-}
+);
 
 export async function POST(req: Request) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  const session = await verifySessionToken(token);
-
-  if (!session || session.role !== 'admin') {
-    return NextResponse.json(
-      { error: 'Unauthorized: Admin privileges required to add plants' },
-      { status: 401 }
-    );
+  const { errorResponse } = await requireAdminSession(req);
+  if (errorResponse) {
+    return errorResponse;
   }
 
-  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  const rate = checkRateLimit(`plant_mutation_${clientIp}_${session.userId}`, 20, 60 * 1000);
-  if (!rate.success) {
-    return NextResponse.json(
-      { error: 'Too many plant modification requests. Rate limit is 20 requests per minute.' },
-      { status: 429, headers: { 'Retry-After': '60' } }
-    );
-  }
-
-  let body: any;
+  let rawBody: unknown;
   try {
-    body = await req.json();
+    rawBody = await req.json();
   } catch {
     return NextResponse.json(
       { error: 'Malformed JSON payload' },
@@ -138,17 +131,32 @@ export async function POST(req: Request) {
     );
   }
 
-  const { accountId, plant } = body || {};
-
-  if (!accountId || !plant || !plant.stationId || !plant.stationName) {
+  const parsed = addPlantBodySchema.safeParse(rawBody);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Fields "accountId" and "plant" with "stationId" & "stationName" are required' },
+      {
+        error: 'Validation failed',
+        details: parsed.error.flatten().fieldErrors,
+      },
       { status: 400 }
     );
   }
 
+  const { accountId, plant } = parsed.data;
+  const plantInfo: PlantInfo = {
+    stationId: plant.stationId,
+    stationName: plant.stationName,
+    installedCapacityKw: plant.installedCapacityKw,
+    address: plant.address,
+    liveSolarPowerKw: plant.liveSolarPowerKw,
+    dailyYieldKwh: plant.dailyYieldKwh,
+    gridPowerKw: plant.gridPowerKw,
+    consumptionPowerKw: plant.consumptionPowerKw,
+    devices: plant.devices as DeviceInfo[],
+  };
+
   try {
-    const result = await accountManager.addPlant(accountId, plant);
+    const result = await accountManager.addPlant(accountId, plantInfo);
     return NextResponse.json(result);
   } catch (error) {
     console.error('[PlantsRoute] Error adding plant:', error);

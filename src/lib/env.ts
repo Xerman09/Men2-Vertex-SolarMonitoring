@@ -31,6 +31,7 @@ const envSchema = z
     DEYE_PASSWORD: z.string().optional().default(''),
     DEYE_DEFAULT_STATION_ID: z.string().default('SP_04'),
     DEYE_DEFAULT_DEVICE_SN: z.string().default('2209X891104'),
+    DEYE_API_TIMEOUT_MS: z.coerce.number().int().min(3000).max(60000).default(15000),
     DIRECTUS_BASE_URL: z.string().url().default('http://localhost:8056'),
     DIRECTUS_API_TOKEN: z.string().optional().default(''),
     DIRECTUS_COLLECTION: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/).default('iot_solar_accounts'),

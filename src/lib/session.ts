@@ -12,6 +12,9 @@ export interface SessionData {
 export const HOST_SESSION_COOKIE_NAME = '__Host-dsm_session';
 export const SESSION_COOKIE_NAME = 'dsm_session';
 
+export const ACCOUNT_ID_PATTERN = '^[A-Za-z0-9_-]+$';
+export const ACCOUNT_ID_REGEX = /^[A-Za-z0-9_-]+$/;
+
 /**
  * Extracts session token checking both secure __Host- prefix and standard cookie name
  */

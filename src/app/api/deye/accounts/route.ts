@@ -1,112 +1,87 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { z } from 'zod';
 import { accountManager } from '@/lib/account-manager';
-import {
-  verifySessionToken,
-  SESSION_COOKIE_NAME,
-  requireAuthenticatedSession,
-} from '@/lib/session';
+import { ACCOUNT_ID_REGEX } from '@/lib/session';
 import { isValidDeyeBaseUrl } from '@/lib/url-validator';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { withGate, requireAdminSession } from '@/lib/gate';
+import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
 
-const ACCOUNT_ID_REGEX = /^[A-Za-z0-9_-]+$/;
+export const addAccountSchema = z.object({
+  name: z.string().min(1, 'Field "name" is required'),
+  appId: z.string().min(1, 'Field "appId" is required'),
+  appSecret: z.string().min(1, 'Field "appSecret" is required'),
+  email: z.string().email('Valid email is required'),
+  password: z.string().min(1, 'Field "password" is required'),
+  baseUrl: z.string().optional(),
+  defaultStationId: z.string().optional(),
+  defaultDeviceSn: z.string().optional(),
+  enabled: z.boolean().optional(),
+});
 
-async function requireAdminSession(req?: Request) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  const session = await verifySessionToken(token);
-  if (!session || session.role !== 'admin') {
-    return {
-      session: null,
-      errorResponse: NextResponse.json(
-        { error: 'Unauthorized: Administrator privileges required for solar gateway account modifications' },
-        { status: 401 }
-      ),
-    };
-  }
+export const updateAccountSchema = z.object({
+  id: z.string().regex(ACCOUNT_ID_REGEX, 'Valid alphanumeric "id" is required to update account'),
+  name: z.string().optional(),
+  appId: z.string().optional(),
+  appSecret: z.string().optional(),
+  email: z.string().email().optional(),
+  password: z.string().optional(),
+  baseUrl: z.string().optional(),
+  defaultStationId: z.string().optional(),
+  defaultDeviceSn: z.string().optional(),
+  enabled: z.boolean().optional(),
+});
 
-  if (req) {
-    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-    const rate = checkRateLimit(`account_mutation_${clientIp}_${session.userId}`, 20, 60 * 1000);
-    if (!rate.success) {
-      return {
-        session: null,
-        errorResponse: NextResponse.json(
-          { error: 'Too many account modification requests. Rate limit is 20 requests per minute.' },
-          { status: 429, headers: { 'Retry-After': '60' } }
-        ),
-      };
-    }
-  }
+export const GET = withGate(
+  {
+    rateLimit: {
+      keyPrefix: 'read_accounts',
+      maxRequests: RATE_LIMIT_CONFIGS.READ_ACCOUNTS.maxRequests,
+      windowMs: RATE_LIMIT_CONFIGS.READ_ACCOUNTS.windowMs,
+    },
+  },
+  async (req, { session }) => {
+    try {
+      const { searchParams } = new URL(req.url);
+      const forceSync = searchParams.get('sync') === 'true' || searchParams.get('force') === 'true';
+      const accounts = await accountManager.getAccountsSummary(forceSync);
+      const directus = accountManager.getDirectusHealth();
 
-  return { session, errorResponse: null };
-}
+      // Consumer role is strictly scoped to their assigned account metadata
+      if (session.role === 'consumer') {
+        const consumerAccounts = session.accountId
+          ? accounts.filter((a) => a.id === session.accountId)
+          : [];
+        return NextResponse.json({
+          total: consumerAccounts.length,
+          accounts: consumerAccounts,
+        });
+      }
 
-export async function GET(req: Request) {
-  // 1. IP Rate Limiting (30 requests per minute)
-  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  const rate = checkRateLimit(`read_accounts_${clientIp}`, 30, 60 * 1000);
-  if (!rate.success) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded: Maximum 30 account registry queries per minute.' },
-      { status: 429, headers: { 'Retry-After': '60' } }
-    );
-  }
-
-  // 2. Enforce Authenticated Session (ADR-08 Default-Deny)
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  const session = await verifySessionToken(token);
-
-  const authCheck = requireAuthenticatedSession(session);
-  if (!authCheck.allowed) {
-    return NextResponse.json(
-      { error: authCheck.error || 'Authentication required to view account registry' },
-      { status: authCheck.status }
-    );
-  }
-
-  try {
-    const { searchParams } = new URL(req.url);
-    const forceSync = searchParams.get('sync') === 'true' || searchParams.get('force') === 'true';
-    const accounts = await accountManager.getAccountsSummary(forceSync);
-    const directus = accountManager.getDirectusHealth();
-
-    // Consumer role is strictly scoped to their assigned account metadata
-    if (session?.role === 'consumer') {
-      const consumerAccounts = session.accountId
-        ? accounts.filter((a) => a.id === session.accountId)
-        : [];
+      // Admin & Viewer roles receive registered accounts and Directus sync status
       return NextResponse.json({
-        total: consumerAccounts.length,
-        accounts: consumerAccounts,
+        total: accounts.length,
+        accounts,
+        directus,
       });
+    } catch (error) {
+      console.error('[AccountsRoute] Failed getting accounts summary:', error);
+      return NextResponse.json(
+        { error: 'Failed to retrieve multi-account status' },
+        { status: 500 }
+      );
     }
-
-    // Admin & Viewer roles receive registered accounts and Directus sync status
-    return NextResponse.json({
-      total: accounts.length,
-      accounts,
-      directus,
-    });
-  } catch (error) {
-    console.error('[AccountsRoute] Failed getting accounts summary:', error);
-    return NextResponse.json(
-      { error: 'Failed to retrieve multi-account status' },
-      { status: 500 }
-    );
   }
-}
+);
 
 export async function POST(req: Request) {
-  const { session, errorResponse } = await requireAdminSession(req);
+  const { errorResponse } = await requireAdminSession(req);
   if (errorResponse) {
     return errorResponse;
   }
 
-  let body: any;
+  let rawBody: unknown;
   try {
-    body = await req.json();
+    rawBody = await req.json();
   } catch {
     return NextResponse.json(
       { error: 'Malformed JSON payload' },
@@ -114,17 +89,18 @@ export async function POST(req: Request) {
     );
   }
 
-  const { name, appId, appSecret, email, password, baseUrl } = body || {};
-
-  if (!name || !appId || !appSecret || !email || !password) {
+  const parsed = addAccountSchema.safeParse(rawBody);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Fields "name", "appId", "appSecret", "email", and "password" are required' },
+      { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
       { status: 400 }
     );
   }
 
+  const data = parsed.data;
+
   // SSRF prevention: ensure target baseUrl is valid
-  if (baseUrl && !isValidDeyeBaseUrl(baseUrl)) {
+  if (data.baseUrl && !isValidDeyeBaseUrl(data.baseUrl)) {
     return NextResponse.json(
       {
         error:
@@ -135,7 +111,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await accountManager.addAccount(body);
+    const result = await accountManager.addAccount(data);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error('[AccountsRoute] Failed adding account:', error);
@@ -147,14 +123,14 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const { session, errorResponse } = await requireAdminSession(req);
+  const { errorResponse } = await requireAdminSession(req);
   if (errorResponse) {
     return errorResponse;
   }
 
-  let body: any;
+  let rawBody: unknown;
   try {
-    body = await req.json();
+    rawBody = await req.json();
   } catch {
     return NextResponse.json(
       { error: 'Malformed JSON payload' },
@@ -162,14 +138,15 @@ export async function PUT(req: Request) {
     );
   }
 
-  const { id, ...updates } = body || {};
-
-  if (!id || typeof id !== 'string' || !ACCOUNT_ID_REGEX.test(id)) {
+  const parsed = updateAccountSchema.safeParse(rawBody);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Valid alphanumeric "id" is required to update account' },
+      { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
       { status: 400 }
     );
   }
+
+  const { id, ...updates } = parsed.data;
 
   if (updates.baseUrl && !isValidDeyeBaseUrl(updates.baseUrl)) {
     return NextResponse.json(
@@ -198,7 +175,7 @@ export async function PUT(req: Request) {
 export const PATCH = PUT;
 
 export async function DELETE(req: Request) {
-  const { session, errorResponse } = await requireAdminSession(req);
+  const { errorResponse } = await requireAdminSession(req);
   if (errorResponse) {
     return errorResponse;
   }

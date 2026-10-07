@@ -41,6 +41,6 @@ Chosen option: **Formal Invalidation & Active Production Denylisting with Automa
 - **Good:**
   - Closes STRIDE T-D1 by formally invalidating historical sandbox tokens and actively blocking them at application runtime.
   - Zero hardcoded static secrets remain in repository source files (`src/`).
-  - Gitleaks CI scanning prevents new secrets from entering the codebase.
+  - Gitleaks CI scanning prevents new secrets from entering the codebase, with conjunctive path-scoped allowlists eliminating scanner blind spots.
 - **Bad / Trade-offs:**
   - Production deployments require explicit environment variable configuration before container boot.

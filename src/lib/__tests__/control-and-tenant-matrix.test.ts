@@ -7,6 +7,7 @@ import {
   HOST_SESSION_COOKIE_NAME,
   SESSION_COOKIE_NAME,
   extractSessionToken,
+  ACCOUNT_ID_REGEX,
 } from '../session';
 import { checkRateLimit } from '../rate-limit';
 import { accountManager } from '../account-manager';
@@ -292,7 +293,7 @@ describe('ADR-08 Fleet Endpoints Default-Deny & Session Requirement', () => {
   });
 
   it('validates account ID regex for mutation safety', () => {
-    const ACCOUNT_ID_REGEX = /^[A-Za-z0-9_-]+$/;
+    // Tests shared ACCOUNT_ID_REGEX exported from session.ts
     expect(ACCOUNT_ID_REGEX.test('station-01')).toBe(true);
     expect(ACCOUNT_ID_REGEX.test('account_alpha_99')).toBe(true);
     expect(ACCOUNT_ID_REGEX.test('Acc123')).toBe(true);

@@ -123,6 +123,7 @@ export class DeyeCloudClient {
       const url = `${this.baseUrl}/v1.0/account/token?appId=${encodeURIComponent(this.appId)}`;
       const sha256Password = this.hashPassword(this.passwordRaw);
 
+      const timeoutMs = env.DEYE_API_TIMEOUT_MS ?? 15000;
       const res = await fetch(url, {
         method: 'POST',
         headers: {
@@ -135,7 +136,7 @@ export class DeyeCloudClient {
           password: sha256Password,
         }),
         redirect: 'error',
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
 
       if (!res.ok) {
@@ -156,8 +157,18 @@ export class DeyeCloudClient {
 
       console.warn(`[DeyeCloud][${this.accountName}] Auth response did not return token:`, data);
       return null;
-    } catch (err) {
-      console.error(`[DeyeCloud][${this.accountName}] Network error during token acquisition:`, err);
+    } catch (err: unknown) {
+      const isTimeout =
+        (err instanceof Error && err.name === 'TimeoutError') ||
+        (typeof err === 'object' && err !== null && (err as { code?: number }).code === 23);
+      if (isTimeout) {
+        console.warn(
+          `[DeyeCloud][${this.accountName}] Auth token request timed out after ${env.DEYE_API_TIMEOUT_MS ?? 15000}ms`
+        );
+      } else {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        console.error(`[DeyeCloud][${this.accountName}] Network error during token acquisition: ${errorMsg}`);
+      }
       return null;
     }
   }
@@ -165,7 +176,7 @@ export class DeyeCloudClient {
   /**
    * Resilient HTTP client wrapper for Deye OpenAPI:
    * - Injects Bearer token
-   * - Enforces 8s timeout
+   * - Enforces configurable timeout (default 15s)
    * - Blocks redirects
    * - Automatically invalidates token and retries once on 401
    */
@@ -173,6 +184,7 @@ export class DeyeCloudClient {
     const token = await this.getAccessToken();
     if (!token) return null;
 
+    const timeoutMs = env.DEYE_API_TIMEOUT_MS ?? 15000;
     const url = `${this.baseUrl}${endpoint}`;
     const makeReq = async (currentToken: string) => {
       const headers = new Headers(init.headers || {});
@@ -184,7 +196,7 @@ export class DeyeCloudClient {
         ...init,
         headers,
         redirect: 'error',
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     };
 
@@ -201,8 +213,19 @@ export class DeyeCloudClient {
       }
 
       return res;
-    } catch (err) {
-      console.warn(`[DeyeCloud][${this.accountName}] Fetch error for ${endpoint}:`, err);
+    } catch (err: unknown) {
+      const isTimeout =
+        (err instanceof Error && err.name === 'TimeoutError') ||
+        (typeof err === 'object' && err !== null && (err as { code?: number }).code === 23);
+
+      if (isTimeout) {
+        console.warn(
+          `[DeyeCloud][${this.accountName}] Request to ${endpoint} timed out after ${timeoutMs}ms (upstream cloud latency)`
+        );
+      } else {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        console.warn(`[DeyeCloud][${this.accountName}] Fetch error for ${endpoint}: ${errorMsg}`);
+      }
       return null;
     }
   }
@@ -414,8 +437,11 @@ export class DeyeCloudClient {
 
     if (stationId && stationId !== 'ALL') {
       const res = await this.getSingleStationSummary(stationId);
-      this.cachedStationSummary.set(cacheKey, { result: res, timestamp: Date.now() });
-      return res;
+      if (res.isLive || !cached || now - cached.timestamp >= 60000) {
+        this.cachedStationSummary.set(cacheKey, { result: res, timestamp: Date.now() });
+        return res;
+      }
+      return cached.result;
     }
 
     // Multi-plant account aggregation
@@ -515,13 +541,20 @@ export class DeyeCloudClient {
         isLive: anyLive,
         stationDetected: true,
       };
-      this.cachedStationSummary.set(cacheKey, { result: finalRes, timestamp: Date.now() });
-      return finalRes;
+
+      if (anyLive || !cached || now - cached.timestamp >= 60000) {
+        this.cachedStationSummary.set(cacheKey, { result: finalRes, timestamp: Date.now() });
+        return finalRes;
+      }
+      return cached.result;
     }
 
     const defaultRes = await this.getSingleStationSummary(this.defaultStationId);
-    this.cachedStationSummary.set(cacheKey, { result: defaultRes, timestamp: Date.now() });
-    return defaultRes;
+    if (defaultRes.isLive || !cached || now - cached.timestamp >= 60000) {
+      this.cachedStationSummary.set(cacheKey, { result: defaultRes, timestamp: Date.now() });
+      return defaultRes;
+    }
+    return cached.result;
   }
 
   /**
@@ -568,7 +601,19 @@ export class DeyeCloudClient {
 
       await Promise.allSettled(promises);
     } catch (e) {
-      console.warn(`[DeyeCloud][${this.accountName}] Batch device latest error:`, e);
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      console.warn(`[DeyeCloud][${this.accountName}] Batch device latest error: ${errorMsg}`);
+    }
+
+    if (result.size > 0) {
+      this.cachedBatchDevices = { result, timestamp: Date.now() };
+      return result;
+    }
+
+    // Stale-while-revalidate fallback: If current fetch returned no data (e.g. timeout or network glitch)
+    // but we have a recent cached reading within the last 60 seconds, retain it rather than dropping to 0kW.
+    if (this.cachedBatchDevices && now - this.cachedBatchDevices.timestamp < 60000) {
+      return this.cachedBatchDevices.result;
     }
 
     this.cachedBatchDevices = { result, timestamp: Date.now() };

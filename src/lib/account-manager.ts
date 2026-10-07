@@ -438,7 +438,11 @@ class DeyeAccountManager {
       return true;
     } catch (e) {
       if (fs.existsSync(tempPath)) {
-        try { fs.unlinkSync(tempPath); } catch {}
+        try {
+          fs.unlinkSync(tempPath);
+        } catch (unlinkErr) {
+          console.warn('[DeyeAccountManager] Failed cleaning up temporary accounts file:', unlinkErr);
+        }
       }
       console.error('[DeyeAccountManager] Failed saving accounts to disk:', e);
       return false;

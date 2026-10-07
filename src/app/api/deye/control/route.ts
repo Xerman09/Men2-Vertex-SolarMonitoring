@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { accountManager } from '@/lib/account-manager';
-import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/session';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { verifySessionToken, SESSION_COOKIE_NAME, ACCOUNT_ID_REGEX } from '@/lib/session';
+import { checkRateLimit, RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
 
 export const VALID_WORK_MODES = [
   'PEAK_SHAVING',
@@ -29,9 +29,10 @@ export const controlBodySchema = z.object({
     .string()
     .min(1)
     .max(64)
-    .regex(/^[A-Za-z0-9_-]+$/, 'Invalid account ID format')
+    .regex(ACCOUNT_ID_REGEX, 'Invalid account ID format')
     .optional(),
 });
+
 
 export async function POST(req: Request) {
   // 1. Authenticate caller session
@@ -49,10 +50,14 @@ export async function POST(req: Request) {
   // 2. Rate limiting (5 hardware commands per minute per user/IP)
   const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
   const rateLimitKey = `control_${clientIp}_${session.userId}`;
-  const rateCheck = checkRateLimit(rateLimitKey, 5, 60 * 1000);
+  const rateCheck = checkRateLimit(
+    rateLimitKey,
+    RATE_LIMIT_CONFIGS.CONTROL.maxRequests,
+    RATE_LIMIT_CONFIGS.CONTROL.windowMs
+  );
   if (!rateCheck.success) {
     return NextResponse.json(
-      { error: 'Rate limit exceeded: Maximum 5 inverter control commands per minute.' },
+      { error: `Rate limit exceeded: Maximum ${RATE_LIMIT_CONFIGS.CONTROL.maxRequests} inverter control commands per minute.` },
       { status: 429, headers: { 'Retry-After': '60' } }
     );
   }

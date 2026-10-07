@@ -16,3 +16,5 @@ This directory contains records of significant architectural and security design
 | [ADR-0008](./0008-fleet-endpoints-default-deny-visibility-policy.md) | Fleet Endpoints Default-Deny Visibility Policy | Accepted | 2026-10-05 |
 | [ADR-0009](./0009-cookie-host-prefix-and-proxy-tls-discipline.md) | Cookie Host Prefix and Reverse Proxy TLS Discipline | Accepted | 2026-10-05 |
 | [ADR-0010](./0010-secret-lifecycle-and-credential-boundary-policy.md) | Secret Lifecycle, Environment Segregation, and Historic Credential Invalidation Policy | Accepted | 2026-10-05 |
+| [ADR-0011](./0011-single-instance-gateway-and-deye-timeout-policy.md) | Single-Instance Gateway Constraint, Upstream Timeout Policy, and Account Boundary | Accepted | 2026-10-06 |
+
