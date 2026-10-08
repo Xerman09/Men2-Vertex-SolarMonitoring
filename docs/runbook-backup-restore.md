@@ -20,11 +20,18 @@ Drill record 2026-10-08: backup→restore byte-identical (SHA256
 9D0ED4026633CE7FBE64CC362380507353B60FBAE787F34CA69AF52AD609BE76),
 1 account parsed, 0 orphan tmp files. Pass.
 
-## Directus leg (manual — needs operator creds, not drilled)
+## Directus leg (snapshot drilled 2026-10-08; restore stays manual)
 
-1. Export collection matching `DIRECTUS_COLLECTION` via Directus admin before any schema change.
-2. Restore = re-import CSV/JSON snapshot; then `POST /api/deye/accounts/sync` and confirm
-   fleet totals match. Never hand-edit the Directus rows the poller writes.
+1. Snapshot (read-only, drilled): `GET /items/iot_solar_accounts?limit=-1` with the static
+   token → saved JSON with `exported_at`, count, items. Drill record: 2 items, SHA256
+   B733F1DA42C9D620635034183ADBCE87BEEE114D03C03819CB97EE5C08881FD1. Snapshot lives
+   OFF-repo (temp dir) — it contains `app_secret`/`password` fields, never commit it.
+2. Restore (manual — writes to shared prod CMS, needs your go-ahead): re-import snapshot
+   via Directus admin; then `POST /api/deye/accounts/sync` and confirm fleet totals match.
+   Never hand-edit the Directus rows the poller writes.
+3. Least privilege (open): this Directus hosts the whole ERP (700+ collections). The DSM
+   token should hold read/write ONLY on `iot_solar_*` collections — verify in Directus
+   admin → Roles → DSM role → collection scope. Today it can read everything.
 
 ## Rotation & audit (auth-skill boundary)
 

@@ -11,6 +11,8 @@
    - Solar & Energy telemetry semantics
  ============================================================ */
 :root {
+  color-scheme: light dark;
+
   /* Core Canvas */
   --background: 240 6% 98.5%;
   --foreground: 240 10% 3.9%;
@@ -95,6 +97,8 @@
    - High-contrast luminescent telemetry accents
  ============================================================ */
 .dark {
+  color-scheme: dark;
+
   /* Core Canvas */
   --background: 240 10% 3.2%;
   --foreground: 0 0% 98%;
