@@ -57,7 +57,7 @@ export class DirectusTransport {
   /**
    * Generic Directus collection reader
    */
-  public async fetchCollection<T = any>(collection: string, query = '?limit=-1'): Promise<T[] | null> {
+  public async fetchCollection<T = unknown>(collection: string, query = '?limit=-1'): Promise<T[] | null> {
     try {
       const safeCollection = encodeURIComponent(collection);
       const url = `${this.getDirectusBaseUrl()}/items/${safeCollection}${query}`;
@@ -93,7 +93,7 @@ export class DirectusTransport {
   /**
    * Generic create helper for any Directus collection
    */
-  public async createItem<T = Record<string, any>>(collection: string, payload: Record<string, any>): Promise<T | null> {
+  public async createItem<T = Record<string, unknown>>(collection: string, payload: Record<string, unknown>): Promise<T | null> {
     try {
       const safeCollection = encodeURIComponent(collection);
       const url = `${this.getDirectusBaseUrl()}/items/${safeCollection}`;
@@ -189,7 +189,7 @@ export class DirectusTransport {
   /**
    * Query configured default Directus collection
    */
-  public async fetchFromDirectus(): Promise<Record<string, any>[] | null> {
+  public async fetchFromDirectus(): Promise<Record<string, unknown>[] | null> {
     return this.fetchCollection(this.getDirectusCollection());
   }
 }

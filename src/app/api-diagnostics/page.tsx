@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
+import { useSafeTimeout } from '@/lib/usePolling';
 
 const log = createLogger('ApiDiagnostics');
 
@@ -33,13 +34,7 @@ export default function ApiDiagnosticsPage() {
   const [currentLang, setCurrentLang] = useState<'curl' | 'python' | 'node'>('curl');
   const [currentPreset, setCurrentPreset] = useState<'telemetry' | 'station' | 'workmode'>('telemetry');
   const [copied, setCopied] = useState(false);
-  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-    };
-  }, []);
+  const { setSafeTimeout } = useSafeTimeout();
 
   // Playground Execution State
   const [executing, setExecuting] = useState(false);
@@ -76,9 +71,9 @@ export default function ApiDiagnosticsPage() {
       workmode: `import requests\n\nurl = "https://api.deyecloud.com/v1.0/control/workmode"\npayload = {"device_sn": "2209X891104", "mode": "PEAK_SHAVING", "grid_charge": True}\nres = requests.post(url, json=payload, headers={"Authorization": "Bearer deye_live_token_77a988d"})\nprint(res.status_code, res.json())`,
     },
     node: {
-      station: `const axios = require('axios');\n\nconst { data } = await axios.get('https://api.deyecloud.com/v1.0/station/latest', {\n  params: { station_id: 'SP_04' },\n  headers: { Authorization: 'Bearer deye_live_token_77a988d' }\n});\nconsole.log(data);`,
-      telemetry: `const axios = require('axios');\n\nconst { data } = await axios.get('https://api.deyecloud.com/v1.0/device/inverter/telemetry', {\n  params: { device_sn: '2209X891104' },\n  headers: { Authorization: 'Bearer deye_live_token_77a988d' }\n});\nconsole.log(data);`,
-      workmode: `const axios = require('axios');\n\nconst { data } = await axios.post('https://api.deyecloud.com/v1.0/control/workmode', {\n  device_sn: '2209X891104',\n  mode: 'PEAK_SHAVING',\n  grid_charge: true\n}, {\n  headers: { Authorization: 'Bearer deye_live_token_77a988d' }\n});\nconsole.log(data);`,
+      station: `const axios = require('axios');\n\nconst { data } = await axios.get('https://api.deyecloud.com/v1.0/station/latest', {\n  params: { station_id: 'SP_04' },\n  headers: { Authorization: 'Bearer deye_live_token_77a988d' }\n});\nprocess.stdout.write(JSON.stringify(data, null, 2) + '\\n');`,
+      telemetry: `const axios = require('axios');\n\nconst { data } = await axios.get('https://api.deyecloud.com/v1.0/device/inverter/telemetry', {\n  params: { device_sn: '2209X891104' },\n  headers: { Authorization: 'Bearer deye_live_token_77a988d' }\n});\nprocess.stdout.write(JSON.stringify(data, null, 2) + '\\n');`,
+      workmode: `const axios = require('axios');\n\nconst { data } = await axios.post('https://api.deyecloud.com/v1.0/control/workmode', {\n  device_sn: '2209X891104',\n  mode: 'PEAK_SHAVING',\n  grid_charge: true\n}, {\n  headers: { Authorization: 'Bearer deye_live_token_77a988d' }\n});\nprocess.stdout.write(JSON.stringify(data, null, 2) + '\\n');`,
     },
   };
 
@@ -86,8 +81,7 @@ export default function ApiDiagnosticsPage() {
     const code = snippets[currentLang][currentPreset];
     navigator.clipboard.writeText(code);
     setCopied(true);
-    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-    copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+    setSafeTimeout(() => setCopied(false), 2000);
   };
 
   const executePlayground = async () => {

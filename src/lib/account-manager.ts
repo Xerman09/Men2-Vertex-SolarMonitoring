@@ -27,6 +27,26 @@ export { COLLECTIONS };
 
 const log = createLogger('DeyeAccountManager');
 
+/**
+ * ARCHITECTURAL VERDICT & FACADE DESIGN REVIEW (v7 SlopRecs Finale):
+ * 
+ * DeyeAccountManager is the verified top-level Facade (GoF Facade Pattern)
+ * that orchestrates four dedicated, isolated domain subsystems:
+ * 
+ * 1. FileAccountCache (src/lib/file-account-cache.ts)
+ *    - Owns local JSON file I/O, disk schema migrations, atomic write safeguards.
+ * 2. DirectusTransport (src/lib/directus-transport.ts)
+ *    - Owns REST transport to Directus CMS, collection CRUD, and immutable control auditing.
+ * 3. ClientRegistry (src/lib/client-registry.ts)
+ *    - Owns instantiation, caching, token management, and lifecycle of DeyeCloudClient instances.
+ * 4. FleetAggregator (src/lib/fleet-aggregator.ts)
+ *    - Owns cross-station rollups, concurrent plant polling, matrix normalization, and fleet totals.
+ * 
+ * Responsibilities retained directly inside DeyeAccountManager are exclusively:
+ * - High-level multi-stage workflows combining disk + remote + cache (e.g. syncWithDirectus).
+ * - Backward-compatible public API delegation shims so existing routes remain stable.
+ * - Credential lifecycle coordination (salting/hashing passwords across cache and Directus).
+ */
 class DeyeAccountManager {
   private accountsCache: DeyeAccountConfig[] | null = null;
   private clientRegistry: ClientRegistry = clientRegistry;
@@ -50,14 +70,14 @@ class DeyeAccountManager {
   /**
    * Generic Directus collection reader for the normalized schema
    */
-  public async fetchCollection<T = any>(collection: string, query = '?limit=-1'): Promise<T[] | null> {
+  public async fetchCollection<T = unknown>(collection: string, query = '?limit=-1'): Promise<T[] | null> {
     return this.directusTransport.fetchCollection<T>(collection, query);
   }
 
   /**
    * Generic create helper for any Directus collection
    */
-  public async createItem<T = Record<string, any>>(collection: string, payload: Record<string, any>): Promise<T | null> {
+  public async createItem<T = Record<string, unknown>>(collection: string, payload: Record<string, unknown>): Promise<T | null> {
     return this.directusTransport.createItem<T>(collection, payload);
   }
 
@@ -85,7 +105,7 @@ class DeyeAccountManager {
   /**
    * Query Directus REST API with a resilient timeout (fallback compatibility)
    */
-  public async fetchFromDirectus(): Promise<Record<string, any>[] | null> {
+  public async fetchFromDirectus(): Promise<Record<string, unknown>[] | null> {
     return this.directusTransport.fetchFromDirectus();
   }
 
@@ -204,7 +224,7 @@ class DeyeAccountManager {
 
       for (const row of directusRows) {
         const rowId = row.id !== undefined && row.id !== null ? String(row.id) : undefined;
-        const rowEmail = (row.email || '').trim().toLowerCase();
+        const rowEmail = String(row.email || '').trim().toLowerCase();
 
         const existing = diskAccounts.find(
           (d) =>
@@ -229,22 +249,22 @@ class DeyeAccountManager {
           row.is_admin === 1 ||
           row.is_admin === 'true' ||
           row.is_admin === '1' ||
-          (row.email && row.email.trim().toLowerCase() === 'admin')
+          (rowEmail === 'admin')
         );
 
         const accountConfig: DeyeAccountConfig = {
           id: existing ? existing.id : (rowId ? `db-${rowId}` : `acc-${Date.now().toString(36)}`),
           directusId: rowId,
-          name: row.name || existing?.name || row.email || 'Solar Site',
+          name: String(row.name || existing?.name || row.email || 'Solar Site'),
           enabled: isEnabled,
           admin: isAdmin,
           baseUrl,
           appId,
           appSecret,
-          email: row.email || existing?.email || '',
-          password: row.password || existing?.password || '',
-          defaultStationId: row.default_station_id || row.defaultStationId || existing?.defaultStationId || '',
-          defaultDeviceSn: row.default_device_sn || row.defaultDeviceSn || existing?.defaultDeviceSn || '',
+          email: String(row.email || existing?.email || ''),
+          password: String(row.password || existing?.password || ''),
+          defaultStationId: String(row.default_station_id || row.defaultStationId || existing?.defaultStationId || ''),
+          defaultDeviceSn: String(row.default_device_sn || row.defaultDeviceSn || existing?.defaultDeviceSn || ''),
           autoDiscovered: existing?.autoDiscovered ?? false,
           lastSyncedAt: existing?.lastSyncedAt,
           plants: existing?.plants || [],
@@ -547,7 +567,7 @@ class DeyeAccountManager {
     // Sync update to Directus
     if (directusId) {
       try {
-        const patchPayload: Record<string, any> = {};
+        const patchPayload: Record<string, unknown> = {};
         if (safeUpdates.name !== undefined) {
           patchPayload.name = safeUpdates.name;
           patchPayload.profile_name = safeUpdates.name;

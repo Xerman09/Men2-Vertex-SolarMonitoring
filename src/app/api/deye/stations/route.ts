@@ -76,7 +76,7 @@ export const GET = withGate(
       // Query all accounts with Promise.allSettled for fault tolerance
       const clients = accountManager.getAllClients();
       const settled = await Promise.allSettled(clients.map((c) => c.getStationList()));
-      const allStations: Array<Record<string, any>> = [];
+      const allStations: Array<Record<string, unknown>> = [];
       let anyLive = false;
 
       settled.forEach((res, idx) => {

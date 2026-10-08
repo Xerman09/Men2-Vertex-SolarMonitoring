@@ -160,16 +160,16 @@ export const POST = withGate(
     }
 
     // 2. Fallback to legacy iot_solar_accounts or local cache
-    let records = await accountManager.fetchFromDirectus();
-    if (!records || records.length === 0) {
-      records = accountManager.getAllRawAccounts(true);
-    }
+    const directusRecords = await accountManager.fetchFromDirectus();
+    const records: Array<Record<string, unknown>> = directusRecords && directusRecords.length > 0
+      ? directusRecords
+      : (accountManager.getAllRawAccounts(true) as unknown as Array<Record<string, unknown>>);
 
     const matched = records.find((row) => {
-      const rowEmail = (row.email || '').trim().toLowerCase();
-      const rowName = (row.name || '').trim().toLowerCase();
+      const rowEmail = String(row.email || '').trim().toLowerCase();
+      const rowName = String(row.name || '').trim().toLowerCase();
       const matchesIdent = rowEmail === inputIdentifier || rowName === inputIdentifier;
-      return matchesIdent && verifyPassword(inputPassword, row.password || '');
+      return matchesIdent && verifyPassword(inputPassword, String(row.password || ''));
     });
 
     if (!matched) {
@@ -179,6 +179,7 @@ export const POST = withGate(
       );
     }
 
+    const matchedEmail = String(matched.email || '').trim().toLowerCase();
     const hasAdminPrivilege = Boolean(
       matched.admin === true ||
       matched.admin === 1 ||
@@ -188,16 +189,20 @@ export const POST = withGate(
       matched.is_admin === 1 ||
       matched.is_admin === 'true' ||
       matched.is_admin === '1' ||
-      (matched.email && matched.email.trim().toLowerCase() === 'admin')
+      matchedEmail === 'admin'
     );
 
     const role = hasAdminPrivilege ? ('admin' as const) : ('consumer' as const);
+    const userId = matched.id !== undefined && matched.id !== null ? String(matched.id) : '1';
+    const userEmail = String(matched.email || matched.name || 'user@example.com');
+    const userName = String(matched.name || matched.email || (hasAdminPrivilege ? 'Admin' : 'Customer'));
+
     const user = {
-      id: matched.id,
-      email: matched.email || matched.name,
-      name: matched.name || matched.email || (hasAdminPrivilege ? 'Admin' : 'Customer'),
+      id: userId,
+      email: userEmail,
+      name: userName,
       role,
-      accountId: String(matched.id),
+      accountId: userId,
     };
 
     const sessionToken = await createSessionToken({

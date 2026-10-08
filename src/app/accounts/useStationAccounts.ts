@@ -5,6 +5,7 @@ import { AccountSummary, PlantInfo, DeviceInfo } from '@/lib/types';
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
 import { createLogger } from '@/lib/logger';
+import { useSafeTimeouts } from '@/lib/usePolling';
 
 const log = createLogger('useStationAccounts');
 
@@ -57,18 +58,7 @@ export function useStationAccounts() {
   const [loading, setLoading] = useState(contextAccounts.length === 0);
   const [syncingId, setSyncingId] = useState<string | null>(null);
 
-  const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
-  const safeTimeout = useCallback((fn: () => void, ms: number) => {
-    const id = setTimeout(fn, ms);
-    timeoutsRef.current.push(id);
-    return id;
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      timeoutsRef.current.forEach(clearTimeout);
-    };
-  }, []);
+  const { safeTimeout } = useSafeTimeouts();
 
   // Collapsed state for registered plants (plant stationId -> boolean)
   const [collapsedPlants, setCollapsedPlants] = useState<Record<string, boolean>>({});

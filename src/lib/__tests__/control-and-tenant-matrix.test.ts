@@ -26,7 +26,7 @@ export function getMockSession(overrides: Partial<SessionData> = {}): SessionDat
   };
 }
 
-export function getMockControlBody(overrides: Record<string, any> = {}) {
+export function getMockControlBody(overrides: Record<string, unknown> = {}) {
   return {
     deviceSn: '2209X891104',
     mode: 'BATTERY_FIRST',

@@ -34,7 +34,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
-import { usePolling } from '@/lib/usePolling';
+import { usePolling, useSafeTimeout } from '@/lib/usePolling';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('Dashboard');
@@ -61,13 +61,7 @@ export default function EnergyFlowDashboard() {
   const [isLive, setIsLive] = useState(false);
   const [loading, setLoading] = useState(true);
   const inFlightRef = useRef(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
+  const { setSafeTimeout } = useSafeTimeout();
 
   const [forceCharge, setForceCharge] = useState(false);
   const [exportLimiter, setExportLimiter] = useState(false);
@@ -217,8 +211,7 @@ export default function EnergyFlowDashboard() {
     setManualPolling(true);
     setFetchingDeye(true, isFleetView ? 'Polling DeyeCloud Fleet Telemetry...' : 'Polling Station Telemetry...');
     await fetchTelemetry();
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
+    setSafeTimeout(() => {
       setManualPolling(false);
       setFetchingDeye(false, null);
     }, 800);

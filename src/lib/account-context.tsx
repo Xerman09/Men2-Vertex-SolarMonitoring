@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { AccountSummary, PlantInfo } from './types';
 import { useRole } from './role-context';
 import { createLogger } from './logger';
+import { useSafeTimeout } from './usePolling';
 
 const log = createLogger('AccountContext');
 
@@ -43,13 +44,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [fetchingStage, setFetchingStage] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [directusStatus, setDirectusStatus] = useState<{ connected: boolean; lastChecked: string; error?: string } | undefined>(undefined);
-  const fetchingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (fetchingTimeoutRef.current) clearTimeout(fetchingTimeoutRef.current);
-    };
-  }, []);
+  const { setSafeTimeout } = useSafeTimeout();
 
   const setFetchingDeye = useCallback((fetching: boolean, stage: string | null = null) => {
     setIsFetchingDeye(fetching);
@@ -80,8 +75,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
       if (showIndicator || forceSync) {
-        if (fetchingTimeoutRef.current) clearTimeout(fetchingTimeoutRef.current);
-        fetchingTimeoutRef.current = setTimeout(() => {
+        setSafeTimeout(() => {
           setIsFetchingDeye(false);
           setFetchingStage(null);
         }, 800);

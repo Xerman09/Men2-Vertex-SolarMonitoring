@@ -275,9 +275,9 @@ export class DeyeCloudClient {
         const stationList = body.stationList || body.data?.stationList || [];
 
         if (Array.isArray(stationList) && stationList.length > 0) {
-          const plants: PlantInfo[] = stationList.map((st: Record<string, any>) => {
-            const rawDevices = (st.deviceListItems || st.deviceList || st.devices || []) as Record<string, any>[];
-            const devices: DeviceInfo[] = rawDevices.map((d: Record<string, any>) => {
+          const plants: PlantInfo[] = stationList.map((st: Record<string, unknown>) => {
+            const rawDevices = (st.deviceListItems || st.deviceList || st.devices || []) as Record<string, unknown>[];
+            const devices: DeviceInfo[] = rawDevices.map((d: Record<string, unknown>) => {
               const isLogger =
                 d.deviceType === 'LOGGER' ||
                 d.deviceType === 'COLLECTOR' ||
@@ -295,27 +295,28 @@ export class DeyeCloudClient {
               return {
                 deviceSn: String(d.deviceSn || d.sn || ''),
                 deviceType: (isLogger ? 'LOGGER' : 'INVERTER') as 'INVERTER' | 'LOGGER',
-                name:
+                name: String(
                   d.deviceName ||
                   d.name ||
-                  (isLogger ? `Deye Collector/Logger (${d.deviceSn})` : `Deye Inverter (${d.deviceSn})`),
-                model: d.deviceModel || d.model || (isLogger ? 'Deye Smart Collector Logger' : 'SUN-100K-SG01HP3-EU-AM2'),
-                ratedKw: parseFloat(d.ratedPower || d.capacity || (isLogger ? '0' : '100')),
+                  (isLogger ? `Deye Collector/Logger (${d.deviceSn})` : `Deye Inverter (${d.deviceSn})`)
+                ),
+                model: String(d.deviceModel || d.model || (isLogger ? 'Deye Smart Collector Logger' : 'SUN-100K-SG01HP3-EU-AM2')),
+                ratedKw: parseFloat(String(d.ratedPower || d.capacity || (isLogger ? '0' : '100'))),
                 loggerSn: d.loggerSn ? String(d.loggerSn) : undefined,
                 status: isOnline ? 'ONLINE' : 'STANDBY',
                 lastSeen: d.collectionTime
-                  ? new Date(d.collectionTime * 1000).toISOString()
+                  ? new Date(Number(d.collectionTime) * 1000).toISOString()
                   : new Date().toISOString(),
               };
             });
 
             return {
               stationId: String(st.id || st.stationId || this.defaultStationId),
-              stationName: st.name || st.stationName || `${this.accountName} Plant`,
-              installedCapacityKw: parseFloat(st.installedCapacity || st.capacity || '100.0'),
-              address: st.locationAddress || st.address || st.location || 'Site Array Location',
-              liveSolarPowerKw: parseFloat(st.generationPower || st.livePower || '0.0'),
-              dailyYieldKwh: parseFloat(st.dailyEnergy || st.dailyYield || '0.0'),
+              stationName: String(st.name || st.stationName || `${this.accountName} Plant`),
+              installedCapacityKw: parseFloat(String(st.installedCapacity || st.capacity || '100.0')),
+              address: String(st.locationAddress || st.address || st.location || 'Site Array Location'),
+              liveSolarPowerKw: parseFloat(String(st.generationPower || st.livePower || '0.0')),
+              dailyYieldKwh: parseFloat(String(st.dailyEnergy || st.dailyYield || '0.0')),
               devices,
             };
           });

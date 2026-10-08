@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
-import { usePolling } from '@/lib/usePolling';
+import { usePolling, useSafeTimeout } from '@/lib/usePolling';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('HardwareTelemetry');
@@ -48,13 +48,7 @@ export default function HardwareTelemetryPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedInverterSn, setSelectedInverterSn] = useState<string>('');
   const inFlightRef = React.useRef(false);
-  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
+  const { setSafeTimeout } = useSafeTimeout();
 
   // Collect inverters from selected account or plant
   const availableInverters = React.useMemo(() => {
@@ -125,8 +119,7 @@ export default function HardwareTelemetryPage() {
     setRefreshing(true);
     setFetchingDeye(true, 'Fetching DeyeCloud Inverter Modbus Telemetry...');
     await fetchTelemetry();
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
+    setSafeTimeout(() => {
       setRefreshing(false);
       setFetchingDeye(false, null);
     }, 800);

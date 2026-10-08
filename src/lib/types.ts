@@ -317,7 +317,7 @@ export interface SolarInverterControlLog {
   device_sn: string;
   action: string;
   work_mode?: 'PEAK_SHAVING' | 'BATTERY_FIRST' | 'LOAD_FIRST' | 'SELLING_FIRST' | null;
-  parameters_payload: Record<string, any> | string;
+  parameters_payload: Record<string, unknown> | string;
   status: 'PENDING' | 'SUCCESS' | 'REJECTED' | 'FAILED';
   upstream_code?: number | null;
   upstream_message?: string | null;
