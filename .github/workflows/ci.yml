@@ -37,6 +37,9 @@ jobs:
       - name: Run unit tests
         run: npm test
 
+      - name: Run slop standing gate (any/console/magic/timers/god-files)
+        run: node scripts/slop-gate.mjs
+
       - name: Check code formatting
         run: npm run format:check
 
