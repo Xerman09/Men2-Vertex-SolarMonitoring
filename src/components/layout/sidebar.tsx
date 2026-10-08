@@ -116,7 +116,7 @@ export function Sidebar() {
                 <div className="flex flex-col leading-tight">
                   <div className="flex items-center gap-1.5">
                     <span className="font-headline font-bold text-sm tracking-wider uppercase">
-                      Deye<span className="text-primary">Solar</span>
+                      VO<span className="text-primary">Solar</span>
                     </span>
                     <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-emerald-500/30 text-emerald-500 bg-emerald-500/10">
                       VOS

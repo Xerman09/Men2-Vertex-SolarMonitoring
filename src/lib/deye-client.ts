@@ -41,9 +41,14 @@ export class DeyeCloudClient {
   private cachedStationSummary: Map<string, { result: { data: StationSummary; isLive: boolean; stationDetected: boolean }; timestamp: number }> = new Map();
   private cachedBatchDevices: { result: Map<string, Map<string, string>>; timestamp: number } | null = null;
 
+  public directusId?: string;
+  public accountEmail?: string;
+
   constructor(config?: Partial<DeyeAccountConfig>) {
     this.accountId = config?.id || 'default-site';
     this.accountName = config?.name || 'Primary Facility';
+    this.directusId = config?.directusId !== undefined ? String(config.directusId) : undefined;
+    this.accountEmail = config?.email;
     this.baseUrl = sanitizeDeyeBaseUrl(config?.baseUrl || env.DEYE_BASE_URL);
     this.appId = (config?.appId || env.DEYE_APP_ID || '').trim();
     this.appSecret = (config?.appSecret || env.DEYE_APP_SECRET || '').trim();
@@ -55,10 +60,14 @@ export class DeyeCloudClient {
   }
 
   public updateConfig(config: Partial<DeyeAccountConfig>): void {
+    if (config.directusId !== undefined) this.directusId = String(config.directusId);
+    if (config.email !== undefined) {
+      this.email = config.email.trim();
+      this.accountEmail = config.email.trim();
+    }
     if (config.baseUrl) this.baseUrl = sanitizeDeyeBaseUrl(config.baseUrl);
     if (config.appId !== undefined) this.appId = config.appId.trim();
     if (config.appSecret !== undefined) this.appSecret = config.appSecret.trim();
-    if (config.email !== undefined) this.email = config.email.trim();
     if (config.password !== undefined) this.passwordRaw = config.password.trim();
     if (config.defaultStationId !== undefined) this.defaultStationId = config.defaultStationId.trim();
     if (config.defaultDeviceSn !== undefined) this.defaultDeviceSn = config.defaultDeviceSn.trim();

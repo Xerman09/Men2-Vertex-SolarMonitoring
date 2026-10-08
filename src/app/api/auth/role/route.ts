@@ -126,14 +126,37 @@ export const POST = withGate(
             log.warn('Permissions lookup non-fatal', { userId: matchedUser.id }, permErr);
           }
 
+          // Resolve matching solar gateway account
+          const allAccounts = accountManager.getAllRawAccounts(true);
+          const matchedEmail = (matchedUser.email || '').trim().toLowerCase();
+          const matchedAcc = allAccounts.find(
+            (a) =>
+              (matchedEmail && a.email.toLowerCase() === matchedEmail) ||
+              (a.directusId && String(a.directusId) === String(matchedUser.id)) ||
+              (assignedStationId &&
+                a.plants?.some((p) => String(p.stationId) === String(assignedStationId))) ||
+              a.id === String(matchedUser.id)
+          );
+
+          const resolvedAccountId = matchedAcc
+            ? matchedAcc.id
+            : assignedStationId
+              ? `station-${assignedStationId}`
+              : String(matchedUser.id);
+
+          const finalStationId =
+            assignedStationId ||
+            matchedAcc?.defaultStationId ||
+            matchedAcc?.plants?.[0]?.stationId;
+
           const role = isAdmin ? ('admin' as const) : ('consumer' as const);
           const user = {
             id: matchedUser.id,
             email: matchedUser.email,
             name: matchedUser.full_name || matchedUser.username || (isAdmin ? 'Admin' : 'Customer'),
             role,
-            accountId: assignedStationId ? `station-${assignedStationId}` : String(matchedUser.id),
-            stationId: assignedStationId,
+            accountId: resolvedAccountId,
+            stationId: finalStationId,
           };
 
           const sessionToken = await createSessionToken({
@@ -192,17 +215,30 @@ export const POST = withGate(
       matchedEmail === 'admin'
     );
 
+    const allAccounts = accountManager.getAllRawAccounts(true);
+    const matchedAcc = allAccounts.find(
+      (a) =>
+        (matchedEmail && a.email.toLowerCase() === matchedEmail) ||
+        (matched.id && (a.id === String(matched.id) || a.directusId === String(matched.id)))
+    );
+
     const role = hasAdminPrivilege ? ('admin' as const) : ('consumer' as const);
     const userId = matched.id !== undefined && matched.id !== null ? String(matched.id) : '1';
     const userEmail = String(matched.email || matched.name || 'user@example.com');
     const userName = String(matched.name || matched.email || (hasAdminPrivilege ? 'Admin' : 'Customer'));
+    const resolvedAccountId = matchedAcc ? matchedAcc.id : userId;
+    const finalStationId =
+      (matched.station_id as string) ||
+      matchedAcc?.defaultStationId ||
+      matchedAcc?.plants?.[0]?.stationId;
 
     const user = {
       id: userId,
       email: userEmail,
       name: userName,
       role,
-      accountId: userId,
+      accountId: resolvedAccountId,
+      stationId: finalStationId,
     };
 
     const sessionToken = await createSessionToken({

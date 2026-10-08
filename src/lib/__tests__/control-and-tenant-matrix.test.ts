@@ -137,6 +137,18 @@ describe('Two-Account Replay & Tenant Isolation Matrix (hunt-idor)', () => {
     expect(check.targetAccountId).toBe('account-tenant-a');
   });
 
+  it('scopes User A to account-tenant-a when querying ALL', () => {
+    const check = enforceTenantAccess(userA, 'ALL');
+    expect(check.allowed).toBe(true);
+    expect(check.targetAccountId).toBe('account-tenant-a');
+  });
+
+  it('allows User A to query using station prefix alias', () => {
+    const check = enforceTenantAccess(userA, 'station-account-tenant-a');
+    expect(check.allowed).toBe(true);
+    expect(check.targetAccountId).toBe('account-tenant-a');
+  });
+
   it('blocks unassigned consumer with no accountId from accessing hardware', () => {
     const check = enforceTenantAccess(unassignedConsumer, 'account-tenant-a');
     expect(check.allowed).toBe(false);

@@ -36,7 +36,22 @@ export class ClientRegistry {
    */
   public getClient(accountId?: string): DeyeCloudClient | null {
     if (accountId) {
-      return this.clientMap.get(accountId) || null;
+      const direct = this.clientMap.get(accountId);
+      if (direct) return direct;
+
+      // Secondary resolution: match by directusId, email, or associated plant stationId
+      const cleanId = accountId.startsWith('station-') ? accountId.replace('station-', '') : accountId;
+      for (const client of this.clientMap.values()) {
+        if (
+          client.directusId === accountId ||
+          client.directusId === cleanId ||
+          (client.accountEmail && client.accountEmail.toLowerCase() === accountId.toLowerCase()) ||
+          client.plants?.some((p) => String(p.stationId) === cleanId || String(p.stationId) === accountId)
+        ) {
+          return client;
+        }
+      }
+      return null;
     }
     const firstClient = this.clientMap.values().next().value;
     return firstClient || null;

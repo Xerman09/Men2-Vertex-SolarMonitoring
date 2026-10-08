@@ -55,16 +55,43 @@ export const GET = withGate(
           { status: 403 }
         );
       }
-      if (accountId && accountId !== session.accountId) {
-        return NextResponse.json(
-          { error: 'Forbidden: You do not have permission to view plants for this account' },
-          { status: 403 }
-        );
+      if (accountId && accountId !== session.accountId && accountId !== 'ALL' && accountId !== 'ALL_FLEET') {
+        const cleanSessionId = session.accountId.startsWith('station-')
+          ? session.accountId.replace('station-', '')
+          : session.accountId;
+        const isMatch =
+          accountId === cleanSessionId ||
+          session.accountId === `station-${accountId}` ||
+          accountId === `station-${session.accountId}`;
+
+        if (!isMatch) {
+          return NextResponse.json(
+            { error: 'Forbidden: You do not have permission to view plants for this account' },
+            { status: 403 }
+          );
+        }
       }
+
       const rawAccounts: DeyeAccountConfig[] = accountManager.getAllRawAccounts();
-      const target = rawAccounts.find((a) => a.id === session.accountId);
+      const cleanSessionId = session.accountId.startsWith('station-')
+        ? session.accountId.replace('station-', '')
+        : session.accountId;
+
+      const target = rawAccounts.find(
+        (a) =>
+          a.id === session.accountId ||
+          a.directusId === session.accountId ||
+          (cleanSessionId && (a.directusId === cleanSessionId || a.id === cleanSessionId)) ||
+          (session.email && a.email?.toLowerCase() === session.email.toLowerCase()) ||
+          a.plants?.some(
+            (p) =>
+              String(p.stationId) === cleanSessionId ||
+              `station-${p.stationId}` === session.accountId
+          )
+      );
+
       return NextResponse.json({
-        accountId: session.accountId,
+        accountId: target?.id || session.accountId,
         plants: target?.plants || [],
         total: target?.plants?.length || 0,
       });

@@ -10,8 +10,8 @@ import { RoleProvider } from '@/lib/role-context';
 import { AppShell } from '@/components/layout/app-shell';
 
 export const metadata: Metadata = {
-  title: 'DeyeCloud Solar Operations | Multi-Account Mission Control',
-  description: 'Enterprise Deye Solar Inverter Telemetry, Multi-Account Fleet Synoptics, Arbitrage Management, and Harmonic Analytics',
+  title: 'VOSolar Operations | Multi-Account Mission Control',
+  description: 'Enterprise VOSolar Inverter Telemetry, Multi-Account Fleet Synoptics, Arbitrage Management, and Harmonic Analytics',
 };
 
 export default function RootLayout({

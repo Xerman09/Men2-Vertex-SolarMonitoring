@@ -1,9 +1,9 @@
 @echo off
-title Deye Solar Monitoring (DSM) - Mission Control
+title VOSolar Monitoring (DSM) - Mission Control
 cd /d "%~dp0"
 
 echo ======================================================================
-echo    DEYE SOLAR MONITORING (DSM) - VOS MULTI-ACCOUNT FLEET ENGINE
+echo    VOSOLAR MONITORING (DSM) - VOS MULTI-ACCOUNT FLEET ENGINE
 echo ======================================================================
 echo.
 echo Checking Node.js environment...

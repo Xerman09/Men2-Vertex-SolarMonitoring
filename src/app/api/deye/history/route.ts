@@ -61,11 +61,26 @@ export const GET = withGate(
           { status: 403 }
         );
       }
-      if (requestedAccountId && requestedAccountId !== session.accountId) {
-        return NextResponse.json(
-          { error: 'Forbidden: You do not have permission to view history for this account' },
-          { status: 403 }
-        );
+      if (
+        requestedAccountId &&
+        requestedAccountId !== session.accountId &&
+        requestedAccountId !== 'ALL' &&
+        requestedAccountId !== 'ALL_FLEET'
+      ) {
+        const cleanSessionId = session.accountId.startsWith('station-')
+          ? session.accountId.replace('station-', '')
+          : session.accountId;
+        const isMatch =
+          requestedAccountId === cleanSessionId ||
+          session.accountId === `station-${requestedAccountId}` ||
+          requestedAccountId === `station-${session.accountId}`;
+
+        if (!isMatch) {
+          return NextResponse.json(
+            { error: 'Forbidden: You do not have permission to view history for this account' },
+            { status: 403 }
+          );
+        }
       }
     }
 

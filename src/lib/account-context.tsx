@@ -115,12 +115,20 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         const accEmail = (acc.email || '').trim().toLowerCase();
 
         return (
-          (userAccId && (accDirectusId === userAccId || accId === userAccId || accId === `directus-${userAccId}`)) ||
+          (userAccId &&
+            (accDirectusId === userAccId ||
+              accId === userAccId ||
+              accId === `directus-${userAccId}` ||
+              acc.plants?.some(
+                (p) =>
+                  String(p.stationId) === userAccId ||
+                  `station-${p.stationId}` === userAccId
+              ))) ||
           (userEmail && accEmail === userEmail)
         );
       });
 
-      return matched;
+      return matched.length > 0 ? matched : rawAccounts;
     }
     return rawAccounts;
   }, [rawAccounts, isConsumer, user]);

@@ -1,4 +1,4 @@
-# ☀️ Deye Solar Monitoring System (DSM)
+# ☀️ VOSolar Monitoring System (DSM)
 
 High-performance, enterprise solar operations dashboard and control platform for Deye Hybrid inverters, integrated with the official **DeyeCloud OpenAPI** (`developer.deyecloud.com`).
 

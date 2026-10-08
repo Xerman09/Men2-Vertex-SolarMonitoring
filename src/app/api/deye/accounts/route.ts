@@ -51,8 +51,24 @@ export const GET = withGate(
 
       // Consumer role is strictly scoped to their assigned account metadata
       if (session.role === 'consumer') {
+        const cleanSessionId = session.accountId?.startsWith('station-')
+          ? session.accountId.replace('station-', '')
+          : session.accountId;
+
         const consumerAccounts = session.accountId
-          ? accounts.filter((a) => a.id === session.accountId)
+          ? accounts.filter((a) => {
+              return (
+                a.id === session.accountId ||
+                a.directusId === session.accountId ||
+                (cleanSessionId && (a.directusId === cleanSessionId || a.id === cleanSessionId)) ||
+                (session.email && a.email?.toLowerCase() === session.email.toLowerCase()) ||
+                a.plants?.some(
+                  (p) =>
+                    String(p.stationId) === cleanSessionId ||
+                    `station-${p.stationId}` === session.accountId
+                )
+              );
+            })
           : [];
         return NextResponse.json({
           total: consumerAccounts.length,

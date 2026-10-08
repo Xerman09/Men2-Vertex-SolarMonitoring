@@ -75,4 +75,51 @@ describe('ClientRegistry Unit Suite', () => {
     expect(registry.size).toBe(0);
     expect(registry.getAllClients()).toEqual([]);
   });
+
+  it('resolves clients by alias: directusId, email, or plant stationId', () => {
+    const registry = new ClientRegistry();
+    const configsWithPlants: DeyeAccountConfig[] = [
+      {
+        id: 'men2-facility-1',
+        directusId: '1',
+        name: 'Hanvin Solar',
+        email: 'hanvinsolar@gmail.com',
+        baseUrl: 'https://eu1-developer.deyecloud.com',
+        appId: 'app-001',
+        appSecret: 'secret-001',
+        password: 'password123',
+        enabled: true,
+        plants: [
+          {
+            stationId: '61825217',
+            stationName: 'Men 2 office',
+            installedCapacityKw: 100,
+            devices: [],
+          },
+          {
+            stationId: '62112170',
+            stationName: 'La Salette School',
+            installedCapacityKw: 100,
+            devices: [],
+          },
+        ],
+      },
+    ];
+
+    registry.syncClients(configsWithPlants);
+
+    // Resolves by direct ID
+    expect(registry.getClient('men2-facility-1')?.accountId).toBe('men2-facility-1');
+
+    // Resolves by directusId
+    expect(registry.getClient('1')?.accountId).toBe('men2-facility-1');
+
+    // Resolves by email
+    expect(registry.getClient('hanvinsolar@gmail.com')?.accountId).toBe('men2-facility-1');
+
+    // Resolves by plant stationId
+    expect(registry.getClient('61825217')?.accountId).toBe('men2-facility-1');
+    expect(registry.getClient('station-61825217')?.accountId).toBe('men2-facility-1');
+    expect(registry.getClient('62112170')?.accountId).toBe('men2-facility-1');
+  });
 });

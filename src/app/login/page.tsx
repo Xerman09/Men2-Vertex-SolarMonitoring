@@ -68,7 +68,7 @@ export default function LoginPage() {
               </div>
               <div>
                 <h1 className="text-xl font-bold font-headline tracking-tight text-foreground">
-                  Deye Solar
+                  VOSolar
                 </h1>
                 <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
                   Telemetry Operations

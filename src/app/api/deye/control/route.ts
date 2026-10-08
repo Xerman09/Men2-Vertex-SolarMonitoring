@@ -75,10 +75,20 @@ export const POST = withGate(
         );
       }
       if (accountId && session.accountId !== accountId) {
-        return NextResponse.json(
-          { error: 'Forbidden: You do not have permission to control hardware for this account' },
-          { status: 403 }
-        );
+        const cleanSessionId = session.accountId.startsWith('station-')
+          ? session.accountId.replace('station-', '')
+          : session.accountId;
+        const isMatch =
+          accountId === cleanSessionId ||
+          session.accountId === `station-${accountId}` ||
+          accountId === `station-${session.accountId}`;
+
+        if (!isMatch) {
+          return NextResponse.json(
+            { error: 'Forbidden: You do not have permission to control hardware for this account' },
+            { status: 403 }
+          );
+        }
       }
       targetAccountId = session.accountId;
     }

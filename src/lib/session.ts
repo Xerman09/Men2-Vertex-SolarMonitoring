@@ -161,6 +161,15 @@ export function enforceTenantAccess(
       };
     }
     if (requestedAccountId && requestedAccountId !== session.accountId) {
+      if (requestedAccountId === 'ALL' || requestedAccountId === 'ALL_FLEET') {
+        return { allowed: true, targetAccountId: session.accountId };
+      }
+      if (
+        session.accountId === `station-${requestedAccountId}` ||
+        requestedAccountId === `station-${session.accountId}`
+      ) {
+        return { allowed: true, targetAccountId: session.accountId };
+      }
       return {
         allowed: false,
         status: 403,
