@@ -373,3 +373,12 @@
   stroke-dasharray: 6 6;
   animation: flowDash 1.4s linear infinite;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-flow-pv,
+  .animate-flow-battery-charge,
+  .animate-flow-grid,
+  .animate-flow-load {
+    animation: none !important;
+  }
+}

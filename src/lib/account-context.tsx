@@ -43,6 +43,13 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [fetchingStage, setFetchingStage] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [directusStatus, setDirectusStatus] = useState<{ connected: boolean; lastChecked: string; error?: string } | undefined>(undefined);
+  const fetchingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (fetchingTimeoutRef.current) clearTimeout(fetchingTimeoutRef.current);
+    };
+  }, []);
 
   const setFetchingDeye = useCallback((fetching: boolean, stage: string | null = null) => {
     setIsFetchingDeye(fetching);
@@ -73,7 +80,8 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
       if (showIndicator || forceSync) {
-        setTimeout(() => {
+        if (fetchingTimeoutRef.current) clearTimeout(fetchingTimeoutRef.current);
+        fetchingTimeoutRef.current = setTimeout(() => {
           setIsFetchingDeye(false);
           setFetchingStage(null);
         }, 800);

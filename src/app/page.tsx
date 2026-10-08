@@ -61,6 +61,14 @@ export default function EnergyFlowDashboard() {
   const [isLive, setIsLive] = useState(false);
   const [loading, setLoading] = useState(true);
   const inFlightRef = useRef(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
   const [forceCharge, setForceCharge] = useState(false);
   const [exportLimiter, setExportLimiter] = useState(false);
   const [manualPolling, setManualPolling] = useState(false);
@@ -209,7 +217,8 @@ export default function EnergyFlowDashboard() {
     setManualPolling(true);
     setFetchingDeye(true, isFleetView ? 'Polling DeyeCloud Fleet Telemetry...' : 'Polling Station Telemetry...');
     await fetchTelemetry();
-    setTimeout(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
       setManualPolling(false);
       setFetchingDeye(false, null);
     }, 800);

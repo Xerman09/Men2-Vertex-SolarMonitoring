@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldCheck,
   Radio,
@@ -33,6 +33,13 @@ export default function ApiDiagnosticsPage() {
   const [currentLang, setCurrentLang] = useState<'curl' | 'python' | 'node'>('curl');
   const [currentPreset, setCurrentPreset] = useState<'telemetry' | 'station' | 'workmode'>('telemetry');
   const [copied, setCopied] = useState(false);
+  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
 
   // Playground Execution State
   const [executing, setExecuting] = useState(false);
@@ -79,7 +86,8 @@ export default function ApiDiagnosticsPage() {
     const code = snippets[currentLang][currentPreset];
     navigator.clipboard.writeText(code);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   const executePlayground = async () => {

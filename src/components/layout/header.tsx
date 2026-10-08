@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { usePolling } from '@/lib/usePolling';
 import {
   Sun,
   ChevronDown,
@@ -684,15 +685,19 @@ export function Header({
 function UtcClock() {
   const [utcTime, setUtcTime] = useState('');
 
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setUtcTime(now.toUTCString().slice(17, 25) + ' UTC');
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
+  const updateTime = useCallback(() => {
+    const now = new Date();
+    setUtcTime(now.toUTCString().slice(17, 25) + ' UTC');
   }, []);
+
+  useEffect(() => {
+    updateTime();
+  }, [updateTime]);
+
+  usePolling(updateTime, {
+    intervalMs: 1000,
+    pauseOnHidden: true,
+  });
 
   return (
     <div className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/40 border border-border/50 text-[11px] font-mono text-muted-foreground shrink-0">

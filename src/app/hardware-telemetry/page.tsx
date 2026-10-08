@@ -48,6 +48,13 @@ export default function HardwareTelemetryPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedInverterSn, setSelectedInverterSn] = useState<string>('');
   const inFlightRef = React.useRef(false);
+  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   // Collect inverters from selected account or plant
   const availableInverters = React.useMemo(() => {
@@ -118,7 +125,8 @@ export default function HardwareTelemetryPage() {
     setRefreshing(true);
     setFetchingDeye(true, 'Fetching DeyeCloud Inverter Modbus Telemetry...');
     await fetchTelemetry();
-    setTimeout(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
       setRefreshing(false);
       setFetchingDeye(false, null);
     }, 800);
