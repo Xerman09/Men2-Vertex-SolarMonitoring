@@ -1,6 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { createLogger } from './logger';
+
+const log = createLogger('RoleProvider');
 
 export type UserRole = 'admin' | 'consumer' | 'viewer';
 
@@ -85,12 +88,12 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
             try {
               setUser(JSON.parse(savedUser));
             } catch (parseErr) {
-              console.warn('[RoleProvider] Failed parsing cached user from localStorage:', parseErr);
+              log.warn('Failed parsing cached user from localStorage', undefined, parseErr);
             }
           }
         }
       } catch (err) {
-        console.warn('[RoleProvider] Offline session check fallback:', err);
+        log.warn('Offline session check fallback', undefined, err);
       } finally {
         if (mounted) {
           setIsInitialized(true);

@@ -237,7 +237,7 @@ export function Sidebar() {
           </div>
         ) : (
           <div className="p-3 flex flex-col items-center gap-2 pb-4">
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 motion-safe:animate-ping" />
           </div>
         )}
       </aside>

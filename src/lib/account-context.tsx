@@ -3,6 +3,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AccountSummary, PlantInfo } from './types';
 import { useRole } from './role-context';
+import { createLogger } from './logger';
+
+const log = createLogger('AccountContext');
 
 interface AccountContextType {
   accounts: AccountSummary[];
@@ -66,7 +69,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         setLastSyncedAt(new Date());
       }
     } catch (e) {
-      console.error('[AccountContext] Failed to load accounts:', e);
+      log.error('Failed to load accounts', e);
     } finally {
       setLoading(false);
       if (showIndicator || forceSync) {

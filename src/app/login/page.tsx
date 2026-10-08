@@ -44,8 +44,9 @@ export default function LoginPage() {
       } else {
         setError(res.error || 'Invalid username/email or password.');
       }
-    } catch (err: any) {
-      setError(err?.message || 'Authentication failed. Please check your connection.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Authentication failed. Please check your connection.';
+      setError(message);
     } finally {
       setLoading(false);
     }

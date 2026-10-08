@@ -22,6 +22,9 @@ import { useRole } from '@/lib/role-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('ApiDiagnostics');
 
 export default function ApiDiagnosticsPage() {
   const { selectedAccountId, selectedAccount, isFleetView, totalAccounts } = useAccount();
@@ -47,7 +50,7 @@ export default function ApiDiagnosticsPage() {
     fetch(`/api/deye/health${query}`)
       .then((r) => r.json())
       .then((data) => setHealth(data))
-      .catch((e) => console.error(e));
+      .catch((e) => log.error('Health fetch failed', e));
   };
 
   useEffect(() => {
@@ -388,7 +391,9 @@ export default function ApiDiagnosticsPage() {
               </label>
               <select
                 value={selectedMode}
-                onChange={(e: any) => setSelectedMode(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setSelectedMode(e.target.value as typeof selectedMode)
+                }
                 className="w-full px-3.5 py-2 rounded-xl bg-muted/40 border border-border/60 text-foreground text-xs focus:outline-none focus:border-primary cursor-pointer font-sans"
               >
                 <option value="PEAK_SHAVING">PEAK_SHAVING (Optimizes TOU Arbitrage)</option>

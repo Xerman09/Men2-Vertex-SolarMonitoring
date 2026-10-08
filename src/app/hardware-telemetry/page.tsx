@@ -27,6 +27,9 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
 import { usePolling } from '@/lib/usePolling';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('HardwareTelemetry');
 
 export default function HardwareTelemetryPage() {
   const {
@@ -92,7 +95,7 @@ export default function HardwareTelemetryPage() {
           }
         }
       } catch (e: unknown) {
-        console.error('[HardwareTelemetry] Telemetry fetch error:', e);
+        log.error('Telemetry fetch error', e);
       } finally {
         inFlightRef.current = false;
         setLoading(false);

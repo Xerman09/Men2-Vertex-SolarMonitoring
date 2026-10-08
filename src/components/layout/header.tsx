@@ -414,7 +414,7 @@ export function Header({
               <span className="font-semibold truncate max-w-[90px] sm:max-w-[130px] md:max-w-[170px]">
                 {fetchingStage || 'Syncing Deye...'}
               </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping shrink-0 hidden md:inline-block" />
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 motion-safe:animate-ping shrink-0 hidden md:inline-block" />
             </div>
           ) : lastSyncedAt && Date.now() - lastSyncedAt.getTime() < 4000 ? (
             <div className="hidden md:flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-mono text-emerald-400 animate-in fade-in duration-300 shrink-0">
@@ -447,7 +447,7 @@ export function Header({
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
                 isFetchingDeye || syncing
-                  ? 'bg-cyan-400 animate-ping'
+                  ? 'bg-cyan-400 motion-safe:animate-ping'
                   : isLiveApi || liveAccountsCount > 0
                   ? 'bg-emerald-500 motion-safe:animate-pulse'
                   : 'bg-amber-500'

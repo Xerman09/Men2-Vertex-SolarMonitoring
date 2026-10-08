@@ -9,7 +9,7 @@ import {
   extractSessionToken,
   ACCOUNT_ID_REGEX,
 } from '../session';
-import { checkRateLimit } from '../rate-limit';
+import { checkRateLimit, ONE_MINUTE_MS } from '../rate-limit';
 import { accountManager } from '../account-manager';
 import { z } from 'zod';
 
@@ -191,12 +191,12 @@ describe('Rate Limiter Contract & 429 Retry-After Headers', () => {
     const key = 'test-mutation-ip-user-123';
     // Consume 5 allowed requests
     for (let i = 0; i < 5; i++) {
-      const res = checkRateLimit(key, 5, 60 * 1000);
+      const res = checkRateLimit(key, 5, ONE_MINUTE_MS);
       expect(res.success).toBe(true);
     }
 
     // 6th request triggers rate limit block
-    const blocked = checkRateLimit(key, 5, 60 * 1000);
+    const blocked = checkRateLimit(key, 5, ONE_MINUTE_MS);
     expect(blocked.success).toBe(false);
     expect(blocked.remaining).toBe(0);
 

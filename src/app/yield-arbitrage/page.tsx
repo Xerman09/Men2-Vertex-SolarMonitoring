@@ -35,6 +35,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('YieldArbitrage');
 
 export default function YieldArbitragePage() {
   const { isAdmin } = useRole();
@@ -48,7 +51,7 @@ export default function YieldArbitragePage() {
       .then((json) => {
         if (json.data) setHourlyData(json.data);
       })
-      .catch((err) => console.error(err));
+      .catch((err) => log.error('Failed to load history', err));
   }, []);
 
   const historyRows = [

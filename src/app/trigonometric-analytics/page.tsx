@@ -18,6 +18,9 @@ import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricH
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
 import { Button } from '@/components/ui/button';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('TrigonometricAnalytics');
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { HourlySolarPoint } from '@/lib/trigonometric-math';
@@ -65,7 +68,7 @@ export default function TrigonometricAnalyticsPage() {
         }
       }
     } catch (e) {
-      console.error('Failed to load history for trigonometric analysis:', e);
+      log.error('Failed to load history for trigonometric analysis', e);
     } finally {
       setLoading(false);
       setRefreshing(false);

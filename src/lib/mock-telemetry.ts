@@ -1,4 +1,5 @@
 import { StationSummary, InverterTelemetry, HourlyEnergyPoint, ApiHealthMetrics } from './types';
+import { ONE_MINUTE_MS } from './rate-limit';
 
 // Deterministic subtle fluctuation helper
 function jitter(base: number, percent: number = 0.03): number {
@@ -73,7 +74,7 @@ export function getMockInverterTelemetry(): InverterTelemetry {
         severity: 'WARNING',
         title: 'Utility Grid Voltage Fluctuation',
         description: 'Phase L3 momentarily spiked to 244V; automatically clamped within nominal IEEE 1547 tolerances.',
-        timestamp: new Date(Date.now() - 42 * 60 * 1000).toISOString(),
+        timestamp: new Date(Date.now() - 42 * ONE_MINUTE_MS).toISOString(),
         resolved: false,
       },
       {
@@ -82,7 +83,7 @@ export function getMockInverterTelemetry(): InverterTelemetry {
         severity: 'INFO',
         title: 'Peak Tariff Window Triggered',
         description: 'Shifted to battery discharge mode to shave peak grid tariff from $0.34/kWh down to self-generation.',
-        timestamp: new Date(Date.now() - 118 * 60 * 1000).toISOString(),
+        timestamp: new Date(Date.now() - 118 * ONE_MINUTE_MS).toISOString(),
         resolved: true,
       },
     ],

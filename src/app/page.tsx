@@ -35,6 +35,9 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
 import { usePolling } from '@/lib/usePolling';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('Dashboard');
 
 export default function EnergyFlowDashboard() {
   const {
@@ -185,7 +188,7 @@ export default function EnergyFlowDashboard() {
         }
       }
     } catch (e) {
-      console.error('Error fetching telemetry:', e);
+      log.error('Error fetching telemetry', e);
     } finally {
       inFlightRef.current = false;
       setLoading(false);

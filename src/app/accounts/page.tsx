@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React from 'react';
 import {
   Building2,
   Plus,
@@ -25,350 +25,55 @@ import {
   Lock,
   User,
 } from 'lucide-react';
-import { AccountSummary, PlantInfo, DeviceInfo } from '@/lib/types';
-import { useAccount } from '@/lib/account-context';
+import { AccountSummary, PlantInfo } from '@/lib/types';
 import { useRole } from '@/lib/role-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useStationAccounts } from './useStationAccounts';
 
 export default function AccountsManagementPage() {
+  const { isAdmin, isConsumer, isViewer, user, setShowAuthModal } = useRole();
   const {
-    accounts: contextAccounts,
-    directusStatus,
-    refreshAccounts: refreshContextAccounts,
+    displayAccounts,
+    directusInfo,
+    loading,
+    syncingId,
     isFetchingDeye,
     fetchingStage,
-    setFetchingDeye,
-  } = useAccount();
-  const { isAdmin, isConsumer, isViewer, user, setShowAuthModal } = useRole();
-  const [accounts, setAccounts] = useState<AccountSummary[]>(contextAccounts || []);
-  const [directusInfo, setDirectusInfo] = useState<{ connected: boolean; lastChecked: string; error?: string } | null>(
-    directusStatus || null
-  );
-  const [loading, setLoading] = useState(contextAccounts.length === 0);
-  const [syncingId, setSyncingId] = useState<string | null>(null);
+    collapsedPlants,
+    togglePlantCollapse,
+    toggleAllPlantsForAccount,
+    fetchAccounts,
+    handleSyncAccount,
+    handleToggleAccount,
+    handleDeleteAccount,
+    showAddAccountModal,
+    setShowAddAccountModal,
+    addForm,
+    setAddForm,
+    adding,
+    addMessage,
+    handleAddAccountSubmit,
+    showAddPlantModal,
+    setShowAddPlantModal,
+    selectedAccountIdForPlant,
+    setSelectedAccountIdForPlant,
+    plantForm,
+    setPlantForm,
+    savingPlant,
+    handleAddPlantSubmit,
+    metrics,
+  } = useStationAccounts();
 
-  const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
-  const safeTimeout = useCallback((fn: () => void, ms: number) => {
-    const id = setTimeout(fn, ms);
-    timeoutsRef.current.push(id);
-    return id;
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      timeoutsRef.current.forEach(clearTimeout);
-    };
-  }, []);
-
-  // Collapsed state for registered plants (plant stationId -> boolean)
-  const [collapsedPlants, setCollapsedPlants] = useState<Record<string, boolean>>({});
-
-  const togglePlantCollapse = (stationId: string) => {
-    setCollapsedPlants((prev) => ({
-      ...prev,
-      [stationId]: !prev[stationId],
-    }));
-  };
-
-  const toggleAllPlantsForAccount = (accountPlants: PlantInfo[]) => {
-    const allCollapsed = accountPlants.every((p) => Boolean(collapsedPlants[p.stationId]));
-    setCollapsedPlants((prev) => {
-      const next = { ...prev };
-      accountPlants.forEach((p) => {
-        next[p.stationId] = !allCollapsed;
-      });
-      return next;
-    });
-  };
-
-  useEffect(() => {
-    if (contextAccounts.length > 0) {
-      setAccounts(contextAccounts);
-      setLoading(false);
-    }
-    if (directusStatus) {
-      setDirectusInfo(directusStatus);
-    }
-  }, [contextAccounts, directusStatus]);
-
-  // Add Account Modal State
-  const [showAddAccountModal, setShowAddAccountModal] = useState(false);
-  const [addForm, setAddForm] = useState({
-    name: '',
-    baseUrl: 'https://eu1-developer.deyecloud.com',
-    appId: '',
-    appSecret: '',
-    email: '',
-    password: '',
-  });
-  const [adding, setAdding] = useState(false);
-  const [addMessage, setAddMessage] = useState<{ text: string; isError: boolean } | null>(null);
-
-  // Add Plant Modal State
-  const [showAddPlantModal, setShowAddPlantModal] = useState(false);
-  const [selectedAccountIdForPlant, setSelectedAccountIdForPlant] = useState('');
-  const [plantForm, setPlantForm] = useState({
-    stationId: '',
-    stationName: '',
-    installedCapacityKw: 120,
-    address: '',
-    inverterSn1: '',
-    inverterModel1: 'SUN-120K-SG01HP3-EU-AM2',
-    inverterKw1: 120,
-    inverterSn2: '',
-    inverterModel2: 'SUN-120K-SG01HP3-EU-AM2',
-    inverterKw2: 120,
-    loggerSn: '',
-  });
-  const [savingPlant, setSavingPlant] = useState(false);
-
-  const fetchAccounts = async (isManualSync = false) => {
-    if (isManualSync) {
-      setFetchingDeye(true, 'Syncing DeyeCloud Accounts & Plants...');
-    }
-    try {
-      const res = await fetch(isManualSync ? '/api/deye/accounts?sync=true' : '/api/deye/accounts');
-      if (res.ok) {
-        const json = await res.json();
-        setAccounts(json.accounts || []);
-        if (json.directus) {
-          setDirectusInfo(json.directus);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load accounts:', e);
-    } finally {
-      setLoading(false);
-      if (isManualSync) {
-        safeTimeout(() => {
-          setFetchingDeye(false, null);
-        }, 600);
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (contextAccounts.length === 0) {
-      fetchAccounts(false);
-    }
-  }, [contextAccounts.length]);
-
-  const handleSyncAccount = async (accountId: string) => {
-    setSyncingId(accountId);
-    setFetchingDeye(true, 'Syncing Account & Auto-Discovering Deye Plants...');
-    try {
-      const res = await fetch('/api/deye/accounts/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId }),
-      });
-      if (res.ok) {
-        await fetchAccounts(true);
-        await refreshContextAccounts(true);
-      }
-    } catch (e) {
-      console.error('Sync error:', e);
-    } finally {
-      setSyncingId(null);
-      safeTimeout(() => {
-        setFetchingDeye(false, null);
-      }, 600);
-    }
-  };
-
-  const handleToggleAccount = async (account: AccountSummary) => {
-    try {
-      const newEnabled = account.status === 'OFFLINE';
-      const res = await fetch('/api/deye/accounts', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: account.id, enabled: newEnabled }),
-      });
-      if (res.ok) {
-        await fetchAccounts();
-        await refreshContextAccounts();
-      }
-    } catch (e) {
-      console.error('Toggle error:', e);
-    }
-  };
-
-  const handleDeleteAccount = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete the account "${name}" and all its registered plants?`)) {
-      return;
-    }
-    try {
-      const res = await fetch(`/api/deye/accounts?id=${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        await fetchAccounts();
-        await refreshContextAccounts();
-      }
-    } catch (e) {
-      console.error('Delete error:', e);
-    }
-  };
-
-  const handleAddAccountSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAdding(true);
-    setAddMessage(null);
-
-    try {
-      const res = await fetch('/api/deye/accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(addForm),
-      });
-
-      const json = await res.json();
-      if (!res.ok) {
-        setAddMessage({ text: json.error || 'Failed to add account', isError: true });
-        setAdding(false);
-        return;
-      }
-
-      setAddMessage({
-        text: `Successfully added account! Auto-discovered ${json.plantsDiscovered} plant(s) and ${json.devicesDiscovered} device(s).`,
-        isError: false,
-      });
-
-      await fetchAccounts();
-      await refreshContextAccounts();
-      safeTimeout(() => {
-        setShowAddAccountModal(false);
-        setAddForm({
-          name: '',
-          baseUrl: 'https://eu1-developer.deyecloud.com',
-          appId: '',
-          appSecret: '',
-          email: '',
-          password: '',
-        });
-        setAddMessage(null);
-      }, 1500);
-    } catch (err) {
-      setAddMessage({ text: String(err), isError: true });
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  const handleAddPlantSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingPlant(true);
-
-    const devices: DeviceInfo[] = [];
-    if (plantForm.inverterSn1) {
-      devices.push({
-        deviceSn: plantForm.inverterSn1.trim(),
-        deviceType: 'INVERTER',
-        name: `${plantForm.stationName} Inverter #1`,
-        model: plantForm.inverterModel1,
-        ratedKw: Number(plantForm.inverterKw1) || 120,
-        loggerSn: plantForm.loggerSn || undefined,
-        status: 'ONLINE',
-      });
-    }
-    if (plantForm.inverterSn2) {
-      devices.push({
-        deviceSn: plantForm.inverterSn2.trim(),
-        deviceType: 'INVERTER',
-        name: `${plantForm.stationName} Inverter #2`,
-        model: plantForm.inverterModel2,
-        ratedKw: Number(plantForm.inverterKw2) || 120,
-        loggerSn: plantForm.loggerSn || undefined,
-        status: 'ONLINE',
-      });
-    }
-    if (plantForm.loggerSn) {
-      devices.push({
-        deviceSn: plantForm.loggerSn.trim(),
-        deviceType: 'LOGGER',
-        name: `${plantForm.stationName} Data Logger`,
-        model: 'Deye Smart Data Logger',
-        status: 'ONLINE',
-      });
-    }
-
-    const newPlant: PlantInfo = {
-      stationId: plantForm.stationId.trim(),
-      stationName: plantForm.stationName.trim(),
-      installedCapacityKw: Number(plantForm.installedCapacityKw) || 120,
-      address: plantForm.address || 'Facility Site',
-      devices,
-    };
-
-    try {
-      const res = await fetch('/api/deye/plants', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountId: selectedAccountIdForPlant,
-          plant: newPlant,
-        }),
-      });
-
-      if (res.ok) {
-        setShowAddPlantModal(false);
-        await fetchAccounts();
-        await refreshContextAccounts();
-        setPlantForm({
-          stationId: '',
-          stationName: '',
-          installedCapacityKw: 120,
-          address: '',
-          inverterSn1: '',
-          inverterModel1: 'SUN-120K-SG01HP3-EU-AM2',
-          inverterKw1: 120,
-          inverterSn2: '',
-          inverterModel2: 'SUN-120K-SG01HP3-EU-AM2',
-          inverterKw2: 120,
-          loggerSn: '',
-        });
-      }
-    } catch (err) {
-      console.error('Error adding plant:', err);
-    } finally {
-      setSavingPlant(false);
-    }
-  };
-
-  const displayAccounts = useMemo(() => {
-    if (isConsumer && user) {
-      const userAccId = String(user.accountId || user.id || '').trim();
-      const userEmail = (user.email || '').trim().toLowerCase();
-
-      return accounts.filter((acc) => {
-        const accId = String(acc.id || '');
-        const accDirectusId = acc.directusId ? String(acc.directusId) : '';
-        const accEmail = (acc.email || '').trim().toLowerCase();
-
-        return (
-          (userAccId && (accDirectusId === userAccId || accId === userAccId || accId === `directus-${userAccId}`)) ||
-          (userEmail && accEmail === userEmail)
-        );
-      });
-    }
-    return accounts;
-  }, [accounts, isConsumer, user]);
-
-  const totalAccountsCount = displayAccounts.length;
-  const activeAccountsCount = displayAccounts.filter((a) => a.status !== 'OFFLINE').length;
-  let totalPlants = 0;
-  let totalInverters = 0;
-  let totalLoggers = 0;
-  let totalCapacity = 0;
-
-  for (const acc of displayAccounts) {
-    totalPlants += acc.plants.length;
-    totalInverters += acc.inverterCount;
-    totalLoggers += acc.loggerCount;
-    totalCapacity += acc.capacityKw;
-  }
+  const {
+    totalAccountsCount,
+    activeAccountsCount,
+    totalPlants,
+    totalInverters,
+    totalLoggers,
+    totalCapacity,
+  } = metrics;
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-16">

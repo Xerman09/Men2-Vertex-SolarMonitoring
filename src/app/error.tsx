@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('DSMErrorBoundary');
 
 export default function ErrorBoundary({
   error,
@@ -10,7 +13,7 @@ export default function ErrorBoundary({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('[DSM Error Boundary caught exception]:', error);
+    log.error('DSM Error Boundary caught exception', error);
   }, [error]);
 
   return (

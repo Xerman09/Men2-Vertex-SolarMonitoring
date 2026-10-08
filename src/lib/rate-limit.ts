@@ -5,6 +5,10 @@ interface RateLimitRecord {
 
 const rateLimitStore = new Map<string, RateLimitRecord>();
 
+export const ONE_MINUTE_MS = 60 * 1000;
+export const FIVE_MINUTES_MS = 5 * ONE_MINUTE_MS;
+export const ONE_HOUR_MS = 60 * ONE_MINUTE_MS;
+
 // Clean up expired records every 5 minutes without holding event loop open
 if (typeof setInterval !== 'undefined') {
   const timer = setInterval(() => {
@@ -14,31 +18,31 @@ if (typeof setInterval !== 'undefined') {
         rateLimitStore.delete(key);
       }
     }
-  }, 5 * 60 * 1000);
+  }, FIVE_MINUTES_MS);
   timer.unref?.();
 }
 
 export const RATE_LIMIT_WINDOW_S = 60;
 
 export const RATE_LIMIT_CONFIGS = {
-  CONTROL: { maxRequests: 5, windowMs: 60 * 1000 },
-  ACCOUNT_MUTATION: { maxRequests: 20, windowMs: 60 * 1000 },
-  SYNC_ACCOUNT: { maxRequests: 20, windowMs: 60 * 1000 },
-  AUTH_LOGIN: { maxRequests: 10, windowMs: 60 * 1000 },
-  READ_HISTORY: { maxRequests: 30, windowMs: 60 * 1000 },
-  READ_ACCOUNTS: { maxRequests: 30, windowMs: 60 * 1000 },
-  READ_STATIONS: { maxRequests: 60, windowMs: 60 * 1000 },
-  READ_PLANTS: { maxRequests: 60, windowMs: 60 * 1000 },
-  READ_AGGREGATE: { maxRequests: 60, windowMs: 60 * 1000 },
-  READ_HEALTH: { maxRequests: 60, windowMs: 60 * 1000 },
-  READ_TELEMETRY: { maxRequests: 60, windowMs: 60 * 1000 },
+  CONTROL: { maxRequests: 5, windowMs: ONE_MINUTE_MS },
+  ACCOUNT_MUTATION: { maxRequests: 20, windowMs: ONE_MINUTE_MS },
+  SYNC_ACCOUNT: { maxRequests: 20, windowMs: ONE_MINUTE_MS },
+  AUTH_LOGIN: { maxRequests: 10, windowMs: ONE_MINUTE_MS },
+  READ_HISTORY: { maxRequests: 30, windowMs: ONE_MINUTE_MS },
+  READ_ACCOUNTS: { maxRequests: 30, windowMs: ONE_MINUTE_MS },
+  READ_STATIONS: { maxRequests: 60, windowMs: ONE_MINUTE_MS },
+  READ_PLANTS: { maxRequests: 60, windowMs: ONE_MINUTE_MS },
+  READ_AGGREGATE: { maxRequests: 60, windowMs: ONE_MINUTE_MS },
+  READ_HEALTH: { maxRequests: 60, windowMs: ONE_MINUTE_MS },
+  READ_TELEMETRY: { maxRequests: 60, windowMs: ONE_MINUTE_MS },
 } as const;
 
 export const POLL_INTERVALS = {
   FAST_TELEMETRY_MS: 5000,
   NORMAL_TELEMETRY_MS: 15000,
   HEALTH_CHECK_MS: 30000,
-  HOURLY_REFRESH_MS: 60 * 60 * 1000,
+  HOURLY_REFRESH_MS: ONE_HOUR_MS,
 } as const;
 
 /**
@@ -63,7 +67,7 @@ export function _resetRateLimitStoreForTesting(): void {
 export function checkRateLimit(
   key: string,
   maxRequests: number = 5,
-  windowMs: number = 60 * 1000
+  windowMs: number = ONE_MINUTE_MS
 ): { success: boolean; remaining: number; resetAt: number } {
   const now = Date.now();
   const record = rateLimitStore.get(key);

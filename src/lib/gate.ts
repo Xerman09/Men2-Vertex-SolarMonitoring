@@ -6,7 +6,7 @@ import {
   SessionData,
   requireAuthenticatedSession,
 } from './session';
-import { checkRateLimit, RATE_LIMIT_CONFIGS, RATE_LIMIT_WINDOW_S } from './rate-limit';
+import { checkRateLimit, RATE_LIMIT_CONFIGS, RATE_LIMIT_WINDOW_S, ONE_MINUTE_MS } from './rate-limit';
 
 export { RATE_LIMIT_WINDOW_S };
 
@@ -144,7 +144,7 @@ export function withGate<TArgs extends unknown[] = unknown[]>(
   options: GateOptions,
   handler: (
     req: Request,
-    ctx: GateContext<any>,
+    ctx: GateContext<SessionData>,
     ...args: TArgs
   ) => Promise<Response> | Response
 ): (req: Request, ...args: TArgs) => Promise<Response> {
@@ -153,7 +153,7 @@ export function withGate<TArgs extends unknown[] = unknown[]>(
 
     // 1. IP Rate Limiting
     if (options.rateLimit) {
-      const { keyPrefix, maxRequests, windowMs = 60 * 1000 } = options.rateLimit;
+      const { keyPrefix, maxRequests, windowMs = ONE_MINUTE_MS } = options.rateLimit;
       const rate = checkRateLimit(`${keyPrefix}_${clientIp}`, maxRequests, windowMs);
       if (!rate.success) {
         return standard429(maxRequests, rate.resetAt);
@@ -182,6 +182,7 @@ export function withGate<TArgs extends unknown[] = unknown[]>(
       return handler(req, { session, clientIp }, ...args);
     }
 
-    return handler(req, { session, clientIp }, ...args);
+    type UnauthHandler = (req: Request, ctx: GateContext<SessionData | null>, ...args: TArgs) => Promise<Response> | Response;
+    return (handler as unknown as UnauthHandler)(req, { session, clientIp }, ...args);
   };
 }
