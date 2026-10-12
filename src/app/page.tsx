@@ -27,6 +27,8 @@ import {
   TrendingUp,
   CheckCircle2,
   ShieldAlert,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { StationSummary, AggregatedFleetSummary, FleetMatrixNode } from '@/lib/types';
 import { useAccount } from '@/lib/account-context';
@@ -303,6 +305,7 @@ export default function EnergyFlowDashboard() {
   }, [nodes]);
 
   const [collapsedPlantKeys, setCollapsedPlantKeys] = useState<Record<string, boolean>>({});
+  const [inverterViewMode, setInverterViewMode] = useState<'table' | 'cards'>('table');
 
   const togglePlantGroup = (key: string) => {
     setCollapsedPlantKeys((prev) => ({
@@ -640,9 +643,6 @@ export default function EnergyFlowDashboard() {
           >
             <Zap className="h-4 w-4 text-amber-500" />
             <span>Real-time Synoptic Power Flow</span>
-            <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-mono bg-amber-500/10 text-amber-500 border-amber-500/20">
-              Animated
-            </Badge>
           </TabsTrigger>
 
           <TabsTrigger
@@ -651,9 +651,6 @@ export default function EnergyFlowDashboard() {
           >
             <Waves className="h-4 w-4 text-cyan-500" />
             <span>Trigonometric & Harmonic Analytics</span>
-            <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-mono bg-cyan-500/10 text-cyan-500 border-cyan-500/20">
-              Fourier / R²
-            </Badge>
           </TabsTrigger>
         </TabsList>
 
@@ -860,144 +857,6 @@ export default function EnergyFlowDashboard() {
                 </span>
               </div>
             </div>
-
-            {/* Plant Station Flow Breakdown & Inverter Groups */}
-            <div className="mt-6 pt-5 border-t border-border/60 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Building2 size={16} className="text-primary" />
-                  <h3 className="text-xs sm:text-sm font-bold text-foreground">
-                    Plant Stations & Inverter Flow Breakdown
-                  </h3>
-                  <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary bg-primary/10">
-                    {plantGroups.length} Plant Group{plantGroups.length > 1 ? 's' : ''} · {nodes.length} Inverters
-                  </Badge>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={collapseAllPlants}
-                    className="text-xs text-muted-foreground hover:text-foreground h-6 px-2 gap-1 font-medium"
-                  >
-                    <ChevronUp size={12} />
-                    <span>Collapse All</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={expandAllPlants}
-                    className="text-xs text-muted-foreground hover:text-foreground h-6 px-2 gap-1 font-medium"
-                  >
-                    <ChevronDown size={12} />
-                    <span>Expand All</span>
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {plantGroups.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-muted-foreground italic bg-muted/20 rounded-xl border border-border/40">
-                    No plant inverters discovered.
-                  </div>
-                ) : (
-                  plantGroups.map((group) => {
-                    const groupKey = `${group.accountId}-${group.stationId || group.stationName}`;
-                    const isCollapsed = Boolean(collapsedPlantKeys[groupKey]);
-
-                    return (
-                      <div
-                        key={`ef-${groupKey}`}
-                        className="rounded-xl border border-border/60 bg-muted/20 overflow-hidden transition-all"
-                      >
-                        {/* Collapsible Plant Header */}
-                        <div
-                          onClick={() => togglePlantGroup(groupKey)}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-muted/40 hover:bg-muted/60 cursor-pointer select-none transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                              {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-                            </div>
-                            <span className="font-bold text-xs sm:text-sm text-foreground">
-                              {group.stationName}
-                            </span>
-                            {group.stationId && (
-                              <Badge variant="outline" className="text-[9px] font-mono px-1 py-0">
-                                ID: {group.stationId}
-                              </Badge>
-                            )}
-                            <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] font-mono">
-                              {group.nodes.length} Inverter{group.nodes.length > 1 ? 's' : ''}
-                            </Badge>
-                          </div>
-
-                          <div className="flex items-center gap-3 text-xs font-mono shrink-0 pl-7 sm:pl-0">
-                            <div>
-                              <span className="text-muted-foreground text-[10.5px]">Harvest: </span>
-                              <span className="font-bold text-amber-500">{group.totalLiveSolarKw.toFixed(1)} kW</span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground text-[10.5px]">Daily: </span>
-                              <span className="font-bold text-foreground">{group.totalDailyYieldKwh.toFixed(1)} kWh</span>
-                            </div>
-                            <div className="flex items-center gap-1 text-emerald-500 text-[11px] font-bold">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
-                              <span>{group.onlineCount}/{group.nodes.length} Online</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Collapsible Inverter Cards Grid */}
-                        {!isCollapsed && (
-                          <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 bg-background/50 border-t border-border/50">
-                            {group.nodes.map((node, nIdx) => (
-                              <div
-                                key={`ef-node-${node.deviceSn}-${nIdx}`}
-                                className="p-2.5 rounded-lg border border-border/50 bg-card/70 hover:border-border transition-all flex flex-col justify-between"
-                              >
-                                <div className="flex items-start justify-between gap-1 mb-1.5">
-                                  <div className="flex items-center gap-1.5">
-                                    <Cpu size={13} className="text-secondary shrink-0" />
-                                    <span className="font-semibold text-xs text-foreground truncate">
-                                      {node.model || 'Deye Inverter'}
-                                    </span>
-                                  </div>
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-500 shrink-0">
-                                    <span className="w-1 h-1 rounded-full bg-emerald-500" />
-                                    {node.isLive ? 'Live' : 'Online'}
-                                  </span>
-                                </div>
-
-                                <div className="font-mono text-[10px] text-muted-foreground mb-2 truncate">
-                                  SN: {node.deviceSn} · {node.ratedKw ? `${node.ratedKw} kW` : '100 kW'}
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/40 font-mono text-xs">
-                                  <div>
-                                    <span className="text-[9.5px] text-muted-foreground block">Live Solar</span>
-                                    <span className="font-bold text-amber-500 text-[11px]">
-                                      {node.liveSolarPowerKw.toFixed(1)} kW
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <span className="text-[9.5px] text-muted-foreground block">Daily Yield</span>
-                                    <span className="font-bold text-foreground text-[11px]">
-                                      {node.dailyYieldKwh ? `${node.dailyYieldKwh.toFixed(1)} kWh` : '--'}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
           </Card>
         </TabsContent>
 
@@ -1024,6 +883,34 @@ export default function EnergyFlowDashboard() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* View Mode Toggle: Table vs Cards */}
+            <div className="flex items-center p-0.5 bg-muted/60 rounded-lg border border-border/60">
+              <button
+                onClick={() => setInverterViewMode('table')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                  inverterViewMode === 'table'
+                    ? 'bg-card text-foreground shadow-xs font-bold border border-border/60'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title="Table data grid view"
+              >
+                <List size={13} />
+                <span className="hidden sm:inline">Table</span>
+              </button>
+              <button
+                onClick={() => setInverterViewMode('cards')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                  inverterViewMode === 'cards'
+                    ? 'bg-card text-foreground shadow-xs font-bold border border-border/60'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title="Cards grid view"
+              >
+                <LayoutGrid size={13} />
+                <span className="hidden sm:inline">Cards</span>
+              </button>
+            </div>
+
             <Button
               variant="outline"
               size="xs"
@@ -1047,193 +934,321 @@ export default function EnergyFlowDashboard() {
             </span>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="data-grid border-0 rounded-none shadow-none">
-              <thead>
-                <tr>
-                  <th>Account / Facility</th>
-                  <th>Plant Station</th>
-                  <th>Inverter Hardware</th>
-                  <th>Connected Logger</th>
-                  <th>Live Harvest</th>
-                  <th>Daily Yield</th>
-                  <th>Battery SOC</th>
-                  <th>Mode</th>
-                  <th className="text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plantGroups.length === 0 ? (
+        <CardContent className={inverterViewMode === 'table' ? "p-0" : "p-4 sm:p-5"}>
+          {inverterViewMode === 'table' ? (
+            <div className="overflow-x-auto">
+              <table className="data-grid border-0 rounded-none shadow-none">
+                <thead>
                   <tr>
-                    <td colSpan={9} className="text-center py-8 text-muted-foreground text-xs italic">
-                      No connected inverters or plant groups discovered.
-                    </td>
+                    <th>Account / Facility</th>
+                    <th>Plant Station</th>
+                    <th>Inverter Hardware</th>
+                    <th>Connected Logger</th>
+                    <th>Live Harvest</th>
+                    <th>Daily Yield</th>
+                    <th>Battery SOC</th>
+                    <th>Mode</th>
+                    <th className="text-right">Status</th>
                   </tr>
-                ) : (
-                  plantGroups.map((group) => {
-                    const groupKey = `${group.accountId}-${group.stationId || group.stationName}`;
-                    const isCollapsed = Boolean(collapsedPlantKeys[groupKey]);
+                </thead>
+                <tbody>
+                  {plantGroups.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="text-center py-8 text-muted-foreground text-xs italic">
+                        No connected inverters or plant groups discovered.
+                      </td>
+                    </tr>
+                  ) : (
+                    plantGroups.map((group) => {
+                      const groupKey = `${group.accountId}-${group.stationId || group.stationName}`;
+                      const isCollapsed = Boolean(collapsedPlantKeys[groupKey]);
 
-                    return (
-                      <React.Fragment key={groupKey}>
-                        {/* Collapsible Plant Group Header Banner */}
-                        <tr
-                          onClick={() => togglePlantGroup(groupKey)}
-                          className="cursor-pointer bg-muted/40 hover:bg-muted/70 border-y border-border/80 transition-colors select-none"
-                        >
-                          <td colSpan={9} className="py-2.5 px-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              {/* Plant Identity & Toggle */}
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-5 h-5 rounded bg-primary/10 flex items-center justify-center text-primary shrink-0 transition-transform">
-                                  {isCollapsed ? (
-                                    <ChevronRight size={14} />
-                                  ) : (
-                                    <ChevronDown size={14} />
+                      return (
+                        <React.Fragment key={groupKey}>
+                          {/* Collapsible Plant Group Header Banner */}
+                          <tr
+                            onClick={() => togglePlantGroup(groupKey)}
+                            className="cursor-pointer bg-muted/40 hover:bg-muted/70 border-y border-border/80 transition-colors select-none"
+                          >
+                            <td colSpan={9} className="py-2.5 px-4">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                {/* Plant Identity & Toggle */}
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-5 h-5 rounded bg-primary/10 flex items-center justify-center text-primary shrink-0 transition-transform">
+                                    {isCollapsed ? (
+                                      <ChevronRight size={14} />
+                                    ) : (
+                                      <ChevronDown size={14} />
+                                    )}
+                                  </div>
+                                  <Building2 size={15} className="text-primary shrink-0" />
+                                  <span className="font-bold text-foreground text-sm tracking-tight">
+                                    {group.stationName}
+                                  </span>
+                                  {group.stationId && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] font-mono px-1.5 py-0 border-border/80"
+                                    >
+                                      ID: {group.stationId}
+                                    </Badge>
                                   )}
-                                </div>
-                                <Building2 size={15} className="text-primary shrink-0" />
-                                <span className="font-bold text-foreground text-sm tracking-tight">
-                                  {group.stationName}
-                                </span>
-                                {group.stationId && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] font-mono px-1.5 py-0 border-border/80"
-                                  >
-                                    ID: {group.stationId}
+                                  {isFleetView && group.accountName && (
+                                    <span className="text-[11px] text-muted-foreground font-mono">
+                                      ({group.accountName})
+                                    </span>
+                                  )}
+                                  <Badge className="bg-primary/15 text-primary border-primary/25 text-[10px] font-mono font-bold">
+                                    {group.nodes.length} Inverter{group.nodes.length > 1 ? 's' : ''}
                                   </Badge>
-                                )}
-                                {isFleetView && group.accountName && (
-                                  <span className="text-[11px] text-muted-foreground font-mono">
-                                    ({group.accountName})
-                                  </span>
-                                )}
-                                <Badge className="bg-primary/15 text-primary border-primary/25 text-[10px] font-mono font-bold">
-                                  {group.nodes.length} Inverter{group.nodes.length > 1 ? 's' : ''}
-                                </Badge>
-                              </div>
+                                </div>
 
-                              {/* Plant Group Rollup Totals */}
-                              <div className="flex items-center gap-3 sm:gap-4 text-xs font-mono shrink-0 pl-7 sm:pl-0">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-muted-foreground text-[11px]">Harvest:</span>
-                                  <span className="font-bold text-amber-500">
-                                    {group.totalLiveSolarKw.toFixed(1)} kW
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-muted-foreground text-[11px]">Daily:</span>
-                                  <span className="font-bold text-foreground">
-                                    {group.totalDailyYieldKwh.toFixed(1)} kWh
-                                  </span>
-                                </div>
-                                {group.totalRatedKw > 0 && (
-                                  <div className="hidden md:flex items-center gap-1.5">
-                                    <span className="text-muted-foreground text-[11px]">Capacity:</span>
-                                    <span className="text-muted-foreground">
-                                      {group.totalRatedKw} kWp
+                                {/* Plant Group Rollup Totals */}
+                                <div className="flex items-center gap-3 sm:gap-4 text-xs font-mono shrink-0 pl-7 sm:pl-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-muted-foreground text-[11px]">Harvest:</span>
+                                    <span className="font-bold text-amber-500">
+                                      {group.totalLiveSolarKw.toFixed(1)} kW
                                     </span>
                                   </div>
-                                )}
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
-                                  <span className="text-emerald-500 font-bold text-[11px]">
-                                    {group.onlineCount}/{group.nodes.length} Online
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-muted-foreground text-[11px]">Daily:</span>
+                                    <span className="font-bold text-foreground">
+                                      {group.totalDailyYieldKwh.toFixed(1)} kWh
+                                    </span>
+                                  </div>
+                                  {group.totalRatedKw > 0 && (
+                                    <div className="hidden md:flex items-center gap-1.5">
+                                      <span className="text-muted-foreground text-[11px]">Capacity:</span>
+                                      <span className="text-muted-foreground">
+                                        {group.totalRatedKw} kWp
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
+                                    <span className="text-emerald-500 font-bold text-[11px]">
+                                      {group.onlineCount}/{group.nodes.length} Online
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] text-muted-foreground underline ml-0.5">
+                                    {isCollapsed ? 'Expand' : 'Collapse'}
                                   </span>
                                 </div>
-                                <span className="text-[10px] text-muted-foreground underline ml-0.5">
-                                  {isCollapsed ? 'Expand' : 'Collapse'}
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Plant Group Inverter Rows */}
+                          {!isCollapsed &&
+                            group.nodes.map((node, index) => {
+                              return (
+                                <tr
+                                  key={`${node.accountId}-${node.deviceSn}-${index}`}
+                                  className="hover:bg-muted/30 transition-colors border-b border-border/30 bg-card/40"
+                                >
+                                  <td className="pl-6">
+                                    <span className="font-semibold text-foreground block leading-tight text-xs">
+                                      {node.accountName}
+                                    </span>
+                                    <span className="font-mono text-[10px] text-primary">
+                                      {node.accountId}
+                                    </span>
+                                  </td>
+                                  <td className="text-foreground font-medium text-xs">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-muted-foreground/50 font-mono text-[11px]">└</span>
+                                      <span>{node.stationName}</span>
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                                      <Cpu size={14} className="text-secondary shrink-0" />
+                                      <span className="text-xs">{node.model}</span>
+                                    </div>
+                                    <span className="font-mono text-[11px] text-muted-foreground block mt-0.5">
+                                      SN: {node.deviceSn} · {node.ratedKw ? `${node.ratedKw} kW` : '100 kW'}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    {node.loggerSn ? (
+                                      <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-muted/60 border border-border/50">
+                                        <Radio
+                                          size={12}
+                                          className={
+                                            node.loggerStatus === 'ONLINE' ? 'text-emerald-500' : 'text-muted-foreground'
+                                          }
+                                        />
+                                        <div className="flex flex-col">
+                                          <span className="font-mono text-[11px] text-foreground font-medium leading-none">
+                                            {node.loggerSn}
+                                          </span>
+                                          <span className="text-[9px] text-emerald-500 font-bold leading-none mt-0.5">
+                                            {node.loggerStatus || 'ONLINE'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground/60 text-[11px] italic">Built-in / Direct</span>
+                                    )}
+                                  </td>
+                                  <td className="td-num font-bold text-amber-500 text-left font-mono">
+                                    {node.liveSolarPowerKw.toFixed(1)} kW
+                                  </td>
+                                  <td className="td-num text-foreground text-left font-mono">
+                                    {node.dailyYieldKwh ? `${node.dailyYieldKwh.toFixed(1)} kWh` : '--'}
+                                  </td>
+                                  <td className="td-num text-cyan-500 text-left font-mono">
+                                    {node.batterySoc ? `${node.batterySoc.toFixed(1)}%` : '--'}
+                                  </td>
+                                  <td>
+                                    <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono font-bold">
+                                      {node.mode}
+                                    </span>
+                                  </td>
+                                  <td className="text-right">
+                                    <span className="inline-flex items-center gap-1.5 text-emerald-500 font-mono text-xs font-bold">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
+                                      {node.isLive ? 'Live Cloud' : 'Online'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </React.Fragment>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {plantGroups.length === 0 ? (
+                <div className="p-6 text-center text-xs text-muted-foreground italic bg-muted/20 rounded-xl border border-border/40">
+                  No connected inverters or plant groups discovered.
+                </div>
+              ) : (
+                plantGroups.map((group) => {
+                  const groupKey = `${group.accountId}-${group.stationId || group.stationName}`;
+                  const isCollapsed = Boolean(collapsedPlantKeys[groupKey]);
+
+                  return (
+                    <div
+                      key={`card-group-${groupKey}`}
+                      className="rounded-xl border border-border/70 bg-card overflow-hidden transition-all shadow-2xs"
+                    >
+                      {/* Collapsible Plant Header */}
+                      <div
+                        onClick={() => togglePlantGroup(groupKey)}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3.5 bg-muted/40 hover:bg-muted/70 cursor-pointer select-none transition-colors border-b border-border/40"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-5 h-5 rounded bg-primary/10 flex items-center justify-center text-primary shrink-0 transition-transform">
+                            {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                          </div>
+                          <Building2 size={16} className="text-primary shrink-0" />
+                          <span className="font-bold text-sm text-foreground">
+                            {group.stationName}
+                          </span>
+                          {group.stationId && (
+                            <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0">
+                              ID: {group.stationId}
+                            </Badge>
+                          )}
+                          {isFleetView && group.accountName && (
+                            <span className="text-[11px] text-muted-foreground font-mono">
+                              ({group.accountName})
+                            </span>
+                          )}
+                          <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] font-mono font-bold">
+                            {group.nodes.length} Inverter{group.nodes.length > 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+
+                        <div className="flex items-center gap-3.5 text-xs font-mono shrink-0 pl-7 sm:pl-0">
+                          <div>
+                            <span className="text-muted-foreground text-[11px]">Harvest: </span>
+                            <span className="font-bold text-amber-500">{group.totalLiveSolarKw.toFixed(1)} kW</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground text-[11px]">Daily: </span>
+                            <span className="font-bold text-foreground">{group.totalDailyYieldKwh.toFixed(1)} kWh</span>
+                          </div>
+                          {group.totalRatedKw > 0 && (
+                            <div className="hidden md:block">
+                              <span className="text-muted-foreground text-[11px]">Cap: </span>
+                              <span className="text-muted-foreground">{group.totalRatedKw} kWp</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1.5 text-emerald-500 text-[11px] font-bold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
+                            <span>{group.onlineCount}/{group.nodes.length} Online</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground underline ml-0.5">
+                            {isCollapsed ? 'Expand' : 'Collapse'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Inverter Cards Grid */}
+                      {!isCollapsed && (
+                        <div className="p-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 bg-muted/10">
+                          {group.nodes.map((node, index) => (
+                            <div
+                              key={`card-node-${node.accountId}-${node.deviceSn}-${index}`}
+                              className="p-3 rounded-xl border border-border/70 bg-card hover:border-primary/40 transition-all flex flex-col justify-between shadow-2xs space-y-2.5"
+                            >
+                              <div className="flex items-start justify-between gap-1.5">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <Cpu size={14} className="text-secondary shrink-0 text-primary" />
+                                  <span className="font-bold text-xs text-foreground truncate">
+                                    {node.model || 'Deye Inverter'}
+                                  </span>
+                                </div>
+                                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-500 shrink-0">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
+                                  {node.isLive ? 'Live Cloud' : 'Online'}
                                 </span>
                               </div>
-                            </div>
-                          </td>
-                        </tr>
 
-                        {/* Plant Group Inverter Rows */}
-                        {!isCollapsed &&
-                          group.nodes.map((node, index) => {
-                            return (
-                              <tr
-                                key={`${node.accountId}-${node.deviceSn}-${index}`}
-                                className="hover:bg-muted/30 transition-colors border-b border-border/30 bg-card/40"
-                              >
-                                <td className="pl-6">
-                                  <span className="font-semibold text-foreground block leading-tight text-xs">
-                                    {node.accountName}
-                                  </span>
-                                  <span className="font-mono text-[10px] text-primary">
-                                    {node.accountId}
-                                  </span>
-                                </td>
-                                <td className="text-foreground font-medium text-xs">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-muted-foreground/50 font-mono text-[11px]">└</span>
-                                    <span>{node.stationName}</span>
+                              <div className="space-y-1 text-xs">
+                                <div className="font-mono text-[10.5px] text-muted-foreground truncate">
+                                  SN: {node.deviceSn} · {node.ratedKw ? `${node.ratedKw} kW` : '100 kW'}
+                                </div>
+                                {node.loggerSn && (
+                                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-muted/60 border border-border/50 text-[10px] font-mono">
+                                    <Radio size={10} className="text-emerald-500 shrink-0" />
+                                    <span className="text-foreground">{node.loggerSn}</span>
+                                    <span className="text-emerald-500 font-bold">({node.loggerStatus || 'ONLINE'})</span>
                                   </div>
-                                </td>
-                                <td>
-                                  <div className="flex items-center gap-1.5 font-semibold text-foreground">
-                                    <Cpu size={14} className="text-secondary shrink-0" />
-                                    <span className="text-xs">{node.model}</span>
-                                  </div>
-                                  <span className="font-mono text-[11px] text-muted-foreground block mt-0.5">
-                                    SN: {node.deviceSn} · {node.ratedKw ? `${node.ratedKw} kW` : '100 kW'}
+                                )}
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/50 font-mono text-xs">
+                                <div>
+                                  <span className="text-[10px] text-muted-foreground block">Live Harvest</span>
+                                  <span className="font-bold text-amber-500 text-xs">
+                                    {node.liveSolarPowerKw.toFixed(1)} kW
                                   </span>
-                                </td>
-                                <td>
-                                  {node.loggerSn ? (
-                                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-muted/60 border border-border/50">
-                                      <Radio
-                                        size={12}
-                                        className={
-                                          node.loggerStatus === 'ONLINE' ? 'text-emerald-500' : 'text-muted-foreground'
-                                        }
-                                      />
-                                      <div className="flex flex-col">
-                                        <span className="font-mono text-[11px] text-foreground font-medium leading-none">
-                                          {node.loggerSn}
-                                        </span>
-                                        <span className="text-[9px] text-emerald-500 font-bold leading-none mt-0.5">
-                                          {node.loggerStatus || 'ONLINE'}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <span className="text-muted-foreground/60 text-[11px] italic">Built-in / Direct</span>
-                                  )}
-                                </td>
-                                <td className="td-num font-bold text-amber-500 text-left font-mono">
-                                  {node.liveSolarPowerKw.toFixed(1)} kW
-                                </td>
-                                <td className="td-num text-foreground text-left font-mono">
-                                  {node.dailyYieldKwh ? `${node.dailyYieldKwh.toFixed(1)} kWh` : '--'}
-                                </td>
-                                <td className="td-num text-cyan-500 text-left font-mono">
-                                  {node.batterySoc ? `${node.batterySoc.toFixed(1)}%` : '--'}
-                                </td>
-                                <td>
-                                  <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono font-bold">
-                                    {node.mode}
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-muted-foreground block">Daily Yield</span>
+                                  <span className="font-bold text-foreground text-xs">
+                                    {node.dailyYieldKwh ? `${node.dailyYieldKwh.toFixed(1)} kWh` : '--'}
                                   </span>
-                                </td>
-                                <td className="text-right">
-                                  <span className="inline-flex items-center gap-1.5 text-emerald-500 font-mono text-xs font-bold">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
-                                    {node.isLive ? 'Live Cloud' : 'Online'}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                      </React.Fragment>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
       </div>

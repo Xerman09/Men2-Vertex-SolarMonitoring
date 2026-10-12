@@ -67,7 +67,6 @@ export function Header({
     lastSyncedAt,
     directusStatus,
   } = useAccount();
-  const { toggleMobileOpen } = useSidebar();
   const { role, isAdmin, isConsumer, isViewer, user, showAuthModal, setShowAuthModal, login, logout } = useRole();
 
   const [loginEmail, setLoginEmail] = useState('');
@@ -133,19 +132,8 @@ export function Header({
       )}
 
       <div className="h-16 w-full px-3 sm:px-5 lg:px-7 flex items-center justify-between gap-2 min-w-0">
-        {/* Left: Mobile Menu & Dynamic Brand / Workspace Selector */}
+        {/* Left: Dynamic Brand / Workspace Selector */}
         <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink">
-          {/* Mobile Drawer Trigger */}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={toggleMobileOpen}
-            className="md:hidden rounded-xl h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
-            aria-label="Open navigation drawer"
-          >
-            <Menu size={18} />
-          </Button>
-
           {/* Account Selector Dropdown */}
           <div className="relative min-w-0 shrink" ref={dropdownRef}>
             <button
