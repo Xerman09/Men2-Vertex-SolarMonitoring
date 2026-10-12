@@ -25,6 +25,7 @@ import {
   Server,
   TrendingUp,
   CheckCircle2,
+  ShieldAlert,
 } from 'lucide-react';
 import { StationSummary, AggregatedFleetSummary, FleetMatrixNode } from '@/lib/types';
 import { useAccount } from '@/lib/account-context';
@@ -53,7 +54,7 @@ export default function EnergyFlowDashboard() {
     fetchingStage,
     setFetchingDeye,
   } = useAccount();
-  const { isAdmin } = useRole();
+  const { isAdmin, user, setShowAuthModal } = useRole();
 
   const [station, setStation] = useState<StationSummary | null>(null);
   const [fleetAggregate, setFleetAggregate] = useState<AggregatedFleetSummary | null>(null);
@@ -248,10 +249,52 @@ export default function EnergyFlowDashboard() {
     ? fleetAggregate?.totalDailyYieldKwh ?? 0
     : station?.dailyYieldKwh ?? 0;
 
+  const capacityUtilizationPct =
+    totalCapacity > 0 ? ((dailyYield / totalCapacity) * 100).toFixed(0) : '0';
+
+  const isDataEmpty =
+    !station && !fleetAggregate && nodes.length === 0 && solarKw === 0 && dailyYield === 0;
+  const isSyncingWithZeroData = (loading || isFetchingDeye || manualPolling) && isDataEmpty;
+
   return (
-    <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-12">
-      {/* Top Command Banner with VOS Design Standards */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border/50 pb-5">
+    <div className="relative w-full max-w-[1600px] mx-auto pb-12">
+      {/* Full Dashboard Greyout Overlay when syncing/fetching with 0 data */}
+      {isSyncingWithZeroData && (
+        <div className="fixed inset-0 z-40 bg-background/70 backdrop-blur-xs flex items-center justify-center p-4 transition-all animate-in fade-in duration-300">
+          <div className="bg-card/95 border border-primary/30 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl flex flex-col items-center text-center space-y-4">
+            <div className="relative flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+              <div
+                className="absolute w-8 h-8 rounded-full border-2 border-emerald-500/20 border-b-emerald-500 animate-spin"
+                style={{ animationDirection: 'reverse' }}
+              />
+              <Zap className="h-5 w-5 text-amber-500 absolute" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-foreground uppercase tracking-wider font-headline">
+                {fetchingStage || (isFleetView ? 'Synchronizing Fleet Telemetry...' : 'Fetching DeyeCloud Telemetry...')}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Connecting to DeyeCloud API gateway & compiling live inverter matrix
+              </p>
+            </div>
+            <div className="w-full bg-muted/60 rounded-full h-1.5 overflow-hidden">
+              <div className="bg-gradient-to-r from-emerald-500 via-primary to-amber-500 h-full w-full animate-pulse" />
+            </div>
+            <span className="text-[11px] font-mono text-muted-foreground">
+              {isFleetView ? `${totalAccounts} Accounts Configured` : selectedAccount?.name || 'Solar Gateway Node'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div
+        className={`flex flex-col gap-6 w-full transition-all duration-300 ${
+          isSyncingWithZeroData ? 'opacity-40 filter grayscale-[40%] pointer-events-none select-none' : ''
+        }`}
+      >
+        {/* Top Command Banner with VOS Design Standards */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border/50 pb-5">
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight uppercase font-headline">
@@ -304,6 +347,26 @@ export default function EnergyFlowDashboard() {
           </span>
         </div>
       </div>
+
+      {/* Unauthenticated Security Alert Banner */}
+      {!user && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 px-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-500 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <ShieldAlert size={16} className="shrink-0" />
+            <span>
+              Authentication is required to stream live fleet telemetry. Sign in with your <strong>Admin PIN (8888)</strong> or account to populate live power and daily yield.
+            </span>
+          </div>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => setShowAuthModal(true)}
+            className="border-amber-500/40 text-amber-500 hover:bg-amber-500/10 shrink-0 font-bold"
+          >
+            Sign In Now
+          </Button>
+        </div>
+      )}
 
       {/* Dynamic Plant Switcher Bar (Collapsible) */}
       {!isFleetView && selectedAccount && (selectedAccount.plants?.length || 0) > 0 && (
@@ -401,9 +464,16 @@ export default function EnergyFlowDashboard() {
             <div className="text-2xl sm:text-3xl font-black tracking-tight text-amber-500 font-mono">
               {solarKw.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">kW</span>
             </div>
-            <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground font-medium">
-              <TrendingUp className="h-3 w-3 text-amber-500" />
-              <span>Daily: {dailyYield.toFixed(1)} kWh ({totalCapacity.toFixed(0)} kWp)</span>
+            <div className="flex items-center justify-between gap-1.5 mt-1 text-xs text-muted-foreground font-medium">
+              <div className="flex items-center gap-1.5 truncate">
+                <TrendingUp className="h-3 w-3 text-amber-500 shrink-0" />
+                <span className="truncate">Daily: {dailyYield.toFixed(1)} kWh ({totalCapacity.toFixed(0)} kWp)</span>
+              </div>
+              {totalCapacity > 0 && (
+                <span className="text-[10px] font-mono font-bold text-amber-500 shrink-0 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                  {capacityUtilizationPct}% util
+                </span>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -619,7 +689,7 @@ export default function EnergyFlowDashboard() {
                   <div className="w-full grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-border/60">
                     <div className="bg-muted/40 p-2 rounded-xl border border-border/40">
                       <span className="text-[10px] text-muted-foreground block font-mono">
-                        Efficiency
+                        Inverter Eff.
                       </span>
                       <span className="font-mono text-sm text-emerald-500 font-bold">
                         98.4%
@@ -835,6 +905,7 @@ export default function EnergyFlowDashboard() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
