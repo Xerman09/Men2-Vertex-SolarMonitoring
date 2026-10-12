@@ -5,12 +5,30 @@ import { createLogger } from './lib/logger';
 
 const log = createLogger('Middleware');
 
+function applyCorsHeaders(response: NextResponse, origin: string | null): NextResponse {
+  // Allow all origins: mirror back origin or '*'
+  response.headers.set('Access-Control-Allow-Origin', origin || '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  response.headers.set('Access-Control-Allow-Credentials', 'true');
+  return response;
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const method = req.method;
+  const requestOrigin = req.headers.get('origin');
+
+  // Handle CORS Preflight requests for API routes
+  if (method === 'OPTIONS' && pathname.startsWith('/api/')) {
+    return applyCorsHeaders(new NextResponse(null, { status: 204 }), requestOrigin);
+  }
 
   // 1. CSRF Protection for state-changing API requests
-  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && pathname.startsWith('/api/')) {
+  // TEMPORARY: Allowed origins set to all (set to false to restore strict origin check)
+  const TEMPORARILY_ALLOW_ALL_ORIGINS = true;
+
+  if (!TEMPORARILY_ALLOW_ALL_ORIGINS && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && pathname.startsWith('/api/')) {
     const origin = req.headers.get('origin');
     const host = req.headers.get('host');
 
@@ -23,15 +41,21 @@ export async function middleware(req: NextRequest) {
             originHost: originUrl.host,
             reqHost: host,
           });
-          return NextResponse.json(
-            { error: 'Cross-origin request blocked' },
-            { status: 403 }
+          return applyCorsHeaders(
+            NextResponse.json(
+              { error: 'Cross-origin request blocked' },
+              { status: 403 }
+            ),
+            origin
           );
         }
       } catch {
-        return NextResponse.json(
-          { error: 'Invalid origin header' },
-          { status: 400 }
+        return applyCorsHeaders(
+          NextResponse.json(
+            { error: 'Invalid origin header' },
+            { status: 400 }
+          ),
+          origin
         );
       }
     }
@@ -43,9 +67,12 @@ export async function middleware(req: NextRequest) {
     const session = await verifySessionToken(token);
 
     if (!session || (session.role !== 'admin' && session.role !== 'consumer')) {
-      return NextResponse.json(
-        { error: 'Authentication required to execute inverter hardware commands' },
-        { status: 401 }
+      return applyCorsHeaders(
+        NextResponse.json(
+          { error: 'Authentication required to execute inverter hardware commands' },
+          { status: 401 }
+        ),
+        requestOrigin
       );
     }
   }
@@ -59,9 +86,12 @@ export async function middleware(req: NextRequest) {
     const session = await verifySessionToken(token);
 
     if (!session || session.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Administrator privileges required for solar gateway account modifications' },
-        { status: 403 }
+      return applyCorsHeaders(
+        NextResponse.json(
+          { error: 'Administrator privileges required for solar gateway account modifications' },
+          { status: 403 }
+        ),
+        requestOrigin
       );
     }
   }
@@ -78,12 +108,12 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  return applyCorsHeaders(NextResponse.next(), requestOrigin);
 }
 
 export const config = {
   matcher: [
-    '/api/deye/:path*',
+    '/api/:path*',
     '/accounts/:path*',
     '/api-diagnostics/:path*',
   ],
