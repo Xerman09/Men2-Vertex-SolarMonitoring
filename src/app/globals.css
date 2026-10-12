@@ -13,79 +13,79 @@
 :root {
   color-scheme: light dark;
 
-  /* Core Canvas */
-  --background: 240 6% 98.5%;
-  --foreground: 240 10% 3.9%;
+  /* Core Canvas (Rich comfortable slate canvas - eliminates glare & blinding white) */
+  --background: 220 14% 96%;
+  --foreground: 222 47% 11%;
 
-  /* Surfaces & Cards */
+  /* Surfaces & Cards (Solid crisp white elevated surfaces) */
   --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
+  --card-foreground: 222 47% 11%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
+  --popover-foreground: 222 47% 11%;
 
   /* Primary Enterprise Brand */
   --primary: 224 76% 48%;
   --primary-foreground: 0 0% 100%;
 
   /* Neutral System Surfaces */
-  --secondary: 240 6% 96.5%;
-  --secondary-foreground: 240 6% 14%;
+  --secondary: 220 14% 92%;
+  --secondary-foreground: 222 47% 11%;
 
-  --muted: 240 6% 96.5%;
-  --muted-foreground: 240 4% 44%;
+  --muted: 220 14% 91%;
+  --muted-foreground: 220 13% 32%;
 
-  --accent: 240 6% 95.5%;
-  --accent-foreground: 240 6% 14%;
+  --accent: 220 14% 90%;
+  --accent-foreground: 222 47% 11%;
 
-  --destructive: 0 84% 60%;
+  --destructive: 0 84% 50%;
   --destructive-foreground: 0 0% 100%;
 
-  /* Inputs & Borders */
-  --border: 240 6% 88%;
-  --input: 240 6% 90%;
+  /* Inputs & Borders (Solid, crisp structure instead of paper-thin) */
+  --border: 220 13% 80%;
+  --input: 220 13% 82%;
   --ring: 224 76% 48%;
 
   --radius: 0.75rem;
 
-  /* ===== Semantic Status Tokens (Light) ===== */
-  --success: 142 71% 45%;
+  /* ===== Semantic Status Tokens (Light - Rich & High Contrast) ===== */
+  --success: 142 72% 30%;
   --success-foreground: 0 0% 100%;
-  --success-bg: 142 71% 95%;
+  --success-bg: 142 60% 92%;
 
-  --warning: 38 92% 50%;
+  --warning: 32 95% 36%;
   --warning-foreground: 20 14% 4%;
-  --warning-bg: 38 92% 95%;
+  --warning-bg: 38 90% 92%;
 
-  --info: 199 89% 48%;
+  --info: 199 89% 36%;
   --info-foreground: 0 0% 100%;
-  --info-bg: 199 89% 95%;
+  --info-bg: 199 80% 92%;
 
-  /* ===== Solar & Energy Domain Tokens (Light) ===== */
-  --solar: 38 92% 50%;
+  /* ===== Solar & Energy Domain Tokens (Light - Deep, Saturated, Not Washed Out) ===== */
+  --solar: 32 95% 36%;
   --solar-foreground: 20 14% 4%;
-  --solar-bg: 38 92% 95%;
+  --solar-bg: 38 90% 92%;
 
-  --battery: 188 86% 42%;
+  --battery: 192 90% 32%;
   --battery-foreground: 0 0% 100%;
-  --battery-bg: 188 86% 94%;
+  --battery-bg: 192 70% 92%;
 
-  --grid: 142 71% 42%;
+  --grid: 142 72% 30%;
   --grid-foreground: 0 0% 100%;
-  --grid-bg: 142 71% 94%;
+  --grid-bg: 142 60% 92%;
 
-  --load: 243 75% 58%;
+  --load: 243 75% 48%;
   --load-foreground: 0 0% 100%;
-  --load-bg: 243 75% 96%;
+  --load-bg: 243 75% 94%;
 
   /* Sidebar Tokens */
-  --sidebar: 240 6% 97.5%;
-  --sidebar-foreground: 240 5% 26%;
+  --sidebar: 220 14% 94%;
+  --sidebar-foreground: 222 47% 15%;
   --sidebar-primary: 224 76% 48%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 240 6% 94.5%;
-  --sidebar-accent-foreground: 240 6% 14%;
-  --sidebar-border: 240 6% 86%;
+  --sidebar-accent: 220 14% 88%;
+  --sidebar-accent-foreground: 222 47% 10%;
+  --sidebar-border: 220 13% 80%;
   --sidebar-ring: 224 76% 48%;
 }
 
@@ -346,6 +346,127 @@
 
   .badge-load {
     @apply border-transparent bg-[hsl(var(--load-bg))] text-[hsl(var(--load))];
+  }
+}
+
+/* ============================================================
+   LIGHT MODE CONTRAST & DENSITY ENHANCEMENTS
+   - Prevents washed out neon/light yellow/cyan on light backgrounds
+   - Deepens solar, battery, grid, and load telemetry for WCAG AAA contrast
+   - Strengthens faint transparent borders and semi-transparent cards
+   - Gives typography and monospace numbers crisp, legible weight
+ ============================================================ */
+:root:not(.dark) {
+  /* Telemetry text colors: rich, deep, high-contrast values */
+  .text-amber-500 {
+    color: #b45309 !important; /* amber-700: deep rich solar gold */
+  }
+  .text-cyan-500,
+  .text-cyan-400 {
+    color: #0e7490 !important; /* cyan-700: deep oceanic cyan */
+  }
+  .text-emerald-500,
+  .text-emerald-400 {
+    color: #047857 !important; /* emerald-700: crisp forest green */
+  }
+  .text-indigo-500 {
+    color: #4338ca !important; /* indigo-700: deep cobalt */
+  }
+
+  /* Status and telemetry badge / chip backgrounds */
+  .bg-amber-500\/10 {
+    background-color: rgba(180, 83, 9, 0.09) !important;
+  }
+  .bg-amber-500\/15 {
+    background-color: rgba(180, 83, 9, 0.15) !important;
+  }
+  .bg-cyan-500\/10 {
+    background-color: rgba(14, 116, 144, 0.09) !important;
+  }
+  .bg-cyan-500\/15 {
+    background-color: rgba(14, 116, 144, 0.15) !important;
+  }
+  .bg-emerald-500\/10 {
+    background-color: rgba(4, 120, 87, 0.09) !important;
+  }
+  .bg-emerald-500\/15 {
+    background-color: rgba(4, 120, 87, 0.15) !important;
+  }
+  .bg-indigo-500\/10 {
+    background-color: rgba(67, 56, 202, 0.09) !important;
+  }
+
+  /* Badge and chip borders */
+  .border-amber-500\/20,
+  .border-amber-500\/30,
+  .border-amber-500\/40,
+  .border-amber-500\/50 {
+    border-color: rgba(180, 83, 9, 0.35) !important;
+  }
+  .border-cyan-500\/20,
+  .border-cyan-500\/30,
+  .border-cyan-500\/40,
+  .border-cyan-500\/60 {
+    border-color: rgba(14, 116, 144, 0.35) !important;
+  }
+  .border-emerald-500\/20,
+  .border-emerald-500\/30,
+  .border-emerald-500\/40 {
+    border-color: rgba(4, 120, 87, 0.35) !important;
+  }
+  .border-indigo-500\/20,
+  .border-indigo-500\/40 {
+    border-color: rgba(67, 56, 202, 0.35) !important;
+  }
+
+  /* Card and container borders: prevent razor-thin faint borders */
+  .border-border\/30,
+  .border-border\/40,
+  .border-border\/50 {
+    border-color: hsl(220 13% 84%) !important;
+  }
+  .border-border\/60,
+  .border-border\/70,
+  .border-border\/80 {
+    border-color: hsl(220 13% 76%) !important;
+  }
+
+  /* Give cards real body and clear elevation instead of washed-out transparency */
+  .bg-card\/70,
+  .bg-card\/80 {
+    background-color: hsl(0 0% 100%) !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Table styling */
+  .data-grid {
+    border-color: hsl(220 13% 78%);
+    background-color: hsl(0 0% 100%);
+  }
+  .data-grid thead {
+    background-color: hsl(220 14% 94%);
+    border-bottom-color: hsl(220 13% 78%);
+  }
+  .data-grid th {
+    color: hsl(220 13% 28%);
+    font-weight: 700;
+  }
+  .data-grid td {
+    color: hsl(222 47% 11%);
+  }
+  .data-grid tbody tr {
+    border-top-color: hsl(220 13% 84%);
+  }
+  .data-grid tbody tr:hover {
+    background-color: hsl(220 14% 95%);
+  }
+
+  /* Monospace metrics and data tables */
+  .td-num {
+    font-weight: 600;
+  }
+  .font-mono {
+    letter-spacing: -0.01em;
   }
 }
 
