@@ -109,8 +109,8 @@ export function SelfConsumptionChart({
             />
           </div>
           <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-            <span>Self-Consumed: <strong className="text-yellow-500">{selfConsumptionMetrics.productionPct}%</strong></span>
-            <span>Exported: <strong className="text-purple-400">{(100 - selfConsumptionMetrics.productionPct).toFixed(1)}%</strong></span>
+            <span>Self-Consumed: <strong className="text-indigo-400">{selfConsumptionMetrics.productionPct}%</strong></span>
+            <span>Exported: <strong className="text-emerald-400">{(100 - selfConsumptionMetrics.productionPct).toFixed(1)}%</strong></span>
           </div>
         </div>
       </div>

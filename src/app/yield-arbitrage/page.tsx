@@ -33,6 +33,7 @@ import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { HoverInfo } from '@/components/ui/tooltip';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
 import { createLogger } from '@/lib/logger';
@@ -256,15 +257,16 @@ export default function YieldArbitragePage() {
         <Card className="border-border/60 bg-card/80 shadow-sm">
           <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-border/50 p-5">
             <div>
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <Zap size={18} className="text-amber-500" />
-                <span>Diurnal Curve: Solar Generation vs Industrial Load Profile</span>
-              </CardTitle>
-              {isAdmin && (
-                <CardDescription className="text-xs mt-0.5">
-                  {TELEMETRY_DESCRIPTIONS.yieldArbitrage.diurnalCurveLegend}
-                </CardDescription>
-              )}
+              <HoverInfo
+                title="Diurnal Energy Curve"
+                content={TELEMETRY_DESCRIPTIONS.yieldArbitrage.diurnalCurveLegend}
+                showIcon
+              >
+                <CardTitle className="text-base font-bold flex items-center gap-2 cursor-help">
+                  <Zap size={18} className="text-amber-500" />
+                  <span>Diurnal Curve: Solar Generation vs Industrial Load Profile</span>
+                </CardTitle>
+              </HoverInfo>
             </div>
             <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground">
               <span className="flex items-center gap-1.5">
@@ -284,12 +286,12 @@ export default function YieldArbitragePage() {
                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="solarGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
                     </linearGradient>
                     <linearGradient id="loadGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#eab308" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#eab308" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
@@ -308,7 +310,7 @@ export default function YieldArbitragePage() {
                     type="monotone"
                     dataKey="solarYieldKw"
                     name="Solar PV Harvest (kW)"
-                    stroke="#10b981"
+                    stroke="#f59e0b"
                     strokeWidth={2}
                     fill="url(#solarGrad)"
                   />
@@ -316,7 +318,7 @@ export default function YieldArbitragePage() {
                     type="monotone"
                     dataKey="loadDemandKw"
                     name="Industrial Load Demand (kW)"
-                    stroke="#eab308"
+                    stroke="#6366f1"
                     strokeWidth={2}
                     fill="url(#loadGrad)"
                   />

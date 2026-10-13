@@ -59,9 +59,11 @@ export interface SelfConsumptionMetrics {
   hourlyRatios: HourlyRatioPoint[];
 }
 
-export const COLOR_PV = '#10b981';
-export const COLOR_LOAD = '#eab308';
-export const COLOR_GRID = '#a855f7';
+// Harmonized Color Palette matching Analytics Dashboard
+export const COLOR_PV = '#f59e0b';       // Amber / Solar Yield
+export const COLOR_LOAD = '#6366f1';     // Indigo / Facility Load
+export const COLOR_BATTERY = '#06b6d4';  // Cyan / ESS Flow
+export const COLOR_GRID = '#10b981';     // Emerald / Grid Net (+Export / -Import)
 
 export function useTrigonometricGraph({
   data,
