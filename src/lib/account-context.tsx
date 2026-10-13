@@ -5,6 +5,7 @@ import { AccountSummary, PlantInfo } from './types';
 import { useRole } from './role-context';
 import { createLogger } from './logger';
 import { useSafeTimeout } from './usePolling';
+import { telemetryCache } from './telemetry-cache';
 
 const log = createLogger('AccountContext');
 
@@ -189,11 +190,17 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       ? (selectedAccount?.name ? `${selectedAccount.name} (All Plants)` : 'All Plants')
       : (targetPlant?.stationName || `Station ${id}`);
 
-    setIsPlantSwitchingState(true);
-    setSwitchingPlantName(plantName);
+    const cacheKey = `${selectedAccountId}:${id}`;
+    const hasCachedData = telemetryCache.get(cacheKey) !== null;
+
+    if (!hasCachedData) {
+      setIsPlantSwitchingState(true);
+      setSwitchingPlantName(plantName);
+      setFetchingDeye(true, `Syncing ${plantName} Telemetry...`);
+    }
+
     setSelectedStationId(id);
-    setFetchingDeye(true, `Syncing ${plantName} Telemetry...`);
-  }, [selectedStationId, selectedAccount, setFetchingDeye]);
+  }, [selectedStationId, selectedAccount, selectedAccountId, setFetchingDeye]);
 
   const handleSetSelectedAccountId = useCallback((id: string) => {
     if (isConsumer) {
@@ -207,9 +214,14 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     if (normalized !== selectedAccountId) {
       const targetAcc = accounts.find((a) => a.id === normalized);
       const accName = normalized === 'ALL' ? 'Fleet Multi-Site' : (targetAcc?.name || normalized);
-      setIsPlantSwitchingState(true);
-      setSwitchingPlantName(accName);
-      setFetchingDeye(true, `Switching to ${accName}...`);
+      const cacheKey = `${normalized}:ALL`;
+      const hasCachedData = telemetryCache.get(cacheKey) !== null;
+
+      if (!hasCachedData) {
+        setIsPlantSwitchingState(true);
+        setSwitchingPlantName(accName);
+        setFetchingDeye(true, `Switching to ${accName}...`);
+      }
     }
     setSelectedAccountId(normalized);
     setSelectedStationId('ALL');
@@ -222,9 +234,14 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       ? (targetAcc?.name ? `${targetAcc.name} (All Plants)` : 'All Plants')
       : (targetPlant?.stationName || `Station ${stationId}`);
 
-    setIsPlantSwitchingState(true);
-    setSwitchingPlantName(plantName);
-    setFetchingDeye(true, `Syncing ${plantName} Telemetry...`);
+    const cacheKey = `${accountId}:${stationId}`;
+    const hasCachedData = telemetryCache.get(cacheKey) !== null;
+
+    if (!hasCachedData) {
+      setIsPlantSwitchingState(true);
+      setSwitchingPlantName(plantName);
+      setFetchingDeye(true, `Syncing ${plantName} Telemetry...`);
+    }
 
     if (isConsumer && accounts.length > 0) {
       setSelectedAccountId(accounts[0].id);
