@@ -33,21 +33,43 @@ const log = createLogger('HardwareTelemetry');
 
 export default function HardwareTelemetryPage() {
   const {
+    accounts,
     selectedAccountId,
     selectedAccount,
     selectedStationId,
     selectedPlant,
     isFleetView,
+    loading: accountLoading,
+    syncing,
     isFetchingDeye,
     fetchingStage,
     setFetchingDeye,
+    isPlantSwitching,
+    switchingPlantName,
+    setIsPlantSwitching,
   } = useAccount();
   const { isAdmin } = useRole();
+
+  const accountPlantsCount = selectedAccount?.plants?.length ?? 0;
+  const totalFleetPlantsCount = React.useMemo(
+    () => accounts.reduce((sum, a) => sum + (a.plants?.length || 0), 0),
+    [accounts]
+  );
+  const hasNoPlants = isFleetView ? totalFleetPlantsCount === 0 : accountPlantsCount === 0;
+  const isSyncingNoPlants = hasNoPlants && (accountLoading || isFetchingDeye || syncing);
+
   const [telemetry, setTelemetry] = useState<InverterTelemetry | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedInverterSn, setSelectedInverterSn] = useState<string>('');
-  const inFlightRef = React.useRef(false);
+  const inFlightControllerRef = React.useRef<AbortController | null>(null);
+
+  const currentTargetKey = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}:${selectedInverterSn}`;
+  const [displayedTargetKey, setDisplayedTargetKey] = useState<string>('');
+  const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
+
+  const isTargetPending = currentTargetKey !== displayedTargetKey || !isDataLoaded;
+  const showOverlay = isPlantSwitching || isTargetPending || isSyncingNoPlants || syncing;
   const { setSafeTimeout } = useSafeTimeout();
 
   // Collect inverters from selected account or plant
@@ -78,36 +100,54 @@ export default function HardwareTelemetryPage() {
   }, [availableInverters, selectedInverterSn]);
 
   const fetchTelemetry = React.useCallback(
-    async (deviceSnOverride?: string) => {
-      if (inFlightRef.current) return;
-      inFlightRef.current = true;
+    async (deviceSnOverride?: string, forceReload: boolean = false) => {
+      const sn = deviceSnOverride || selectedInverterSn || availableInverters[0]?.deviceSn;
+      const targetKeyAtStart = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}:${sn || ''}`;
+
+      if (inFlightControllerRef.current) {
+        if (!forceReload && targetKeyAtStart === displayedTargetKey) {
+          return;
+        }
+        inFlightControllerRef.current.abort();
+      }
+
+      const controller = new AbortController();
+      inFlightControllerRef.current = controller;
 
       try {
-        const sn = deviceSnOverride || selectedInverterSn || availableInverters[0]?.deviceSn;
         const queryParams = new URLSearchParams();
         if (!isFleetView && selectedAccountId) queryParams.set('accountId', selectedAccountId);
         if (sn) queryParams.set('device_sn', sn);
 
-        const res = await fetch(`/api/deye/telemetry?${queryParams.toString()}`);
+        const res = await fetch(`/api/deye/telemetry?${queryParams.toString()}`, { signal: controller.signal });
         if (res.ok) {
           const json = await res.json();
+          if (controller.signal.aborted) return;
           if (json.data) {
             setTelemetry(json.data);
           }
+          setDisplayedTargetKey(targetKeyAtStart);
+          setIsDataLoaded(true);
         }
-      } catch (e: unknown) {
-        log.error('Telemetry fetch error', e);
+      } catch (e: any) {
+        if (e?.name !== 'AbortError') {
+          log.error('Telemetry fetch error', e);
+        }
       } finally {
-        inFlightRef.current = false;
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          inFlightControllerRef.current = null;
+          setLoading(false);
+          setIsPlantSwitching(false);
+          setFetchingDeye(false, null);
+        }
       }
     },
-    [selectedAccountId, isFleetView, selectedInverterSn, availableInverters]
+    [selectedAccountId, isFleetView, selectedInverterSn, availableInverters, displayedTargetKey, setIsPlantSwitching, setFetchingDeye, selectedStationId]
   );
 
   useEffect(() => {
-    fetchTelemetry();
-  }, [fetchTelemetry]);
+    fetchTelemetry(undefined, true);
+  }, [currentTargetKey, fetchTelemetry]);
 
   usePolling(fetchTelemetry, {
     intervalMs: 5000,
@@ -136,7 +176,44 @@ export default function HardwareTelemetryPage() {
   const currentInvMeta = availableInverters.find((i) => i.deviceSn === (telemetry?.deviceSn || selectedInverterSn));
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-12">
+    <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-12 relative">
+      {/* Full Frosted Overlay when switching plants or syncing with zero plants */}
+      {showOverlay && (
+        <div className="fixed inset-0 z-50 bg-background/60 backdrop-blur-sm flex items-center justify-center p-4 transition-all animate-in fade-in duration-200">
+          <div className="bg-card/95 border border-primary/30 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl flex flex-col items-center text-center space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="relative flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+              <div
+                className="absolute w-8 h-8 rounded-full border-2 border-emerald-500/20 border-b-emerald-500 animate-spin"
+                style={{ animationDirection: 'reverse' }}
+              />
+              <Zap className="h-5 w-5 text-amber-500 absolute animate-pulse" />
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-mono uppercase tracking-wider font-bold mb-1.5">
+                <RefreshCw size={10} className="animate-spin" />
+                <span>
+                  {isSyncingNoPlants ? 'Discovering Solar Plants...' : 'Station Re-Sync in Progress'}
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-foreground uppercase tracking-wider font-headline">
+                {isSyncingNoPlants
+                  ? fetchingStage || (selectedAccount ? `Scanning Inverters for ${selectedAccount.name}...` : 'Syncing Solar Inverters...')
+                  : `Syncing ${switchingPlantName || selectedPlant?.stationName || 'Plant'} Telemetry`}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                {isSyncingNoPlants
+                  ? 'Connecting to DeyeCloud API gateway to discover registered hardware nodes...'
+                  : 'Connecting to Modbus registers & refreshing live hardware telemetry...'}
+              </p>
+            </div>
+            <div className="w-full bg-muted/60 rounded-full h-1.5 overflow-hidden">
+              <div className="bg-gradient-to-r from-emerald-500 via-primary to-amber-500 h-full w-full animate-pulse" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Header with VOS Design Standards */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-border/50">
         <div>

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { RefreshCw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { HourlySolarPoint } from '@/lib/trigonometric-math';
 import { useTrigonometricGraph } from './useTrigonometricGraph';
@@ -13,12 +14,14 @@ export interface TrigonometricHistoryGraphProps {
   data?: HourlySolarPoint[];
   installedCapacityKw?: number;
   compact?: boolean;
+  loading?: boolean;
 }
 
 export function TrigonometricHistoryGraph({
   data,
   installedCapacityKw = 120,
   compact = false,
+  loading = false,
 }: TrigonometricHistoryGraphProps) {
   const graph = useTrigonometricGraph({
     data,
@@ -38,7 +41,15 @@ export function TrigonometricHistoryGraph({
         onTabChange={graph.setActiveTab}
       />
 
-      <CardContent className={compact ? 'p-3 pt-2.5 space-y-3' : 'p-4 pt-3.5 space-y-4'}>
+      <CardContent className={compact ? 'p-3 pt-2.5 space-y-3 relative overflow-hidden' : 'p-4 pt-3.5 space-y-4 relative overflow-hidden'}>
+        {loading && (
+          <div className="absolute inset-0 z-20 bg-background/60 backdrop-blur-xs flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card border border-primary/20 shadow-md">
+              <RefreshCw size={13} className="animate-spin text-primary" />
+              <span className="text-xs font-mono font-bold text-foreground">Syncing Harmonic Telemetry Curve...</span>
+            </div>
+          </div>
+        )}
         {graph.activeTab === 'power' && (
           <PowerFlowChart
             compact={compact}
