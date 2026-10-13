@@ -44,6 +44,8 @@ import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricH
 import { usePolling, useSafeTimeout } from '@/lib/usePolling';
 import { createLogger } from '@/lib/logger';
 import { telemetryCache } from '@/lib/telemetry-cache';
+import { HoverInfo } from '@/components/ui/tooltip';
+import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 
 const log = createLogger('Dashboard');
 
@@ -779,9 +781,15 @@ export default function EnergyFlowDashboard() {
         {/* PV Live Yield */}
         <Card className="border-border/60 bg-card/80 shadow-xs hover:border-amber-500/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2 p-4">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
-              {isFleetView ? 'Total PV Harvest' : 'PV Live Harvest'}
-            </CardTitle>
+            <HoverInfo
+              title={isFleetView ? 'Total PV Harvest' : 'Live Solar Generation'}
+              content={TELEMETRY_DESCRIPTIONS.energyFlow.solarNode}
+              showIcon
+            >
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono cursor-help">
+                {isFleetView ? 'Total PV Harvest' : 'PV Live Harvest'}
+              </CardTitle>
+            </HoverInfo>
             <div className="flex items-center gap-1.5">
               {isDataPlacementLoading && (
                 <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-amber-500 animate-pulse bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
@@ -802,18 +810,33 @@ export default function EnergyFlowDashboard() {
               </div>
             ) : (
               <>
-                <div className="text-2xl sm:text-3xl font-black tracking-tight text-amber-500 font-mono">
-                  {solarKw.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">kW</span>
-                </div>
-                <div className="flex items-center justify-between gap-1.5 mt-1 text-xs text-muted-foreground font-medium">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <TrendingUp className="h-3 w-3 text-amber-500 shrink-0" />
-                    <span className="truncate">Daily: {dailyYield.toFixed(1)} kWh ({totalCapacity.toFixed(0)} kWp)</span>
+                <HoverInfo
+                  title="Instantaneous Solar PV Power"
+                  content={TELEMETRY_DESCRIPTIONS.analytics.solarYield}
+                >
+                  <div className="text-2xl sm:text-3xl font-black tracking-tight text-amber-500 font-mono cursor-help">
+                    {solarKw.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">kW</span>
                   </div>
+                </HoverInfo>
+                <div className="flex items-center justify-between gap-1.5 mt-1 text-xs text-muted-foreground font-medium">
+                  <HoverInfo
+                    title="Cumulative Daily Harvest"
+                    content="Total electrical energy harvested from sunrise until current minute."
+                  >
+                    <div className="flex items-center gap-1.5 truncate cursor-help">
+                      <TrendingUp className="h-3 w-3 text-amber-500 shrink-0" />
+                      <span className="truncate">Daily: {dailyYield.toFixed(1)} kWh ({totalCapacity.toFixed(0)} kWp)</span>
+                    </div>
+                  </HoverInfo>
                   {totalCapacity > 0 && (
-                    <span className="text-[10px] font-mono font-bold text-amber-500 shrink-0 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                      {capacityUtilizationPct}% util
-                    </span>
+                    <HoverInfo
+                      title="Array Capacity Utilization"
+                      content="Percentage of peak installed nameplate DC capacity currently being generated."
+                    >
+                      <span className="text-[10px] font-mono font-bold text-amber-500 shrink-0 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 cursor-help">
+                        {capacityUtilizationPct}% util
+                      </span>
+                    </HoverInfo>
                   )}
                 </div>
               </>
@@ -824,9 +847,15 @@ export default function EnergyFlowDashboard() {
         {/* Battery Storage */}
         <Card className="border-border/60 bg-card/80 shadow-xs hover:border-cyan-500/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2 p-4">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
-              {isFleetView ? 'Fleet ESS Storage' : 'Battery Storage'}
-            </CardTitle>
+            <HoverInfo
+              title={isFleetView ? 'Fleet ESS Storage' : 'Battery Storage ESS'}
+              content={TELEMETRY_DESCRIPTIONS.energyFlow.batteryNode}
+              showIcon
+            >
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono cursor-help">
+                {isFleetView ? 'Fleet ESS Storage' : 'Battery Storage'}
+              </CardTitle>
+            </HoverInfo>
             <div className="flex items-center gap-1.5">
               {isDataPlacementLoading && (
                 <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-cyan-500 animate-pulse bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20">
@@ -847,12 +876,34 @@ export default function EnergyFlowDashboard() {
               </div>
             ) : (
               <>
-                <div className="text-2xl sm:text-3xl font-black tracking-tight text-cyan-500 font-mono">
-                  {batterySoc.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">% SOC</span>
-                </div>
+                <HoverInfo
+                  title="Battery State of Charge"
+                  content={batterySoc > 0 ? "Battery capacity available for backup or peak shaving." : TELEMETRY_DESCRIPTIONS.analytics.futureEss}
+                >
+                  <div className="text-2xl sm:text-3xl font-black tracking-tight text-cyan-500 font-mono cursor-help">
+                    {batterySoc > 0 ? (
+                      <>
+                        {batterySoc.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">% SOC</span>
+                      </>
+                    ) : (
+                      <span className="text-lg sm:text-xl text-cyan-400 font-bold">Not Installed</span>
+                    )}
+                  </div>
+                </HoverInfo>
                 <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground font-medium">
                   <Activity className="h-3 w-3 text-cyan-500" />
-                  <span>Flow: {batteryKw >= 0 ? `+${batteryKw.toFixed(1)}` : batteryKw.toFixed(1)} kW</span>
+                  {batterySoc > 0 || Math.abs(batteryKw) > 0.05 ? (
+                    <span>Flow: {batteryKw >= 0 ? `+${batteryKw.toFixed(1)}` : batteryKw.toFixed(1)} kW</span>
+                  ) : (
+                    <HoverInfo
+                      title="Plug-and-Play Future ESS"
+                      content={TELEMETRY_DESCRIPTIONS.analytics.futureEss}
+                    >
+                      <span className="text-emerald-400 font-medium flex items-center gap-1 font-mono text-[11px] cursor-help">
+                        <CheckCircle2 size={12} /> Future ESS Ready
+                      </span>
+                    </HoverInfo>
+                  )}
                 </div>
               </>
             )}
@@ -862,9 +913,15 @@ export default function EnergyFlowDashboard() {
         {/* Facility Load */}
         <Card className="border-border/60 bg-card/80 shadow-xs hover:border-indigo-500/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2 p-4">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
-              {isFleetView ? 'Total Facility Load' : 'Facility Demand'}
-            </CardTitle>
+            <HoverInfo
+              title={isFleetView ? 'Total Facility Load' : 'Industrial Facility Demand'}
+              content={TELEMETRY_DESCRIPTIONS.energyFlow.loadNode}
+              showIcon
+            >
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono cursor-help">
+                {isFleetView ? 'Total Facility Load' : 'Facility Demand'}
+              </CardTitle>
+            </HoverInfo>
             <div className="flex items-center gap-1.5">
               {isDataPlacementLoading && (
                 <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-indigo-500 animate-pulse bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">
@@ -885,12 +942,22 @@ export default function EnergyFlowDashboard() {
               </div>
             ) : (
               <>
-                <div className="text-2xl sm:text-3xl font-black tracking-tight text-foreground font-mono">
-                  {loadKw.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">kW</span>
-                </div>
+                <HoverInfo
+                  title="Active Electrical Power Load"
+                  content={TELEMETRY_DESCRIPTIONS.analytics.loadDemand}
+                >
+                  <div className="text-2xl sm:text-3xl font-black tracking-tight text-foreground font-mono cursor-help">
+                    {loadKw.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">kW</span>
+                  </div>
+                </HoverInfo>
                 <div className="flex items-center gap-1.5 mt-1 text-xs text-emerald-500 font-medium">
                   <CheckCircle2 className="h-3 w-3" />
-                  <span>100% Self-Powered Bus</span>
+                  <HoverInfo
+                    title="Self-Powered Autarky"
+                    content="Solar production is currently sufficient to power operations without blackouts."
+                  >
+                    <span className="cursor-help">100% Self-Powered Bus</span>
+                  </HoverInfo>
                 </div>
               </>
             )}
@@ -900,9 +967,15 @@ export default function EnergyFlowDashboard() {
         {/* Grid Interconnection */}
         <Card className="border-border/60 bg-card/80 shadow-xs hover:border-emerald-500/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2 p-4">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
-              {isFleetView ? 'Net Grid Dispatch' : 'Grid Interconnect'}
-            </CardTitle>
+            <HoverInfo
+              title={isFleetView ? 'Net Grid Dispatch' : 'Utility Grid Interconnect'}
+              content={TELEMETRY_DESCRIPTIONS.energyFlow.gridNode}
+              showIcon
+            >
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono cursor-help">
+                {isFleetView ? 'Net Grid Dispatch' : 'Grid Interconnect'}
+              </CardTitle>
+            </HoverInfo>
             <div className="flex items-center gap-1.5">
               {isDataPlacementLoading && (
                 <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-emerald-500 animate-pulse bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
@@ -923,12 +996,22 @@ export default function EnergyFlowDashboard() {
               </div>
             ) : (
               <>
-                <div className="text-2xl sm:text-3xl font-black tracking-tight text-emerald-500 font-mono">
-                  {gridKw >= 0 ? `+${gridKw.toFixed(1)}` : gridKw.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">kW</span>
-                </div>
+                <HoverInfo
+                  title="Net Utility Exchange Rate"
+                  content={TELEMETRY_DESCRIPTIONS.analytics.gridExchange}
+                >
+                  <div className="text-2xl sm:text-3xl font-black tracking-tight text-emerald-500 font-mono cursor-help">
+                    {gridKw >= 0 ? `+${gridKw.toFixed(1)}` : gridKw.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">kW</span>
+                  </div>
+                </HoverInfo>
                 <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground font-medium">
                   <Radio className="h-3 w-3 text-emerald-500" />
-                  <span>Synced @ 60.01 Hz (0.02°)</span>
+                  <HoverInfo
+                    title="Grid Phase Lock"
+                    content="Inverter phase-locked loop (PLL) synchronized with utility grid voltage and 60Hz frequency."
+                  >
+                    <span className="cursor-help">Synced @ 60.01 Hz (0.02°)</span>
+                  </HoverInfo>
                 </div>
               </>
             )}
@@ -938,9 +1021,15 @@ export default function EnergyFlowDashboard() {
         {/* Fleet Hardware Health */}
         <Card className="border-border/60 bg-card/80 shadow-xs hover:border-primary/40 transition-all col-span-2 sm:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between pb-2 p-4">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
-              {isFleetView ? 'Connected Sites' : 'Hardware Health'}
-            </CardTitle>
+            <HoverInfo
+              title={isFleetView ? 'Connected Sites' : 'Hardware Operating Health'}
+              content={TELEMETRY_DESCRIPTIONS.energyFlow.fleetMatrix}
+              showIcon
+            >
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono cursor-help">
+                {isFleetView ? 'Connected Sites' : 'Hardware Health'}
+              </CardTitle>
+            </HoverInfo>
             <div className="flex items-center gap-1.5">
               {isDataPlacementLoading && (
                 <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-primary animate-pulse bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
@@ -961,12 +1050,22 @@ export default function EnergyFlowDashboard() {
               </div>
             ) : (
               <>
-                <div className="text-2xl sm:text-3xl font-black tracking-tight text-primary font-mono">
-                  {isFleetView ? totalAccounts : '100'} <span className="text-xs text-muted-foreground font-normal">{isFleetView ? 'Accounts' : '%'}</span>
-                </div>
+                <HoverInfo
+                  title="Operating Inverters"
+                  content="Online hardware communication status across all discovered dataloggers."
+                >
+                  <div className="text-2xl sm:text-3xl font-black tracking-tight text-primary font-mono cursor-help">
+                    {isFleetView ? totalAccounts : '100'} <span className="text-xs text-muted-foreground font-normal">{isFleetView ? 'Accounts' : '%'}</span>
+                  </div>
+                </HoverInfo>
                 <div className="flex items-center gap-1.5 mt-1 text-xs text-emerald-500 font-medium">
                   <ShieldCheck className="h-3 w-3" />
-                  <span>{nodes.length} Inverter Nodes Active</span>
+                  <HoverInfo
+                    title="Active Inverters"
+                    content="Number of inverter telemetry nodes reporting telemetry."
+                  >
+                    <span className="cursor-help">{nodes.length} Inverter Nodes Active</span>
+                  </HoverInfo>
                 </div>
               </>
             )}
@@ -1076,128 +1175,162 @@ export default function EnergyFlowDashboard() {
             {/* Synoptic Power Flow Architectural Diagram */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center py-6">
               {/* Left: Solar PV Array */}
-              <div className="flex flex-col items-center">
-                <div className="w-56 p-5 bg-card rounded-2xl border-2 border-amber-500/50 shadow-md flex flex-col items-center text-center">
-                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-2">
-                    <Sun size={26} />
+              <HoverInfo
+                title={isFleetView ? 'Combined PV Generation' : 'Solar PV Array'}
+                content={TELEMETRY_DESCRIPTIONS.energyFlow.solarNode}
+                side="bottom"
+              >
+                <div className="flex flex-col items-center cursor-help">
+                  <div className="w-56 p-5 bg-card rounded-2xl border-2 border-amber-500/50 shadow-md flex flex-col items-center text-center">
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-2">
+                      <Sun size={26} />
+                    </div>
+                    <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
+                      {isFleetView ? 'Combined PV Generation' : 'Solar PV Array'}
+                    </span>
+                    <span className="font-mono text-2xl text-amber-500 font-bold my-1">
+                      {solarKw.toFixed(1)} kW
+                    </span>
+                    <span className="text-[11px] text-muted-foreground font-mono">
+                      {totalCapacity.toFixed(0)} kWp Nameplate
+                    </span>
                   </div>
-                  <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
-                    {isFleetView ? 'Combined PV Generation' : 'Solar PV Array'}
-                  </span>
-                  <span className="font-mono text-2xl text-amber-500 font-bold my-1">
-                    {solarKw.toFixed(1)} kW
-                  </span>
-                  <span className="text-[11px] text-muted-foreground font-mono">
-                    {totalCapacity.toFixed(0)} kWp Nameplate
-                  </span>
                 </div>
-              </div>
+              </HoverInfo>
 
               {/* Center: Core Hybrid Inverter Hub */}
-              <div className="flex flex-col items-center">
-                <div className="w-72 p-6 bg-card rounded-3xl border-2 border-cyan-500/60 shadow-lg flex flex-col items-center text-center relative">
-                  <div className="absolute -top-3 px-3 py-0.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider font-mono">
-                    {isFleetView ? 'Multi-Site Hub' : selectedPlant ? 'Plant Hybrid Hub' : 'Core Hybrid Inverter'}
-                  </div>
-                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-2 mt-1">
-                    <Cpu size={32} />
-                  </div>
-                  <span className="text-base font-bold text-foreground">
-                    {isFleetView
-                      ? 'Deye Multi-Account Fleet'
-                      : selectedPlant
-                      ? selectedPlant.stationName
-                      : 'Deye Hybrid Inverter'}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground font-mono mt-0.5">
-                    {isFleetView
-                      ? `${totalAccounts} Accounts · ${nodes.length} Inverters`
-                      : selectedPlant
-                      ? `Station ID: ${selectedPlant.stationId}`
-                      : `SN: ${nodes[0]?.deviceSn || '2209X891104'}`}
-                  </span>
-                  <div className="w-full grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-border/60">
-                    <div className="bg-muted/40 p-2 rounded-xl border border-border/40">
-                      <span className="text-[10px] text-muted-foreground block font-mono">
-                        Inverter Eff.
-                      </span>
-                      <span className="font-mono text-sm text-emerald-500 font-bold">
-                        98.4%
-                      </span>
+              <HoverInfo
+                title="Deye Smart Hybrid Inverter Hub"
+                content={TELEMETRY_DESCRIPTIONS.energyFlow.inverterNode}
+                side="bottom"
+              >
+                <div className="flex flex-col items-center cursor-help">
+                  <div className="w-72 p-6 bg-card rounded-3xl border-2 border-cyan-500/60 shadow-lg flex flex-col items-center text-center relative">
+                    <div className="absolute -top-3 px-3 py-0.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider font-mono">
+                      {isFleetView ? 'Multi-Site Hub' : selectedPlant ? 'Plant Hybrid Hub' : 'Core Hybrid Inverter'}
                     </div>
-                    <div className="bg-muted/40 p-2 rounded-xl border border-border/40">
-                      <span className="text-[10px] text-muted-foreground block font-mono">
-                        {isFleetView ? 'Active Sites' : 'Core Temp'}
-                      </span>
-                      <span className="font-mono text-sm text-foreground font-bold">
-                        {isFleetView ? `${totalAccounts} Sites` : '46.8°C'}
-                      </span>
+                    <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-2 mt-1">
+                      <Cpu size={32} />
+                    </div>
+                    <span className="text-base font-bold text-foreground">
+                      {isFleetView
+                        ? 'Deye Multi-Account Fleet'
+                        : selectedPlant
+                        ? selectedPlant.stationName
+                        : 'Deye Hybrid Inverter'}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                      {isFleetView
+                        ? `${totalAccounts} Accounts · ${nodes.length} Inverters`
+                        : selectedPlant
+                        ? `Station ID: ${selectedPlant.stationId}`
+                        : `SN: ${nodes[0]?.deviceSn || '2209X891104'}`}
+                    </span>
+                    <div className="w-full grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-border/60">
+                      <div className="bg-muted/40 p-2 rounded-xl border border-border/40">
+                        <span className="text-[10px] text-muted-foreground block font-mono">
+                          Inverter Eff.
+                        </span>
+                        <span className="font-mono text-sm text-emerald-500 font-bold">
+                          98.4%
+                        </span>
+                      </div>
+                      <div className="bg-muted/40 p-2 rounded-xl border border-border/40">
+                        <span className="text-[10px] text-muted-foreground block font-mono">
+                          {isFleetView ? 'Active Sites' : 'Core Temp'}
+                        </span>
+                        <span className="font-mono text-sm text-foreground font-bold">
+                          {isFleetView ? `${totalAccounts} Sites` : '46.8°C'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              </HoverInfo>
 
               {/* Right: 3 Output Sinks (Battery, Demand, Grid) */}
               <div className="flex flex-col gap-3">
                 {/* Battery ESS Node */}
-                <div className="p-3.5 bg-card rounded-2xl border border-cyan-500/40 flex items-center justify-between shadow-2xs">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-500">
-                      <BatteryCharging size={20} />
+                <HoverInfo
+                  title="Storage Battery (ESS)"
+                  content={batterySoc > 0 ? "Active LiFePO4 battery energy storage bank." : TELEMETRY_DESCRIPTIONS.energyFlow.batteryNode}
+                  side="left"
+                >
+                  <div className="p-3.5 bg-card rounded-2xl border border-cyan-500/40 flex items-center justify-between shadow-2xs cursor-help">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-500">
+                        <BatteryCharging size={20} />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-foreground block">
+                          {isFleetView ? 'Combined Battery Fleet' : 'Storage Battery (ESS)'}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          {batterySoc > 0
+                            ? `${batterySoc.toFixed(1)}% SOC · LiFePO4`
+                            : 'Not Installed · ESS Expansion Ready'}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-xs font-semibold text-foreground block">
-                        {isFleetView ? 'Combined Battery Fleet' : 'Storage Battery (ESS)'}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground font-mono">
-                        {batterySoc.toFixed(1)}% SOC · LiFePO4
-                      </span>
-                    </div>
+                    <span className="font-mono text-sm text-cyan-500 font-bold ml-4">
+                      {batterySoc > 0 || Math.abs(batteryKw) > 0.05
+                        ? `${batteryKw >= 0 ? `+${batteryKw.toFixed(1)}` : batteryKw.toFixed(1)} kW`
+                        : 'Standby'}
+                    </span>
                   </div>
-                  <span className="font-mono text-sm text-cyan-500 font-bold">
-                    {batteryKw >= 0 ? `+${batteryKw.toFixed(1)}` : batteryKw.toFixed(1)} kW
-                  </span>
-                </div>
+                </HoverInfo>
 
                 {/* Facility Demand Node */}
-                <div className="p-3.5 bg-card rounded-2xl border border-border/60 flex items-center justify-between shadow-2xs">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
-                      <Building2 size={20} />
+                <HoverInfo
+                  title="Industrial Facility Consumption"
+                  content={TELEMETRY_DESCRIPTIONS.energyFlow.loadNode}
+                  side="left"
+                >
+                  <div className="p-3.5 bg-card rounded-2xl border border-border/60 flex items-center justify-between shadow-2xs cursor-help">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+                        <Building2 size={20} />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-foreground block">
+                          {isFleetView ? 'Total Facility Demand' : 'Industrial Facility Load'}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          Machine Lines & Operations
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-xs font-semibold text-foreground block">
-                        {isFleetView ? 'Total Facility Demand' : 'Industrial Facility Load'}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">
-                        Machine Lines & Operations
-                      </span>
-                    </div>
+                    <span className="font-mono text-sm text-foreground font-bold ml-4">
+                      {loadKw.toFixed(1)} kW
+                    </span>
                   </div>
-                  <span className="font-mono text-sm text-foreground font-bold">
-                    {loadKw.toFixed(1)} kW
-                  </span>
-                </div>
+                </HoverInfo>
 
                 {/* Utility Grid Dispatch */}
-                <div className="p-3.5 bg-card rounded-2xl border border-emerald-500/40 flex items-center justify-between shadow-2xs">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                      <Zap size={20} />
+                <HoverInfo
+                  title="Utility Grid Interconnection"
+                  content={TELEMETRY_DESCRIPTIONS.energyFlow.gridNode}
+                  side="left"
+                >
+                  <div className="p-3.5 bg-card rounded-2xl border border-emerald-500/40 flex items-center justify-between shadow-2xs cursor-help">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                        <Zap size={20} />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-foreground block">
+                          {isFleetView ? 'Net Utility Grid Feed-In' : 'Utility Grid Dispatch'}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          Synced In-Phase @ 60.01 Hz
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-xs font-semibold text-foreground block">
-                        {isFleetView ? 'Net Utility Grid Feed-In' : 'Utility Grid Dispatch'}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground font-mono">
-                        Synced In-Phase @ 60.01 Hz
-                      </span>
-                    </div>
+                    <span className="font-mono text-sm text-emerald-500 font-bold ml-4">
+                      {gridKw >= 0 ? `+${gridKw.toFixed(1)}` : gridKw.toFixed(1)} kW
+                    </span>
                   </div>
-                  <span className="font-mono text-sm text-emerald-500 font-bold">
-                    {gridKw >= 0 ? `+${gridKw.toFixed(1)}` : gridKw.toFixed(1)} kW
-                  </span>
-                </div>
+                </HoverInfo>
               </div>
             </div>
 
@@ -1401,21 +1534,31 @@ export default function EnergyFlowDashboard() {
                           {isFleetView ? 'Battery Fleet' : 'Storage Battery (ESS)'}
                         </span>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] font-mono text-cyan-500 font-bold">
-                            {batterySoc.toFixed(1)}% SOC
-                          </span>
-                          <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                            <div
-                              className="h-full bg-cyan-500 rounded-full"
-                              style={{ width: `${Math.min(100, Math.max(0, batterySoc))}%` }}
-                            />
-                          </div>
+                          {batterySoc > 0 ? (
+                            <>
+                              <span className="text-[10px] font-mono text-cyan-500 font-bold">
+                                {batterySoc.toFixed(1)}% SOC
+                              </span>
+                              <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className="h-full bg-cyan-500 rounded-full"
+                                  style={{ width: `${Math.min(100, Math.max(0, batterySoc))}%` }}
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-[10px] font-mono text-muted-foreground">
+                              Not Installed · Future ESS Ready
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
                       <span className="font-mono text-xs font-bold text-cyan-500 block">
-                        {batteryKw >= 0 ? `+${batteryKw.toFixed(1)}` : batteryKw.toFixed(1)} kW
+                        {batterySoc > 0 || Math.abs(batteryKw) > 0.05
+                          ? `${batteryKw >= 0 ? `+${batteryKw.toFixed(1)}` : batteryKw.toFixed(1)} kW`
+                          : 'Standby'}
                       </span>
                       <span className="text-[9.5px] font-mono text-muted-foreground">
                         {batteryKw > 0 ? 'Charging' : batteryKw < 0 ? 'Discharging' : 'Standby'}
