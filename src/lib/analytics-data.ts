@@ -68,9 +68,12 @@ export interface AnalyticsSummary {
   totalGridExportKwh: number;
   totalGridImportKwh: number;
   netGridBalanceKwh: number;
+  hasBattery: boolean;
   batteryCycles: number;
   batteryRoundTripEfficiencyPct: number;
   currentSocPct: number;
+  totalBatCharge?: number;
+  totalBatDischarge?: number;
   performanceRatioPct: number;
   specificYieldKwhKwp: number;
   totalSavingsUsd: number;
@@ -84,7 +87,8 @@ export interface AnalyticsSummary {
  */
 export function generateDailyAnalytics(
   days: number = 7,
-  capacityKw: number = 120
+  capacityKw: number = 120,
+  hasBattery: boolean = false
 ): DailyAnalyticsPoint[] {
   const points: DailyAnalyticsPoint[] = [];
   const now = new Date();
@@ -103,8 +107,8 @@ export function generateDailyAnalytics(
     const baseSolar = 490 * scale * weatherFactor;
     const baseLoad = (460 + ((seed % 20) - 10)) * scale;
     const selfConsKwh = Math.min(baseLoad * 0.72, baseSolar * 0.8);
-    const batStored = Math.min(68 * scale, (baseSolar - selfConsKwh) * 0.5);
-    const batDischarged = batStored * 0.94;
+    const batStored = hasBattery ? Math.min(68 * scale, (baseSolar - selfConsKwh) * 0.5) : 0;
+    const batDischarged = hasBattery ? batStored * 0.94 : 0;
     const gridExport = Math.max(0, baseSolar - selfConsKwh - batStored);
     const gridImport = Math.max(0, baseLoad - selfConsKwh - batDischarged);
     const peakKw = Number((116 * scale * weatherFactor).toFixed(1));
@@ -177,13 +181,26 @@ export function generateMonthlyAnalytics(
  * Generate 24-hour battery State-of-Charge and power flow curve
  */
 export function generateBatteryHourlyTelemetry(
-  points: HourlyEnergyPoint[] = []
+  points: HourlyEnergyPoint[] = [],
+  hasBattery: boolean = true
 ): BatteryTelemetryPoint[] {
-  // Base 24h battery telemetry
   const result: BatteryTelemetryPoint[] = [];
 
   for (let i = 0; i < 24; i++) {
     const hourLabel = `${String(i).padStart(2, '0')}:00`;
+    
+    if (!hasBattery) {
+      result.push({
+        time: hourLabel,
+        socPct: 0,
+        batteryPowerKw: 0,
+        cellTempC: 25.0,
+        voltageV: 0,
+        state: 'IDLE',
+      });
+      continue;
+    }
+
     let soc = 50;
     let power = 0;
     let state: BatteryTelemetryPoint['state'] = 'IDLE';
@@ -241,10 +258,15 @@ export function generateBatteryHourlyTelemetry(
  */
 export function computeAnalyticsSummary(
   hourly: HourlyEnergyPoint[],
-  capacityKw: number = 120
+  capacityKw: number = 120,
+  hasBattery?: boolean
 ): AnalyticsSummary {
   const elapsed = hourly.filter((pt) => pt.isElapsed !== false && pt.solarYieldKw !== null);
   const data = elapsed.length > 0 ? elapsed : hourly;
+
+  const hasExplicitBattery = hasBattery !== undefined
+    ? hasBattery
+    : hourly.some((pt) => pt.batteryFlowKw !== null && Math.abs(pt.batteryFlowKw) > 0.05);
 
   let totalSolarYield = 0;
   let peakSolar = 0;
@@ -261,7 +283,7 @@ export function computeAnalyticsSummary(
   data.forEach((pt) => {
     const solar = pt.solarYieldKw ?? 0;
     const load = pt.loadDemandKw ?? 0;
-    const bat = pt.batteryFlowKw ?? 0;
+    const bat = hasExplicitBattery ? (pt.batteryFlowKw ?? 0) : 0;
     const grid = pt.gridFlowKw ?? 0;
 
     totalSolarYield += solar * hoursPerStep;
@@ -274,7 +296,7 @@ export function computeAnalyticsSummary(
 
     if (bat > 0) {
       totalBatCharge += bat * hoursPerStep;
-    } else {
+    } else if (bat < 0) {
       totalBatDischarge += Math.abs(bat) * hoursPerStep;
     }
 
@@ -293,12 +315,12 @@ export function computeAnalyticsSummary(
     totalLoad = 478.2;
     totalExport = 94.6;
     totalImport = 60.4;
-    totalBatCharge = 48.2;
-    totalBatDischarge = 45.1;
+    totalBatCharge = hasExplicitBattery ? 48.2 : 0;
+    totalBatDischarge = hasExplicitBattery ? 45.1 : 0;
   }
 
-  const directSelfCons = Math.max(0, totalSolarYield - totalExport - totalBatCharge);
-  const totalSelfConsumed = directSelfCons + totalBatDischarge;
+  const directSelfCons = Math.max(0, totalSolarYield - totalExport - (hasExplicitBattery ? totalBatCharge : 0));
+  const totalSelfConsumed = directSelfCons + (hasExplicitBattery ? totalBatDischarge : 0);
   const selfConsPct = Number(Math.min(100, (totalSelfConsumed / (totalSolarYield || 1)) * 100).toFixed(1));
   const selfSufficiencyPct = Number(Math.min(100, (totalSelfConsumed / (totalLoad || 1)) * 100).toFixed(1));
   const netBalance = Number((totalExport - totalImport).toFixed(1));
@@ -322,9 +344,12 @@ export function computeAnalyticsSummary(
     totalGridExportKwh: Number(totalExport.toFixed(1)),
     totalGridImportKwh: Number(totalImport.toFixed(1)),
     netGridBalanceKwh: netBalance,
-    batteryCycles: 1.8,
-    batteryRoundTripEfficiencyPct: 94.2,
-    currentSocPct: 68,
+    hasBattery: hasExplicitBattery,
+    batteryCycles: hasExplicitBattery ? 1.8 : 0,
+    batteryRoundTripEfficiencyPct: hasExplicitBattery ? 94.2 : 0,
+    currentSocPct: hasExplicitBattery ? 68 : 0,
+    totalBatCharge: Number(totalBatCharge.toFixed(1)),
+    totalBatDischarge: Number(totalBatDischarge.toFixed(1)),
     performanceRatioPct: pr,
     specificYieldKwhKwp: specYield,
     totalSavingsUsd: savings,
