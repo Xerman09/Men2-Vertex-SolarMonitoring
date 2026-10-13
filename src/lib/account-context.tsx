@@ -29,6 +29,9 @@ interface AccountContextType {
   totalAccounts: number;
   liveAccountsCount: number;
   directusStatus?: { connected: boolean; lastChecked: string; error?: string };
+  isPlantSwitching: boolean;
+  switchingPlantName: string | null;
+  setIsPlantSwitching: (switching: boolean, plantName?: string | null) => void;
 }
 
 const AccountContext = createContext<AccountContextType | undefined>(undefined);
@@ -38,6 +41,8 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [rawAccounts, setRawAccounts] = useState<AccountSummary[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('ALL');
   const [selectedStationId, setSelectedStationId] = useState<string>('ALL');
+  const [isPlantSwitching, setIsPlantSwitchingState] = useState<boolean>(false);
+  const [switchingPlantName, setSwitchingPlantName] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [syncing, setSyncing] = useState<boolean>(false);
   const [isFetchingDeye, setIsFetchingDeye] = useState<boolean>(false);
@@ -45,6 +50,26 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [directusStatus, setDirectusStatus] = useState<{ connected: boolean; lastChecked: string; error?: string } | undefined>(undefined);
   const { setSafeTimeout } = useSafeTimeout();
+
+  const setIsPlantSwitching = useCallback((switching: boolean, plantName?: string | null) => {
+    setIsPlantSwitchingState(switching);
+    if (plantName !== undefined) {
+      setSwitchingPlantName(plantName);
+    }
+    if (!switching) {
+      setSwitchingPlantName(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isPlantSwitching) {
+      const timer = setTimeout(() => {
+        setIsPlantSwitchingState(false);
+        setSwitchingPlantName(null);
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [isPlantSwitching]);
 
   const setFetchingDeye = useCallback((fetching: boolean, stage: string | null = null) => {
     setIsFetchingDeye(fetching);
@@ -75,10 +100,8 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
       if (showIndicator || forceSync) {
-        setSafeTimeout(() => {
-          setIsFetchingDeye(false);
-          setFetchingStage(null);
-        }, 800);
+        setIsFetchingDeye(false);
+        setFetchingStage(null);
       }
     }
   }, []);
@@ -158,6 +181,20 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     return selectedAccount.plants?.find((p) => p.stationId === selectedStationId) || null;
   }, [selectedAccount, selectedStationId]);
 
+  const handleSetSelectedStationId = useCallback((id: string) => {
+    if (id === selectedStationId) return;
+
+    const targetPlant = selectedAccount?.plants?.find((p) => p.stationId === id);
+    const plantName = id === 'ALL'
+      ? (selectedAccount?.name ? `${selectedAccount.name} (All Plants)` : 'All Plants')
+      : (targetPlant?.stationName || `Station ${id}`);
+
+    setIsPlantSwitchingState(true);
+    setSwitchingPlantName(plantName);
+    setSelectedStationId(id);
+    setFetchingDeye(true, `Syncing ${plantName} Telemetry...`);
+  }, [selectedStationId, selectedAccount, setFetchingDeye]);
+
   const handleSetSelectedAccountId = useCallback((id: string) => {
     if (isConsumer) {
       if (accounts.length > 0) {
@@ -167,11 +204,28 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     const normalized = id === 'ALL_FLEET' ? 'ALL' : id;
+    if (normalized !== selectedAccountId) {
+      const targetAcc = accounts.find((a) => a.id === normalized);
+      const accName = normalized === 'ALL' ? 'Fleet Multi-Site' : (targetAcc?.name || normalized);
+      setIsPlantSwitchingState(true);
+      setSwitchingPlantName(accName);
+      setFetchingDeye(true, `Switching to ${accName}...`);
+    }
     setSelectedAccountId(normalized);
     setSelectedStationId('ALL');
-  }, [isConsumer, accounts]);
+  }, [isConsumer, accounts, selectedAccountId, setFetchingDeye]);
 
   const selectAccountAndPlant = useCallback((accountId: string, stationId: string = 'ALL') => {
+    const targetAcc = accounts.find((a) => a.id === accountId);
+    const targetPlant = targetAcc?.plants?.find((p) => p.stationId === stationId);
+    const plantName = stationId === 'ALL'
+      ? (targetAcc?.name ? `${targetAcc.name} (All Plants)` : 'All Plants')
+      : (targetPlant?.stationName || `Station ${stationId}`);
+
+    setIsPlantSwitchingState(true);
+    setSwitchingPlantName(plantName);
+    setFetchingDeye(true, `Syncing ${plantName} Telemetry...`);
+
     if (isConsumer && accounts.length > 0) {
       setSelectedAccountId(accounts[0].id);
       setSelectedStationId(stationId);
@@ -180,7 +234,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     const normalized = accountId === 'ALL_FLEET' ? 'ALL' : accountId;
     setSelectedAccountId(normalized);
     setSelectedStationId(stationId);
-  }, [isConsumer, accounts]);
+  }, [isConsumer, accounts, setFetchingDeye]);
 
   // Fleet view is NEVER active for consumer accounts
   const isFleetView = !isConsumer && (selectedAccountId === 'ALL' || selectedAccountId === 'ALL_FLEET');
@@ -193,7 +247,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     setSelectedAccountId: handleSetSelectedAccountId,
     selectedAccount,
     selectedStationId,
-    setSelectedStationId,
+    setSelectedStationId: handleSetSelectedStationId,
     selectedPlant,
     selectAccountAndPlant,
     isFleetView,
@@ -208,12 +262,16 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     totalAccounts,
     liveAccountsCount,
     directusStatus,
+    isPlantSwitching,
+    switchingPlantName,
+    setIsPlantSwitching,
   }), [
     accounts,
     selectedAccountId,
     handleSetSelectedAccountId,
     selectedAccount,
     selectedStationId,
+    handleSetSelectedStationId,
     selectedPlant,
     selectAccountAndPlant,
     isFleetView,
@@ -228,6 +286,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     totalAccounts,
     liveAccountsCount,
     directusStatus,
+    isPlantSwitching,
+    switchingPlantName,
+    setIsPlantSwitching,
   ]);
 
   return (

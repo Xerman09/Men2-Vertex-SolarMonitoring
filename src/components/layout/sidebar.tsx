@@ -17,6 +17,8 @@ import {
   Activity,
   Layers,
   Sparkles,
+  LayoutGrid,
+  BarChart3,
 } from 'lucide-react';
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
@@ -40,48 +42,46 @@ export function Sidebar() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [mobileOpen, closeMobile]);
 
-  const navItems = [
+  const navItems: Array<{
+    label: string;
+    href: string;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    badge?: string;
+  }> = [
+    {
+      label: 'Analytics Dashboard',
+      href: '/analytics',
+      icon: BarChart3,
+    },
     {
       label: 'Energy Flow & Fleet',
       href: '/',
       icon: Zap,
-      badge: 'Live Hub',
-      badgeVariant: 'solar' as const,
     },
     {
       label: isAdmin ? 'Accounts & Plants' : 'Fleet Directory',
       href: '/accounts',
       icon: Building2,
-      badge: `${totalAccounts}`,
-      badgeVariant: 'outline' as const,
     },
     {
       label: 'Hardware Telemetry',
       href: '/hardware-telemetry',
       icon: Sliders,
-      badge: 'MPPT / AC',
-      badgeVariant: 'outline' as const,
     },
     {
       label: 'Yield & Arbitrage',
       href: '/yield-arbitrage',
       icon: TrendingUp,
-      badge: 'Tariff',
-      badgeVariant: 'outline' as const,
     },
     {
       label: 'Trigonometric Analytics',
       href: '/trigonometric-analytics',
       icon: Activity,
-      badge: 'Fourier/Phase',
-      badgeVariant: 'battery' as const,
     },
     {
       label: 'API & Diagnostics',
       href: '/api-diagnostics',
       icon: ShieldCheck,
-      badge: isAdmin ? 'Live' : 'View Only',
-      badgeVariant: 'outline' as const,
     },
   ];
 
@@ -125,7 +125,7 @@ export function Sidebar() {
             ) : (
               <div className="flex items-center justify-between w-full">
                 <Link
-                  href="/"
+                  href="/analytics"
                   className="flex items-center gap-2.5 overflow-hidden group select-none"
                   title="VOSolar Telemetry"
                 >

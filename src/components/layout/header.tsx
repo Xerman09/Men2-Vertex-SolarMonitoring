@@ -66,6 +66,8 @@ export function Header({
     fetchingStage,
     lastSyncedAt,
     directusStatus,
+    isPlantSwitching,
+    switchingPlantName,
   } = useAccount();
   const { role, isAdmin, isConsumer, isViewer, user, showAuthModal, setShowAuthModal, login, logout } = useRole();
 
@@ -125,7 +127,7 @@ export function Header({
   return (
     <header className="sticky top-0 z-30 h-16 w-full bg-background/85 backdrop-blur-md border-b border-border/60 transition-all relative">
       {/* Top-Edge Glowing Cybernetic Data Stream Progress Bar */}
-      {(isFetchingDeye || syncing) && (
+      {(isFetchingDeye || syncing || isPlantSwitching) && (
         <div className="absolute top-0 left-0 right-0 h-[2.5px] overflow-hidden z-50 pointer-events-none">
           <div className="h-full w-full bg-gradient-to-r from-emerald-500 via-cyan-400 to-amber-400 motion-safe:animate-pulse shadow-[0_0_10px_rgba(6,182,212,0.9)]" />
         </div>
@@ -183,7 +185,7 @@ export function Header({
                 <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground border-b border-border/60 mb-2 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2">
                     <span>{isConsumer ? 'Your Solar Plants' : 'Monitor Accounts & Plants'}</span>
-                    {(isFetchingDeye || syncing) && (
+                    {(isFetchingDeye || syncing || isPlantSwitching) && (
                       <span className="flex items-center gap-1 text-[9px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30 font-bold lowercase tracking-normal motion-safe:animate-pulse">
                         <RefreshCw size={9} className="animate-spin text-cyan-400" />
                         syncing...
@@ -306,7 +308,11 @@ export function Header({
                               </button>
                             )}
                             {isSelected && selectedStationId === 'ALL' && (
-                              <Check size={13} className="text-primary" />
+                              isPlantSwitching ? (
+                                <RefreshCw size={13} className="animate-spin text-primary" />
+                              ) : (
+                                <Check size={13} className="text-primary" />
+                              )
                             )}
                           </div>
                         </div>
@@ -349,7 +355,13 @@ export function Header({
                                     <span className="text-[10px] text-muted-foreground font-mono">
                                       {plant.installedCapacityKw} kWp
                                     </span>
-                                    {isPlantActive && <Check size={11} className="text-primary" />}
+                                    {isPlantActive && (
+                                      isPlantSwitching ? (
+                                        <RefreshCw size={11} className="animate-spin text-primary" />
+                                      ) : (
+                                        <Check size={11} className="text-primary" />
+                                      )
+                                    )}
                                   </div>
                                 </div>
                               );

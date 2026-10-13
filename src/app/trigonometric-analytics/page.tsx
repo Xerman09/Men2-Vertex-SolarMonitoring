@@ -13,6 +13,7 @@ import {
   Sparkles,
   Sliders,
   CheckCircle2,
+  Zap,
 } from 'lucide-react';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
 import { useAccount } from '@/lib/account-context';
@@ -28,26 +29,64 @@ import { HourlyEnergyPoint } from '@/lib/types';
 
 export default function TrigonometricAnalyticsPage() {
   const {
+    accounts,
     selectedAccountId,
     selectedAccount,
     selectedStationId,
     selectedPlant,
     isFleetView,
     totalAccounts,
+    loading: accountLoading,
+    syncing,
+    isFetchingDeye,
+    fetchingStage,
+    isPlantSwitching,
+    switchingPlantName,
+    setIsPlantSwitching,
+    setFetchingDeye,
   } = useAccount();
   const { isAdmin } = useRole();
+
+  const accountPlantsCount = selectedAccount?.plants?.length ?? 0;
+  const totalFleetPlantsCount = React.useMemo(
+    () => accounts.reduce((sum, a) => sum + (a.plants?.length || 0), 0),
+    [accounts]
+  );
+  const hasNoPlants = isFleetView ? totalFleetPlantsCount === 0 : accountPlantsCount === 0;
+  const isSyncingNoPlants = hasNoPlants && (accountLoading || isFetchingDeye || syncing);
 
   const [dateRange, setDateRange] = useState<'TODAY' | 'YESTERDAY' | 'WEEK' | 'SEASONAL'>('TODAY');
   const [hourlyData, setHourlyData] = useState<HourlySolarPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const currentTargetKey = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}:${dateRange}`;
+  const [displayedTargetKey, setDisplayedTargetKey] = useState<string>('');
+  const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
+  const inFlightControllerRef = React.useRef<AbortController | null>(null);
+
+  const isTargetPending = currentTargetKey !== displayedTargetKey || !isDataLoaded;
+  const showOverlay = isPlantSwitching || isTargetPending || isSyncingNoPlants || syncing;
+
   // Load telemetry data from API or fall back to simulated dataset
-  const fetchHistoricalData = async (range: string = dateRange) => {
+  const fetchHistoricalData = async (range: string = dateRange, forceReload: boolean = false) => {
+    const targetKeyAtStart = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}:${range}`;
+
+    if (inFlightControllerRef.current) {
+      if (!forceReload && targetKeyAtStart === displayedTargetKey) {
+        return;
+      }
+      inFlightControllerRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    inFlightControllerRef.current = controller;
+
     try {
-      const res = await fetch(`/api/deye/history?range=${range}&step=5`);
+      const res = await fetch(`/api/deye/history?range=${range}&step=5`, { signal: controller.signal });
       if (res.ok) {
         const json = await res.json();
+        if (controller.signal.aborted) return;
         if (json.data && Array.isArray(json.data)) {
           const mapped: HourlySolarPoint[] = json.data.map((item: HourlyEnergyPoint & { gridFlowKw?: number; isElapsed?: boolean }) => {
             const parts = item.hour.split(':');
@@ -65,19 +104,28 @@ export default function TrigonometricAnalyticsPage() {
             };
           });
           setHourlyData(mapped);
+          setDisplayedTargetKey(targetKeyAtStart);
+          setIsDataLoaded(true);
         }
       }
-    } catch (e) {
-      log.error('Failed to load history for trigonometric analysis', e);
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') {
+        log.error('Failed to load history for trigonometric analysis', e);
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!controller.signal.aborted) {
+        inFlightControllerRef.current = null;
+        setLoading(false);
+        setRefreshing(false);
+        setIsPlantSwitching(false);
+        setFetchingDeye(false, null);
+      }
     }
   };
 
   useEffect(() => {
-    fetchHistoricalData(dateRange);
-  }, [selectedAccountId, selectedStationId, dateRange]);
+    fetchHistoricalData(dateRange, true);
+  }, [currentTargetKey]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -89,7 +137,44 @@ export default function TrigonometricAnalyticsPage() {
     : selectedAccount?.capacityKw || 120;
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-12">
+    <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-12 relative">
+      {/* Full Frosted Overlay when switching plants or syncing with zero plants */}
+      {showOverlay && (
+        <div className="fixed inset-0 z-50 bg-background/60 backdrop-blur-sm flex items-center justify-center p-4 transition-all animate-in fade-in duration-200">
+          <div className="bg-card/95 border border-primary/30 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl flex flex-col items-center text-center space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="relative flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+              <div
+                className="absolute w-8 h-8 rounded-full border-2 border-emerald-500/20 border-b-emerald-500 animate-spin"
+                style={{ animationDirection: 'reverse' }}
+              />
+              <Zap className="h-5 w-5 text-amber-500 absolute animate-pulse" />
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-mono uppercase tracking-wider font-bold mb-1.5">
+                <RefreshCw size={10} className="animate-spin" />
+                <span>
+                  {isSyncingNoPlants ? 'Discovering Solar Plants...' : 'Station Re-Sync in Progress'}
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-foreground uppercase tracking-wider font-headline">
+                {isSyncingNoPlants
+                  ? fetchingStage || (selectedAccount ? `Scanning Plants for ${selectedAccount.name}...` : 'Syncing Solar Plants...')
+                  : `Syncing ${switchingPlantName || selectedPlant?.stationName || 'Plant'} Analytics`}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                {isSyncingNoPlants
+                  ? 'Connecting to DeyeCloud API gateway to discover registered stations...'
+                  : 'Recalibrating 24h harmonic history & trigonometric telemetry curve...'}
+              </p>
+            </div>
+            <div className="w-full bg-muted/60 rounded-full h-1.5 overflow-hidden">
+              <div className="bg-gradient-to-r from-emerald-500 via-primary to-amber-500 h-full w-full animate-pulse" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Banner with VOS Design Standards */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-border/50">
         <div>
@@ -182,6 +267,7 @@ export default function TrigonometricAnalyticsPage() {
       <TrigonometricHistoryGraph
         data={hourlyData.length > 0 ? hourlyData : undefined}
         installedCapacityKw={installedKw}
+        loading={loading || refreshing || isPlantSwitching || isSyncingNoPlants}
       />
 
       {/* Comparative Analytical Notes & Formula Breakdown */}
