@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-import { Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const TooltipProvider = TooltipPrimitive.Provider;
@@ -49,26 +48,16 @@ export function HoverInfo({
   side = 'top',
   align = 'center',
   className,
-  showIcon = false,
 }: HoverInfoProps) {
+  if (!children) return null;
+
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          {children ? (
-            <span className={cn('inline-flex items-center gap-1 cursor-help', className)}>
-              {children}
-              {showIcon && <Info className="w-3.5 h-3.5 text-muted-foreground/70 hover:text-foreground transition-colors shrink-0" />}
-            </span>
-          ) : (
-            <button
-              type="button"
-              className={cn('inline-flex items-center justify-center text-muted-foreground/70 hover:text-foreground transition-colors p-0.5 rounded-full hover:bg-muted/50 cursor-help', className)}
-              aria-label="Information"
-            >
-              <Info className="w-3.5 h-3.5 shrink-0" />
-            </button>
-          )}
+          <span className={cn('inline-flex items-center gap-1 cursor-help', className)}>
+            {children}
+          </span>
         </TooltipTrigger>
         <TooltipContent side={side} align={align} className="max-w-xs shadow-2xl border-border/70">
           {title && (

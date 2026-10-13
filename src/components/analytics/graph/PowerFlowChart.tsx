@@ -207,7 +207,7 @@ export function PowerFlowChart({
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-semibold text-foreground">
-                5-Minute Continuous Telemetry — PV (Green) · Consumption (Yellow) · Grid (Purple)
+                5-Minute Continuous Telemetry — Solar Yield (Amber) · Facility Load (Indigo) · Net Grid (Emerald)
               </span>
               <Badge variant="outline" className="text-[10px] font-mono border-border/70 text-muted-foreground bg-muted/40 px-1.5 py-0">
                 Dynamic Scale: {combinedYDomain[0]} kW → {combinedYDomain[1]} kW
@@ -215,13 +215,13 @@ export function PowerFlowChart({
             </div>
             <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> PV Power
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Solar Yield
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-yellow-500" /> Consumption
+                <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" /> Facility Load
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-purple-500" /> Net Grid Flow
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Net Grid Flow
               </span>
             </div>
           </div>
@@ -317,14 +317,14 @@ export function PowerFlowChart({
         </div>
       )}
 
-      {/* Individual PV Power (Green) */}
+      {/* Individual PV Power (Amber) */}
       {powerSubView === 'pv' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <span className="text-xs font-semibold text-foreground">
-              PV Power (Green) — Continuous 5-Minute Solar Generation Profile
+              Solar Yield (Amber) — Continuous 5-Minute Generation Profile
             </span>
-            <Badge variant="outline" className="text-[10px] font-mono border-emerald-500/30 text-emerald-400 bg-emerald-500/10 px-1.5 py-0">
+            <Badge variant="outline" className="text-[10px] font-mono border-amber-500/30 text-amber-500 bg-amber-500/10 px-1.5 py-0">
               Dynamic Scale: {pvYDomain[0]} kW → {pvYDomain[1]} kW (+18% Headroom)
             </Badge>
           </div>
@@ -357,7 +357,7 @@ export function PowerFlowChart({
                 <Area
                   type="monotone"
                   dataKey="pvPowerKw"
-                  name="PV Power (kW)"
+                  name="Solar Yield (kW)"
                   stroke={COLOR_PV}
                   strokeWidth={2.5}
                   fill="url(#soloPvGrad)"
@@ -372,14 +372,14 @@ export function PowerFlowChart({
         </div>
       )}
 
-      {/* Individual Consumption (Yellow) */}
+      {/* Individual Consumption (Indigo) */}
       {powerSubView === 'consumption' && (
         <div className="space-y-2.5">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <span className="text-xs font-semibold text-foreground">
-              Consumption (Yellow) — Continuous 5-Minute Industrial Load Demand Profile
+              Facility Load (Indigo) — Continuous 5-Minute Industrial Load Demand Profile
             </span>
-            <Badge variant="outline" className="text-[10px] font-mono border-yellow-500/30 text-yellow-400 bg-yellow-500/10 px-1.5 py-0">
+            <Badge variant="outline" className="text-[10px] font-mono border-indigo-500/30 text-indigo-400 bg-indigo-500/10 px-1.5 py-0">
               Dynamic Scale: {consumptionYDomain[0]} kW → {consumptionYDomain[1]} kW (+18% Headroom)
             </Badge>
           </div>
@@ -412,7 +412,7 @@ export function PowerFlowChart({
                 <Area
                   type="monotone"
                   dataKey="consumptionKw"
-                  name="Consumption (kW)"
+                  name="Facility Load (kW)"
                   stroke={COLOR_LOAD}
                   strokeWidth={2.5}
                   fill="url(#soloLoadGrad)"
@@ -427,14 +427,14 @@ export function PowerFlowChart({
         </div>
       )}
 
-      {/* Individual Grid Power (Purple) */}
+      {/* Individual Grid Power (Emerald) */}
       {powerSubView === 'grid' && (
         <div className="space-y-2.5">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <span className="text-xs font-semibold text-foreground">
-              Grid Power (Purple) — Continuous 5-Minute Net Exchange (+ Export / − Import)
+              Grid Net (Emerald) — Continuous 5-Minute Net Exchange (+ Export / − Import)
             </span>
-            <Badge variant="outline" className="text-[10px] font-mono border-purple-500/30 text-purple-400 bg-purple-500/10 px-1.5 py-0">
+            <Badge variant="outline" className="text-[10px] font-mono border-emerald-500/30 text-emerald-400 bg-emerald-500/10 px-1.5 py-0">
               Dynamic Scale: {gridYDomain[0]} kW → {gridYDomain[1]} kW (+18% Head / +14% Foot)
             </Badge>
           </div>
@@ -476,23 +476,23 @@ export function PowerFlowChart({
             </ResponsiveContainer>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] flex-wrap">
-            <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono font-medium text-[9.5px]">
-              Positive (+): Solar Export
+            <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-medium text-[9.5px]">
+              Positive (+): Clean Solar Export (Emerald)
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/20 font-mono font-medium text-[9.5px]">
-              Negative (−): Grid Import
+            <span className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 font-mono font-medium text-[9.5px]">
+              Negative (−): Utility Grid Import (Rose)
             </span>
           </div>
           {isAdmin && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/20">
-                <span className="font-semibold text-purple-400 block font-mono text-xs">Positive (+): Clean Solar Feed-in Export</span>
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/20">
+                <span className="font-semibold text-emerald-400 block font-mono text-xs">Positive (+): Clean Solar Feed-in Export</span>
                 <span className="text-[11px] text-muted-foreground mt-0.5 block">
                   {TELEMETRY_DESCRIPTIONS.trigonometricGraph.gridExportPositive}
                 </span>
               </div>
-              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/20">
-                <span className="font-semibold text-purple-300 block font-mono text-xs">Negative (−): Utility Grid Import</span>
+              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-rose-500/20">
+                <span className="font-semibold text-rose-400 block font-mono text-xs">Negative (−): Utility Grid Import</span>
                 <span className="text-[11px] text-muted-foreground mt-0.5 block">
                   {TELEMETRY_DESCRIPTIONS.trigonometricGraph.gridImportNegative}
                 </span>

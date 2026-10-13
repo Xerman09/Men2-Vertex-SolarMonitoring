@@ -82,7 +82,6 @@ export default function EnergyFlowDashboard() {
   const [forceCharge, setForceCharge] = useState(false);
   const [exportLimiter, setExportLimiter] = useState(false);
   const [manualPolling, setManualPolling] = useState(false);
-  const [isPlantBarCollapsed, setIsPlantBarCollapsed] = useState(false);
   const [mainTab, setMainTab] = useState<'synoptics' | 'compact-flow' | 'trigonometric'>('synoptics');
   const [compactSearchQuery, setCompactSearchQuery] = useState('');
 
@@ -539,13 +538,25 @@ export default function EnergyFlowDashboard() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border/50 pb-5">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight uppercase font-headline">
-              {isFleetView
-                ? 'Fleet Energy Synoptics'
-                : selectedPlant
-                ? `${selectedPlant.stationName} Synoptics`
-                : `${selectedAccount?.name || 'Selected Site'} Synoptics`}
-            </h1>
+            <HoverInfo
+              title="Energy Synoptics Loop"
+              content={
+                isFleetView
+                  ? `Real-time multi-site energy flow across ${totalAccounts} configured DeyeCloud accounts.`
+                  : selectedPlant
+                  ? `Real-time hybrid inverter loop for ${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp).`
+                  : `Real-time aggregated telemetry across all ${selectedAccount?.plants?.length || 1} plants (${totalCapacity.toFixed(0)} kWp total capacity).`
+              }
+              showIcon
+            >
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight uppercase font-headline cursor-help">
+                {isFleetView
+                  ? 'Fleet Energy Synoptics'
+                  : selectedPlant
+                  ? `${selectedPlant.stationName} Synoptics`
+                  : `${selectedAccount?.name || 'Selected Site'} Synoptics`}
+              </h1>
+            </HoverInfo>
             <Badge
               variant="outline"
               className="h-5 px-2 text-[10px] font-black uppercase tracking-widest border-emerald-500/30 text-emerald-500 bg-emerald-500/10"
@@ -553,15 +564,6 @@ export default function EnergyFlowDashboard() {
               {isFleetView ? 'Multi-Account Bus' : selectedStationId === 'ALL' ? `All ${selectedAccount?.plants?.length || 1} Plants Bus` : 'Hybrid Plant'}
             </Badge>
           </div>
-          {isAdmin && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {isFleetView
-                ? `Real-time multi-site energy flow across ${totalAccounts} configured DeyeCloud accounts.`
-                : selectedPlant
-                ? `Real-time hybrid inverter loop for ${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp).`
-                : `Real-time aggregated telemetry across all ${selectedAccount?.plants?.length || 1} plants (${totalCapacity.toFixed(0)} kWp total capacity).`}
-            </p>
-          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
@@ -686,95 +688,7 @@ export default function EnergyFlowDashboard() {
         </div>
       )}
 
-      {/* Dynamic Plant Switcher Bar (Collapsible) */}
-      {!isFleetView && selectedAccount && (selectedAccount.plants?.length || 0) > 0 && (
-        isPlantBarCollapsed ? (
-          <div className="flex items-center justify-between p-2 px-3.5 bg-card/70 rounded-xl border border-border/60 transition-all shadow-2xs">
-            <div className="flex items-center gap-2 text-xs truncate">
-              <Building2 size={15} className="text-primary shrink-0" />
-              <span className="text-muted-foreground font-mono uppercase tracking-wider text-[11px]">Active Plant:</span>
-              <span className="font-semibold text-foreground truncate">
-                {selectedPlant ? selectedPlant.stationName : `All Plants (${selectedAccount.plants?.length})`}
-              </span>
-              <span className="text-[10.5px] text-muted-foreground font-mono shrink-0">
-                ({selectedPlant ? `${selectedPlant.installedCapacityKw} kWp` : `${selectedAccount.capacityKw} kWp`})
-              </span>
-            </div>
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={() => setIsPlantBarCollapsed(false)}
-              className="gap-1 text-xs"
-            >
-              <span>Switch Plant</span>
-              <ChevronDown size={12} />
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 p-2 bg-card/70 rounded-xl border border-border/60 overflow-x-auto transition-all shadow-2xs">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono uppercase tracking-wider text-muted-foreground shrink-0">
-              <Building2 size={14} className="text-primary" />
-              <span>Select Plant:</span>
-            </div>
 
-            <button
-              onClick={() => setSelectedStationId('ALL')}
-              disabled={isReloadingPlant}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
-                selectedStationId === 'ALL'
-                  ? 'bg-primary text-primary-foreground font-bold shadow-xs'
-                  : 'bg-muted/50 text-foreground hover:bg-muted'
-              } ${isReloadingPlant && selectedStationId === 'ALL' ? 'ring-2 ring-primary/40 ring-offset-1' : ''}`}
-            >
-              {isReloadingPlant && selectedStationId === 'ALL' ? (
-                <RefreshCw size={11} className="animate-spin text-primary-foreground shrink-0" />
-              ) : null}
-              <span>All Plants ({selectedAccount.plants?.length})</span>
-              <span className="text-[10px] opacity-80">{selectedAccount.capacityKw} kWp</span>
-            </button>
-
-            {selectedAccount.plants?.map((plant) => {
-              const isPlantActive = selectedStationId === plant.stationId;
-              const isThisPlantSwitching = isReloadingPlant && isPlantActive;
-              return (
-                <button
-                  key={plant.stationId}
-                  onClick={() => setSelectedStationId(plant.stationId)}
-                  disabled={isReloadingPlant}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
-                    isPlantActive
-                      ? 'bg-primary text-primary-foreground font-bold shadow-xs'
-                      : 'bg-muted/50 text-foreground hover:bg-muted'
-                  } ${isThisPlantSwitching ? 'ring-2 ring-primary/40 ring-offset-1' : ''}`}
-                >
-                  {isThisPlantSwitching ? (
-                    <RefreshCw size={11} className="animate-spin text-primary-foreground shrink-0" />
-                  ) : (
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        isPlantActive ? 'bg-white' : 'bg-emerald-500'
-                      }`}
-                    />
-                  )}
-                  <span>{plant.stationName}</span>
-                  <span className="text-[10px] opacity-80 font-mono">
-                    ({plant.installedCapacityKw} kWp)
-                  </span>
-                </button>
-              );
-            })}
-
-            <button
-              onClick={() => setIsPlantBarCollapsed(true)}
-              className="ml-auto p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0 flex items-center gap-1 text-[11px] cursor-pointer"
-              title="Collapse plant picker bar"
-            >
-              <span className="hidden sm:inline text-[10.5px]">Fold</span>
-              <ChevronUp size={13} />
-            </button>
-          </div>
-        )
-      )}
 
       {/* 5 Primary Telemetry Summary Cards in VOS KPI Format */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 w-full">
@@ -1130,18 +1044,19 @@ export default function EnergyFlowDashboard() {
                   <Cpu size={18} />
                 </div>
                 <div>
-                  <h2 className="text-base sm:text-lg font-bold text-foreground">
-                    {isFleetView
-                      ? 'Multi-Site Aggregated Energy Flow Architecture'
-                      : selectedPlant
-                      ? `Energy Flow · ${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp)`
-                      : `Energy Flow · ${selectedAccount?.name || 'Inverter Hub'}`}
-                  </h2>
-                  {isAdmin && (
-                    <p className="text-xs text-muted-foreground">
-                      Dynamic balance between PV harvest, battery storage, facility load, and grid interconnect.
-                    </p>
-                  )}
+                  <HoverInfo
+                    title="Energy Flow Architecture"
+                    content="Dynamic balance between PV harvest, battery storage, facility load, and grid interconnect."
+                    showIcon
+                  >
+                    <h2 className="text-base sm:text-lg font-bold text-foreground cursor-help">
+                      {isFleetView
+                        ? 'Multi-Site Aggregated Energy Flow Architecture'
+                        : selectedPlant
+                        ? `Energy Flow · ${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp)`
+                        : `Energy Flow · ${selectedAccount?.name || 'Inverter Hub'}`}
+                    </h2>
+                  </HoverInfo>
                 </div>
               </div>
 

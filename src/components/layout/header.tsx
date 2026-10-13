@@ -17,6 +17,7 @@ import {
   Zap,
   Settings,
   Building2,
+  Cpu,
   RefreshCw,
   Menu,
   Shield,
@@ -79,7 +80,20 @@ export function Header({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
+  const [expandedPlants, setExpandedPlants] = useState<Record<string, boolean>>({});
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const isPlantDevicesExpanded = (stationId: string) => {
+    return Boolean(expandedPlants[stationId]);
+  };
+
+  const togglePlantExpand = (stationId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setExpandedPlants((prev) => ({
+      ...prev,
+      [stationId]: !prev[stationId],
+    }));
+  };
 
   const isAccountExpanded = (accId: string) => {
     if (expandedAccounts[accId] !== undefined) {
@@ -323,46 +337,105 @@ export function Header({
                             {plants.map((plant) => {
                               const isPlantActive =
                                 isSelected && selectedStationId === plant.stationId;
+                              const plantInverters = (plant.devices || []).filter(
+                                (d) => d.deviceType === 'INVERTER'
+                              );
+                              const hasInverters = plantInverters.length > 0;
+                              const isInvertersExpanded = isPlantDevicesExpanded(plant.stationId);
+
                               return (
-                                <div
-                                  key={plant.stationId}
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    selectAccountAndPlant(acc.id, plant.stationId);
-                                    setShowAccountDropdown(false);
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.preventDefault();
+                                <div key={plant.stationId} className="space-y-1">
+                                  <div
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={(e) => {
                                       e.stopPropagation();
                                       selectAccountAndPlant(acc.id, plant.stationId);
                                       setShowAccountDropdown(false);
-                                    }
-                                  }}
-                                  className={`flex items-center justify-between p-1.5 rounded-lg text-left cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-primary ${
-                                    isPlantActive
-                                      ? 'bg-primary/15 text-primary font-semibold'
-                                      : 'hover:bg-accent text-foreground/85'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-1.5 truncate">
-                                    <Building2 size={12} className={isPlantActive ? 'text-primary' : 'text-muted-foreground'} />
-                                    <span className="text-[11px] truncate">{plant.stationName}</span>
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        selectAccountAndPlant(acc.id, plant.stationId);
+                                        setShowAccountDropdown(false);
+                                      }
+                                    }}
+                                    className={`flex items-center justify-between p-1.5 rounded-lg text-left cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-primary ${
+                                      isPlantActive
+                                        ? 'bg-primary/15 text-primary font-semibold'
+                                        : 'hover:bg-accent text-foreground/85'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5 truncate">
+                                      <Building2 size={12} className={isPlantActive ? 'text-primary' : 'text-muted-foreground'} />
+                                      <span className="text-[11px] truncate">{plant.stationName}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <span className="text-[10px] text-muted-foreground font-mono">
+                                        {plant.installedCapacityKw} kWp
+                                      </span>
+                                      {hasInverters && (
+                                        <button
+                                          type="button"
+                                          aria-label={`Toggle inverters for ${plant.stationName}`}
+                                          onClick={(e) => togglePlantExpand(plant.stationId, e)}
+                                          className="p-0.5 rounded hover:bg-background/80 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                          title={isInvertersExpanded ? 'Hide inverters' : `Show ${plantInverters.length} inverters`}
+                                        >
+                                          <ChevronDown
+                                            size={11}
+                                            className={`transition-transform duration-200 ${
+                                              isInvertersExpanded ? 'rotate-180' : ''
+                                            }`}
+                                          />
+                                        </button>
+                                      )}
+                                      {isPlantActive && (
+                                        isPlantSwitching ? (
+                                          <RefreshCw size={11} className="animate-spin text-primary" />
+                                        ) : (
+                                          <Check size={11} className="text-primary" />
+                                        )
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    <span className="text-[10px] text-muted-foreground font-mono">
-                                      {plant.installedCapacityKw} kWp
-                                    </span>
-                                    {isPlantActive && (
-                                      isPlantSwitching ? (
-                                        <RefreshCw size={11} className="animate-spin text-primary" />
-                                      ) : (
-                                        <Check size={11} className="text-primary" />
-                                      )
-                                    )}
-                                  </div>
+
+                                  {/* Sub-node: Individual Inverters (Collapsed/Hidden by default) */}
+                                  {hasInverters && isInvertersExpanded && (
+                                    <div className="pl-4 pr-1 py-1 space-y-1 bg-muted/20 rounded-lg border border-border/40 ml-2 animate-in fade-in-50">
+                                      <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground px-1.5 py-0.5 flex items-center justify-between">
+                                        <span className="flex items-center gap-1">
+                                          <Cpu size={10} className="text-cyan-400" />
+                                          Inverters ({plantInverters.length})
+                                        </span>
+                                      </div>
+                                      {plantInverters.map((inv) => (
+                                        <div
+                                          key={inv.deviceSn}
+                                          className="flex items-center justify-between px-2 py-1 rounded text-[10.5px] hover:bg-accent/40 font-mono transition-colors"
+                                        >
+                                          <div className="flex items-center gap-1.5 truncate">
+                                            <span
+                                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                                inv.status === 'ONLINE'
+                                                  ? 'bg-emerald-500'
+                                                  : inv.status === 'FAULT'
+                                                  ? 'bg-rose-500'
+                                                  : 'bg-amber-500'
+                                              }`}
+                                            />
+                                            <span className="truncate text-foreground/90 font-sans">
+                                              {inv.model || inv.name || 'Deye Inverter'}
+                                            </span>
+                                          </div>
+                                          <span className="text-[9.5px] text-muted-foreground shrink-0">
+                                            {inv.ratedKw ? `${inv.ratedKw} kW` : inv.deviceSn}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}

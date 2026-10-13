@@ -24,6 +24,7 @@ import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { HoverInfo } from '@/components/ui/tooltip';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
 import { usePolling, useSafeTimeout } from '@/lib/usePolling';
@@ -484,14 +485,15 @@ export default function HardwareTelemetryPage() {
               <Activity size={18} />
             </div>
             <div>
-              <CardTitle className="text-sm sm:text-base font-bold text-foreground">
-                Three-Phase AC Grid Harmonics & Phasor Trigonometry
-              </CardTitle>
-              {isAdmin && (
-                <CardDescription className="text-xs mt-0.5">
-                  {TELEMETRY_DESCRIPTIONS.hardwareTelemetry.threePhaseAcGrid}
-                </CardDescription>
-              )}
+              <HoverInfo
+                title="Three-Phase Grid Harmonics & Phasor"
+                content={TELEMETRY_DESCRIPTIONS.hardwareTelemetry.threePhaseAcGrid}
+                showIcon
+              >
+                <CardTitle className="text-sm sm:text-base font-bold text-foreground cursor-help">
+                  Three-Phase AC Grid Harmonics & Phasor Trigonometry
+                </CardTitle>
+              </HoverInfo>
             </div>
           </div>
           <Badge variant="outline" className="text-cyan-500 border-cyan-500/30 bg-cyan-500/10 font-mono text-xs">

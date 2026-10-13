@@ -153,20 +153,12 @@ export function getMockHourlyEnergyPoints(
       }
       load = Number(Math.max(20, load).toFixed(2));
 
-      // Battery storage dispatch
-      let battery = 0;
-      if (solar > load) {
-        // Absorb excess solar up to 32 kW
-        battery = Math.min(32.0, (solar - load) * 0.55);
-      } else {
-        // Discharge to assist peak hours
-        const deficit = load - solar;
-        battery = hourDecimal >= 17.0 && hourDecimal <= 22.0 ? -Math.min(28.0, deficit * 0.6) : -Math.min(18.0, deficit * 0.35);
-      }
-      battery = Number(battery.toFixed(2));
+      // Pure Grid-Tied solar system (No physical battery installed)
+      // When physical battery banks are added in the future, battery dispatch will be populated
+      const battery = 0;
 
-      // Net grid exchange: solar - load - battery (+ = export, - = import)
-      const gridFlow = Number((solar - load - battery).toFixed(2));
+      // Net grid exchange: solar - load (+ = export, - = import)
+      const gridFlow = Number((solar - load).toFixed(2));
       const gridExport = Number(Math.max(0, gridFlow).toFixed(2));
       const tariff = h >= 14 && h <= 20 ? 0.36 : 0.14;
 
@@ -174,7 +166,7 @@ export function getMockHourlyEnergyPoints(
         hour: hourLabel,
         solarYieldKw: solar,
         loadDemandKw: load,
-        batteryFlowKw: battery,
+        batteryFlowKw: 0,
         gridFlowKw: gridFlow,
         gridExportKw: gridExport,
         tariffRateUsd: tariff,

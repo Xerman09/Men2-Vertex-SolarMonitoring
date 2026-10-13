@@ -75,6 +75,8 @@ export interface AnalyticsSummary {
   totalBatCharge?: number;
   totalBatDischarge?: number;
   performanceRatioPct: number;
+  inverterEfficiencyPct: number;
+  pvModuleEfficiencyPct: number;
   specificYieldKwhKwp: number;
   totalSavingsUsd: number;
   co2AvoidedKg: number;
@@ -351,6 +353,8 @@ export function computeAnalyticsSummary(
     totalBatCharge: Number(totalBatCharge.toFixed(1)),
     totalBatDischarge: Number(totalBatDischarge.toFixed(1)),
     performanceRatioPct: pr,
+    inverterEfficiencyPct: 98.4,
+    pvModuleEfficiencyPct: 21.8,
     specificYieldKwhKwp: specYield,
     totalSavingsUsd: savings,
     co2AvoidedKg: co2,

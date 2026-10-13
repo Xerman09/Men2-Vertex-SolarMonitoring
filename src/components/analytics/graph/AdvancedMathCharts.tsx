@@ -155,7 +155,7 @@ export function AdvancedMathCharts({
               <Area
                 type="monotone"
                 dataKey="actualSolarKw"
-                name="Actual Measured PV (Green)"
+                name="Actual Measured PV (Amber)"
                 stroke={COLOR_PV}
                 strokeWidth={2}
                 fill="url(#solarActualGreenGrad)"
@@ -230,7 +230,7 @@ export function AdvancedMathCharts({
               <Line
                 type="monotone"
                 dataKey="actualSolarKw"
-                name="Actual Harvest (Green)"
+                name="Actual Harvest (Amber)"
                 stroke={COLOR_PV}
                 strokeWidth={2}
                 dot={false}

@@ -25,6 +25,10 @@ export const TELEMETRY_DESCRIPTIONS = {
       'Normalized yield (kWh produced per kWp of installed solar capacity). Standard international metric for solar plant efficiency.',
     performanceRatio:
       'Performance Ratio (PR %): Overall plant quality factor comparing actual AC output against theoretical DC irradiance under standard conditions.',
+    inverterEfficiency:
+      'European weighted conversion efficiency of Deye silicon IGBT power semiconductors converting DC panel string power to synchronized AC grid electricity.',
+    pvModuleEfficiency:
+      'Photovoltaic panel conversion efficiency converting solar irradiance into DC power under ambient temperature and standard test conditions (STC).',
     costSavings:
       'Monetary savings achieved by displacing costly utility retail electricity with on-site solar self-consumption.',
     co2Avoided:
