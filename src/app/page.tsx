@@ -43,6 +43,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
 import { usePolling, useSafeTimeout } from '@/lib/usePolling';
 import { createLogger } from '@/lib/logger';
+import { telemetryCache } from '@/lib/telemetry-cache';
 
 const log = createLogger('Dashboard');
 
@@ -118,6 +119,31 @@ export default function EnergyFlowDashboard() {
   const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
   const inFlightControllerRef = useRef<AbortController | null>(null);
 
+  // Instantly restore cached plant telemetry (0ms instant switch)
+  useEffect(() => {
+    const cached = telemetryCache.get<{
+      station: StationSummary | null;
+      fleetAggregate: AggregatedFleetSummary | null;
+      nodes: FleetMatrixNode[];
+      isLive: boolean;
+    }>(currentTargetKey);
+
+    if (cached) {
+      if (isFleetView) {
+        if (cached.fleetAggregate) setFleetAggregate(cached.fleetAggregate);
+      } else {
+        if (cached.station) setStation(cached.station);
+      }
+      if (cached.nodes && cached.nodes.length > 0) {
+        setNodes(cached.nodes);
+      }
+      setIsLive(cached.isLive);
+      setDisplayedTargetKey(currentTargetKey);
+      setIsDataLoaded(true);
+      setIsPlantSwitching(false);
+    }
+  }, [currentTargetKey, isFleetView, setIsPlantSwitching]);
+
   const fetchTelemetry = useCallback(async (forceReload: boolean = false) => {
     // If target is already loaded and request is running for the same target, skip duplicate polling
     if (inFlightControllerRef.current) {
@@ -143,6 +169,12 @@ export default function EnergyFlowDashboard() {
           setIsLive(json.isLive);
           setDisplayedTargetKey(targetKeyAtStart);
           setIsDataLoaded(true);
+          telemetryCache.set(targetKeyAtStart, {
+            station: null,
+            fleetAggregate: json,
+            nodes: json.nodes || [],
+            isLive: json.isLive,
+          });
         }
       } else {
         const stationParam =
@@ -159,8 +191,9 @@ export default function EnergyFlowDashboard() {
           setStation(json.data);
           setIsLive(json.isLive);
 
+          let currentStationNodes: FleetMatrixNode[] = [];
+
           if (selectedAccount?.plants && selectedAccount.plants.length > 0) {
-            const accNodes: FleetMatrixNode[] = [];
             const targetPlants =
               selectedStationId !== 'ALL'
                 ? selectedAccount.plants.filter((p) => p.stationId === selectedStationId)
@@ -209,7 +242,7 @@ export default function EnergyFlowDashboard() {
                   loggers[i] ||
                   loggers[0];
 
-                accNodes.push({
+                currentStationNodes.push({
                   accountId: selectedAccountId,
                   accountName: selectedAccount.name,
                   stationName: plant.stationName,
@@ -231,9 +264,9 @@ export default function EnergyFlowDashboard() {
                 });
               }
             }
-            setNodes(accNodes);
+            setNodes(currentStationNodes);
           } else if (json.data) {
-            setNodes([
+            currentStationNodes = [
               {
                 accountId: selectedAccountId,
                 accountName: selectedAccount?.name || 'Selected Site',
@@ -248,11 +281,18 @@ export default function EnergyFlowDashboard() {
                 status: json.data.status === 'ONLINE' ? 'ONLINE' : 'FAULT',
                 isLive: json.isLive,
               },
-            ]);
+            ];
+            setNodes(currentStationNodes);
           }
 
           setDisplayedTargetKey(targetKeyAtStart);
           setIsDataLoaded(true);
+          telemetryCache.set(targetKeyAtStart, {
+            station: json.data,
+            fleetAggregate: null,
+            nodes: currentStationNodes,
+            isLive: json.isLive,
+          });
         }
       }
     } catch (e: any) {

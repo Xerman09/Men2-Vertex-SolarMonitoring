@@ -71,6 +71,7 @@ import {
   AnalyticsSummary,
 } from '@/lib/analytics-data';
 import { createLogger } from '@/lib/logger';
+import { telemetryCache } from '@/lib/telemetry-cache';
 
 const log = createLogger('AnalyticsDashboard');
 
@@ -157,6 +158,17 @@ export default function AnalyticsDashboardPage() {
   const [displayedTargetKey, setDisplayedTargetKey] = useState<string>('');
   const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
   const inFlightControllerRef = useRef<AbortController | null>(null);
+
+  // Instantly apply cached analytics telemetry on plant/range switch (0ms instant switch)
+  useEffect(() => {
+    const cached = telemetryCache.get<HourlyEnergyPoint[]>(`analytics:${currentTargetKey}`);
+    if (cached && cached.length > 0) {
+      setHourlyData(cached);
+      setDisplayedTargetKey(currentTargetKey);
+      setIsDataLoaded(true);
+      setIsPlantSwitching(false);
+    }
+  }, [currentTargetKey, setIsPlantSwitching]);
 
   // Derive all available plants across fleet or selected account
   const availablePlants = useMemo(() => {
@@ -347,9 +359,11 @@ export default function AnalyticsDashboardPage() {
           const json = await res.json();
           if (controller.signal.aborted) return;
           if (json.data && Array.isArray(json.data)) {
+            telemetryCache.set(`analytics:${targetKeyAtStart}`, json.data);
             setHourlyData(json.data);
             setDisplayedTargetKey(targetKeyAtStart);
             setIsDataLoaded(true);
+            setIsPlantSwitching(false);
             setLastRefreshedAt(new Date());
           }
         }
