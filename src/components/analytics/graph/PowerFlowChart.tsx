@@ -13,7 +13,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { Badge } from '@/components/ui/badge';
-import { useRole } from '@/lib/role-context';
+import { HoverInfo } from '@/components/ui/tooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { HourlySolarPoint } from '@/lib/trigonometric-math';
 import { CustomExactTooltip } from '../GraphTooltip';
@@ -66,112 +66,182 @@ export function PowerFlowChart({
   onSubViewChange,
   onRenderModeChange,
 }: PowerFlowChartProps) {
-  const { isAdmin } = useRole();
-
   return (
     <div className="space-y-3.5">
       {/* Real-Time Live Telemetry Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {/* PV Power (Green) */}
-        <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
-              PV Power ({currentLivePoint.hour})
-            </span>
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 motion-safe:animate-ping" />
+        {/* PV Power */}
+        <HoverInfo
+          className="block w-full cursor-help"
+          title={`PV Generation (${currentLivePoint.hour})`}
+          content={
+            <div className="text-[11px] space-y-1 min-w-[160px]">
+              <p className="text-muted-foreground">Instantaneous photovoltaic DC to AC generation sampled across current 5-minute interval.</p>
+              <div className="pt-1 border-t border-border/50 text-emerald-400 font-mono font-medium">
+                Peak: {peakPv.toFixed(1)} kW
+              </div>
+            </div>
+          }
+        >
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                PV Power ({currentLivePoint.hour})
+              </span>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 motion-safe:animate-ping" />
+            </div>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-lg sm:text-xl font-bold font-mono text-emerald-500">
+                {currentLivePoint.solarYieldKw !== null ? currentLivePoint.solarYieldKw.toFixed(2) : '0.00'}
+              </span>
+              <span className="text-[10px] text-muted-foreground font-mono">kW</span>
+            </div>
           </div>
-          <div className="flex items-baseline gap-1 mt-0.5">
-            <span className="text-lg sm:text-xl font-bold font-mono text-emerald-500">
-              {currentLivePoint.solarYieldKw !== null ? currentLivePoint.solarYieldKw.toFixed(2) : '0.00'}
-            </span>
-            <span className="text-[10px] text-muted-foreground font-mono">kW</span>
-          </div>
-          <span className="text-[10px] text-emerald-500/80 font-medium block truncate">
-            Peak: {peakPv.toFixed(1)} kW
-          </span>
-        </div>
+        </HoverInfo>
 
-        {/* Consumption (Yellow) */}
-        <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/30">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
-              Load ({currentLivePoint.hour})
-            </span>
-            <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
+        {/* Consumption */}
+        <HoverInfo
+          className="block w-full cursor-help"
+          title={`Facility Load (${currentLivePoint.hour})`}
+          content={
+            <div className="text-[11px] space-y-1 min-w-[160px]">
+              <p className="text-muted-foreground">Aggregated electrical consumption demands across on-site circuits and equipment.</p>
+              <div className="pt-1 border-t border-border/50 text-yellow-400 font-mono font-medium">
+                Peak: {peakLoad.toFixed(1)} kW
+              </div>
+            </div>
+          }
+        >
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/30">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                Load ({currentLivePoint.hour})
+              </span>
+              <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
+            </div>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-lg sm:text-xl font-bold font-mono text-yellow-500">
+                {currentLivePoint.loadDemandKw !== null ? currentLivePoint.loadDemandKw.toFixed(2) : '0.00'}
+              </span>
+              <span className="text-[10px] text-muted-foreground font-mono">kW</span>
+            </div>
           </div>
-          <div className="flex items-baseline gap-1 mt-0.5">
-            <span className="text-lg sm:text-xl font-bold font-mono text-yellow-500">
-              {currentLivePoint.loadDemandKw !== null ? currentLivePoint.loadDemandKw.toFixed(2) : '0.00'}
-            </span>
-            <span className="text-[10px] text-muted-foreground font-mono">kW</span>
-          </div>
-          <span className="text-[10px] text-yellow-500/80 font-medium block truncate">
-            Peak: {peakLoad.toFixed(1)} kW
-          </span>
-        </div>
+        </HoverInfo>
 
-        {/* Grid Power (Purple) */}
-        <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/30">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
-              Grid Flow ({currentLivePoint.hour})
-            </span>
-            <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+        {/* Grid Power */}
+        <HoverInfo
+          className="block w-full cursor-help"
+          title={`Grid Exchange (${currentLivePoint.hour})`}
+          content={
+            <div className="text-[11px] space-y-1 min-w-[160px]">
+              <p className="text-muted-foreground">Net power flow through bidirectional utility meter (+ export / - import).</p>
+              <div className="pt-1 border-t border-border/50 text-purple-400 font-mono font-medium">
+                Direction: {(currentLivePoint.gridExportKw ?? 0) >= 0 ? 'Surplus Export' : 'Grid Import'}
+              </div>
+            </div>
+          }
+        >
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/30">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                Grid Flow ({currentLivePoint.hour})
+              </span>
+              <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+            </div>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-lg sm:text-xl font-bold font-mono text-purple-500">
+                {currentLivePoint.gridExportKw !== null
+                  ? `${currentLivePoint.gridExportKw > 0 ? '+' : ''}${currentLivePoint.gridExportKw.toFixed(2)}`
+                  : '0.00'}
+              </span>
+              <span className="text-[10px] text-muted-foreground font-mono">kW</span>
+            </div>
           </div>
-          <div className="flex items-baseline gap-1 mt-0.5">
-            <span className="text-lg sm:text-xl font-bold font-mono text-purple-500">
-              {currentLivePoint.gridExportKw !== null
-                ? `${currentLivePoint.gridExportKw > 0 ? '+' : ''}${currentLivePoint.gridExportKw.toFixed(2)}`
-                : '0.00'}
-            </span>
-            <span className="text-[10px] text-muted-foreground font-mono">kW</span>
-          </div>
-          <span className="text-[10px] text-purple-500/80 font-medium block truncate">
-            {(currentLivePoint.gridExportKw ?? 0) >= 0 ? 'Surplus Export' : 'Grid Import'}
-          </span>
-        </div>
+        </HoverInfo>
 
-        {/* Battery Flow (Cyan) */}
-        <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-cyan-500/30">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
-              Battery ({currentLivePoint.hour})
-            </span>
-            <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
+        {/* Battery Flow */}
+        <HoverInfo
+          className="block w-full cursor-help"
+          title={`Battery ESS Flow (${currentLivePoint.hour})`}
+          content={
+            <div className="text-[11px] space-y-1 min-w-[160px]">
+              <p className="text-muted-foreground">Active charge or discharge rate across connected energy storage battery banks.</p>
+              <div className="pt-1 border-t border-border/50 text-cyan-400 font-mono font-medium">
+                State: {(currentLivePoint.batteryFlowKw ?? 0) >= 0 ? 'Charging' : 'Discharging'}
+              </div>
+            </div>
+          }
+        >
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-cyan-500/30">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                Battery ({currentLivePoint.hour})
+              </span>
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
+            </div>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-lg sm:text-xl font-bold font-mono text-cyan-500">
+                {currentLivePoint.batteryFlowKw !== null
+                  ? `${currentLivePoint.batteryFlowKw > 0 ? '+' : ''}${currentLivePoint.batteryFlowKw.toFixed(2)}`
+                  : '0.00'}
+              </span>
+              <span className="text-[10px] text-muted-foreground font-mono">kW</span>
+            </div>
           </div>
-          <div className="flex items-baseline gap-1 mt-0.5">
-            <span className="text-lg sm:text-xl font-bold font-mono text-cyan-500">
-              {currentLivePoint.batteryFlowKw !== null
-                ? `${currentLivePoint.batteryFlowKw > 0 ? '+' : ''}${currentLivePoint.batteryFlowKw.toFixed(2)}`
-                : '0.00'}
-            </span>
-            <span className="text-[10px] text-muted-foreground font-mono">kW</span>
-          </div>
-          <span className="text-[10px] text-cyan-500/80 font-medium block truncate">
-            {(currentLivePoint.batteryFlowKw ?? 0) >= 0 ? 'Charging' : 'Discharging'}
-          </span>
-        </div>
+        </HoverInfo>
       </div>
 
       {/* Sub-view selector & Style Toggle */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div className="flex items-center gap-0.5 p-0.5 bg-muted/50 rounded-lg border border-border/50 w-fit flex-wrap">
-          {(['combined', 'pv', 'consumption', 'grid'] as const).map((v) => (
+          <HoverInfo title="Combined Vectors" content="Simultaneous overlay of PV generation, facility load demand, and net utility grid exchange.">
             <button
-              key={v}
-              onClick={() => onSubViewChange(v)}
+              onClick={() => onSubViewChange('combined')}
               className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
-                powerSubView === v
+                powerSubView === 'combined'
                   ? 'bg-background text-foreground shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              {v === 'combined' && 'Combined'}
-              {v === 'pv' && 'PV (Green)'}
-              {v === 'consumption' && 'Load (Yellow)'}
-              {v === 'grid' && 'Grid (Purple)'}
+              Combined
             </button>
-          ))}
+          </HoverInfo>
+          <HoverInfo title="Solar PV Profile" content="High-resolution solar PV generation. Captures cloud transients, irradiance changes, and MPPT dynamic tracking.">
+            <button
+              onClick={() => onSubViewChange('pv')}
+              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+                powerSubView === 'pv'
+                  ? 'bg-background text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              PV
+            </button>
+          </HoverInfo>
+          <HoverInfo title="Facility Load Demand" content="Industrial facility electrical consumption. Reflects machinery stepping, cooling, and operational diurnal baselines.">
+            <button
+              onClick={() => onSubViewChange('consumption')}
+              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+                powerSubView === 'consumption'
+                  ? 'bg-background text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Load
+            </button>
+          </HoverInfo>
+          <HoverInfo title="Net Grid Flow" content="Two-way utility exchange balance. Positive (+) clean solar export vs negative (−) shortfall grid draw.">
+            <button
+              onClick={() => onSubViewChange('grid')}
+              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+                powerSubView === 'grid'
+                  ? 'bg-background text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Grid
+            </button>
+          </HoverInfo>
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -311,28 +381,39 @@ export function PowerFlowChart({
             </ResponsiveContainer>
           </div>
           <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono">
-            <span>288 points/day (every {timeResolution} mins) • Elapsed: 00:00 → {nowSlotStr}</span>
-            <span className="text-purple-400">Unelapsed: {nowSlotStr} → 23:55 (Pending)</span>
+            <HoverInfo
+              title="Daily Telemetry Resolution"
+              content="288 distinct 5-minute sampling intervals covering 24 hours. Points up to current time reflect measured inverter values."
+            >
+              <span className="cursor-help">288 points/day (every {timeResolution} mins) • Elapsed: 00:00 → {nowSlotStr}</span>
+            </HoverInfo>
+            <HoverInfo
+              title="Unelapsed Intervals"
+              content="Future intervals through 23:55 remain pending and cleanly stop at the current time."
+            >
+              <span className="text-purple-400 cursor-help">Unelapsed: {nowSlotStr} → 23:55 (Pending)</span>
+            </HoverInfo>
           </div>
         </div>
       )}
 
-      {/* Individual PV Power (Amber) */}
+      {/* Individual PV Power */}
       {powerSubView === 'pv' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <span className="text-xs font-semibold text-foreground">
-              Solar Yield (Amber) — Continuous 5-Minute Generation Profile
-            </span>
+            <HoverInfo
+              title="Solar PV Generation Profile"
+              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.pvPowerSolo}
+              showIcon
+            >
+              <span className="text-xs font-semibold text-foreground cursor-help">
+                Solar Yield — Continuous 5-Minute Generation Profile
+              </span>
+            </HoverInfo>
             <Badge variant="outline" className="text-[10px] font-mono border-amber-500/30 text-amber-500 bg-amber-500/10 px-1.5 py-0">
               Dynamic Scale: {pvYDomain[0]} kW → {pvYDomain[1]} kW (+18% Headroom)
             </Badge>
           </div>
-          {isAdmin && (
-            <p className="text-xs text-muted-foreground">
-              {TELEMETRY_DESCRIPTIONS.trigonometricGraph.pvPowerSolo}
-            </p>
-          )}
           <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
@@ -372,22 +453,23 @@ export function PowerFlowChart({
         </div>
       )}
 
-      {/* Individual Consumption (Indigo) */}
+      {/* Individual Consumption */}
       {powerSubView === 'consumption' && (
         <div className="space-y-2.5">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <span className="text-xs font-semibold text-foreground">
-              Facility Load (Indigo) — Continuous 5-Minute Industrial Load Demand Profile
-            </span>
+            <HoverInfo
+              title="Industrial Facility Load Profile"
+              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.consumptionSolo}
+              showIcon
+            >
+              <span className="text-xs font-semibold text-foreground cursor-help">
+                Facility Load — Continuous 5-Minute Industrial Load Demand Profile
+              </span>
+            </HoverInfo>
             <Badge variant="outline" className="text-[10px] font-mono border-indigo-500/30 text-indigo-400 bg-indigo-500/10 px-1.5 py-0">
               Dynamic Scale: {consumptionYDomain[0]} kW → {consumptionYDomain[1]} kW (+18% Headroom)
             </Badge>
           </div>
-          {isAdmin && (
-            <p className="text-xs text-muted-foreground">
-              {TELEMETRY_DESCRIPTIONS.trigonometricGraph.consumptionSolo}
-            </p>
-          )}
           <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
@@ -427,12 +509,12 @@ export function PowerFlowChart({
         </div>
       )}
 
-      {/* Individual Grid Power (Emerald) */}
+      {/* Individual Grid Power */}
       {powerSubView === 'grid' && (
         <div className="space-y-2.5">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <span className="text-xs font-semibold text-foreground">
-              Grid Net (Emerald) — Continuous 5-Minute Net Exchange (+ Export / − Import)
+              Grid Net — Continuous 5-Minute Net Exchange (+ Export / − Import)
             </span>
             <Badge variant="outline" className="text-[10px] font-mono border-emerald-500/30 text-emerald-400 bg-emerald-500/10 px-1.5 py-0">
               Dynamic Scale: {gridYDomain[0]} kW → {gridYDomain[1]} kW (+18% Head / +14% Foot)
@@ -475,30 +557,24 @@ export function PowerFlowChart({
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex items-center gap-1.5 text-[10px] flex-wrap">
-            <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-medium text-[9.5px]">
-              Positive (+): Clean Solar Export (Emerald)
-            </span>
-            <span className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 font-mono font-medium text-[9.5px]">
-              Negative (−): Utility Grid Import (Rose)
-            </span>
+          <div className="flex items-center gap-2 text-[10px] flex-wrap">
+            <HoverInfo
+              title="Clean Solar Feed-in Export (+)"
+              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.gridExportPositive}
+            >
+              <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-medium text-[9.5px] cursor-help">
+                Positive (+): Clean Solar Export
+              </span>
+            </HoverInfo>
+            <HoverInfo
+              title="Utility Grid Import (−)"
+              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.gridImportNegative}
+            >
+              <span className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 font-mono font-medium text-[9.5px] cursor-help">
+                Negative (−): Utility Grid Import
+              </span>
+            </HoverInfo>
           </div>
-          {isAdmin && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/20">
-                <span className="font-semibold text-emerald-400 block font-mono text-xs">Positive (+): Clean Solar Feed-in Export</span>
-                <span className="text-[11px] text-muted-foreground mt-0.5 block">
-                  {TELEMETRY_DESCRIPTIONS.trigonometricGraph.gridExportPositive}
-                </span>
-              </div>
-              <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-rose-500/20">
-                <span className="font-semibold text-rose-400 block font-mono text-xs">Negative (−): Utility Grid Import</span>
-                <span className="text-[11px] text-muted-foreground mt-0.5 block">
-                  {TELEMETRY_DESCRIPTIONS.trigonometricGraph.gridImportNegative}
-                </span>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

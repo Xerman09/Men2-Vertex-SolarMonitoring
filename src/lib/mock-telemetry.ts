@@ -93,15 +93,29 @@ export function getMockInverterTelemetry(): InverterTelemetry {
 export function getMockHourlyEnergyPoints(
   range: string = 'TODAY',
   currentHour?: number,
-  stepMinutes: number = 5
+  stepMinutes: number = 5,
+  date?: string
 ): HourlyEnergyPoint[] {
   const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const isToday = range.toUpperCase() === 'TODAY' && (!date || date === todayStr);
+
   const currentMinutes =
     currentHour !== undefined
       ? currentHour * 60 + now.getMinutes()
       : now.getHours() * 60 + now.getMinutes();
 
-  const isToday = range.toUpperCase() === 'TODAY';
+  // Deterministic variance factor based on date string (if specified)
+  let dateVariance = 1.0;
+  if (date) {
+    let hash = 0;
+    for (let c = 0; c < date.length; c++) {
+      hash = (hash * 31 + date.charCodeAt(c)) & 0xffffffff;
+    }
+    // Variance between 0.88 and 1.08
+    dateVariance = 0.88 + ((Math.abs(hash) % 21) / 100);
+  }
+
   const totalSteps = Math.floor((24 * 60) / stepMinutes);
   const points: HourlyEnergyPoint[] = [];
 
@@ -134,7 +148,7 @@ export function getMockHourlyEnergyPoints(
         // Realistic dynamic telemetry: morning cloud transient and MPPT tracking ripples
         const cloudDip = hourDecimal >= 9.25 && hourDecimal <= 9.75 ? 0.84 : 1.0;
         const ripple = Math.sin(hourDecimal * 7.5) * 1.8 + Math.cos(hourDecimal * 18.3) * 0.9;
-        solar = Math.max(0, Number((baseSine * 119.5 * cloudDip + (baseSine > 0.05 ? ripple : 0)).toFixed(2)));
+        solar = Math.max(0, Number((baseSine * 119.5 * dateVariance * cloudDip + (baseSine > 0.05 ? ripple : 0)).toFixed(2)));
       }
 
       // Industrial Load Demand profile (morning ramp, daytime industrial operation, evening drop)

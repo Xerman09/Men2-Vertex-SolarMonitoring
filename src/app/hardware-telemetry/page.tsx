@@ -169,9 +169,9 @@ export default function HardwareTelemetryPage() {
   const pv1 = telemetry?.mpptStrings[0] || { stringId: 'MPPT-1 String', voltageV: 0, currentA: 0, powerKw: 0 };
   const pv2 = telemetry?.mpptStrings[1] || { stringId: 'MPPT-2 String', voltageV: 0, currentA: 0, powerKw: 0 };
   const phases = telemetry?.phases && telemetry.phases.length > 0 ? telemetry.phases : [
-    { phase: 'L1' as const, voltageV: 230.4, currentA: 28.5, frequencyHz: 60.01 },
-    { phase: 'L2' as const, voltageV: 229.8, currentA: 28.1, frequencyHz: 60.01 },
-    { phase: 'L3' as const, voltageV: 231.2, currentA: 28.4, frequencyHz: 60.00 },
+    { phase: 'L1' as const, voltageV: 0, currentA: 0, frequencyHz: telemetry?.gridFrequencyHz || 0 },
+    { phase: 'L2' as const, voltageV: 0, currentA: 0, frequencyHz: telemetry?.gridFrequencyHz || 0 },
+    { phase: 'L3' as const, voltageV: 0, currentA: 0, frequencyHz: telemetry?.gridFrequencyHz || 0 },
   ];
 
   const currentInvMeta = availableInverters.find((i) => i.deviceSn === (telemetry?.deviceSn || selectedInverterSn));
@@ -224,20 +224,23 @@ export default function HardwareTelemetryPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline">
-                  Inverter Hardware & Electrical Telemetry
-                </h1>
+                <HoverInfo
+                  title="Inverter Hardware & Electrical Telemetry"
+                  content={
+                    isFleetView
+                      ? TELEMETRY_DESCRIPTIONS.pageHeaders.hardwareTelemetryFleet
+                      : `Component diagnostics for ${selectedAccount?.name || 'Selected Site'}.`
+                  }
+                  showIcon
+                >
+                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline cursor-help">
+                    Inverter Hardware & Electrical Telemetry
+                  </h1>
+                </HoverInfo>
                 <Badge variant="outline" className="border-cyan-500/30 text-cyan-500 bg-cyan-500/10 font-mono text-[10px]">
                   Direct Modbus / Cloud
                 </Badge>
               </div>
-              {isAdmin && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {isFleetView
-                    ? 'Deep component diagnostics, DC MPPT string performance, AC waveforms, and thermal matrices across fleet inverters.'
-                    : `Component diagnostics for ${selectedAccount?.name || 'Selected Site'}.`}
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -382,7 +385,7 @@ export default function HardwareTelemetryPage() {
                   {pv1.stringId}
                 </CardTitle>
                 <span className="text-[11px] text-muted-foreground">
-                  Monocrystalline PERC (32 Modules)
+                  {pv1.powerKw > 0 || pv1.voltageV > 0 ? 'DC MPPT Channel 1' : 'Channel 1 (Idle)'}
                 </span>
               </div>
             </div>
@@ -399,7 +402,9 @@ export default function HardwareTelemetryPage() {
                 <span className="text-base font-bold font-mono text-foreground block mt-0.5">
                   {pv1.voltageV.toFixed(1)} V
                 </span>
-                <span className="text-[10px] text-emerald-500">200-850V Range</span>
+                <span className="text-[10px] text-emerald-500">
+                  {pv1.voltageV > 0 ? `${pv1.voltageV.toFixed(1)} V Active` : '0.0 V'}
+                </span>
               </div>
               <div className="p-3 bg-muted/40 rounded-xl border border-border/40">
                 <span className="text-[10px] font-mono text-muted-foreground uppercase block">
@@ -408,16 +413,20 @@ export default function HardwareTelemetryPage() {
                 <span className="text-base font-bold font-mono text-foreground block mt-0.5">
                   {pv1.currentA.toFixed(1)} A
                 </span>
-                <span className="text-[10px] text-muted-foreground">Isc: 40A</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {pv1.currentA > 0 ? `${pv1.currentA.toFixed(1)} A Flow` : '0.0 A'}
+                </span>
               </div>
               <div className="p-3 bg-muted/40 rounded-xl border border-border/40">
                 <span className="text-[10px] font-mono text-muted-foreground uppercase block">
                   MPPT Tracking
                 </span>
                 <span className="text-base font-bold font-mono text-emerald-500 block mt-0.5">
-                  99.8%
+                  {pv1.powerKw > 0 ? 'Active' : 'Standby'}
                 </span>
-                <span className="text-[10px] text-muted-foreground">Locked</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {pv1.powerKw > 0 ? 'Tracking' : 'Idle'}
+                </span>
               </div>
             </div>
           </CardContent>
@@ -435,7 +444,7 @@ export default function HardwareTelemetryPage() {
                   {pv2.stringId}
                 </CardTitle>
                 <span className="text-[11px] text-muted-foreground">
-                  Monocrystalline PERC (32 Modules)
+                  {pv2.powerKw > 0 || pv2.voltageV > 0 ? 'DC MPPT Channel 2' : 'Channel 2 (Idle)'}
                 </span>
               </div>
             </div>
@@ -452,7 +461,9 @@ export default function HardwareTelemetryPage() {
                 <span className="text-base font-bold font-mono text-foreground block mt-0.5">
                   {pv2.voltageV.toFixed(1)} V
                 </span>
-                <span className="text-[10px] text-emerald-500">200-850V Range</span>
+                <span className="text-[10px] text-emerald-500">
+                  {pv2.voltageV > 0 ? `${pv2.voltageV.toFixed(1)} V Active` : '0.0 V'}
+                </span>
               </div>
               <div className="p-3 bg-muted/40 rounded-xl border border-border/40">
                 <span className="text-[10px] font-mono text-muted-foreground uppercase block">
@@ -461,16 +472,20 @@ export default function HardwareTelemetryPage() {
                 <span className="text-base font-bold font-mono text-foreground block mt-0.5">
                   {pv2.currentA.toFixed(1)} A
                 </span>
-                <span className="text-[10px] text-muted-foreground">Isc: 40A</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {pv2.currentA > 0 ? `${pv2.currentA.toFixed(1)} A Flow` : '0.0 A'}
+                </span>
               </div>
               <div className="p-3 bg-muted/40 rounded-xl border border-border/40">
                 <span className="text-[10px] font-mono text-muted-foreground uppercase block">
                   MPPT Tracking
                 </span>
                 <span className="text-base font-bold font-mono text-emerald-500 block mt-0.5">
-                  99.7%
+                  {pv2.powerKw > 0 ? 'Active' : 'Standby'}
                 </span>
-                <span className="text-[10px] text-muted-foreground">Locked</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {pv2.powerKw > 0 ? 'Tracking' : 'Idle'}
+                </span>
               </div>
             </div>
           </CardContent>
@@ -497,7 +512,7 @@ export default function HardwareTelemetryPage() {
             </div>
           </div>
           <Badge variant="outline" className="text-cyan-500 border-cyan-500/30 bg-cyan-500/10 font-mono text-xs">
-            Grid Synced @ 60.01 Hz
+            {telemetry?.gridFrequencyHz ? `Grid Synced @ ${telemetry.gridFrequencyHz.toFixed(2)} Hz` : 'Grid Standby'}
           </Badge>
         </CardHeader>
         <CardContent className="p-5">
@@ -508,17 +523,21 @@ export default function HardwareTelemetryPage() {
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="font-bold text-xs text-foreground font-mono">Phase {ph.phase}</span>
                   <Badge variant="outline" className="text-[10px] font-mono border-emerald-500/30 text-emerald-500">
-                    {ph.frequencyHz.toFixed(2)} Hz
+                    {ph.frequencyHz ? `${ph.frequencyHz.toFixed(2)} Hz` : '--'}
                   </Badge>
                 </div>
                 <div className="flex items-baseline justify-between mt-2">
                   <div>
                     <span className="text-[10px] text-muted-foreground block font-mono">Voltage</span>
-                    <span className="text-lg font-bold font-mono text-foreground">{ph.voltageV.toFixed(1)} V</span>
+                    <span className="text-lg font-bold font-mono text-foreground">
+                      {ph.voltageV > 0 ? `${ph.voltageV.toFixed(1)} V` : '--'}
+                    </span>
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] text-muted-foreground block font-mono">Current</span>
-                    <span className="text-lg font-bold font-mono text-cyan-500">{ph.currentA.toFixed(1)} A</span>
+                    <span className="text-lg font-bold font-mono text-cyan-500">
+                      {ph.currentA > 0 ? `${ph.currentA.toFixed(1)} A` : '--'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -541,19 +560,19 @@ export default function HardwareTelemetryPage() {
             <div className="flex justify-between py-1">
               <span className="text-muted-foreground">IGBT Heatsink</span>
               <span className="font-mono font-bold text-foreground">
-                {telemetry?.heatsinkTempC ? `${telemetry.heatsinkTempC.toFixed(1)}°C` : '46.2°C'}
+                {telemetry?.heatsinkTempC ? `${telemetry.heatsinkTempC.toFixed(1)}°C` : '--'}
               </span>
             </div>
             <div className="flex justify-between py-1 border-t border-border/40">
               <span className="text-muted-foreground">Transformer Core</span>
               <span className="font-mono font-bold text-foreground">
-                {telemetry?.heatsinkTempC ? `${(telemetry.heatsinkTempC + 6.6).toFixed(1)}°C` : '52.8°C'}
+                {telemetry?.heatsinkTempC ? `${(telemetry.heatsinkTempC + 6.6).toFixed(1)}°C` : '--'}
               </span>
             </div>
             <div className="flex justify-between py-1 border-t border-border/40">
               <span className="text-muted-foreground">Ambient Internal Air</span>
               <span className="font-mono font-bold text-emerald-500">
-                {telemetry?.ambientTempC ? `${telemetry.ambientTempC.toFixed(1)}°C` : '31.4°C'}
+                {telemetry?.ambientTempC ? `${telemetry.ambientTempC.toFixed(1)}°C` : '--'}
               </span>
             </div>
           </div>
@@ -568,19 +587,19 @@ export default function HardwareTelemetryPage() {
             <div className="flex justify-between py-1">
               <span className="text-muted-foreground">DC Bus Voltage</span>
               <span className="font-mono font-bold text-cyan-500">
-                51.4 V
+                --
               </span>
             </div>
             <div className="flex justify-between py-1 border-t border-border/40">
               <span className="text-muted-foreground">State of Charge (SOC)</span>
               <span className="font-mono font-bold text-foreground">
-                92.5%
+                --
               </span>
             </div>
             <div className="flex justify-between py-1 border-t border-border/40">
               <span className="text-muted-foreground">Battery Core Temp</span>
               <span className="font-mono font-bold text-emerald-500">
-                28.1°C
+                {telemetry?.ambientTempC ? `${(telemetry.ambientTempC - 2).toFixed(1)}°C` : '--'}
               </span>
             </div>
           </div>

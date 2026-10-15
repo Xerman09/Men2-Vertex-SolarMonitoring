@@ -22,6 +22,8 @@ import { useRole } from '@/lib/role-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { HoverInfo } from '@/components/ui/tooltip';
+import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { createLogger } from '@/lib/logger';
 import { useSafeTimeout } from '@/lib/usePolling';
 
@@ -59,21 +61,24 @@ export default function ApiDiagnosticsPage() {
     fetchHealth();
   }, [selectedAccountId, isFleetView]);
 
+  const activeStationId = selectedAccount?.plants?.[0]?.stationId || 'SP_01';
+  const activeDeviceSn = selectedAccount?.plants?.[0]?.devices?.find((d) => d.deviceType === 'INVERTER')?.deviceSn || 'DEVICE_SN';
+
   const snippets = {
     curl: {
-      station: `curl -X GET "https://api.deyecloud.com/v1.0/station/latest?station_id=SP_04" \\\n  -H "Authorization: Bearer deye_live_token_77a988d" \\\n  -H "Accept: application/json"`,
-      telemetry: `curl -X GET "https://api.deyecloud.com/v1.0/device/inverter/telemetry?device_sn=2209X891104" \\\n  -H "Authorization: Bearer deye_live_token_77a988d" \\\n  -H "Content-Type: application/json"`,
-      workmode: `curl -X POST "https://api.deyecloud.com/v1.0/control/workmode" \\\n  -H "Authorization: Bearer deye_live_token_77a988d" \\\n  -H "Content-Type: application/json" \\\n  -d '{"device_sn": "2209X891104", "mode": "PEAK_SHAVING", "grid_charge": true}'`,
+      station: `curl -X GET "https://api.deyecloud.com/v1.0/station/latest?station_id=${activeStationId}" \\\n  -H "Authorization: Bearer deye_live_token_77a988d" \\\n  -H "Accept: application/json"`,
+      telemetry: `curl -X GET "https://api.deyecloud.com/v1.0/device/inverter/telemetry?device_sn=${activeDeviceSn}" \\\n  -H "Authorization: Bearer deye_live_token_77a988d" \\\n  -H "Content-Type: application/json"`,
+      workmode: `curl -X POST "https://api.deyecloud.com/v1.0/control/workmode" \\\n  -H "Authorization: Bearer deye_live_token_77a988d" \\\n  -H "Content-Type: application/json" \\\n  -d '{"device_sn": "${activeDeviceSn}", "mode": "PEAK_SHAVING", "grid_charge": true}'`,
     },
     python: {
-      station: `import requests\n\nurl = "https://api.deyecloud.com/v1.0/station/latest"\nheaders = {"Authorization": "Bearer deye_live_token_77a988d"}\nres = requests.get(url, params={"station_id": "SP_04"}, headers=headers)\nprint(res.json())`,
-      telemetry: `import requests\n\nurl = "https://api.deyecloud.com/v1.0/device/inverter/telemetry"\nheaders = {"Authorization": "Bearer deye_live_token_77a988d"}\nres = requests.get(url, params={"device_sn": "2209X891104"}, headers=headers)\nprint(res.json())`,
-      workmode: `import requests\n\nurl = "https://api.deyecloud.com/v1.0/control/workmode"\npayload = {"device_sn": "2209X891104", "mode": "PEAK_SHAVING", "grid_charge": True}\nres = requests.post(url, json=payload, headers={"Authorization": "Bearer deye_live_token_77a988d"})\nprint(res.status_code, res.json())`,
+      station: `import requests\n\nurl = "https://api.deyecloud.com/v1.0/station/latest"\nheaders = {"Authorization": "Bearer deye_live_token_77a988d"}\nres = requests.get(url, params={"station_id": "${activeStationId}"}, headers=headers)\nprint(res.json())`,
+      telemetry: `import requests\n\nurl = "https://api.deyecloud.com/v1.0/device/inverter/telemetry"\nheaders = {"Authorization": "Bearer deye_live_token_77a988d"}\nres = requests.get(url, params={"device_sn": "${activeDeviceSn}"}, headers=headers)\nprint(res.json())`,
+      workmode: `import requests\n\nurl = "https://api.deyecloud.com/v1.0/control/workmode"\npayload = {"device_sn": "${activeDeviceSn}", "mode": "PEAK_SHAVING", "grid_charge": True}\nres = requests.post(url, json=payload, headers={"Authorization": "Bearer deye_live_token_77a988d"})\nprint(res.status_code, res.json())`,
     },
     node: {
-      station: `const axios = require('axios');\n\nconst { data } = await axios.get('https://api.deyecloud.com/v1.0/station/latest', {\n  params: { station_id: 'SP_04' },\n  headers: { Authorization: 'Bearer deye_live_token_77a988d' }\n});\nprocess.stdout.write(JSON.stringify(data, null, 2) + '\\n');`,
-      telemetry: `const axios = require('axios');\n\nconst { data } = await axios.get('https://api.deyecloud.com/v1.0/device/inverter/telemetry', {\n  params: { device_sn: '2209X891104' },\n  headers: { Authorization: 'Bearer deye_live_token_77a988d' }\n});\nprocess.stdout.write(JSON.stringify(data, null, 2) + '\\n');`,
-      workmode: `const axios = require('axios');\n\nconst { data } = await axios.post('https://api.deyecloud.com/v1.0/control/workmode', {\n  device_sn: '2209X891104',\n  mode: 'PEAK_SHAVING',\n  grid_charge: true\n}, {\n  headers: { Authorization: 'Bearer deye_live_token_77a988d' }\n});\nprocess.stdout.write(JSON.stringify(data, null, 2) + '\\n');`,
+      station: `const axios = require('axios');\n\nconst { data } = await axios.get('https://api.deyecloud.com/v1.0/station/latest', {\n  params: { station_id: '${activeStationId}' },\n  headers: { Authorization: 'Bearer deye_live_token_77a988d' }\n});\nprocess.stdout.write(JSON.stringify(data, null, 2) + '\\n');`,
+      telemetry: `const axios = require('axios');\n\nconst { data } = await axios.get('https://api.deyecloud.com/v1.0/device/inverter/telemetry', {\n  params: { device_sn: '${activeDeviceSn}' },\n  headers: { Authorization: 'Bearer deye_live_token_77a988d' }\n});\nprocess.stdout.write(JSON.stringify(data, null, 2) + '\\n');`,
+      workmode: `const axios = require('axios');\n\nconst { data } = await axios.post('https://api.deyecloud.com/v1.0/control/workmode', {\n  device_sn: '${activeDeviceSn}',\n  mode: 'PEAK_SHAVING',\n  grid_charge: true\n}, {\n  headers: { Authorization: 'Bearer deye_live_token_77a988d' }\n});\nprocess.stdout.write(JSON.stringify(data, null, 2) + '\\n');`,
     },
   };
 
@@ -100,7 +105,7 @@ export default function ApiDiagnosticsPage() {
         endpoint = '/api/deye/control';
         method = 'POST';
         bodyData = JSON.stringify({
-          deviceSn: '2209X891104',
+          deviceSn: activeDeviceSn,
           mode: 'PEAK_SHAVING',
           gridCharge: true,
           accountId: isFleetView ? undefined : selectedAccountId,
@@ -142,7 +147,7 @@ export default function ApiDiagnosticsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          deviceSn: '2209X891104',
+          deviceSn: activeDeviceSn,
           mode: selectedMode,
           gridCharge,
           accountId: isFleetView ? undefined : selectedAccountId,
@@ -182,18 +187,19 @@ export default function ApiDiagnosticsPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline">
-                  API & Diagnostics Console
-                </h1>
+                <HoverInfo
+                  title="API & Diagnostics Console"
+                  content={TELEMETRY_DESCRIPTIONS.pageHeaders.apiDiagnostics}
+                  showIcon
+                >
+                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline cursor-help">
+                    API & Diagnostics Console
+                  </h1>
+                </HoverInfo>
                 <Badge variant="outline" className="border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono text-[10px]">
                   Database / DeyeCloud
                 </Badge>
               </div>
-              {isAdmin && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Inspect OAuth token caches, probe latency, send real-time control dispatches, and test REST endpoints.
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -226,12 +232,12 @@ export default function ApiDiagnosticsPage() {
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-3xl font-black font-mono text-emerald-500">
-              {health?.pingMs ?? 14}
+              {health?.pingMs !== undefined ? health.pingMs : '--'}
             </span>
             <span className="text-xs text-muted-foreground font-mono">ms</span>
           </div>
           <span className="text-xs text-muted-foreground mt-1 block">
-            {health?.region || 'Frankfurt eu1 Gateway'}
+            {health?.region || '--'}
           </span>
         </Card>
 
@@ -244,7 +250,7 @@ export default function ApiDiagnosticsPage() {
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-3xl font-black font-mono text-cyan-500">
-              {health?.tokenExpiresAt ? 'ACTIVE' : 'READY'}
+              {health?.tokenExpiresAt ? 'ACTIVE' : health ? 'READY' : '--'}
             </span>
           </div>
           <span className="text-xs text-muted-foreground mt-1 block">
@@ -261,9 +267,11 @@ export default function ApiDiagnosticsPage() {
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-3xl font-black font-mono text-primary">
-              {health ? health.rateLimitMax - health.rateLimitUsed : 984}
+              {health ? health.rateLimitMax - health.rateLimitUsed : '--'}
             </span>
-            <span className="text-xs text-muted-foreground font-mono">/ {health?.rateLimitMax || 1000} req</span>
+            <span className="text-xs text-muted-foreground font-mono">
+              {health?.rateLimitMax ? `/ ${health.rateLimitMax} req` : ''}
+            </span>
           </div>
           <span className="text-xs text-muted-foreground mt-1 block">
             Refreshes every 60 seconds
@@ -279,11 +287,11 @@ export default function ApiDiagnosticsPage() {
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-3xl font-black font-mono text-emerald-500">
-              {health?.status || 'ONLINE'}
+              {health?.status || '--'}
             </span>
           </div>
           <span className="text-xs text-muted-foreground mt-1 block">
-            Cloud polling active
+            {health?.status ? 'Cloud polling active' : 'Connecting to gateway...'}
           </span>
         </Card>
       </div>
@@ -382,7 +390,7 @@ export default function ApiDiagnosticsPage() {
               <input
                 type="text"
                 disabled
-                value="2209X891104 (SUN-120K-SG01HP3-EU-AM2)"
+                value={activeDeviceSn !== 'DEVICE_SN' ? `${activeDeviceSn} (${selectedAccount?.name || 'Selected Station'})` : 'No Inverter Configured'}
                 className="w-full px-3.5 py-2 rounded-xl bg-muted/40 border border-border/60 text-foreground font-mono text-xs cursor-not-allowed"
               />
             </div>

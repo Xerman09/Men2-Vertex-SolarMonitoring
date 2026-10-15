@@ -23,6 +23,8 @@ import { createLogger } from '@/lib/logger';
 
 const log = createLogger('TrigonometricAnalytics');
 import { Badge } from '@/components/ui/badge';
+import { HoverInfo } from '@/components/ui/tooltip';
+import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { HourlySolarPoint } from '@/lib/trigonometric-math';
 import { HourlyEnergyPoint } from '@/lib/types';
@@ -134,7 +136,7 @@ export default function TrigonometricAnalyticsPage() {
 
   const installedKw = selectedPlant
     ? selectedPlant.installedCapacityKw
-    : selectedAccount?.capacityKw || 120;
+    : selectedAccount?.capacityKw || 0;
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-12 relative">
@@ -184,18 +186,19 @@ export default function TrigonometricAnalyticsPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline">
-                  Trigonometric History & Waveform Analytics
-                </h1>
+                <HoverInfo
+                  title="Trigonometric History & Waveform Analytics"
+                  content={TELEMETRY_DESCRIPTIONS.pageHeaders.trigonometricAnalytics}
+                  showIcon
+                >
+                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline cursor-help">
+                    Trigonometric History & Waveform Analytics
+                  </h1>
+                </HoverInfo>
                 <Badge variant="outline" className="border-cyan-500/30 text-cyan-500 bg-cyan-500/10 font-mono text-[10px]">
                   Fourier Engine v2.4
                 </Badge>
               </div>
-              {isAdmin && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Harmonic series decomposition, theoretical sinusoidal curve fitting ($R^2$), 24-hour polar phasor radar, and instantaneous 3-phase AC waveforms.
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -274,40 +277,40 @@ export default function TrigonometricAnalyticsPage() {
       {isAdmin && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
           <Card className="border-border/60 bg-card/60">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground font-mono">
-                1. 24h Fourier Decomposition
-              </CardTitle>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <HoverInfo
+                title="24h Discrete Fourier Decomposition"
+                content="Transforms the 24-hour diurnal cycle into discrete Fourier coefficients. The fundamental k=1 wave defines the macro solar curve, while k=2 and k=3 harmonics model steep industrial load ramps."
+                showIcon
+              >
+                <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground font-mono cursor-help">
+                  1. 24h Fourier Decomposition
+                </CardTitle>
+              </HoverInfo>
             </CardHeader>
-            <CardContent className="text-xs text-muted-foreground space-y-1.5">
-              <p>
-                Transforms the 24-hour cycle into discrete Fourier coefficients:
-              </p>
-              <div className="p-2 rounded-lg bg-muted/50 font-mono text-[11px] text-foreground">
+            <CardContent className="pt-0">
+              <div className="p-2 rounded-lg bg-muted/50 font-mono text-[11px] text-foreground text-center">
                 P(t) = a0 + Σ [ak·cos(kω0t) + bk·sin(kω0t)]
               </div>
-              <p>
-                The fundamental $k=1$ wave defines the macro solar curve, while $k=2$ and $k=3$ model steep load ramps.
-              </p>
             </CardContent>
           </Card>
 
           <Card className="border-border/60 bg-card/60">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground font-mono">
-                2. 3-Phase AC Phasor Vectors
-              </CardTitle>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <HoverInfo
+                title="3-Phase AC Phasor Vectors"
+                content="Simulates high-frequency instantaneous 60Hz waveforms across L1, L2, L3. Verifies phase angle φ and calculates active power P, reactive power Q, and apparent power S = √(P² + Q²)."
+                showIcon
+              >
+                <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground font-mono cursor-help">
+                  2. 3-Phase AC Phasor Vectors
+                </CardTitle>
+              </HoverInfo>
             </CardHeader>
-            <CardContent className="text-xs text-muted-foreground space-y-1.5">
-              <p>
-                Simulates high-frequency instantaneous 60Hz waveforms:
-              </p>
-              <div className="p-2 rounded-lg bg-muted/50 font-mono text-[11px] text-foreground">
+            <CardContent className="pt-0">
+              <div className="p-2 rounded-lg bg-muted/50 font-mono text-[11px] text-foreground text-center">
                 v(t) = Vpeak · sin(2πft ± 120°)
               </div>
-              <p>
-                Verifies phase angle φ, calculates active power P and reactive power Q (S = √(P² + Q²)).
-              </p>
             </CardContent>
           </Card>
         </div>

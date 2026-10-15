@@ -11,7 +11,6 @@ import {
 } from '@/lib/trigonometric-math';
 
 export type ThreePhaseACResult = ReturnType<typeof generateThreePhaseACWaveforms>;
-import { getMockHourlyEnergyPoints } from '@/lib/mock-telemetry';
 import { usePolling } from '@/lib/usePolling';
 
 export interface UseTrigonometricGraphProps {
@@ -71,23 +70,26 @@ export function useTrigonometricGraph({
 }: UseTrigonometricGraphProps = {}) {
   const [timeResolution, setTimeResolution] = useState<TimeResolution>(5);
 
-  // 1. Initial baseline dataset (5-minute resolution = 288 points per day)
+// 1. Initial baseline dataset (5-minute resolution = 288 points per day)
   const initialData = useMemo<HourlySolarPoint[]>(() => {
     if (data && data.length > 0) return data;
-    return getMockHourlyEnergyPoints('TODAY', undefined, timeResolution).map((pt) => {
-      const parts = pt.hour.split(':');
-      const h = parseInt(parts[0], 10) || 0;
-      const m = parseInt(parts[1], 10) || 0;
-      return {
-        hour: pt.hour,
+    const totalSteps = Math.floor((24 * 60) / timeResolution);
+    const pts: HourlySolarPoint[] = [];
+    for (let i = 0; i < totalSteps; i++) {
+      const totalMins = i * timeResolution;
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      pts.push({
+        hour: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
         hourDecimal: Number((h + m / 60).toFixed(4)),
-        solarYieldKw: pt.solarYieldKw,
-        loadDemandKw: pt.loadDemandKw,
-        batteryFlowKw: pt.batteryFlowKw,
-        gridExportKw: pt.gridFlowKw,
-        isElapsed: pt.isElapsed,
-      };
-    });
+        solarYieldKw: null,
+        loadDemandKw: null,
+        batteryFlowKw: null,
+        gridExportKw: null,
+        isElapsed: false,
+      });
+    }
+    return pts;
   }, [data, timeResolution]);
 
   const [activeData, setActiveData] = useState<HourlySolarPoint[]>(initialData);
@@ -115,20 +117,22 @@ export function useTrigonometricGraph({
   const handleResolutionChange = useCallback((newRes: TimeResolution) => {
     setTimeResolution(newRes);
     if (!data || data.length === 0) {
-      const newPoints = getMockHourlyEnergyPoints('TODAY', undefined, newRes).map((pt) => {
-        const parts = pt.hour.split(':');
-        const h = parseInt(parts[0], 10) || 0;
-        const m = parseInt(parts[1], 10) || 0;
-        return {
-          hour: pt.hour,
+      const totalSteps = Math.floor((24 * 60) / newRes);
+      const newPoints: HourlySolarPoint[] = [];
+      for (let i = 0; i < totalSteps; i++) {
+        const totalMins = i * newRes;
+        const h = Math.floor(totalMins / 60);
+        const m = totalMins % 60;
+        newPoints.push({
+          hour: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
           hourDecimal: Number((h + m / 60).toFixed(4)),
-          solarYieldKw: pt.solarYieldKw,
-          loadDemandKw: pt.loadDemandKw,
-          batteryFlowKw: pt.batteryFlowKw,
-          gridExportKw: pt.gridFlowKw,
-          isElapsed: pt.isElapsed,
-        };
-      });
+          solarYieldKw: null,
+          loadDemandKw: null,
+          batteryFlowKw: null,
+          gridExportKw: null,
+          isElapsed: false,
+        });
+      }
       setActiveData(newPoints);
     }
   }, [data]);
@@ -213,7 +217,7 @@ export function useTrigonometricGraph({
     return generateThreePhaseACWaveforms(acVoltage, acCurrent, 60.0, powerFactor, 64);
   }, [acVoltage, acCurrent, powerFactor]);
 
-  // Exact power series data (PV green, Consumption yellow, Grid purple)
+  // Exact power series data (PV, Consumption, Grid)
   const powerSeriesData: PowerSeriesPoint[] = useMemo(() => {
     return activeData.map((pt) => {
       const isEl = pt.isElapsed ?? (pt.solarYieldKw !== null);

@@ -20,7 +20,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { Badge } from '@/components/ui/badge';
-import { useRole } from '@/lib/role-context';
+import { HoverInfo } from '@/components/ui/tooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import {
   SinusoidalFitResult,
@@ -75,59 +75,114 @@ export function AdvancedMathCharts({
   onAcCurrentChange,
   onPowerFactorChange,
 }: AdvancedMathChartsProps) {
-  const { isAdmin } = useRole();
-
   if (activeTab === 'sinusoidal') {
     return (
       <div className={compact ? 'space-y-3' : 'space-y-4'}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+          <div>
+            <HoverInfo
+              title="Theoretical Clear-Sky Insolation Model"
+              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.sinusoidalModelNote}
+              showIcon
+            >
+              <span className="text-xs font-semibold text-foreground cursor-help">
+                Diurnal Sinusoidal Curve Fit & Clear-Sky Model
+              </span>
+            </HoverInfo>
+          </div>
+          <Badge variant="outline" className="text-cyan-500 border-cyan-500/30 bg-cyan-500/10 font-mono text-[10px] px-1.5 py-0 w-fit">
+            R² = {fitResults.rSquared}
+          </Badge>
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
-          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
-              Sinusoidal Goodness R²
-            </span>
-            <span className="text-base sm:text-lg font-bold font-mono text-cyan-500">
-              {fitResults.rSquared}
-            </span>
-            <span className="text-[9.5px] text-muted-foreground block mt-0.5">
-              Elapsed Correlation
-            </span>
-          </div>
+          <HoverInfo
+            className="block w-full cursor-help"
+            title="Sinusoidal Goodness R²"
+            content={
+              <div className="text-[11px] space-y-1 min-w-[160px]">
+                <p className="text-muted-foreground">Statistical coefficient of determination comparing measured PV curve against theoretical half-wave sine.</p>
+                <div className="pt-1 border-t border-border/50 text-cyan-400 font-mono font-medium">
+                  Elapsed Correlation: R² = {fitResults.rSquared}
+                </div>
+              </div>
+            }
+          >
+            <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
+                Sinusoidal Goodness R²
+              </span>
+              <span className="text-base sm:text-lg font-bold font-mono text-cyan-500">
+                {fitResults.rSquared}
+              </span>
+            </div>
+          </HoverInfo>
 
-          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
-              Peak Sun Hours (PSH)
-            </span>
-            <span className="text-base sm:text-lg font-bold font-mono text-amber-500">
-              {fitResults.peakSunHours} h
-            </span>
-            <span className="text-[9.5px] text-muted-foreground block mt-0.5">
-              1 kW/m² Insolation Equiv
-            </span>
-          </div>
+          <HoverInfo
+            className="block w-full cursor-help"
+            title="Peak Sun Hours (PSH)"
+            content={
+              <div className="text-[11px] space-y-1 min-w-[160px]">
+                <p className="text-muted-foreground">Integrated solar insolation normalized to standard test condition of 1,000 W/m².</p>
+                <div className="pt-1 border-t border-border/50 text-amber-400 font-mono font-medium">
+                  1 kW/m² Insolation Equiv: {fitResults.peakSunHours} h
+                </div>
+              </div>
+            }
+          >
+            <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
+                Peak Sun Hours (PSH)
+              </span>
+              <span className="text-base sm:text-lg font-bold font-mono text-amber-500">
+                {fitResults.peakSunHours} h
+              </span>
+            </div>
+          </HoverInfo>
 
-          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
-              Solar Noon Phase Shift
-            </span>
-            <span className="text-base sm:text-lg font-bold font-mono text-foreground">
-              {fitResults.phaseShiftHours > 0 ? `+${fitResults.phaseShiftHours}` : fitResults.phaseShiftHours} h
-            </span>
-            <span className="text-[9.5px] text-muted-foreground block mt-0.5">
-              Offset from 12:00 Zenith
-            </span>
-          </div>
+          <HoverInfo
+            className="block w-full cursor-help"
+            title="Solar Noon Phase Shift"
+            content={
+              <div className="text-[11px] space-y-1 min-w-[160px]">
+                <p className="text-muted-foreground">Temporal deviation between astronomical clock solar noon (12:00) and peak generation time.</p>
+                <div className="pt-1 border-t border-border/50 text-foreground font-mono font-medium">
+                  Offset from 12:00 Zenith: {fitResults.phaseShiftHours > 0 ? `+${fitResults.phaseShiftHours}` : fitResults.phaseShiftHours} h
+                </div>
+              </div>
+            }
+          >
+            <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
+                Solar Noon Phase Shift
+              </span>
+              <span className="text-base sm:text-lg font-bold font-mono text-foreground">
+                {fitResults.phaseShiftHours > 0 ? `+${fitResults.phaseShiftHours}` : fitResults.phaseShiftHours} h
+              </span>
+            </div>
+          </HoverInfo>
 
-          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
-              Harvest Model Efficiency
-            </span>
-            <span className="text-base sm:text-lg font-bold font-mono text-emerald-500">
-              {fitResults.harvestEfficiencyPct}%
-            </span>
-            <span className="text-[9.5px] text-muted-foreground block mt-0.5">
-              Of Clear-Sky Integral
-            </span>
-          </div>
+          <HoverInfo
+            className="block w-full cursor-help"
+            title="Harvest Model Efficiency"
+            content={
+              <div className="text-[11px] space-y-1 min-w-[160px]">
+                <p className="text-muted-foreground">Ratio of actual energy integral harvested versus ideal clear-sky theoretical envelope.</p>
+                <div className="pt-1 border-t border-border/50 text-emerald-400 font-mono font-medium">
+                  Of Clear-Sky Integral: {fitResults.harvestEfficiencyPct}%
+                </div>
+              </div>
+            }
+          >
+            <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
+                Harvest Model Efficiency
+              </span>
+              <span className="text-base sm:text-lg font-bold font-mono text-emerald-500">
+                {fitResults.harvestEfficiencyPct}%
+              </span>
+            </div>
+          </HoverInfo>
         </div>
 
         <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
@@ -183,11 +238,6 @@ export function AdvancedMathCharts({
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        {isAdmin && (
-          <p className="text-xs text-muted-foreground">
-            {TELEMETRY_DESCRIPTIONS.trigonometricGraph.sinusoidalModelNote}
-          </p>
-        )}
       </div>
     );
   }
@@ -197,18 +247,25 @@ export function AdvancedMathCharts({
       <div className={compact ? 'space-y-3' : 'space-y-4'}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
           <div>
-            <span className="text-xs font-semibold text-foreground">
-              Discrete Fourier Decomposition of 24-Hour Diurnal Cycle
-            </span>
-            {isAdmin && (
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                {TELEMETRY_DESCRIPTIONS.trigonometricGraph.fourierDecomposition}
-              </p>
-            )}
+            <HoverInfo
+              title="Discrete Fourier Decomposition"
+              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.fourierDecomposition}
+              showIcon
+            >
+              <span className="text-xs font-semibold text-foreground cursor-help">
+                Discrete Fourier Decomposition of 24-Hour Diurnal Cycle
+              </span>
+            </HoverInfo>
           </div>
-          <Badge variant="outline" className="text-cyan-500 border-cyan-500/30 bg-cyan-500/10 font-mono text-[10px] px-1.5 py-0 w-fit">
-            Harmonics k = 1, 2, 3
-          </Badge>
+          <HoverInfo
+            title="Harmonic Phase Angles"
+            content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.fourierHarmonicPhases}
+            showIcon
+          >
+            <Badge variant="outline" className="text-cyan-500 border-cyan-500/30 bg-cyan-500/10 font-mono text-[10px] px-1.5 py-0 w-fit cursor-help">
+              Harmonics k = 1, 2, 3
+            </Badge>
+          </HoverInfo>
         </div>
 
         <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
@@ -265,11 +322,6 @@ export function AdvancedMathCharts({
             </LineChart>
           </ResponsiveContainer>
         </div>
-        {isAdmin && (
-          <p className="text-[11px] text-muted-foreground">
-            {TELEMETRY_DESCRIPTIONS.trigonometricGraph.fourierHarmonicPhases}
-          </p>
-        )}
       </div>
     );
   }
@@ -279,14 +331,15 @@ export function AdvancedMathCharts({
       <div className={compact ? 'space-y-3' : 'space-y-4'}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
           <div>
-            <span className="text-xs font-semibold text-foreground">
-              360-Degree Circular Phasor: Solar Lobe (Green) vs Load (Yellow)
-            </span>
-            {isAdmin && (
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                {TELEMETRY_DESCRIPTIONS.trigonometricGraph.polarPhasor}
-              </p>
-            )}
+            <HoverInfo
+              title="360-Degree Circular Phasor"
+              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.polarPhasor}
+              showIcon
+            >
+              <span className="text-xs font-semibold text-foreground cursor-help">
+                360-Degree Circular Phasor: Solar Lobe vs Load Profile
+              </span>
+            </HoverInfo>
           </div>
           <Badge variant="outline" className="text-indigo-500 border-indigo-500/30 bg-indigo-500/10 font-mono text-[10px] px-1.5 py-0 w-fit">
             Polar Coordinates (r, θ)
@@ -300,21 +353,21 @@ export function AdvancedMathCharts({
               <PolarAngleAxis dataKey="hourLabel" stroke="currentColor" className="text-[10px] opacity-70" />
               <PolarRadiusAxis angle={30} domain={[0, 140]} stroke="currentColor" className="text-[9px] opacity-50" />
               <Radar
-                name="Solar Generation (Green)"
+                name="Solar Generation"
                 dataKey="solarHarvestRadius"
                 stroke={COLOR_PV}
                 fill={COLOR_PV}
                 fillOpacity={0.35}
               />
               <Radar
-                name="Industrial Load Demand (Yellow)"
+                name="Industrial Load Demand"
                 dataKey="loadDemandRadius"
                 stroke={COLOR_LOAD}
                 fill={COLOR_LOAD}
                 fillOpacity={0.25}
               />
               <Radar
-                name="Battery Energy Flow (Cyan)"
+                name="Battery Energy Flow"
                 dataKey="batteryRadius"
                 stroke="#06b6d4"
                 fill="#06b6d4"
@@ -339,6 +392,23 @@ export function AdvancedMathCharts({
   // activeTab === 'waveform'
   return (
     <div className={compact ? 'space-y-3' : 'space-y-4'}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+        <div>
+          <HoverInfo
+            title="Three-Phase AC Instantaneous Waveforms"
+            content="Real-time 60Hz instantaneous sinusoidal waveforms across Phase A (0°), Phase B (-120°), Phase C (+120°), and Phase A Current with power factor phase shift φ."
+            showIcon
+          >
+            <span className="text-xs font-semibold text-foreground cursor-help">
+              Three-Phase AC Instantaneous Waveforms & Harmonic Phasors
+            </span>
+          </HoverInfo>
+        </div>
+        <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10 font-mono text-[10px] px-1.5 py-0 w-fit">
+          60.00 Hz • Balanced
+        </Badge>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-2.5 rounded-lg bg-card border border-border/60">
         <div>
           <label htmlFor="grid-rms-voltage-range" className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
@@ -443,53 +513,93 @@ export function AdvancedMathCharts({
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
-        <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-          <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
-            Active Power P
-          </span>
-          <span className="text-base sm:text-lg font-bold font-mono text-emerald-500">
-            {acResults.metrics.activePowerKw} kW
-          </span>
-          <span className="text-[9.5px] text-muted-foreground block mt-0.5">
-            P = √3 · V · I · cos(φ)
-          </span>
-        </div>
+        <HoverInfo
+          className="block w-full cursor-help"
+          title="Active Power P"
+          content={
+            <div className="text-[11px] space-y-1 min-w-[170px]">
+              <p className="text-muted-foreground">True work-producing power transmitted across the 3-phase grid interface.</p>
+              <div className="pt-1 border-t border-border/50 text-emerald-400 font-mono font-medium">
+                P = √3 · V · I · cos(φ)
+              </div>
+            </div>
+          }
+        >
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+            <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
+              Active Power P
+            </span>
+            <span className="text-base sm:text-lg font-bold font-mono text-emerald-500">
+              {acResults.metrics.activePowerKw} kW
+            </span>
+          </div>
+        </HoverInfo>
 
-        <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-          <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
-            Reactive Power Q
-          </span>
-          <span className="text-base sm:text-lg font-bold font-mono text-amber-500">
-            {acResults.metrics.reactivePowerKvar} kVAR
-          </span>
-          <span className="text-[9.5px] text-muted-foreground block mt-0.5">
-            Q = √3 · V · I · sin(φ)
-          </span>
-        </div>
+        <HoverInfo
+          className="block w-full cursor-help"
+          title="Reactive Power Q"
+          content={
+            <div className="text-[11px] space-y-1 min-w-[170px]">
+              <p className="text-muted-foreground">Volt-Amperes reactive sustaining internal transformer magnetic fields.</p>
+              <div className="pt-1 border-t border-border/50 text-amber-400 font-mono font-medium">
+                Q = √3 · V · I · sin(φ)
+              </div>
+            </div>
+          }
+        >
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+            <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
+              Reactive Power Q
+            </span>
+            <span className="text-base sm:text-lg font-bold font-mono text-amber-500">
+              {acResults.metrics.reactivePowerKvar} kVAR
+            </span>
+          </div>
+        </HoverInfo>
 
-        <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-          <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
-            Apparent Power S
-          </span>
-          <span className="text-base sm:text-lg font-bold font-mono text-cyan-500">
-            {acResults.metrics.apparentPowerKva} kVA
-          </span>
-          <span className="text-[9.5px] text-muted-foreground block mt-0.5">
-            S = √(P² + Q²)
-          </span>
-        </div>
+        <HoverInfo
+          className="block w-full cursor-help"
+          title="Apparent Power S"
+          content={
+            <div className="text-[11px] space-y-1 min-w-[170px]">
+              <p className="text-muted-foreground">Total vector sum magnitude of combined active and reactive components.</p>
+              <div className="pt-1 border-t border-border/50 text-cyan-400 font-mono font-medium">
+                S = √(P² + Q²)
+              </div>
+            </div>
+          }
+        >
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+            <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
+              Apparent Power S
+            </span>
+            <span className="text-base sm:text-lg font-bold font-mono text-cyan-500">
+              {acResults.metrics.apparentPowerKva} kVA
+            </span>
+          </div>
+        </HoverInfo>
 
-        <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-          <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
-            Grid Synchronicity
-          </span>
-          <span className="text-base sm:text-lg font-bold font-mono text-foreground">
-            60.00 Hz
-          </span>
-          <span className="text-[9.5px] text-emerald-500 block mt-0.5">
-            Phase Locked (0.18% VUF)
-          </span>
-        </div>
+        <HoverInfo
+          className="block w-full cursor-help"
+          title="Grid Synchronicity"
+          content={
+            <div className="text-[11px] space-y-1 min-w-[170px]">
+              <p className="text-muted-foreground">Frequency lock stability and voltage unbalance factor across three phases.</p>
+              <div className="pt-1 border-t border-border/50 text-emerald-400 font-mono font-medium">
+                Phase Locked (0.18% VUF)
+              </div>
+            </div>
+          }
+        >
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+            <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
+              Grid Synchronicity
+            </span>
+            <span className="text-base sm:text-lg font-bold font-mono text-foreground">
+              60.00 Hz
+            </span>
+          </div>
+        </HoverInfo>
       </div>
     </div>
   );

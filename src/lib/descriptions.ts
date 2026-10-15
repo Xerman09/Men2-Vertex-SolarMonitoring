@@ -50,7 +50,7 @@ export const TELEMETRY_DESCRIPTIONS = {
     plantSwitcher:
       'Switch between individual solar stations or view combined cross-plant Fleet Aggregation with instant 0ms caching.',
     timeRange:
-      'Switch temporal aggregation between Today (5-min intervals), 7 Days, 30 Days, or 12 Months seasonal analysis.',
+      'Select any date or temporal aggregation window via the date picker to inspect historical or real-time solar telemetry.',
   },
   energyFlow: {
     solarNode:
@@ -76,7 +76,7 @@ export const TELEMETRY_DESCRIPTIONS = {
   },
   trigonometricGraph: {
     header:
-      'Exact 5-minute sampling intervals (PV: Green, Consumption: Yellow, Grid: Purple). Unelapsed intervals cleanly stop at current time.',
+      'Exact 5-minute sampling intervals for PV, Consumption, and Grid. Unelapsed intervals cleanly stop at current time.',
     pvPowerSolo:
       'High-resolution 5-minute solar PV generation. Captures cloud transients, irradiance changes, and MPPT dynamic tracking in real-time.',
     consumptionSolo:
@@ -100,7 +100,19 @@ export const TELEMETRY_DESCRIPTIONS = {
   },
   yieldArbitrage: {
     diurnalCurveLegend:
-      'Green = Solar PV Production | Yellow = Facility Load Demand | Purple = Grid Net Exchange',
+      'Solar PV Production | Facility Load Demand | Grid Net Exchange',
+    subtitle:
+      'Tariff delta optimization, smart battery peak-shaving, and historical revenue generation.',
+  },
+  pageHeaders: {
+    trigonometricAnalytics:
+      'Harmonic series decomposition, theoretical sinusoidal curve fitting ($R^2$), 24-hour polar phasor radar, and instantaneous 3-phase AC waveforms.',
+    apiDiagnostics:
+      'Inspect OAuth token caches, probe latency, send real-time control dispatches, and test REST endpoints.',
+    accountsManagement:
+      'Two-way database account synchronization, credentials management, automatic plant discovery, and inverter hierarchy.',
+    hardwareTelemetryFleet:
+      'Deep component diagnostics, DC MPPT string performance, AC waveforms, and thermal matrices across fleet inverters.',
   },
 } as const;
 

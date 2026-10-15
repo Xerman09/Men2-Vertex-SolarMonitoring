@@ -40,7 +40,9 @@ export default function LoginPage() {
     try {
       const res = await login(email, password);
       if (res.success) {
-        router.replace('/');
+        const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const redirectParam = searchParams?.get('redirect');
+        router.replace(redirectParam || '/analytics');
       } else {
         setError(res.error || 'Invalid username/email or password.');
       }

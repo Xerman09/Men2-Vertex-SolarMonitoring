@@ -1,6 +1,6 @@
 # System & Telemetry Descriptions Reference
 
-This file documents descriptions, subtitles, and explanatory notes defined in `src/lib/descriptions.ts`. To ensure an uncluttered experience for standard viewers and consumers, these long descriptional statements are **only visible when using an admin account** (`isAdmin === true` via `useRole()`).
+This file documents descriptions, subtitles, and explanatory notes defined in `src/lib/descriptions.ts`. To ensure a sleek, uncluttered experience while retaining in-depth technical context, these telemetry and analytics descriptions are presented as interactive hover tooltips via `<HoverInfo>` with descriptive titles, content, and information icons.
 
 ---
 
@@ -48,4 +48,23 @@ This file documents descriptions, subtitles, and explanatory notes defined in `s
 ## 3. Yield & Arbitrage Analytics (`/yield-arbitrage`)
 
 - **Diurnal Generation vs Load Curve**:
-  > *"Green = Solar PV Production | Yellow = Facility Load Demand | Cyan = Battery ESS Flow"*
+  > *"Green = Solar PV Production | Yellow = Facility Load Demand | Purple = Grid Net Exchange"*
+
+- **Page Header**:
+  > *"Tariff delta optimization, smart battery peak-shaving, and historical revenue generation."*
+
+---
+
+## 4. Page Header Tooltips
+
+- **Trigonometric History & Waveform Analytics (`/trigonometric-analytics`)**:
+  > *"Harmonic series decomposition, theoretical sinusoidal curve fitting ($R^2$), 24-hour polar phasor radar, and instantaneous 3-phase AC waveforms."*
+
+- **API & Diagnostics Console (`/api-diagnostics`)**:
+  > *"Inspect OAuth token caches, probe latency, send real-time control dispatches, and test REST endpoints."*
+
+- **Fleet & Operations Directory (`/accounts`)**:
+  > *"Two-way database account synchronization, credentials management, automatic plant discovery, and inverter hierarchy."*
+
+- **Inverter Hardware & Electrical Telemetry (`/hardware-telemetry`)**:
+  > *"Deep component diagnostics, DC MPPT string performance, AC waveforms, and thermal matrices across fleet inverters."*

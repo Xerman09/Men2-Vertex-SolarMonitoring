@@ -30,6 +30,8 @@ import { useRole } from '@/lib/role-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { HoverInfo } from '@/components/ui/tooltip';
+import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { useStationAccounts } from './useStationAccounts';
 
 export default function AccountsManagementPage() {
@@ -86,13 +88,19 @@ export default function AccountsManagementPage() {
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline">
-                  {isAdmin
-                    ? 'Fleet & Plant Operations Manager'
-                    : isConsumer
-                    ? 'Your Solar Plants & Telemetry Directory'
-                    : 'Solar Fleet & Plants Directory'}
-                </h1>
+                <HoverInfo
+                  title="Fleet & Operations Directory"
+                  content={TELEMETRY_DESCRIPTIONS.pageHeaders.accountsManagement}
+                  showIcon
+                >
+                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline cursor-help">
+                    {isAdmin
+                      ? 'Fleet & Plant Operations Manager'
+                      : isConsumer
+                      ? 'Your Solar Plants & Telemetry Directory'
+                      : 'Solar Fleet & Plants Directory'}
+                  </h1>
+                </HoverInfo>
                 <Badge
                   variant="outline"
                   className={`font-mono text-[10px] ${
@@ -123,11 +131,6 @@ export default function AccountsManagementPage() {
                   </Badge>
                 )}
               </div>
-              {isAdmin && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Two-way database account synchronization, credentials management, automatic plant discovery, and inverter hierarchy.
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -497,7 +500,7 @@ export default function AccountsManagementPage() {
                                             {device.model || 'Deye Standard'}
                                           </td>
                                           <td className="py-2.5 px-2 text-foreground font-mono">
-                                            {isInverter ? `${device.ratedKw || 120} kW` : 'Gateway'}
+                                            {isInverter ? (device.ratedKw ? `${device.ratedKw} kW` : '--') : 'Gateway'}
                                           </td>
                                           <td className="py-2.5 px-2 text-right">
                                             <span className="inline-flex items-center gap-1 text-emerald-500 font-bold text-[11px]">

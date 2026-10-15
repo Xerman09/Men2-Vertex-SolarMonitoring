@@ -45,9 +45,9 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
-        source: '/energy-flow',
-        destination: '/',
-        permanent: true,
+        source: '/',
+        destination: '/analytics',
+        permanent: false,
       },
     ];
   },

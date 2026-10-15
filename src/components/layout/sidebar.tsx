@@ -55,7 +55,7 @@ export function Sidebar() {
     },
     {
       label: 'Energy Flow & Fleet',
-      href: '/',
+      href: '/energy-flow',
       icon: Zap,
     },
     {
@@ -178,8 +178,8 @@ export function Sidebar() {
           >
             {navItems.map((item) => {
               const isActive =
-                item.href === '/'
-                  ? pathname === '/'
+                item.href === '/analytics'
+                  ? pathname === '/' || pathname.startsWith('/analytics')
                   : pathname.startsWith(item.href);
               const Icon = item.icon;
               const isIconOnly = collapsed && !mobileOpen;

@@ -873,8 +873,12 @@ export class DeyeCloudClient {
   /**
    * Hourly curves (Returns model-driven diurnal curves)
    */
-  public getHourlyEnergy(range: string = 'TODAY', stepMinutes: number = 5): HourlyEnergyPoint[] {
-    return getMockHourlyEnergyPoints(range, undefined, stepMinutes);
+  public getHourlyEnergy(
+    range: string = 'TODAY',
+    stepMinutes: number = 5,
+    date?: string
+  ): HourlyEnergyPoint[] {
+    return getMockHourlyEnergyPoints(range, undefined, stepMinutes, date);
   }
 }
 
