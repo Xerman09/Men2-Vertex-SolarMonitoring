@@ -48,6 +48,7 @@ export function HoverInfo({
   side = 'top',
   align = 'center',
   className,
+  showIcon,
 }: HoverInfoProps) {
   if (!children) return null;
 

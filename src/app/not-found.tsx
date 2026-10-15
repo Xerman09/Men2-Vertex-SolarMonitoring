@@ -10,7 +10,7 @@ export default function NotFound() {
           The requested station, route, or telemetry telemetry endpoint does not exist.
         </p>
         <Link
-          href="/"
+          href="/analytics"
           className="inline-block px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold text-sm transition-colors"
         >
           Return to Mission Control

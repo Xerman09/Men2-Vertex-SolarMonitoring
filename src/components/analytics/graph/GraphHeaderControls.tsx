@@ -6,7 +6,7 @@ import { CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useRole } from '@/lib/role-context';
+import { HoverInfo } from '@/components/ui/tooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { ChartTab, TimeResolution } from '../useTrigonometricGraph';
 
@@ -31,8 +31,6 @@ export function GraphHeaderControls({
   onManualTick,
   onTabChange,
 }: GraphHeaderControlsProps) {
-  const { isAdmin } = useRole();
-
   return (
     <CardHeader className={compact ? 'py-2 px-3 sm:px-3.5 border-b border-border/50' : 'py-3 px-4 border-b border-border/50'}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
@@ -42,9 +40,15 @@ export function GraphHeaderControls({
               <Radio className="h-4 w-4 motion-safe:animate-pulse" />
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <CardTitle className="text-sm sm:text-base font-bold">
-                5-Minute Telemetry & Power Curves
-              </CardTitle>
+              <HoverInfo
+                title="5-Minute Telemetry & Power Curves"
+                content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.header}
+                showIcon
+              >
+                <CardTitle className="text-sm sm:text-base font-bold cursor-help">
+                  5-Minute Telemetry & Power Curves
+                </CardTitle>
+              </HoverInfo>
               <Badge variant="outline" className="border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono text-[10px] px-1.5 py-0 flex items-center gap-1">
                 <span className="relative flex h-1.5 w-1.5">
                   {isLiveStreaming && (
@@ -56,11 +60,6 @@ export function GraphHeaderControls({
               </Badge>
             </div>
           </div>
-          {isAdmin && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {TELEMETRY_DESCRIPTIONS.trigonometricGraph.header}
-            </p>
-          )}
         </div>
 
         {/* Dynamic Stream & Resolution Controls */}
@@ -109,30 +108,42 @@ export function GraphHeaderControls({
       <div className="pt-2">
         <Tabs value={activeTab} onValueChange={(v: string) => onTabChange(v as ChartTab)} className="w-full">
           <TabsList className="bg-muted/50 p-0.5 rounded-lg h-auto border border-border/50 inline-flex w-fit max-w-full overflow-x-auto gap-0.5">
-            <TabsTrigger value="power" className="text-xs gap-1 px-2.5 py-1 font-medium">
-              <Zap className="h-3.5 w-3.5 text-yellow-500" />
-              <span>Power Curves</span>
-            </TabsTrigger>
-            <TabsTrigger value="selfconsumption" className="text-xs gap-1 px-2.5 py-1 font-medium">
-              <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-              <span>Self-Consumption</span>
-            </TabsTrigger>
-            <TabsTrigger value="sinusoidal" className="text-xs gap-1 px-2.5 py-1 font-medium">
-              <Sun className="h-3.5 w-3.5 text-amber-500" />
-              <span>Diurnal Fit</span>
-            </TabsTrigger>
-            <TabsTrigger value="fourier" className="text-xs gap-1 px-2.5 py-1 font-medium">
-              <Waves className="h-3.5 w-3.5 text-cyan-500" />
-              <span>Fourier</span>
-            </TabsTrigger>
-            <TabsTrigger value="polar" className="text-xs gap-1 px-2.5 py-1 font-medium">
-              <Compass className="h-3.5 w-3.5 text-indigo-500" />
-              <span>Polar Radar</span>
-            </TabsTrigger>
-            <TabsTrigger value="waveform" className="text-xs gap-1 px-2.5 py-1 font-medium">
-              <Activity className="h-3.5 w-3.5 text-emerald-500" />
-              <span>3-Phase AC</span>
-            </TabsTrigger>
+            <HoverInfo title="Power Curves" content="High-resolution 5-minute sampling curves of PV solar generation, facility industrial load, and net utility exchange.">
+              <TabsTrigger value="power" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
+                <Zap className="h-3.5 w-3.5 text-yellow-500" />
+                <span>Power Curves</span>
+              </TabsTrigger>
+            </HoverInfo>
+            <HoverInfo title="Self-Consumption Analysis" content="Breakdown of solar self-consumption, local load coverage utilization, and export vs import ratios.">
+              <TabsTrigger value="selfconsumption" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                <span>Self-Consumption</span>
+              </TabsTrigger>
+            </HoverInfo>
+            <HoverInfo title="Diurnal Curve Fitting" content="Theoretical sinusoidal clear-sky insolation curve fit and model deviation residual calculations.">
+              <TabsTrigger value="sinusoidal" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
+                <Sun className="h-3.5 w-3.5 text-amber-500" />
+                <span>Diurnal Fit</span>
+              </TabsTrigger>
+            </HoverInfo>
+            <HoverInfo title="Fourier Decomposition" content="Discrete Fourier decomposition of 24-hour diurnal cycle across fundamental and harmonic frequencies.">
+              <TabsTrigger value="fourier" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
+                <Waves className="h-3.5 w-3.5 text-cyan-500" />
+                <span>Fourier</span>
+              </TabsTrigger>
+            </HoverInfo>
+            <HoverInfo title="Polar Radar Phasor" content="360-degree circular phasor radar mapping 24-hour solar harvest lobes against industrial load demand.">
+              <TabsTrigger value="polar" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
+                <Compass className="h-3.5 w-3.5 text-indigo-500" />
+                <span>Polar Radar</span>
+              </TabsTrigger>
+            </HoverInfo>
+            <HoverInfo title="3-Phase AC Waveforms" content="Real-time 60Hz instantaneous 3-phase AC voltage & current sinusoidal waveforms with power factor metrics.">
+              <TabsTrigger value="waveform" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
+                <Activity className="h-3.5 w-3.5 text-emerald-500" />
+                <span>3-Phase AC</span>
+              </TabsTrigger>
+            </HoverInfo>
           </TabsList>
         </Tabs>
       </div>

@@ -90,16 +90,17 @@ export interface AnalyticsSummary {
 export function generateDailyAnalytics(
   days: number = 7,
   capacityKw: number = 120,
-  hasBattery: boolean = false
+  hasBattery: boolean = false,
+  referenceDate: Date = new Date()
 ): DailyAnalyticsPoint[] {
   const points: DailyAnalyticsPoint[] = [];
-  const now = new Date();
+  const ref = new Date(referenceDate);
   const scale = capacityKw / 120;
 
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now);
+    const d = new Date(ref);
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
 
     // Weather variability factor (0.75 - 1.05)

@@ -74,6 +74,14 @@ import {
 } from '@/lib/analytics-data';
 import { createLogger } from '@/lib/logger';
 import { telemetryCache } from '@/lib/telemetry-cache';
+import {
+  AnalyticsDatePicker,
+  AnalyticsDatePickerValue,
+  DatePreset,
+  toLocalIsoDate,
+  formatHumanDate,
+  parseLocalIsoDate,
+} from '@/components/analytics/AnalyticsDatePicker';
 
 const log = createLogger('AnalyticsDashboard');
 
@@ -136,8 +144,23 @@ export default function AnalyticsDashboardPage() {
 
   const { isAdmin } = useRole();
 
-  // Active configurations
-  const [timeRange, setTimeRange] = useState<TimeRange>('TODAY');
+  // Active temporal configurations
+  const [dateSelection, setDateSelection] = useState<AnalyticsDatePickerValue>(() => ({
+    preset: 'TODAY',
+    selectedDate: toLocalIsoDate(new Date()),
+  }));
+
+  const timeRange: TimeRange = useMemo(() => {
+    if (dateSelection.preset === '12M') return '12M';
+    if (dateSelection.preset === '30D' || dateSelection.preset === 'THIS_MONTH') return '30D';
+    if (dateSelection.preset === '7D') return '7D';
+    return 'TODAY';
+  }, [dateSelection.preset]);
+
+  const isViewingToday = useMemo(() => {
+    return dateSelection.preset === 'TODAY' && dateSelection.selectedDate === toLocalIsoDate(new Date());
+  }, [dateSelection]);
+
   const [streamFilter, setStreamFilter] = useState<StreamFilter>('ALL');
   const [showSolarModel, setShowSolarModel] = useState<boolean>(true);
   const [showPeakWindow, setShowPeakWindow] = useState<boolean>(true);
@@ -156,8 +179,8 @@ export default function AnalyticsDashboardPage() {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
 
-  // Strict loading synchronization tracking
-  const currentTargetKey = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}:${timeRange}`;
+  // Strict loading synchronization tracking with date isolation
+  const currentTargetKey = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}:${dateSelection.preset}:${dateSelection.selectedDate}`;
   const [displayedTargetKey, setDisplayedTargetKey] = useState<string>('');
   const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
   const inFlightControllerRef = useRef<AbortController | null>(null);
@@ -237,25 +260,6 @@ export default function AnalyticsDashboardPage() {
               dailyYieldKwh: plant.dailyYieldKwh ? plant.dailyYieldKwh / invDevices.length : undefined,
             });
           });
-        } else {
-          // If no devices array exists on the plant object yet, synthesize standard inverters based on capacity
-          const count = plant.installedCapacityKw > 80 ? 2 : 1;
-          const ratedEach = Math.round(plant.installedCapacityKw / count);
-          for (let i = 1; i <= count; i++) {
-            list.push({
-              deviceSn: `INV-${plant.stationId}-${String(i).padStart(2, '0')}`,
-              model: ratedEach >= 50 ? `SUN-${ratedEach}K-SG01HP3-EU` : `SUN-${ratedEach}K-SG04LP3-EU`,
-              ratedKw: ratedEach,
-              loggerSn: `LOG-${plant.stationId}-${String(i).padStart(2, '0')}`,
-              stationId: plant.stationId,
-              stationName: plant.stationName,
-              accountId: acc.id,
-              accountName: acc.name,
-              status: 'ONLINE',
-              liveSolarPowerKw: plant.liveSolarPowerKw ? plant.liveSolarPowerKw / count : undefined,
-              dailyYieldKwh: plant.dailyYieldKwh ? plant.dailyYieldKwh / count : undefined,
-            });
-          }
         }
       });
     });
@@ -289,15 +293,15 @@ export default function AnalyticsDashboardPage() {
           cap += p.installedCapacityKw || 0;
         });
       });
-      return cap > 0 ? cap : 450;
+      return cap;
     }
-    return selectedPlant?.installedCapacityKw || selectedAccount?.capacityKw || 120;
+    return selectedPlant?.installedCapacityKw || selectedAccount?.capacityKw || 0;
   }, [isFleetView, accounts, selectedPlant, selectedAccount]);
 
   // Effective capacity when isolated to a single inverter or plant
   const effectiveCapacityKw = useMemo(() => {
     if (selectedInverter) {
-      return selectedInverter.ratedKw || 50;
+      return selectedInverter.ratedKw || 0;
     }
     return baseCapacityKw;
   }, [selectedInverter, baseCapacityKw]);
@@ -325,8 +329,11 @@ export default function AnalyticsDashboardPage() {
 
   // Telemetry Fetcher
   const fetchAnalyticsData = useCallback(
-    async (range: TimeRange = timeRange, forceReload: boolean = false) => {
-      const targetKeyAtStart = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}:${range}`;
+    async (
+      dateVal: AnalyticsDatePickerValue = dateSelection,
+      forceReload: boolean = false
+    ) => {
+      const targetKeyAtStart = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}:${dateVal.preset}:${dateVal.selectedDate}`;
 
       if (inFlightControllerRef.current) {
         if (!forceReload && targetKeyAtStart === displayedTargetKey) {
@@ -340,10 +347,18 @@ export default function AnalyticsDashboardPage() {
 
       try {
         setRefreshing(true);
-        const apiRange = range === 'TODAY' ? 'TODAY' : range === '7D' ? 'WEEK' : 'MONTH';
+        const apiRange =
+          dateVal.preset === '12M'
+            ? 'YEAR'
+            : dateVal.preset === '30D' || dateVal.preset === 'THIS_MONTH'
+            ? 'MONTH'
+            : dateVal.preset === '7D'
+            ? 'WEEK'
+            : 'TODAY';
         const stationParam =
           selectedStationId !== 'ALL' ? `&station_id=${encodeURIComponent(selectedStationId)}` : '';
-        const res = await fetch(`/api/deye/history?range=${apiRange}&step=5${stationParam}`, {
+        const dateParam = `&date=${encodeURIComponent(dateVal.selectedDate)}`;
+        const res = await fetch(`/api/deye/history?range=${apiRange}&step=5${dateParam}${stationParam}`, {
           signal: controller.signal,
         });
 
@@ -372,12 +387,12 @@ export default function AnalyticsDashboardPage() {
         }
       }
     },
-    [isFleetView, selectedAccountId, selectedStationId, timeRange, displayedTargetKey, setIsPlantSwitching]
+    [isFleetView, selectedAccountId, selectedStationId, dateSelection, displayedTargetKey, setIsPlantSwitching]
   );
 
   useEffect(() => {
-    fetchAnalyticsData(timeRange);
-  }, [fetchAnalyticsData, timeRange]);
+    fetchAnalyticsData(dateSelection);
+  }, [fetchAnalyticsData, dateSelection]);
 
   // Scale raw hourly telemetry according to inverter isolation if active
   const isolatedHourlyData = useMemo(() => {
@@ -417,12 +432,22 @@ export default function AnalyticsDashboardPage() {
   }, [isolatedHourlyData, effectiveCapacityKw, hasBattery]);
 
   const dailyPoints7D = useMemo<DailyAnalyticsPoint[]>(() => {
-    return generateDailyAnalytics(7, effectiveCapacityKw, hasBattery);
-  }, [effectiveCapacityKw, hasBattery]);
+    return generateDailyAnalytics(
+      7,
+      effectiveCapacityKw,
+      hasBattery,
+      parseLocalIsoDate(dateSelection.selectedDate)
+    );
+  }, [effectiveCapacityKw, hasBattery, dateSelection.selectedDate]);
 
   const dailyPoints30D = useMemo<DailyAnalyticsPoint[]>(() => {
-    return generateDailyAnalytics(30, effectiveCapacityKw, hasBattery);
-  }, [effectiveCapacityKw, hasBattery]);
+    return generateDailyAnalytics(
+      30,
+      effectiveCapacityKw,
+      hasBattery,
+      parseLocalIsoDate(dateSelection.selectedDate)
+    );
+  }, [effectiveCapacityKw, hasBattery, dateSelection.selectedDate]);
 
   const monthlyPoints12M = useMemo<MonthlyAnalyticsPoint[]>(() => {
     return generateMonthlyAnalytics(effectiveCapacityKw);
@@ -521,7 +546,7 @@ export default function AnalyticsDashboardPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Deye_Analytics_${selectedInverter ? selectedInverter.deviceSn : 'Plant'}_${timeRange}_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `Deye_Analytics_${selectedInverter ? selectedInverter.deviceSn : 'Plant'}_${dateSelection.preset}_${dateSelection.selectedDate}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -566,69 +591,62 @@ export default function AnalyticsDashboardPage() {
               <BarChart3 className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline">
+              <HoverInfo
+                title="Enterprise Analytics Dashboard"
+                content={
+                  <div className="space-y-2 text-[11px] min-w-[240px]">
+                    <div className="flex flex-wrap items-center gap-1.5 pb-1.5 border-b border-border/40">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                        Fleet Matrix
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                        {isViewingToday ? 'Live Sync (5m)' : `Archive (${dateSelection.preset})`}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-primary/15 text-primary border border-primary/30">
+                        {isFleetView ? 'Fleet Aggregate' : activeDashboardTitle}
+                      </span>
+                    </div>
+                    <div className="space-y-1 font-mono text-[10.5px]">
+                      <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                        <span>Operating Matrix:</span>
+                        <span className="font-semibold text-amber-400">
+                          {selectedInverter ? 'Inverter Isolated' : isFleetView ? 'Fleet Matrix' : 'Plant View'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                        <span>Scope Target:</span>
+                        <span className="font-semibold text-foreground">
+                          {isFleetView ? 'Fleet Aggregate' : activeDashboardTitle}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                        <span>Sync Telemetry:</span>
+                        <span className="font-semibold text-emerald-400">
+                          {isViewingToday ? 'Live Sync 5m (Sub-minute Gateway)' : `Archive (${dateSelection.preset})`}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground pt-1 border-t border-border/40 leading-normal">
+                      IEC 61724 Standard Photovoltaic PR monitoring, localized inverter isolation, and sub-minute telemetry synchronization.
+                    </p>
+                  </div>
+                }
+              >
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline cursor-help">
                   Enterprise Analytics Dashboard
                 </h1>
-                <HoverInfo
-                  title="Operating Matrix Level"
-                  content={selectedInverter ? TELEMETRY_DESCRIPTIONS.analytics.inverterIsolation : isFleetView ? TELEMETRY_DESCRIPTIONS.energyFlow.fleetMatrix : TELEMETRY_DESCRIPTIONS.analytics.plantSwitcher}
-                >
-                  <Badge
-                    variant="outline"
-                    className="border-amber-500/40 text-amber-500 bg-amber-500/10 font-mono text-[11px] px-2.5 py-0.5 cursor-help"
-                  >
-                    {selectedInverter ? 'INVERTER ISOLATED' : isFleetView ? 'FLEET MATRIX' : 'PLANT VIEW'}
-                  </Badge>
-                </HoverInfo>
-                <HoverInfo
-                  title="Sub-Minute Telemetry Stream"
-                  content="Real-time 5-minute telemetry intervals synchronized directly with the DeyeCloud gateway."
-                >
-                  <Badge
-                    variant="outline"
-                    className="border-emerald-500/40 text-emerald-400 bg-emerald-500/10 font-mono text-[11px] px-2.5 py-0.5 flex items-center gap-1.5 cursor-help"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                    Live Sync 5m
-                  </Badge>
-                </HoverInfo>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-2">
-                <span className="font-semibold text-foreground">{activeDashboardTitle}</span>
-                <span>•</span>
-                <span>IEC 61724 Standard PR Monitoring & Hardware Isolation</span>
-              </p>
+              </HoverInfo>
             </div>
           </div>
         </div>
 
-        {/* Global Controls: Timeframe, Export, Refresh */}
+        {/* Global Controls: Solar Date Picker, Export, Refresh */}
         <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-start lg:justify-end">
-          {/* Time Range Selector */}
-          <div className="flex items-center bg-card border border-border/70 rounded-xl p-1 shadow-sm">
-            {(
-              [
-                { id: 'TODAY', label: 'Today (5m)', desc: 'High-resolution 5-minute sampling intervals for real-time solar tracking.' },
-                { id: '7D', label: '7 Days', desc: 'Daily generation and consumption balance over the last 7 rolling days.' },
-                { id: '30D', label: '30 Days', desc: 'Monthly diurnal pattern and grid energy exchange overview.' },
-                { id: '12M', label: '12 Months', desc: 'Yearly seasonal generation trends in MWh with seasonal performance ratio.' },
-              ] as const
-            ).map((tab) => (
-              <HoverInfo key={tab.id} title={`${tab.label} View`} content={tab.desc} side="bottom">
-                <button
-                  onClick={() => setTimeRange(tab.id)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer ${
-                    timeRange === tab.id
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              </HoverInfo>
-            ))}
-          </div>
+          {/* Solar Telemetry Date Picker */}
+          <AnalyticsDatePicker
+            value={dateSelection}
+            onChange={(newVal) => setDateSelection(newVal)}
+          />
 
           {/* Export CSV Button */}
           <HoverInfo title="Download Report" content="Exports all isolated solar, load, and grid exchange data for this view as a CSV report." side="bottom">
@@ -648,7 +666,7 @@ export default function AnalyticsDashboardPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => fetchAnalyticsData(timeRange, true)}
+              onClick={() => fetchAnalyticsData(dateSelection, true)}
               disabled={refreshing}
               className="border-border/70 hover:bg-card flex items-center gap-1.5 text-xs h-9 cursor-pointer"
             >
@@ -667,17 +685,31 @@ export default function AnalyticsDashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8 gap-3.5">
         {/* KPI 1: Solar Generation */}
         <Card className="border-amber-500/30 bg-gradient-to-b from-amber-500/[0.04] to-card shadow-sm hover:border-amber-500/50 transition-colors">
-          <CardContent className="p-4 space-y-2">
+          <HoverInfo
+            className="block w-full h-full p-4 space-y-2 cursor-help"
+            title={selectedInverter ? "Inverter Solar Yield" : "Total Solar Generation"}
+            content={
+              <div className="space-y-1.5 min-w-[200px] text-[11px]">
+                <p className="text-muted-foreground leading-snug">
+                  {TELEMETRY_DESCRIPTIONS.analytics.solarYield}
+                </p>
+                <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Peak Power:</span>
+                    <span className="font-semibold text-foreground">{analyticsSummary.peakSolarKw} kW at {analyticsSummary.peakHour}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Specific Yield:</span>
+                    <span className="font-semibold text-amber-400">{analyticsSummary.specificYieldKwhKwp} kWh/kWp</span>
+                  </div>
+                </div>
+              </div>
+            }
+          >
             <div className="flex items-center justify-between">
-              <HoverInfo
-                title={selectedInverter ? "Inverter Solar Yield" : "Total Solar Generation"}
-                content={TELEMETRY_DESCRIPTIONS.analytics.solarYield}
-                showIcon
-              >
-                <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
-                  {selectedInverter ? 'Inverter Yield' : 'Total Yield'}
-                </span>
-              </HoverInfo>
+              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+                {selectedInverter ? 'Inverter Yield' : 'Total Yield'}
+              </span>
               <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
                 <Sun className="w-4 h-4" />
               </div>
@@ -688,40 +720,37 @@ export default function AnalyticsDashboardPage() {
                   ? `${(analyticsSummary.totalSolarYieldKwh / 1000).toFixed(2)} MWh`
                   : `${analyticsSummary.totalSolarYieldKwh} kWh`}
               </div>
-              <HoverInfo
-                title="Midday Peak Power"
-                content={TELEMETRY_DESCRIPTIONS.analytics.peakPower}
-              >
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Peak: <span className="font-semibold text-foreground">{analyticsSummary.peakSolarKw} kW</span> at {analyticsSummary.peakHour}
-                </p>
-              </HoverInfo>
             </div>
-            <div className="pt-1 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground font-mono">
-              <HoverInfo
-                title="Specific Yield (kWh/kWp)"
-                content={TELEMETRY_DESCRIPTIONS.analytics.specificYield}
-              >
-                <span>Specific Yield</span>
-              </HoverInfo>
-              <span className="text-amber-400 font-semibold">{analyticsSummary.specificYieldKwhKwp} kWh/kWp</span>
-            </div>
-          </CardContent>
+          </HoverInfo>
         </Card>
 
         {/* KPI 2: Self Consumption Ratio */}
         <Card className="border-emerald-500/30 bg-gradient-to-b from-emerald-500/[0.04] to-card shadow-sm hover:border-emerald-500/50 transition-colors">
-          <CardContent className="p-4 space-y-2">
+          <HoverInfo
+            className="block w-full h-full p-4 space-y-2 cursor-help"
+            title="Self-Consumption Ratio"
+            content={
+              <div className="space-y-1.5 min-w-[200px] text-[11px]">
+                <p className="text-muted-foreground leading-snug">
+                  {TELEMETRY_DESCRIPTIONS.analytics.selfConsumption}
+                </p>
+                <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Local Usage:</span>
+                    <span className="font-semibold text-foreground">{analyticsSummary.totalSelfConsumedKwh} kWh</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Self-Sufficiency:</span>
+                    <span className="font-semibold text-emerald-400">{analyticsSummary.selfSufficiencyPct}% of load</span>
+                  </div>
+                </div>
+              </div>
+            }
+          >
             <div className="flex items-center justify-between">
-              <HoverInfo
-                title="Self-Consumption Ratio"
-                content={TELEMETRY_DESCRIPTIONS.analytics.selfConsumption}
-                showIcon
-              >
-                <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
-                  Self-Consumption
-                </span>
-              </HoverInfo>
+              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+                Self-Consumption
+              </span>
               <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500">
                 <Zap className="w-4 h-4" />
               </div>
@@ -730,41 +759,39 @@ export default function AnalyticsDashboardPage() {
               <div className="text-2xl font-bold font-mono text-emerald-500 tracking-tight">
                 {analyticsSummary.selfConsumptionPct}%
               </div>
-              <HoverInfo
-                title="Direct Local Consumption"
-                content="Amount of on-site solar power consumed immediately by your equipment."
-              >
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Local usage: <span className="font-semibold text-foreground">{analyticsSummary.totalSelfConsumedKwh} kWh</span>
-                </p>
-              </HoverInfo>
             </div>
-            <div className="pt-1 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground font-mono">
-              <HoverInfo
-                title="Self-Sufficiency (Autarky)"
-                content={TELEMETRY_DESCRIPTIONS.analytics.selfSufficiency}
-              >
-                <span>Self-Sufficiency</span>
-              </HoverInfo>
-              <span className="text-emerald-400 font-semibold">{analyticsSummary.selfSufficiencyPct}% of load</span>
-            </div>
-          </CardContent>
+          </HoverInfo>
         </Card>
 
-        {/* KPI 3: Battery Storage ESS (or Grid-Tied Mode if no battery installed) */}
-        {/* KPI 3: Battery Storage ESS (Always retained, showing 0 / standby when no battery is present) */}
+        {/* KPI 3: Battery Storage ESS */}
         <Card className="border-cyan-500/30 bg-gradient-to-b from-cyan-500/[0.04] to-card shadow-sm hover:border-cyan-500/50 transition-colors">
-          <CardContent className="p-4 space-y-2">
+          <HoverInfo
+            className="block w-full h-full p-4 space-y-2 cursor-help"
+            title="Battery Storage ESS"
+            content={
+              <div className="space-y-1.5 min-w-[200px] text-[11px]">
+                <p className="text-muted-foreground leading-snug">
+                  {hasBattery ? "Active connected battery banks." : TELEMETRY_DESCRIPTIONS.analytics.futureEss}
+                </p>
+                <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Power Flow:</span>
+                    <span className="font-semibold text-foreground font-mono">0.0 kW (Standby)</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Throughput:</span>
+                    <span className="font-semibold text-cyan-400">
+                      {hasBattery ? `${analyticsSummary.batteryCycles} Cycles/day` : '0.0 kWh (No ESS)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            }
+          >
             <div className="flex items-center justify-between">
-              <HoverInfo
-                title="Battery Storage ESS"
-                content="State of Charge (SOC %) and round-trip efficiency of storage battery banks."
-                showIcon
-              >
-                <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
-                  Battery ESS
-                </span>
-              </HoverInfo>
+              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+                Battery ESS
+              </span>
               <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
                 <BatteryCharging className="w-4 h-4" />
               </div>
@@ -773,38 +800,37 @@ export default function AnalyticsDashboardPage() {
               <div className="text-2xl font-bold font-mono text-cyan-400 tracking-tight">
                 {analyticsSummary.currentSocPct.toFixed(1)}% <span className="text-xs text-muted-foreground font-normal">SOC</span>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Flow: <span className="font-semibold text-foreground font-mono">0.0 kW</span>
-                <span className="opacity-70 ml-1.5 font-sans">(Standby)</span>
-              </p>
             </div>
-            <div className="pt-1 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground font-mono">
-              <HoverInfo
-                title="Battery Storage Status"
-                content={hasBattery ? "Active connected battery banks." : TELEMETRY_DESCRIPTIONS.analytics.futureEss}
-              >
-                <span>Throughput</span>
-              </HoverInfo>
-              <span className="text-cyan-400 font-semibold">
-                {hasBattery ? `${analyticsSummary.batteryCycles} Cycles/day` : '0.0 kWh (No ESS)'}
-              </span>
-            </div>
-          </CardContent>
+          </HoverInfo>
         </Card>
 
         {/* KPI 4: Grid Balance & Feed-in */}
         <Card className="border-purple-500/30 bg-gradient-to-b from-purple-500/[0.04] to-card shadow-sm hover:border-purple-500/50 transition-colors">
-          <CardContent className="p-4 space-y-2">
+          <HoverInfo
+            className="block w-full h-full p-4 space-y-2 cursor-help"
+            title="Grid Net Balance"
+            content={
+              <div className="space-y-1.5 min-w-[200px] text-[11px]">
+                <p className="text-muted-foreground leading-snug">
+                  {TELEMETRY_DESCRIPTIONS.analytics.gridExchange}
+                </p>
+                <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Grid Export:</span>
+                    <span className="font-semibold text-foreground">{analyticsSummary.totalGridExportKwh} kWh</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Grid Imported:</span>
+                    <span className="font-semibold text-rose-400">{analyticsSummary.totalGridImportKwh} kWh</span>
+                  </div>
+                </div>
+              </div>
+            }
+          >
             <div className="flex items-center justify-between">
-              <HoverInfo
-                title="Grid Net Balance"
-                content={TELEMETRY_DESCRIPTIONS.analytics.gridExchange}
-                showIcon
-              >
-                <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
-                  Grid Exchange
-                </span>
-              </HoverInfo>
+              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+                Grid Exchange
+              </span>
               <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
                 <TrendingUp className="w-4 h-4" />
               </div>
@@ -813,40 +839,37 @@ export default function AnalyticsDashboardPage() {
               <div className="text-2xl font-bold font-mono text-purple-400 tracking-tight">
                 {analyticsSummary.netGridBalanceKwh >= 0 ? `+${analyticsSummary.netGridBalanceKwh}` : analyticsSummary.netGridBalanceKwh} kWh
               </div>
-              <HoverInfo
-                title="Surplus Clean Solar Export"
-                content="Excess clean solar power pushed onto the utility grid."
-              >
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Export: <span className="font-semibold text-foreground">{analyticsSummary.totalGridExportKwh} kWh</span>
-                </p>
-              </HoverInfo>
             </div>
-            <div className="pt-1 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground font-mono">
-              <HoverInfo
-                title="Grid Power Imported"
-                content="Energy drawn from the utility grid during cloud cover or nighttime."
-              >
-                <span>Imported</span>
-              </HoverInfo>
-              <span className="text-rose-400 font-semibold">{analyticsSummary.totalGridImportKwh} kWh</span>
-            </div>
-          </CardContent>
+          </HoverInfo>
         </Card>
 
         {/* KPI 5: Performance Ratio (PR) / Utilization */}
         <Card className="border-blue-500/30 bg-gradient-to-b from-blue-500/[0.04] to-card shadow-sm hover:border-blue-500/50 transition-colors">
-          <CardContent className="p-4 space-y-2">
+          <HoverInfo
+            className="block w-full h-full p-4 space-y-2 cursor-help"
+            title="Performance Ratio (PR) / Utilization"
+            content={
+              <div className="space-y-1.5 min-w-[200px] text-[11px]">
+                <p className="text-muted-foreground leading-snug">
+                  {TELEMETRY_DESCRIPTIONS.analytics.performanceRatio}
+                </p>
+                <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Benchmark:</span>
+                    <span className="font-semibold text-foreground">&gt; 80.0% Optimal</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Plant Capacity:</span>
+                    <span className="font-semibold text-blue-400">{effectiveCapacityKw} kWp</span>
+                  </div>
+                </div>
+              </div>
+            }
+          >
             <div className="flex items-center justify-between">
-              <HoverInfo
-                title="Performance Ratio (PR) / Utilization"
-                content={TELEMETRY_DESCRIPTIONS.analytics.performanceRatio}
-                showIcon
-              >
-                <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
-                  PR / Utilization
-                </span>
-              </HoverInfo>
+              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+                PR / Utilization
+              </span>
               <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
                 <Gauge className="w-4 h-4" />
               </div>
@@ -855,35 +878,37 @@ export default function AnalyticsDashboardPage() {
               <div className="text-2xl font-bold font-mono text-blue-400 tracking-tight">
                 {analyticsSummary.performanceRatioPct}%
               </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Benchmark: <span className="font-semibold text-foreground">&gt; 80.0% Optimal</span>
-              </p>
             </div>
-            <div className="pt-1 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground font-mono">
-              <HoverInfo
-                title="Array Capacity Factor"
-                content="Operating utilization factor relative to nominal nameplate capacity rating."
-              >
-                <span>Plant Capacity</span>
-              </HoverInfo>
-              <span className="text-blue-400 font-semibold">{effectiveCapacityKw} kWp</span>
-            </div>
-          </CardContent>
+          </HoverInfo>
         </Card>
 
         {/* KPI 6: Inverter Efficiency */}
         <Card className="border-emerald-500/30 bg-gradient-to-b from-emerald-500/[0.04] to-card shadow-sm hover:border-emerald-500/50 transition-colors">
-          <CardContent className="p-4 space-y-2">
+          <HoverInfo
+            className="block w-full h-full p-4 space-y-2 cursor-help"
+            title="Inverter Efficiency"
+            content={
+              <div className="space-y-1.5 min-w-[200px] text-[11px]">
+                <p className="text-muted-foreground leading-snug">
+                  {TELEMETRY_DESCRIPTIONS.analytics.inverterEfficiency}
+                </p>
+                <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Conversion:</span>
+                    <span className="font-semibold text-foreground">European Weighted</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Conversion Loss:</span>
+                    <span className="font-semibold text-emerald-400">&lt; 1.6% (Low Loss)</span>
+                  </div>
+                </div>
+              </div>
+            }
+          >
             <div className="flex items-center justify-between">
-              <HoverInfo
-                title="Inverter Efficiency"
-                content={TELEMETRY_DESCRIPTIONS.analytics.inverterEfficiency}
-                showIcon
-              >
-                <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
-                  Inverter Efficiency
-                </span>
-              </HoverInfo>
+              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+                Inverter Efficiency
+              </span>
               <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
                 <Cpu className="w-4 h-4" />
               </div>
@@ -892,35 +917,37 @@ export default function AnalyticsDashboardPage() {
               <div className="text-2xl font-bold font-mono text-emerald-400 tracking-tight">
                 {analyticsSummary.inverterEfficiencyPct}%
               </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Conversion: <span className="font-semibold text-foreground">European Weighted</span>
-              </p>
             </div>
-            <div className="pt-1 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground font-mono">
-              <HoverInfo
-                title="Semiconductor Conversion Losses"
-                content="Thermal and switching loss across internal IGBT inverter bridges."
-              >
-                <span>Conversion Loss</span>
-              </HoverInfo>
-              <span className="text-emerald-400 font-semibold">&lt; 1.6% (Low Loss)</span>
-            </div>
-          </CardContent>
+          </HoverInfo>
         </Card>
 
         {/* KPI 7: PV Module Efficiency */}
         <Card className="border-amber-500/30 bg-gradient-to-b from-amber-500/[0.04] to-card shadow-sm hover:border-amber-500/50 transition-colors">
-          <CardContent className="p-4 space-y-2">
+          <HoverInfo
+            className="block w-full h-full p-4 space-y-2 cursor-help"
+            title="PV Module Efficiency"
+            content={
+              <div className="space-y-1.5 min-w-[200px] text-[11px]">
+                <p className="text-muted-foreground leading-snug">
+                  {TELEMETRY_DESCRIPTIONS.analytics.pvModuleEfficiency}
+                </p>
+                <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Cell Tech:</span>
+                    <span className="font-semibold text-foreground">Tier-1 Mono PERC</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Rating Spec:</span>
+                    <span className="font-semibold text-amber-500">STC 1000W/m²</span>
+                  </div>
+                </div>
+              </div>
+            }
+          >
             <div className="flex items-center justify-between">
-              <HoverInfo
-                title="PV Module Efficiency"
-                content={TELEMETRY_DESCRIPTIONS.analytics.pvModuleEfficiency}
-                showIcon
-              >
-                <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
-                  PV Module Efficiency
-                </span>
-              </HoverInfo>
+              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+                PV Module Efficiency
+              </span>
               <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
                 <Layers className="w-4 h-4" />
               </div>
@@ -929,35 +956,37 @@ export default function AnalyticsDashboardPage() {
               <div className="text-2xl font-bold font-mono text-amber-500 tracking-tight">
                 {analyticsSummary.pvModuleEfficiencyPct}%
               </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Cell Tech: <span className="font-semibold text-foreground">Tier-1 Mono PERC</span>
-              </p>
             </div>
-            <div className="pt-1 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground font-mono">
-              <HoverInfo
-                title="STC Irradiance Testing Benchmark"
-                content="Rated at 1000 W/m² solar irradiance, 25°C cell temperature, AM 1.5G spectrum."
-              >
-                <span>Rating Spec</span>
-              </HoverInfo>
-              <span className="text-amber-500 font-semibold">STC 1000W/m²</span>
-            </div>
-          </CardContent>
+          </HoverInfo>
         </Card>
 
         {/* KPI 8: ESG & Avoided CO2 */}
         <Card className="border-teal-600/30 bg-gradient-to-b from-teal-600/[0.04] to-card shadow-sm hover:border-teal-600/50 transition-colors">
-          <CardContent className="p-4 space-y-2">
+          <HoverInfo
+            className="block w-full h-full p-4 space-y-2 cursor-help"
+            title="Carbon Offset (ESG)"
+            content={
+              <div className="space-y-1.5 min-w-[200px] text-[11px]">
+                <p className="text-muted-foreground leading-snug">
+                  {TELEMETRY_DESCRIPTIONS.analytics.co2Avoided}
+                </p>
+                <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Equivalent:</span>
+                    <span className="font-semibold text-foreground">{analyticsSummary.treesEquivalent} Mature Trees</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Tariff Savings:</span>
+                    <span className="font-semibold text-teal-400">${analyticsSummary.totalSavingsUsd}</span>
+                  </div>
+                </div>
+              </div>
+            }
+          >
             <div className="flex items-center justify-between">
-              <HoverInfo
-                title="Carbon Offset (ESG)"
-                content={TELEMETRY_DESCRIPTIONS.analytics.co2Avoided}
-                showIcon
-              >
-                <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
-                  Carbon Offset
-                </span>
-              </HoverInfo>
+              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+                Carbon Offset
+              </span>
               <div className="p-1.5 rounded-lg bg-teal-600/10 text-teal-400">
                 <Leaf className="w-4 h-4" />
               </div>
@@ -966,25 +995,8 @@ export default function AnalyticsDashboardPage() {
               <div className="text-2xl font-bold font-mono text-teal-400 tracking-tight">
                 {analyticsSummary.co2AvoidedKg} kg
               </div>
-              <HoverInfo
-                title="Tree Equivalence"
-                content="Equivalent carbon absorption of mature urban trees over a full annual cycle."
-              >
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Equivalent: <span className="font-semibold text-foreground">{analyticsSummary.treesEquivalent} Mature Trees</span>
-                </p>
-              </HoverInfo>
             </div>
-            <div className="pt-1 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground font-mono">
-              <HoverInfo
-                title="Estimated Tariff Savings"
-                content={TELEMETRY_DESCRIPTIONS.analytics.costSavings}
-              >
-                <span>Savings Generated</span>
-              </HoverInfo>
-              <span className="text-teal-400 font-semibold">${analyticsSummary.totalSavingsUsd}</span>
-            </div>
-          </CardContent>
+          </HoverInfo>
         </Card>
       </div>
 
@@ -1005,6 +1017,21 @@ export default function AnalyticsDashboardPage() {
                     {selectedInverter ? `Inverter Generation Profile (${selectedInverter.model})` : 'Diurnal Generation & Industrial Load Profile'}
                   </CardTitle>
                 </HoverInfo>
+                <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+                  {dateSelection.preset === 'TODAY'
+                    ? `Real-time 5-minute sampling · ${formatHumanDate(dateSelection.selectedDate)}`
+                    : dateSelection.preset === 'YESTERDAY'
+                    ? `Full 24h recorded curve · Yesterday (${formatHumanDate(dateSelection.selectedDate)})`
+                    : dateSelection.preset === '7D'
+                    ? `7-Day rolling envelope ending ${formatHumanDate(dateSelection.selectedDate)}`
+                    : dateSelection.preset === '30D'
+                    ? `30-Day monthly envelope ending ${formatHumanDate(dateSelection.selectedDate)}`
+                    : dateSelection.preset === 'THIS_MONTH'
+                    ? `Calendar month envelope (${formatHumanDate(dateSelection.selectedDate, { month: 'long', year: 'numeric' })})`
+                    : dateSelection.preset === '12M'
+                    ? '12-Month seasonal diurnal profile'
+                    : `Historical 24h recorded profile · ${formatHumanDate(dateSelection.selectedDate)}`}
+                </p>
               </div>
 
               {/* Stream filter toggles */}
@@ -1449,7 +1476,15 @@ export default function AnalyticsDashboardPage() {
                 </HoverInfo>
               </div>
               <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10 font-mono text-[10px]">
-                {selectedInverter ? `Inverter: ${selectedInverter.deviceSn}` : timeRange === '12M' ? '12 Months' : timeRange === '30D' ? '30 Days' : '7 Days'}
+                {selectedInverter
+                  ? `Inverter: ${selectedInverter.deviceSn}`
+                  : dateSelection.preset === '12M'
+                  ? '12 Months Seasonal'
+                  : dateSelection.preset === '30D' || dateSelection.preset === 'THIS_MONTH'
+                  ? '30 Days Envelope'
+                  : dateSelection.preset === '7D'
+                  ? '7 Days Rolling'
+                  : `Ending ${formatHumanDate(dateSelection.selectedDate)} (7-Day Rolling)`}
               </Badge>
             </div>
           </CardHeader>
@@ -1682,7 +1717,7 @@ export default function AnalyticsDashboardPage() {
               >
                 <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-help">
                   <Calendar className="w-5 h-5 text-primary" />
-                  Interval Telemetry Log & Financial Ledger
+                  Interval Telemetry Log ({formatHumanDate(dateSelection.selectedDate)})
                 </CardTitle>
               </HoverInfo>
             </div>

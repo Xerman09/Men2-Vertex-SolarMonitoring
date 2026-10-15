@@ -13,7 +13,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { Zap, TrendingUp } from 'lucide-react';
-import { useRole } from '@/lib/role-context';
+import { HoverInfo } from '@/components/ui/tooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { SelfConsumptionMetrics, COLOR_PV, COLOR_LOAD } from '../useTrigonometricGraph';
 
@@ -30,32 +30,81 @@ export function SelfConsumptionChart({
   majorXTicks,
   nowSlotStr,
 }: SelfConsumptionChartProps) {
-  const { isAdmin } = useRole();
-
   return (
     <div className={compact ? 'space-y-3' : 'space-y-4'}>
-      {/* KPI Cards with Green, Yellow, Purple alignment */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
-        <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Utilization Rate</span>
-          <span className="text-lg sm:text-xl font-bold font-mono text-emerald-500">{selfConsumptionMetrics.utilizationPct}%</span>
-          <span className="text-[9.5px] text-muted-foreground block mt-0.5">Load covered by PV</span>
-        </div>
-        <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/30">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Self-Consumption</span>
-          <span className="text-lg sm:text-xl font-bold font-mono text-yellow-500">{selfConsumptionMetrics.productionPct}%</span>
-          <span className="text-[9.5px] text-muted-foreground block mt-0.5">PV consumed locally</span>
-        </div>
-        <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Self-Consumed kWh</span>
-          <span className="text-lg sm:text-xl font-bold font-mono text-emerald-400">{selfConsumptionMetrics.selfConsumedKwh}</span>
-          <span className="text-[9.5px] text-muted-foreground block mt-0.5">of {selfConsumptionMetrics.totalPvKwh} kWh PV</span>
-        </div>
-        <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/30">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Grid Import</span>
-          <span className="text-lg sm:text-xl font-bold font-mono text-purple-400">{selfConsumptionMetrics.totalImportKwh}</span>
-          <span className="text-[9.5px] text-muted-foreground block mt-0.5">of {selfConsumptionMetrics.totalLoadKwh} kWh load</span>
-        </div>
+        <HoverInfo
+          className="block w-full cursor-help"
+          title="Utilization Rate"
+          content={
+            <div className="text-[11px] space-y-1 min-w-[160px]">
+              <p className="text-muted-foreground">Percentage of total facility electrical load directly met by on-site solar PV generation.</p>
+              <div className="pt-1 border-t border-border/50 text-emerald-400 font-mono font-medium">
+                Load covered by PV
+              </div>
+            </div>
+          }
+        >
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Utilization Rate</span>
+            <span className="text-lg sm:text-xl font-bold font-mono text-emerald-500">{selfConsumptionMetrics.utilizationPct}%</span>
+          </div>
+        </HoverInfo>
+
+        <HoverInfo
+          className="block w-full cursor-help"
+          title="Self-Consumption"
+          content={
+            <div className="text-[11px] space-y-1 min-w-[160px]">
+              <p className="text-muted-foreground">Fraction of total solar PV generation absorbed immediately on-site rather than exported.</p>
+              <div className="pt-1 border-t border-border/50 text-yellow-400 font-mono font-medium">
+                PV consumed locally
+              </div>
+            </div>
+          }
+        >
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/30">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Self-Consumption</span>
+            <span className="text-lg sm:text-xl font-bold font-mono text-yellow-500">{selfConsumptionMetrics.productionPct}%</span>
+          </div>
+        </HoverInfo>
+
+        <HoverInfo
+          className="block w-full cursor-help"
+          title="Self-Consumed kWh"
+          content={
+            <div className="text-[11px] space-y-1 min-w-[160px]">
+              <p className="text-muted-foreground">Actual volume of solar generation utilized by local industrial plant circuits.</p>
+              <div className="pt-1 border-t border-border/50 text-emerald-400 font-mono font-medium">
+                of {selfConsumptionMetrics.totalPvKwh} kWh PV
+              </div>
+            </div>
+          }
+        >
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Self-Consumed kWh</span>
+            <span className="text-lg sm:text-xl font-bold font-mono text-emerald-400">{selfConsumptionMetrics.selfConsumedKwh}</span>
+          </div>
+        </HoverInfo>
+
+        <HoverInfo
+          className="block w-full cursor-help"
+          title="Grid Import"
+          content={
+            <div className="text-[11px] space-y-1 min-w-[160px]">
+              <p className="text-muted-foreground">Supplementary energy purchased from the utility grid to cover facility deficit.</p>
+              <div className="pt-1 border-t border-border/50 text-purple-400 font-mono font-medium">
+                of {selfConsumptionMetrics.totalLoadKwh} kWh load
+              </div>
+            </div>
+          }
+        >
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/30">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Grid Import</span>
+            <span className="text-lg sm:text-xl font-bold font-mono text-purple-400">{selfConsumptionMetrics.totalImportKwh}</span>
+          </div>
+        </HoverInfo>
       </div>
 
       {/* Ratio definition cards */}
@@ -67,12 +116,15 @@ export function SelfConsumptionChart({
               <Zap className="h-3.5 w-3.5 text-emerald-500" />
             </div>
             <div>
-              <span className="text-xs sm:text-sm font-bold text-foreground block">Utilization — PV to Import</span>
-              {isAdmin && (
-                <span className="text-[11px] text-muted-foreground block mt-0.5">
-                  {TELEMETRY_DESCRIPTIONS.trigonometricGraph.selfConsumptionUtilization}
+              <HoverInfo
+                title="Utilization — PV to Import"
+                content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.selfConsumptionUtilization}
+                showIcon
+              >
+                <span className="text-xs sm:text-sm font-bold text-foreground block cursor-help">
+                  Utilization — PV to Import
                 </span>
-              )}
+              </HoverInfo>
             </div>
           </div>
           <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden">
@@ -94,12 +146,15 @@ export function SelfConsumptionChart({
               <TrendingUp className="h-3.5 w-3.5 text-yellow-500" />
             </div>
             <div>
-              <span className="text-xs sm:text-sm font-bold text-foreground block">Production — Consumption to Export</span>
-              {isAdmin && (
-                <span className="text-[11px] text-muted-foreground block mt-0.5">
-                  {TELEMETRY_DESCRIPTIONS.trigonometricGraph.selfConsumptionProduction}
+              <HoverInfo
+                title="Production — Consumption to Export"
+                content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.selfConsumptionProduction}
+                showIcon
+              >
+                <span className="text-xs sm:text-sm font-bold text-foreground block cursor-help">
+                  Production — Consumption to Export
                 </span>
-              )}
+              </HoverInfo>
             </div>
           </div>
           <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden">

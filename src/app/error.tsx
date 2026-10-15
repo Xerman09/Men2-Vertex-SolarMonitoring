@@ -34,7 +34,7 @@ export default function ErrorBoundary({
             Retry Pipeline
           </button>
           <a
-            href="/"
+            href="/analytics"
             className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium transition-colors"
           >
             Mission Control

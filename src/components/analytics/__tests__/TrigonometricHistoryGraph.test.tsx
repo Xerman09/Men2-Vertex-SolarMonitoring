@@ -86,9 +86,9 @@ describe('TrigonometricHistoryGraph Component & Architecture', () => {
     );
 
     expect(html).toContain('Combined');
-    expect(html).toContain('PV (Green)');
-    expect(html).toContain('Load (Yellow)');
-    expect(html).toContain('Grid (Purple)');
+    expect(html).toContain('PV');
+    expect(html).toContain('Load');
+    expect(html).toContain('Grid');
     expect(html).toContain('Style:');
     expect(html).toContain('Line');
     expect(html).toContain('Area');

@@ -26,6 +26,10 @@ export const historyQuerySchema = z.object({
     .min(1)
     .max(60)
     .default(5),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (must be YYYY-MM-DD)')
+    .optional(),
 });
 
 export const GET = withGate(
@@ -42,6 +46,7 @@ export const GET = withGate(
       accountId: searchParams.get('accountId') || undefined,
       range: searchParams.get('range') || undefined,
       step: searchParams.get('step') || undefined,
+      date: searchParams.get('date') || undefined,
     });
 
     if (!parsed.success) {
@@ -51,7 +56,7 @@ export const GET = withGate(
       );
     }
 
-    const { accountId: requestedAccountId, range, step } = parsed.data;
+    const { accountId: requestedAccountId, range, step, date } = parsed.data;
 
     // Consumer Tenant Scoping
     if (session.role === 'consumer') {
@@ -85,18 +90,19 @@ export const GET = withGate(
     }
 
     try {
-      const points = deyeClient.getHourlyEnergy(range, step);
+      const points = deyeClient.getHourlyEnergy(range, step, date);
       return NextResponse.json({
         data: points,
         isLive: false,
         isModelSimulated: true,
         range,
         stepMinutes: step,
+        date: date || undefined,
         notice:
           'Historical interval data is synthesized via sinusoidal clear-sky model until Deye historical telemetry aggregation tier is activated.',
       });
     } catch (error) {
-      log.error('Error retrieving hourly history', error, { route: 'history', range, step });
+      log.error('Error retrieving hourly history', error, { route: 'history', range, step, date });
       return NextResponse.json(
         { error: 'Failed to retrieve hourly history' },
         { status: 500 }
