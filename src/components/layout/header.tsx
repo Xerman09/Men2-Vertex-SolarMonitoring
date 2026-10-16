@@ -38,6 +38,8 @@ import { ModeToggle } from '@/components/theme/ModeToggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
+import { InverterConfig } from '@/lib/types';
+
 interface HeaderProps {
   currentStationName?: string;
   isLiveApi?: boolean;
@@ -58,6 +60,7 @@ export function Header({
     setSelectedStationId,
     selectedPlant,
     selectAccountAndPlant,
+    selectedInverterSn,
     isFleetView,
     totalAccounts,
     liveAccountsCount,
@@ -157,11 +160,23 @@ export function Header({
               aria-haspopup="listbox"
               aria-expanded={showAccountDropdown}
               aria-label="Select solar account or plant"
-              className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 bg-card/80 hover:bg-accent/60 rounded-xl border border-border/60 cursor-pointer transition-colors text-left shadow-2xs min-w-0 max-w-[210px] xs:max-w-[250px] sm:max-w-[300px] md:max-w-[360px]"
+              className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border cursor-pointer transition-all text-left shadow-2xs min-w-0 max-w-[210px] xs:max-w-[250px] sm:max-w-[300px] md:max-w-[360px] ${
+                selectedInverterSn && selectedInverterSn !== 'ALL'
+                  ? 'bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-500/40 ring-1 ring-cyan-500/20'
+                  : 'bg-card/80 hover:bg-accent/60 border-border/60'
+              }`}
             >
-              <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+              <div
+                className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                  selectedInverterSn && selectedInverterSn !== 'ALL'
+                    ? 'bg-cyan-500/20 text-cyan-400'
+                    : 'bg-primary/10 text-primary'
+                }`}
+              >
                 {isFleetView ? (
                   <Globe size={14} />
+                ) : selectedInverterSn && selectedInverterSn !== 'ALL' ? (
+                  <Cpu size={14} className="text-cyan-400" />
                 ) : selectedPlant ? (
                   <Building2 size={14} />
                 ) : (
@@ -170,20 +185,26 @@ export function Header({
               </div>
               <div className="flex flex-col min-w-0 shrink">
                 <span className="font-semibold text-xs text-foreground truncate block">
-                  {displayTitle}
+                  {selectedInverterSn && selectedInverterSn !== 'ALL'
+                    ? `Inverter ${selectedInverterSn}`
+                    : displayTitle}
                 </span>
-                {!isFleetView && selectedPlant && selectedAccount && (
-                  <span className="text-[10px] text-muted-foreground leading-none truncate block">
-                    {selectedAccount.name} · {selectedPlant.installedCapacityKw} kWp
+                {selectedInverterSn && selectedInverterSn !== 'ALL' ? (
+                  <span className="text-[10px] text-cyan-400 font-medium leading-none truncate flex items-center gap-1 mt-0.5">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0" />
+                    {selectedPlant?.stationName || `Station ${selectedStationId}`} · Isolated
                   </span>
-                )}
-                {!isFleetView && !selectedPlant && selectedAccount && (
+                ) : !isFleetView && selectedPlant && selectedAccount ? (
+                  <span className="text-[10px] text-muted-foreground leading-none truncate block">
+                    {`${selectedAccount.name} · ${selectedPlant.installedCapacityKw} kWp`}
+                  </span>
+                ) : !isFleetView && !selectedPlant && selectedAccount ? (
                   <span className="text-[10px] text-muted-foreground leading-none truncate block">
                     {selectedAccount.plants?.length
                       ? `${selectedAccount.plants.length} Plants · ${selectedAccount.capacityKw} kWp Total`
                       : `${selectedAccount.capacityKw} kWp Total`}
                   </span>
-                )}
+                ) : null}
               </div>
               <ChevronDown
                 className={`text-muted-foreground transition-transform duration-200 ml-1 shrink-0 ${
@@ -222,6 +243,34 @@ export function Header({
                     </span>
                   </div>
                 </div>
+
+                {/* Active Inverter Isolation Banner inside Dropdown */}
+                {selectedInverterSn && selectedInverterSn !== 'ALL' && (
+                  <div className="shrink-0 mb-2 p-2 rounded-xl bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Cpu size={14} className="text-cyan-400 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-semibold text-[11px] text-cyan-300 truncate">
+                          Inverter Isolated: {selectedInverterSn}
+                        </div>
+                        <div className="text-[10px] text-cyan-400/80 truncate">
+                          Station: {selectedPlant?.stationName || selectedStationId}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        selectAccountAndPlant(selectedAccountId, selectedStationId);
+                        setShowAccountDropdown(false);
+                      }}
+                      className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 cursor-pointer shrink-0 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
 
                 {/* Global Fleet View Option - Only for Admins / Multi-account Viewers */}
                 {!isConsumer && (
@@ -336,11 +385,26 @@ export function Header({
                           <div className="pl-6 pr-2 pb-2 pt-0.5 space-y-1">
                             {plants.map((plant) => {
                               const isPlantActive =
-                                isSelected && selectedStationId === plant.stationId;
+                                isSelected && String(selectedStationId) === String(plant.stationId);
                               const plantInverters = (plant.devices || []).filter(
-                                (d) => d.deviceType === 'INVERTER'
+                                (d) => String(d.deviceType || '').toUpperCase() === 'INVERTER'
                               );
-                              const hasInverters = plantInverters.length > 0;
+                              const effectiveInverters: Array<{
+                                deviceSn: string;
+                                name?: string;
+                                model?: string;
+                                ratedKw?: number;
+                                status?: string;
+                              }> = plantInverters.length > 0
+                                ? plantInverters
+                                : (acc.inverters || []).map((inv: InverterConfig) => ({
+                                    deviceSn: inv.sn,
+                                    name: inv.name,
+                                    model: inv.model,
+                                    ratedKw: inv.ratedKw,
+                                    status: 'ONLINE',
+                                  }));
+                              const hasInverters = effectiveInverters.length > 0;
                               const isInvertersExpanded = isPlantDevicesExpanded(plant.stationId);
 
                               return (
@@ -381,7 +445,7 @@ export function Header({
                                           aria-label={`Toggle inverters for ${plant.stationName}`}
                                           onClick={(e) => togglePlantExpand(plant.stationId, e)}
                                           className="p-0.5 rounded hover:bg-background/80 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                                          title={isInvertersExpanded ? 'Hide inverters' : `Show ${plantInverters.length} inverters`}
+                                          title={isInvertersExpanded ? 'Hide inverters' : `Show ${effectiveInverters.length} inverters`}
                                         >
                                           <ChevronDown
                                             size={11}
@@ -401,19 +465,19 @@ export function Header({
                                     </div>
                                   </div>
 
-                                  {/* Sub-node: Individual Inverters (Collapsed/Hidden by default) */}
+                                  {/* Sub-node: Individual Inverters (Informational hardware list, non-clickable) */}
                                   {hasInverters && isInvertersExpanded && (
                                     <div className="pl-4 pr-1 py-1 space-y-1 bg-muted/20 rounded-lg border border-border/40 ml-2 animate-in fade-in-50">
                                       <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground px-1.5 py-0.5 flex items-center justify-between">
                                         <span className="flex items-center gap-1">
                                           <Cpu size={10} className="text-cyan-400" />
-                                          Inverters ({plantInverters.length})
+                                          Inverters ({effectiveInverters.length})
                                         </span>
                                       </div>
-                                      {plantInverters.map((inv) => (
+                                      {effectiveInverters.map((inv) => (
                                         <div
                                           key={inv.deviceSn}
-                                          className="flex items-center justify-between px-2 py-1 rounded text-[10.5px] hover:bg-accent/40 font-mono transition-colors"
+                                          className="flex items-center justify-between px-2 py-1 rounded-md text-[10.5px] font-mono select-none bg-muted/15 border border-border/30 text-muted-foreground"
                                         >
                                           <div className="flex items-center gap-1.5 truncate">
                                             <span
@@ -425,13 +489,15 @@ export function Header({
                                                   : 'bg-amber-500'
                                               }`}
                                             />
-                                            <span className="truncate text-foreground/90 font-sans">
+                                            <span className="truncate text-foreground/80 font-sans">
                                               {inv.model || inv.name || 'Deye Inverter'}
                                             </span>
                                           </div>
-                                          <span className="text-[9.5px] text-muted-foreground shrink-0">
-                                            {inv.ratedKw ? `${inv.ratedKw} kW` : inv.deviceSn}
-                                          </span>
+                                          <div className="flex items-center gap-1.5 shrink-0">
+                                            <span className="text-[9.5px] text-muted-foreground/80 font-mono">
+                                              {inv.ratedKw ? `${inv.ratedKw} kW` : inv.deviceSn}
+                                            </span>
+                                          </div>
                                         </div>
                                       ))}
                                     </div>

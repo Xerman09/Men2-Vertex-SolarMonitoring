@@ -17,7 +17,7 @@ import {
   Radio,
   Waves,
 } from 'lucide-react';
-import { InverterTelemetry } from '@/lib/types';
+import { InverterTelemetry, InverterConfig } from '@/lib/types';
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
@@ -48,6 +48,8 @@ export default function HardwareTelemetryPage() {
     isPlantSwitching,
     switchingPlantName,
     setIsPlantSwitching,
+    selectedInverterSn: globalInverterSn,
+    setSelectedInverterSn: setGlobalInverterSn,
   } = useAccount();
   const { isAdmin } = useRole();
 
@@ -75,15 +77,19 @@ export default function HardwareTelemetryPage() {
 
   // Collect inverters from selected account or plant
   const availableInverters = React.useMemo(() => {
-    const plants = selectedAccount?.plants || [];
+    const plants = isFleetView
+      ? accounts.flatMap((a) => a.plants || [])
+      : selectedAccount?.plants ||
+        (accounts.find((a) => a.plants?.some((p) => String(p.stationId) === String(selectedStationId)))?.plants || []);
+
     const targetPlants =
       selectedStationId !== 'ALL'
-        ? plants.filter((p) => p.stationId === selectedStationId)
+        ? plants.filter((p) => String(p.stationId) === String(selectedStationId))
         : plants;
 
-    return targetPlants.flatMap((p) =>
-      p.devices
-        .filter((d) => d.deviceType === 'INVERTER')
+    const list = targetPlants.flatMap((p) =>
+      (p.devices || [])
+        .filter((d) => String(d.deviceType || '').toUpperCase() === 'INVERTER')
         .map((d) => ({
           deviceSn: d.deviceSn,
           name: d.name,
@@ -92,13 +98,40 @@ export default function HardwareTelemetryPage() {
           loggerSn: d.loggerSn,
         }))
     );
-  }, [selectedAccount, selectedStationId]);
+
+    if (list.length === 0) {
+      const targetAccounts = isFleetView ? accounts : selectedAccount ? [selectedAccount] : accounts;
+      targetAccounts.forEach((acc) => {
+        (acc.inverters || []).forEach((inv: InverterConfig) => {
+          list.push({
+            deviceSn: inv.sn,
+            name: inv.name,
+            model: inv.model || 'Deye Inverter',
+            stationName: targetPlants[0]?.stationName || acc.name,
+            loggerSn: `LOG-${inv.sn.slice(-6)}`,
+          });
+        });
+      });
+    }
+
+    return list;
+  }, [isFleetView, accounts, selectedAccount, selectedStationId]);
 
   useEffect(() => {
-    if (availableInverters.length > 0 && !availableInverters.some((i) => i.deviceSn === selectedInverterSn)) {
+    if (globalInverterSn && globalInverterSn !== 'ALL') {
+      const match = availableInverters.find(
+        (i) => String(i.deviceSn).trim() === String(globalInverterSn).trim()
+      );
+      if (match && selectedInverterSn !== match.deviceSn) {
+        setSelectedInverterSn(match.deviceSn);
+      }
+    } else if (
+      availableInverters.length > 0 &&
+      !availableInverters.some((i) => String(i.deviceSn).trim() === String(selectedInverterSn).trim())
+    ) {
       setSelectedInverterSn(availableInverters[0].deviceSn);
     }
-  }, [availableInverters, selectedInverterSn]);
+  }, [availableInverters, selectedInverterSn, globalInverterSn]);
 
   const fetchTelemetry = React.useCallback(
     async (deviceSnOverride?: string, forceReload: boolean = false) => {
@@ -254,6 +287,7 @@ export default function HardwareTelemetryPage() {
                 value={selectedInverterSn}
                 onChange={(e) => {
                   setSelectedInverterSn(e.target.value);
+                  setGlobalInverterSn(e.target.value);
                   fetchTelemetry(e.target.value);
                 }}
                 className="bg-transparent text-xs font-mono text-foreground focus:outline-none cursor-pointer"

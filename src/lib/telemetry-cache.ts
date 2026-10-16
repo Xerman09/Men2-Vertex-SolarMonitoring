@@ -10,6 +10,47 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
+/**
+ * Shared device serial-number contract: optional `device_sn` query param.
+ * Mirrors telemetry route usage; validated as ^[A-Za-z0-9_-]{1,64}$ upstream.
+ */
+export const DEVICE_SN_PATTERN = '^[A-Za-z0-9_-]{1,64}$';
+export const DEVICE_SN_REGEX = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * Deterministic per-inverter cache key: `${account}:${station}:${sn}`.
+ * Optional `extra` appends a suffix segment (e.g. telemetry, station).
+ * Missing/blank SN normalizes to 'ALL' so fleet-level probes stay stable.
+ */
+export function inverterCacheKey(
+  account: string,
+  station: string,
+  sn?: string | null,
+  extra?: string
+): string {
+  const cleanSn = sn && String(sn).trim() ? String(sn).trim() : 'ALL';
+  const base = `${account}:${station}:${cleanSn}`;
+  return extra && extra.trim() ? `${base}:${extra.trim()}` : base;
+}
+
+/**
+ * Ownership check: SN belongs to one of the tenant's plants' devices.
+ * 'ALL' / 'ALL_FLEET' / undefined pass through as true so fleet views
+ * stay byte-identical (no filtering). Unknown SN returns false.
+ */
+export function isValidInverterSn(
+  plants: Array<{ devices?: Array<{ deviceSn?: string | null }> | null } | null> | null | undefined,
+  sn?: string | null
+): boolean {
+  if (sn === undefined || sn === null) return true;
+  const clean = String(sn).trim();
+  if (clean === '' || clean === 'ALL' || clean === 'ALL_FLEET') return true;
+  if (!plants || plants.length === 0) return false;
+  return plants.some((p) =>
+    p?.devices?.some((d) => d?.deviceSn != null && String(d.deviceSn).trim() === clean)
+  );
+}
+
 class TelemetryCacheManager {
   private store = new Map<string, CacheEntry<unknown>>();
 

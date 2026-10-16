@@ -6,6 +6,26 @@ import {
   FleetMatrixNode,
 } from './types';
 
+/**
+ * Pure helper: single-node SN-filtered view over an aggregated fleet summary.
+ * Returns null for blank/ALL passthrough (caller keeps the full fleet
+ * byte-identical) and for unknown SN (caller maps to 404, never 403, so
+ * SN existence across tenants is not leaked).
+ */
+export function filterFleetByDeviceSn(
+  aggregate: AggregatedFleetSummary,
+  sn: string | null | undefined
+): { nodes: FleetMatrixNode[]; deviceSn: string } | null {
+  if (sn === null || sn === undefined) return null;
+  const clean = String(sn).trim();
+  if (clean === '' || clean === 'ALL' || clean === 'ALL_FLEET') return null;
+  const matched = aggregate.nodes.filter(
+    (n) => n && n.deviceSn != null && String(n.deviceSn).trim() === clean
+  );
+  if (matched.length === 0) return null;
+  return { nodes: matched, deviceSn: clean };
+}
+
 export class FleetAggregator {
   /**
    * Poll all active accounts (or specific allowed accounts), plants, and inverters concurrently

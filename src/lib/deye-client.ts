@@ -25,6 +25,106 @@ interface DeyeTokenCache {
   expiresAt: number;
 }
 
+/**
+ * Optional per-inverter scaling for hourly history synthesis.
+ * - `deviceSn`: deterministic SN hash variance (0.9-1.1) applied to the mock series.
+ * - `capacityRatio`: explicit share multiplier (e.g. ratedKw / plantCapacityKw).
+ * When both are absent, the base mock series is returned byte-identical.
+ */
+export interface HourlyEnergyInverterOpts {
+  deviceSn?: string;
+  capacityRatio?: number;
+}
+
+export interface InverterShareInfo {
+  ratedKw: number;
+  baseCapKw: number;
+  ratio: number;
+  plant: PlantInfo;
+  device: DeviceInfo;
+}
+
+export interface SingleInverterStationView {
+  deviceSn: string;
+  data: StationSummary;
+  raw: Map<string, string>;
+}
+
+/**
+ * Deterministic SN hash variance in [0.9, 1.1] (step 0.01).
+ * Pure: same SN always yields the same factor.
+ */
+export function getInverterSnScaleFactor(sn: string): number {
+  const s = String(sn);
+  let hash = 0;
+  for (let c = 0; c < s.length; c++) {
+    hash = (hash * 31 + s.charCodeAt(c)) | 0;
+  }
+  return 0.9 + ((Math.abs(hash) % 21) / 100);
+}
+
+/**
+ * Pure helper: locate the plant/device owning `sn` and compute its
+ * capacity share. Returns null for unknown SN (no guessing).
+ */
+export function getInverterShareInfo(
+  plants: PlantInfo[] | null | undefined,
+  sn: string | null | undefined
+): InverterShareInfo | null {
+  if (sn === null || sn === undefined) return null;
+  const clean = String(sn).trim();
+  if (!clean || !plants || plants.length === 0) return null;
+  for (const plant of plants) {
+    if (!plant || !Array.isArray(plant.devices)) continue;
+    const device = plant.devices.find(
+      (d) => d && d.deviceSn != null && String(d.deviceSn).trim() === clean
+    );
+    if (device) {
+      const baseCapKw = plant.installedCapacityKw || 0;
+      const ratedKw = device.ratedKw && device.ratedKw > 0 ? device.ratedKw : baseCapKw;
+      const ratio = baseCapKw > 0 ? Math.min(1, ratedKw / baseCapKw) : 1;
+      return { ratedKw, baseCapKw, ratio, plant, device };
+    }
+  }
+  return null;
+}
+
+/**
+ * Pure helper: filtered single-inverter view over a station summary plus
+ * the batch `/device/latest` map. Returns null for unknown SN.
+ */
+export function getSingleInverterStationView(
+  stationSummary: StationSummary,
+  batchMap: Map<string, Map<string, string>>,
+  sn: string | null | undefined
+): SingleInverterStationView | null {
+  if (sn === null || sn === undefined) return null;
+  const clean = String(sn).trim();
+  if (!clean || !batchMap) return null;
+  const raw = batchMap.get(clean);
+  if (!raw) return null;
+  return { deviceSn: clean, data: stationSummary, raw };
+}
+
+export interface SnLiveOverlay {
+  liveSolarPowerKw: number;
+  todayEnergyKwh: number;
+}
+
+/**
+ * Pure helper: parse the live SN overlay fields from a single-inverter
+ * `/device/latest` raw map. `TotalActiveACOutputPower` is in watts,
+ * `DailyActiveProduction` is already in kWh.
+ */
+export function getSnLiveOverlay(raw: Map<string, string>): SnLiveOverlay {
+  const activeW = parseFloat(raw.get('TotalActiveACOutputPower') || '0');
+  const dailyKwh = parseFloat(raw.get('DailyActiveProduction') || '0');
+  return {
+    liveSolarPowerKw: parseFloat(((Number.isFinite(activeW) ? activeW : 0) / 1000).toFixed(2)),
+    todayEnergyKwh: Number.isFinite(dailyKwh) ? dailyKwh : 0,
+  };
+}
+
 export class DeyeCloudClient {
   public readonly accountId: string;
   public readonly accountName: string;
@@ -871,14 +971,42 @@ export class DeyeCloudClient {
   }
 
   /**
-   * Hourly curves (Returns model-driven diurnal curves)
+   * Hourly curves (Returns model-driven diurnal curves).
+   * Optional 4th arg `opts` scales the mock series per inverter:
+   * factor = SN-hash variance [0.9, 1.1] x capacityRatio (explicit or
+   * looked up from this.plants). Absent opts => byte-identical base series.
    */
   public getHourlyEnergy(
     range: string = 'TODAY',
     stepMinutes: number = 5,
-    date?: string
+    date?: string,
+    opts?: HourlyEnergyInverterOpts
   ): HourlyEnergyPoint[] {
-    return getMockHourlyEnergyPoints(range, undefined, stepMinutes, date);
+    const base = getMockHourlyEnergyPoints(range, undefined, stepMinutes, date);
+    if (!opts || (opts.deviceSn === undefined && opts.capacityRatio === undefined)) {
+      return base;
+    }
+    const snFactor = opts.deviceSn ? getInverterSnScaleFactor(opts.deviceSn) : 1;
+    let shareRatio = 1;
+    if (opts.capacityRatio !== undefined) {
+      shareRatio = opts.capacityRatio;
+    } else if (opts.deviceSn) {
+      const info = getInverterShareInfo(this.plants, opts.deviceSn);
+      shareRatio = info ? info.ratio : 1;
+    }
+    const factor = snFactor * shareRatio;
+    return base.map((p) => {
+      if (p.solarYieldKw === null || p.solarYieldKw === undefined) return p;
+      const solar = Number((p.solarYieldKw * factor).toFixed(2));
+      const load = p.loadDemandKw ?? 0;
+      const gridFlow = Number((solar - load).toFixed(2));
+      return {
+        ...p,
+        solarYieldKw: solar,
+        gridFlowKw: p.gridFlowKw === null ? null : gridFlow,
+        gridExportKw: p.gridExportKw === null ? null : Number(Math.max(0, gridFlow).toFixed(2)),
+      };
+    });
   }
 }
 

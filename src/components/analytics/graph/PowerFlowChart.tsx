@@ -277,7 +277,7 @@ export function PowerFlowChart({
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-semibold text-foreground">
-                5-Minute Continuous Telemetry — Solar Yield (Amber) · Facility Load (Indigo) · Net Grid (Emerald)
+                5-Minute Continuous Telemetry — Solar Yield · Facility Load · Net Grid
               </span>
               <Badge variant="outline" className="text-[10px] font-mono border-border/70 text-muted-foreground bg-muted/40 px-1.5 py-0">
                 Dynamic Scale: {combinedYDomain[0]} kW → {combinedYDomain[1]} kW

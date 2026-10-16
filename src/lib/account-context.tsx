@@ -5,7 +5,7 @@ import { AccountSummary, PlantInfo } from './types';
 import { useRole } from './role-context';
 import { createLogger } from './logger';
 import { useSafeTimeout } from './usePolling';
-import { telemetryCache } from './telemetry-cache';
+import { telemetryCache, inverterCacheKey } from './telemetry-cache';
 
 const log = createLogger('AccountContext');
 
@@ -18,6 +18,9 @@ interface AccountContextType {
   setSelectedStationId: (id: string) => void;
   selectedPlant: PlantInfo | null;
   selectAccountAndPlant: (accountId: string, stationId?: string) => void;
+  selectedInverterSn: string; // 'ALL' or specific deviceSn
+  setSelectedInverterSn: (sn: string) => void;
+  selectInverter: (accountId: string, stationId: string, inverterSn: string) => void;
   isFleetView: boolean;
   loading: boolean;
   syncing: boolean;
@@ -42,6 +45,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [rawAccounts, setRawAccounts] = useState<AccountSummary[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('ALL');
   const [selectedStationId, setSelectedStationId] = useState<string>('ALL');
+  const [selectedInverterSn, setSelectedInverterSn] = useState<string>('ALL');
   const [isPlantSwitching, setIsPlantSwitchingState] = useState<boolean>(false);
   const [switchingPlantName, setSwitchingPlantName] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -179,13 +183,19 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   // Find plant if specific station is chosen
   const selectedPlant = useMemo(() => {
     if (!selectedAccount || selectedStationId === 'ALL') return null;
-    return selectedAccount.plants?.find((p) => p.stationId === selectedStationId) || null;
+    return (
+      selectedAccount.plants?.find(
+        (p) => String(p.stationId) === String(selectedStationId)
+      ) || null
+    );
   }, [selectedAccount, selectedStationId]);
 
   const handleSetSelectedStationId = useCallback((id: string) => {
     if (id === selectedStationId) return;
 
-    const targetPlant = selectedAccount?.plants?.find((p) => p.stationId === id);
+    const targetPlant = selectedAccount?.plants?.find(
+      (p) => String(p.stationId) === String(id)
+    );
     const plantName = id === 'ALL'
       ? (selectedAccount?.name ? `${selectedAccount.name} (All Plants)` : 'All Plants')
       : (targetPlant?.stationName || `Station ${id}`);
@@ -199,7 +209,8 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       setFetchingDeye(true, `Syncing ${plantName} Telemetry...`);
     }
 
-    setSelectedStationId(id);
+    setSelectedStationId(String(id));
+    setSelectedInverterSn('ALL');
   }, [selectedStationId, selectedAccount, selectedAccountId, setFetchingDeye]);
 
   const handleSetSelectedAccountId = useCallback((id: string) => {
@@ -208,6 +219,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         setSelectedAccountId(accounts[0].id);
       }
       setSelectedStationId('ALL');
+      setSelectedInverterSn('ALL');
       return;
     }
     const normalized = id === 'ALL_FLEET' ? 'ALL' : id;
@@ -225,16 +237,20 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     }
     setSelectedAccountId(normalized);
     setSelectedStationId('ALL');
+    setSelectedInverterSn('ALL');
   }, [isConsumer, accounts, selectedAccountId, setFetchingDeye]);
 
   const selectAccountAndPlant = useCallback((accountId: string, stationId: string = 'ALL') => {
+    const cleanStationId = String(stationId);
     const targetAcc = accounts.find((a) => a.id === accountId);
-    const targetPlant = targetAcc?.plants?.find((p) => p.stationId === stationId);
-    const plantName = stationId === 'ALL'
+    const targetPlant = targetAcc?.plants?.find(
+      (p) => String(p.stationId) === cleanStationId
+    );
+    const plantName = cleanStationId === 'ALL'
       ? (targetAcc?.name ? `${targetAcc.name} (All Plants)` : 'All Plants')
-      : (targetPlant?.stationName || `Station ${stationId}`);
+      : (targetPlant?.stationName || `Station ${cleanStationId}`);
 
-    const cacheKey = `${accountId}:${stationId}`;
+    const cacheKey = `${accountId}:${cleanStationId}`;
     const hasCachedData = telemetryCache.get(cacheKey) !== null;
 
     if (!hasCachedData) {
@@ -245,12 +261,51 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 
     if (isConsumer && accounts.length > 0) {
       setSelectedAccountId(accounts[0].id);
-      setSelectedStationId(stationId);
+      setSelectedStationId(cleanStationId);
+      setSelectedInverterSn('ALL');
       return;
     }
     const normalized = accountId === 'ALL_FLEET' ? 'ALL' : accountId;
     setSelectedAccountId(normalized);
-    setSelectedStationId(stationId);
+    setSelectedStationId(cleanStationId);
+    setSelectedInverterSn('ALL');
+  }, [isConsumer, accounts, setFetchingDeye]);
+
+  const selectInverter = useCallback((accountId: string, stationId: string, inverterSn: string) => {
+    const cleanStationId = String(stationId);
+    const cleanInverterSn = String(inverterSn).trim();
+
+    // Find account by ID or by matching plant station
+    const targetAcc =
+      accounts.find((a) => a.id === accountId) ||
+      accounts.find((a) =>
+        a.plants?.some((p) => String(p.stationId) === cleanStationId)
+      );
+    const targetPlant = targetAcc?.plants?.find(
+      (p) => String(p.stationId) === cleanStationId
+    );
+    const plantName = targetPlant?.stationName || `Station ${cleanStationId}`;
+
+    const effectiveAccId = targetAcc?.id || (accountId === 'ALL_FLEET' ? 'ALL' : accountId);
+    const cacheKey = inverterCacheKey(effectiveAccId, cleanStationId, cleanInverterSn);
+    const hasCachedData = telemetryCache.get(cacheKey) !== null;
+
+    if (!hasCachedData) {
+      setIsPlantSwitchingState(true);
+      setSwitchingPlantName(plantName);
+      setFetchingDeye(true, `Syncing ${plantName} · Inverter ${cleanInverterSn}...`);
+    }
+
+    if (isConsumer && accounts.length > 0) {
+      setSelectedAccountId(accounts[0].id);
+      setSelectedStationId(cleanStationId);
+      setSelectedInverterSn(cleanInverterSn);
+      return;
+    }
+
+    setSelectedAccountId(effectiveAccId);
+    setSelectedStationId(cleanStationId);
+    setSelectedInverterSn(cleanInverterSn);
   }, [isConsumer, accounts, setFetchingDeye]);
 
   // Fleet view is NEVER active for consumer accounts
@@ -267,6 +322,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     setSelectedStationId: handleSetSelectedStationId,
     selectedPlant,
     selectAccountAndPlant,
+    selectedInverterSn,
+    setSelectedInverterSn,
+    selectInverter,
     isFleetView,
     loading,
     syncing,
@@ -291,6 +349,8 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     handleSetSelectedStationId,
     selectedPlant,
     selectAccountAndPlant,
+    selectedInverterSn,
+    selectInverter,
     isFleetView,
     loading,
     syncing,

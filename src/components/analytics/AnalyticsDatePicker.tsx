@@ -347,6 +347,22 @@ export function AnalyticsDatePicker({
 
   return (
     <div className={`relative inline-flex items-center gap-1.5 ${className}`} ref={containerRef}>
+      {/* Quick "Today" Reset Pill (shown when viewing any past date) */}
+      {!isSelectedToday && (
+        <HoverInfo title="Jump to Today" content="Return immediately to real-time live today telemetry." side="bottom">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => applyPreset('TODAY')}
+            className="h-9 px-2.5 text-xs text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-xl border border-emerald-500/30 flex items-center gap-1 cursor-pointer font-medium shadow-2xs"
+          >
+            <RotateCcw className="w-3 h-3" />
+            Today
+          </Button>
+        </HoverInfo>
+      )}
+
       {/* 1-Day Step Back */}
       <HoverInfo title="Previous Day" content="Step backward 1 day in solar telemetry history." side="bottom">
         <Button
@@ -407,22 +423,6 @@ export function AnalyticsDatePicker({
           <ChevronRight className="w-4 h-4" />
         </Button>
       </HoverInfo>
-
-      {/* Quick "Today" Reset Pill (shown when viewing any past date) */}
-      {!isSelectedToday && (
-        <HoverInfo title="Jump to Today" content="Return immediately to real-time live today telemetry." side="bottom">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => applyPreset('TODAY')}
-            className="h-9 px-2.5 text-xs text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-xl border border-emerald-500/30 flex items-center gap-1 cursor-pointer font-medium shadow-2xs"
-          >
-            <RotateCcw className="w-3 h-3" />
-            Today
-          </Button>
-        </HoverInfo>
-      )}
 
       {/* Interactive Popover Dropdown */}
       {isOpen && (

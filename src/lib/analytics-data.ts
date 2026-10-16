@@ -95,7 +95,8 @@ export function generateDailyAnalytics(
 ): DailyAnalyticsPoint[] {
   const points: DailyAnalyticsPoint[] = [];
   const ref = new Date(referenceDate);
-  const scale = capacityKw / 120;
+  const safeCapacity = capacityKw && capacityKw > 0 ? capacityKw : 120;
+  const scale = safeCapacity / 120;
 
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(ref);
@@ -116,7 +117,7 @@ export function generateDailyAnalytics(
     const gridImport = Math.max(0, baseLoad - selfConsKwh - batDischarged);
     const peakKw = Number((116 * scale * weatherFactor).toFixed(1));
     const pr = Number((81 + (seed % 6)).toFixed(1));
-    const specYield = Number((baseSolar / capacityKw).toFixed(2));
+    const specYield = Number((baseSolar / safeCapacity).toFixed(2));
     const savings = Number((selfConsKwh * 0.32 + gridExport * 0.12).toFixed(2));
     const co2 = Number((baseSolar * 0.83).toFixed(1));
 
@@ -147,8 +148,9 @@ export function generateDailyAnalytics(
 export function generateMonthlyAnalytics(
   capacityKw: number = 120
 ): MonthlyAnalyticsPoint[] {
+  const safeCapacity = capacityKw && capacityKw > 0 ? capacityKw : 120;
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const scale = capacityKw / 120;
+  const scale = safeCapacity / 120;
 
   // Northern hemisphere seasonal irradiance curve
   const irradianceProfile = [11.2, 12.8, 15.6, 17.8, 19.4, 20.2, 19.8, 18.6, 16.4, 14.2, 12.0, 10.8];
@@ -161,7 +163,7 @@ export function generateMonthlyAnalytics(
     const importMwh = Number(Math.max(0, loadMwh - yieldMwh * 0.72).toFixed(2));
     const selfConsPct = Number((((yieldMwh - exportMwh) / yieldMwh) * 100).toFixed(1));
     const pr = Number((82.5 + Math.sin(index) * 2.5).toFixed(1));
-    const specYield = Number(((yieldMwh * 1000) / capacityKw).toFixed(1));
+    const specYield = Number(((yieldMwh * 1000) / safeCapacity).toFixed(1));
     const savings = Number(((yieldMwh * 1000 * 0.24)).toFixed(0));
     const co2Tons = Number((yieldMwh * 0.83).toFixed(2));
 
