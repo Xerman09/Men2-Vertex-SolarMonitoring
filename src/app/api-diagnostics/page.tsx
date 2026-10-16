@@ -189,16 +189,23 @@ export default function ApiDiagnosticsPage() {
               <div className="flex items-center gap-2">
                 <HoverInfo
                   title="API & Diagnostics Console"
-                  content={TELEMETRY_DESCRIPTIONS.pageHeaders.apiDiagnostics}
+                  content={
+                    <div className="space-y-2">
+                      <p>{TELEMETRY_DESCRIPTIONS.pageHeaders.apiDiagnostics}</p>
+                      <div className="pt-1.5 border-t border-border/40 flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-muted-foreground font-mono">Gateway Interface</span>
+                        <Badge variant="outline" className="h-4 px-1.5 text-[9px] font-mono border-emerald-500/30 text-emerald-500 bg-emerald-500/10">
+                          Database / DeyeCloud
+                        </Badge>
+                      </div>
+                    </div>
+                  }
                   showIcon
                 >
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline cursor-help">
                     API & Diagnostics Console
                   </h1>
                 </HoverInfo>
-                <Badge variant="outline" className="border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono text-[10px]">
-                  Database / DeyeCloud
-                </Badge>
               </div>
             </div>
           </div>

@@ -189,7 +189,7 @@ export function AdvancedMathCharts({
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={fitResults.theoreticalPoints} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
               <defs>
-                <linearGradient id="solarActualGreenGrad" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="solarActualYellowGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={COLOR_PV} stopOpacity={0.35} />
                   <stop offset="95%" stopColor={COLOR_PV} stopOpacity={0.0} />
                 </linearGradient>
@@ -213,7 +213,7 @@ export function AdvancedMathCharts({
                 name="Actual Measured PV"
                 stroke={COLOR_PV}
                 strokeWidth={2}
-                fill="url(#solarActualGreenGrad)"
+                fill="url(#solarActualYellowGrad)"
                 dot={false}
                 connectNulls={false}
               />

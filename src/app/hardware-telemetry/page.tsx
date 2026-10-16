@@ -260,9 +260,19 @@ export default function HardwareTelemetryPage() {
                 <HoverInfo
                   title="Inverter Hardware & Electrical Telemetry"
                   content={
-                    isFleetView
-                      ? TELEMETRY_DESCRIPTIONS.pageHeaders.hardwareTelemetryFleet
-                      : `Component diagnostics for ${selectedAccount?.name || 'Selected Site'}.`
+                    <div className="space-y-2">
+                      <p>
+                        {isFleetView
+                          ? TELEMETRY_DESCRIPTIONS.pageHeaders.hardwareTelemetryFleet
+                          : `Component diagnostics for ${selectedAccount?.name || 'Selected Site'}.`}
+                      </p>
+                      <div className="pt-1.5 border-t border-border/40 flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-muted-foreground font-mono">Telemetry Protocol</span>
+                        <Badge variant="outline" className="h-4 px-1.5 text-[9px] font-mono border-cyan-500/30 text-cyan-500 bg-cyan-500/10">
+                          Direct Modbus / Cloud
+                        </Badge>
+                      </div>
+                    </div>
                   }
                   showIcon
                 >
@@ -270,9 +280,6 @@ export default function HardwareTelemetryPage() {
                     Inverter Hardware & Electrical Telemetry
                   </h1>
                 </HoverInfo>
-                <Badge variant="outline" className="border-cyan-500/30 text-cyan-500 bg-cyan-500/10 font-mono text-[10px]">
-                  Direct Modbus / Cloud
-                </Badge>
               </div>
             </div>
           </div>

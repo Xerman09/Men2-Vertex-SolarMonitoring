@@ -89,9 +89,13 @@ export default function TrigonometricAnalyticsPage() {
 
     try {
       let historyUrl = `/api/deye/history?range=${range}&step=5`;
+      if (!isFleetView && selectedAccountId) {
+        historyUrl += `&accountId=${encodeURIComponent(selectedAccountId)}`;
+      }
+      if (selectedStationId && selectedStationId !== 'ALL') {
+        historyUrl += `&station_id=${encodeURIComponent(selectedStationId)}`;
+      }
       if (isSnIsolated) {
-        if (!isFleetView && selectedAccountId) historyUrl += `&accountId=${encodeURIComponent(selectedAccountId)}`;
-        if (selectedStationId && selectedStationId !== 'ALL') historyUrl += `&station_id=${encodeURIComponent(selectedStationId)}`;
         historyUrl += `&device_sn=${encodeURIComponent(selectedSnKey)}`;
       }
       const res = await fetch(historyUrl, { signal: controller.signal });
@@ -143,9 +147,16 @@ export default function TrigonometricAnalyticsPage() {
     await fetchHistoricalData(dateRange);
   };
 
-  const installedKw = selectedPlant
+  const fleetTotalCapacity = React.useMemo(
+    () => accounts.reduce((sum, a) => sum + (a.capacityKw || 0), 0),
+    [accounts]
+  );
+
+  const installedKw = isFleetView
+    ? (fleetTotalCapacity > 0 ? fleetTotalCapacity : 120)
+    : selectedPlant
     ? selectedPlant.installedCapacityKw
-    : selectedAccount?.capacityKw || 0;
+    : selectedAccount?.capacityKw || 120;
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-12 relative">
@@ -197,16 +208,23 @@ export default function TrigonometricAnalyticsPage() {
               <div className="flex items-center gap-2">
                 <HoverInfo
                   title="Trigonometric History & Waveform Analytics"
-                  content={TELEMETRY_DESCRIPTIONS.pageHeaders.trigonometricAnalytics}
+                  content={
+                    <div className="space-y-2">
+                      <p>{TELEMETRY_DESCRIPTIONS.pageHeaders.trigonometricAnalytics}</p>
+                      <div className="pt-1.5 border-t border-border/40 flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-muted-foreground font-mono">Harmonic Solver</span>
+                        <Badge variant="outline" className="h-4 px-1.5 text-[9px] font-mono border-cyan-500/30 text-cyan-500 bg-cyan-500/10">
+                          Fourier Engine v2.4
+                        </Badge>
+                      </div>
+                    </div>
+                  }
                   showIcon
                 >
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline cursor-help">
                     Trigonometric History & Waveform Analytics
                   </h1>
                 </HoverInfo>
-                <Badge variant="outline" className="border-cyan-500/30 text-cyan-500 bg-cyan-500/10 font-mono text-[10px]">
-                  Fourier Engine v2.4
-                </Badge>
               </div>
             </div>
           </div>

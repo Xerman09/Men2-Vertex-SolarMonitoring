@@ -93,4 +93,20 @@ describe('TrigonometricHistoryGraph Component & Architecture', () => {
     expect(html).toContain('Line');
     expect(html).toContain('Area');
   });
+
+  it('renders live KPI badges with computed metrics when 5-minute telemetry is supplied', () => {
+    const html = renderToStaticMarkup(
+      <RoleProvider>
+        <TrigonometricHistoryGraph
+          data={samplePoints}
+          installedCapacityKw={120}
+        />
+      </RoleProvider>
+    );
+
+    expect(html).toContain('PV Power');
+    expect(html).toContain('Load (');
+    expect(html).toContain('Grid Flow (');
+    expect(html).toContain('Self-Consumption');
+  });
 });
