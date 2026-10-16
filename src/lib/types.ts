@@ -169,6 +169,7 @@ export interface AccountSummary {
   status: 'ONLINE' | 'OFFLINE' | 'ALARM' | 'SIMULATED';
   lastPingMs: number;
   plants: PlantInfo[];
+  inverters?: InverterConfig[];
   autoDiscovered?: boolean;
   lastSyncedAt?: string;
   source?: 'directus' | 'cache' | 'env';

@@ -36,6 +36,7 @@ export default function TrigonometricAnalyticsPage() {
     selectedAccount,
     selectedStationId,
     selectedPlant,
+    selectedInverterSn,
     isFleetView,
     totalAccounts,
     loading: accountLoading,
@@ -62,7 +63,9 @@ export default function TrigonometricAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const currentTargetKey = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}:${dateRange}`;
+  const selectedSnKey = selectedInverterSn && selectedInverterSn.trim() ? selectedInverterSn.trim() : 'ALL';
+  const isSnIsolated = selectedSnKey !== 'ALL' && selectedSnKey !== 'ALL_FLEET';
+  const currentTargetKey = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}:${dateRange}:${selectedSnKey}`;
   const [displayedTargetKey, setDisplayedTargetKey] = useState<string>('');
   const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
   const inFlightControllerRef = React.useRef<AbortController | null>(null);
@@ -72,7 +75,7 @@ export default function TrigonometricAnalyticsPage() {
 
   // Load telemetry data from API or fall back to simulated dataset
   const fetchHistoricalData = async (range: string = dateRange, forceReload: boolean = false) => {
-    const targetKeyAtStart = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}:${range}`;
+    const targetKeyAtStart = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}:${range}:${selectedSnKey}`;
 
     if (inFlightControllerRef.current) {
       if (!forceReload && targetKeyAtStart === displayedTargetKey) {
@@ -85,7 +88,13 @@ export default function TrigonometricAnalyticsPage() {
     inFlightControllerRef.current = controller;
 
     try {
-      const res = await fetch(`/api/deye/history?range=${range}&step=5`, { signal: controller.signal });
+      let historyUrl = `/api/deye/history?range=${range}&step=5`;
+      if (isSnIsolated) {
+        if (!isFleetView && selectedAccountId) historyUrl += `&accountId=${encodeURIComponent(selectedAccountId)}`;
+        if (selectedStationId && selectedStationId !== 'ALL') historyUrl += `&station_id=${encodeURIComponent(selectedStationId)}`;
+        historyUrl += `&device_sn=${encodeURIComponent(selectedSnKey)}`;
+      }
+      const res = await fetch(historyUrl, { signal: controller.signal });
       if (res.ok) {
         const json = await res.json();
         if (controller.signal.aborted) return;

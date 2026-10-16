@@ -32,7 +32,7 @@ import {
   Search,
   ArrowDown,
 } from 'lucide-react';
-import { StationSummary, AggregatedFleetSummary, FleetMatrixNode } from '@/lib/types';
+import { StationSummary, AggregatedFleetSummary, FleetMatrixNode, PlantInfo, DeviceInfo } from '@/lib/types';
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -43,7 +43,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
 import { usePolling, useSafeTimeout } from '@/lib/usePolling';
 import { createLogger } from '@/lib/logger';
-import { telemetryCache } from '@/lib/telemetry-cache';
+import { telemetryCache, inverterCacheKey } from '@/lib/telemetry-cache';
 import { HoverInfo } from '@/components/ui/tooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 
@@ -57,6 +57,7 @@ export default function EnergyFlowDashboard() {
     selectedAccount,
     selectedStationId,
     setSelectedStationId,
+    selectedInverterSn,
     selectedPlant,
     totalAccounts,
     liveAccountsCount,
@@ -115,7 +116,10 @@ export default function EnergyFlowDashboard() {
     }
   }, []);
 
-  const currentTargetKey = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}`;
+  const snScoped = selectedInverterSn.trim() !== '' && selectedInverterSn !== 'ALL' && selectedInverterSn !== 'ALL_FLEET';
+  const currentTargetKey = isFleetView
+    ? `FLEET|${inverterCacheKey(selectedAccountId, selectedStationId, selectedInverterSn)}`
+    : inverterCacheKey(selectedAccountId, selectedStationId, selectedInverterSn);
   const [displayedTargetKey, setDisplayedTargetKey] = useState<string>('');
   const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
   const inFlightControllerRef = useRef<AbortController | null>(null);
@@ -161,19 +165,27 @@ export default function EnergyFlowDashboard() {
 
     try {
       if (isFleetView) {
-        const res = await fetch('/api/deye/aggregate', { signal: controller.signal });
+        const aggSnParam = snScoped
+          ? `?device_sn=${encodeURIComponent(selectedInverterSn.trim())}`
+          : '';
+        const res = await fetch(`/api/deye/aggregate${aggSnParam}`, { signal: controller.signal });
         if (res.ok) {
           const json: AggregatedFleetSummary = await res.json();
           if (controller.signal.aborted) return;
+          const scopedNodes = snScoped
+            ? (json.nodes || []).filter(
+                (n) => String(n.deviceSn).trim() === selectedInverterSn.trim()
+              )
+            : (json.nodes || []);
           setFleetAggregate(json);
-          setNodes(json.nodes || []);
+          setNodes(scopedNodes);
           setIsLive(json.isLive);
           setDisplayedTargetKey(targetKeyAtStart);
           setIsDataLoaded(true);
           telemetryCache.set(targetKeyAtStart, {
             station: null,
             fleetAggregate: json,
-            nodes: json.nodes || [],
+            nodes: scopedNodes,
             isLive: json.isLive,
           });
         }
@@ -182,8 +194,11 @@ export default function EnergyFlowDashboard() {
           selectedStationId !== 'ALL'
             ? `&station_id=${encodeURIComponent(selectedStationId)}`
             : '';
+        const stationSnParam = snScoped
+          ? `&device_sn=${encodeURIComponent(selectedInverterSn.trim())}`
+          : '';
         const res = await fetch(
-          `/api/deye/station?accountId=${encodeURIComponent(selectedAccountId)}${stationParam}`,
+          `/api/deye/station?accountId=${encodeURIComponent(selectedAccountId)}${stationParam}${stationSnParam}`,
           { signal: controller.signal }
         );
         if (res.ok) {
@@ -194,15 +209,64 @@ export default function EnergyFlowDashboard() {
 
           let currentStationNodes: FleetMatrixNode[] = [];
 
-          if (selectedAccount?.plants && selectedAccount.plants.length > 0) {
+          if (snScoped && typeof json.deviceSn === 'string' && json.deviceSn.trim() !== '') {
+            // Single-inverter view: live kW comes from the route SN overlay, not even-split.
+            const routeSn = json.deviceSn.trim();
+            let snPlant: PlantInfo | null = null;
+            let snDevice: DeviceInfo | null = null;
+            for (const plant of selectedAccount?.plants || []) {
+              const found = (plant.devices || []).find(
+                (d) => d.deviceSn != null && String(d.deviceSn).trim() === routeSn
+              );
+              if (found) {
+                snPlant = plant;
+                snDevice = found;
+                break;
+              }
+            }
+            const snLogger = snPlant
+              ? (snPlant.devices || []).find(
+                  (d) =>
+                    String(d.deviceType || '').toUpperCase() === 'LOGGER' &&
+                    (d.deviceSn === snDevice?.loggerSn || snDevice?.loggerSn === undefined)
+                )
+              : undefined;
+            currentStationNodes = [
+              {
+                accountId: selectedAccountId,
+                accountName: selectedAccount?.name || json.data?.accountName || 'Selected Site',
+                stationName: snPlant?.stationName || json.data?.name || 'Selected Station',
+                stationId: snPlant ? String(snPlant.stationId) : String(json.data?.stationId ?? selectedStationId),
+                deviceSn: routeSn,
+                deviceType: 'INVERTER',
+                model: snDevice?.model || 'Deye Inverter',
+                ratedKw: snDevice?.ratedKw || 50,
+                loggerSn: snDevice?.loggerSn || snLogger?.deviceSn,
+                loggerStatus: snLogger?.status === 'OFFLINE' ? 'OFFLINE' : 'ONLINE',
+                liveSolarPowerKw: typeof json.liveSolarPowerKw === 'number' ? json.liveSolarPowerKw : (json.data?.liveSolarPowerKw || 0),
+                dailyYieldKwh: typeof json.todayEnergyKwh === 'number' ? json.todayEnergyKwh : (json.data?.dailyYieldKwh || 0),
+                gridPowerKw: json.data?.gridPowerKw || 0,
+                consumptionPowerKw: json.data?.loadPowerKw || 0,
+                batterySoc: json.data?.batterySoc || 0,
+                mode: 'PEAK SHAVING',
+                status: json.data?.status === 'ONLINE' || snDevice?.status === 'ONLINE' ? 'ONLINE' : 'STANDBY',
+                isLive: json.isLive,
+              },
+            ];
+            setNodes(currentStationNodes);
+          } else if (selectedAccount?.plants && selectedAccount.plants.length > 0) {
             const targetPlants =
               selectedStationId !== 'ALL'
-                ? selectedAccount.plants.filter((p) => p.stationId === selectedStationId)
+                ? selectedAccount.plants.filter((p) => String(p.stationId) === String(selectedStationId))
                 : selectedAccount.plants;
 
             for (const plant of targetPlants) {
-              const inverters = plant.devices.filter((d) => d.deviceType === 'INVERTER');
-              const loggers = plant.devices.filter((d) => d.deviceType === 'LOGGER');
+              const inverters = (plant.devices || []).filter(
+                (d) => String(d.deviceType || '').toUpperCase() === 'INVERTER'
+              );
+              const loggers = (plant.devices || []).filter(
+                (d) => String(d.deviceType || '').toUpperCase() === 'LOGGER'
+              );
 
               const plantSummary = json.data?.plantsSummary?.find(
                 (ps: { stationId?: string | number; liveSolarPowerKw?: number; dailyYieldKwh?: number; gridPowerKw?: number; loadPowerKw?: number; batterySoc?: number }) =>
@@ -308,7 +372,7 @@ export default function EnergyFlowDashboard() {
         setFetchingDeye(false, null);
       }
     }
-  }, [isFleetView, selectedAccountId, selectedStationId, selectedAccount, currentTargetKey, displayedTargetKey, setIsPlantSwitching, setFetchingDeye]);
+  }, [isFleetView, selectedAccountId, selectedStationId, selectedAccount, selectedInverterSn, snScoped, currentTargetKey, displayedTargetKey, setIsPlantSwitching, setFetchingDeye]);
 
   useEffect(() => {
     fetchTelemetry(true);
@@ -567,36 +631,6 @@ export default function EnergyFlowDashboard() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Mode Switcher: Synoptic Flow vs Vertical Flow & Fleet */}
-          <div className="flex items-center bg-card/80 border border-border/70 rounded-xl p-1 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => handleTabChange('synoptics')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                mainTab === 'synoptics'
-                  ? 'bg-primary text-primary-foreground font-bold shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-              title="Switch to Synoptic Circular Flow View"
-            >
-              <Zap size={13} className={mainTab === 'synoptics' ? 'text-primary-foreground' : 'text-amber-500'} />
-              <span>Synoptic Flow</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTabChange('compact-flow')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                mainTab === 'compact-flow'
-                  ? 'bg-emerald-500 text-black font-bold shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-              title="Switch to Vertical Stacked Flow & Inverter Matrix"
-            >
-              <LayoutGrid size={13} className={mainTab === 'compact-flow' ? 'text-black' : 'text-emerald-500'} />
-              <span>Vertical Flow & Fleet</span>
-            </button>
-          </div>
-
           <Button
             variant="outline"
             size="sm"

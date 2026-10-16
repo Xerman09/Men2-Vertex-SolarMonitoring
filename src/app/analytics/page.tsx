@@ -13,7 +13,6 @@ import {
   ArrowDownRight,
   Download,
   RefreshCw,
-  Sparkles,
   ShieldCheck,
   Building2,
   Calendar,
@@ -61,7 +60,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { HoverInfo } from '@/components/ui/tooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
-import { HourlyEnergyPoint } from '@/lib/types';
+import { HourlyEnergyPoint, InverterConfig } from '@/lib/types';
 import {
   generateDailyAnalytics,
   generateMonthlyAnalytics,
@@ -73,7 +72,7 @@ import {
   AnalyticsSummary,
 } from '@/lib/analytics-data';
 import { createLogger } from '@/lib/logger';
-import { telemetryCache } from '@/lib/telemetry-cache';
+import { telemetryCache, inverterCacheKey } from '@/lib/telemetry-cache';
 import {
   AnalyticsDatePicker,
   AnalyticsDatePickerValue,
@@ -130,6 +129,8 @@ export default function AnalyticsDashboardPage() {
     setSelectedStationId,
     selectedPlant,
     selectAccountAndPlant,
+    selectedInverterSn,
+    setSelectedInverterSn,
     isFleetView,
     totalAccounts,
     loading: accountLoading,
@@ -162,8 +163,6 @@ export default function AnalyticsDashboardPage() {
   }, [dateSelection]);
 
   const [streamFilter, setStreamFilter] = useState<StreamFilter>('ALL');
-  const [showSolarModel, setShowSolarModel] = useState<boolean>(true);
-  const [showPeakWindow, setShowPeakWindow] = useState<boolean>(true);
   const [tableSearch, setTableSearch] = useState<string>('');
   const [tableFilter, setTableFilter] = useState<'ALL' | 'RECORDED'>('RECORDED');
   const [tablePage, setTablePage] = useState<number>(1);
@@ -171,7 +170,6 @@ export default function AnalyticsDashboardPage() {
 
   // Plant & Inverter/Logger isolation states
   const [previewEssModel, setPreviewEssModel] = useState<boolean>(false);
-  const [selectedInverterSn, setSelectedInverterSn] = useState<string>('ALL');
 
   // Raw and computed data states
   const [hourlyData, setHourlyData] = useState<HourlyEnergyPoint[]>([]);
@@ -179,13 +177,22 @@ export default function AnalyticsDashboardPage() {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
 
-  // Strict loading synchronization tracking with date isolation
-  const currentTargetKey = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}:${dateSelection.preset}:${dateSelection.selectedDate}`;
+  // Strict loading synchronization tracking with date + inverter isolation.
+  // Cache key shape: analytics:<FLEET|account>:<station>:<sn>:<preset>:<date>
+  const currentTargetKey = inverterCacheKey(
+    isFleetView ? 'FLEET' : selectedAccountId,
+    selectedStationId,
+    selectedInverterSn,
+    `${dateSelection.preset}:${dateSelection.selectedDate}`
+  );
   const [displayedTargetKey, setDisplayedTargetKey] = useState<string>('');
   const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
   const inFlightControllerRef = useRef<AbortController | null>(null);
+  // Backend-preferred scale factor for the currently displayed SN series.
+  // Set from history route `appliedRatio` when present; null = fleet/ALL (unscaled).
+  const [serverScale, setServerScale] = useState<{ sn: string; ratio: number } | null>(null);
 
-  // Instantly apply cached analytics telemetry on plant/range switch (0ms instant switch)
+  // Instantly apply cached analytics telemetry on plant/range/SN switch (0ms instant switch)
   useEffect(() => {
     const cached = telemetryCache.get<HourlyEnergyPoint[]>(`analytics:${currentTargetKey}`);
     if (cached && cached.length > 0) {
@@ -193,8 +200,17 @@ export default function AnalyticsDashboardPage() {
       setDisplayedTargetKey(currentTargetKey);
       setIsDataLoaded(true);
       setIsPlantSwitching(false);
+      // Cached SN series was already backend-scaled at fetch time: mark it so
+      // the local fallback ratio is not re-applied on a cache hit. ALL stays unscaled.
+      if (selectedInverterSn && selectedInverterSn !== 'ALL') {
+        setServerScale((prev) =>
+          prev && prev.sn === selectedInverterSn ? prev : { sn: selectedInverterSn, ratio: -1 }
+        );
+      } else {
+        setServerScale(null);
+      }
     }
-  }, [currentTargetKey, setIsPlantSwitching]);
+  }, [currentTargetKey, selectedInverterSn, setIsPlantSwitching]);
 
   // Derive all available plants across fleet or selected account
   const availablePlants = useMemo(() => {
@@ -227,17 +243,21 @@ export default function AnalyticsDashboardPage() {
   // Derive all discovered Inverter & Logger hardware nodes
   const availableInverters = useMemo<InverterNode[]>(() => {
     const list: InverterNode[] = [];
-    const targetAccounts = isFleetView ? accounts : selectedAccount ? [selectedAccount] : [];
+    const targetAccounts = isFleetView ? accounts : selectedAccount ? [selectedAccount] : accounts;
 
     targetAccounts.forEach((acc) => {
       acc.plants?.forEach((plant) => {
         // If an individual plant is selected, isolate inverter list to this plant
-        if (!isFleetView && selectedStationId !== 'ALL' && plant.stationId !== selectedStationId) {
+        if (!isFleetView && selectedStationId !== 'ALL' && String(plant.stationId) !== String(selectedStationId)) {
           return;
         }
 
-        const invDevices = plant.devices?.filter((d) => d.deviceType === 'INVERTER') || [];
-        const logDevices = plant.devices?.filter((d) => d.deviceType === 'LOGGER') || [];
+        const invDevices = (plant.devices || []).filter(
+          (d) => String(d.deviceType || '').toUpperCase() === 'INVERTER'
+        );
+        const logDevices = (plant.devices || []).filter(
+          (d) => String(d.deviceType || '').toUpperCase() === 'LOGGER'
+        );
 
         if (invDevices.length > 0) {
           invDevices.forEach((dev, idx) => {
@@ -251,13 +271,29 @@ export default function AnalyticsDashboardPage() {
               model: dev.model || 'SUN-Hybrid-Inverter',
               ratedKw: dev.ratedKw || Math.round((plant.installedCapacityKw || 100) / invDevices.length),
               loggerSn: dev.loggerSn || matchingLogger?.deviceSn || `LOG-${dev.deviceSn.slice(-6)}`,
-              stationId: plant.stationId,
+              stationId: String(plant.stationId),
               stationName: plant.stationName,
               accountId: acc.id,
               accountName: acc.name,
               status: dev.status || 'ONLINE',
               liveSolarPowerKw: plant.liveSolarPowerKw ? plant.liveSolarPowerKw / invDevices.length : undefined,
               dailyYieldKwh: plant.dailyYieldKwh ? plant.dailyYieldKwh / invDevices.length : undefined,
+            });
+          });
+        } else if (acc.inverters && acc.inverters.length > 0 && (selectedStationId === 'ALL' || String(plant.stationId) === String(selectedStationId))) {
+          acc.inverters.forEach((inv: InverterConfig) => {
+            list.push({
+              deviceSn: inv.sn,
+              model: inv.model || 'SUN-Hybrid-Inverter',
+              ratedKw: inv.ratedKw || Math.round((plant.installedCapacityKw || 100) / acc.inverters!.length),
+              loggerSn: `LOG-${inv.sn.slice(-6)}`,
+              stationId: String(plant.stationId),
+              stationName: plant.stationName,
+              accountId: acc.id,
+              accountName: acc.name,
+              status: 'ONLINE',
+              liveSolarPowerKw: plant.liveSolarPowerKw ? plant.liveSolarPowerKw / acc.inverters!.length : undefined,
+              dailyYieldKwh: plant.dailyYieldKwh ? plant.dailyYieldKwh / acc.inverters!.length : undefined,
             });
           });
         }
@@ -269,18 +305,51 @@ export default function AnalyticsDashboardPage() {
 
   // Selected Inverter Node
   const selectedInverter = useMemo<InverterNode | null>(() => {
-    if (selectedInverterSn === 'ALL') return null;
-    return availableInverters.find((inv) => inv.deviceSn === selectedInverterSn) || null;
-  }, [availableInverters, selectedInverterSn]);
+    if (!selectedInverterSn || selectedInverterSn === 'ALL') return null;
+    const directMatch = availableInverters.find(
+      (inv) => String(inv.deviceSn).trim() === String(selectedInverterSn).trim()
+    );
+    if (directMatch) return directMatch;
 
-  // When plant changes, reset inverter isolation if the previous inverter doesn't belong to the new plant
-  useEffect(() => {
-    if (selectedInverterSn !== 'ALL' && selectedInverter) {
-      if (selectedStationId !== 'ALL' && selectedInverter.stationId !== selectedStationId) {
-        setSelectedInverterSn('ALL');
+    // Direct fallback: scan across all accounts and plants
+    for (const acc of accounts) {
+      for (const plant of acc.plants || []) {
+        const dev = plant.devices?.find(
+          (d) => String(d.deviceSn).trim() === String(selectedInverterSn).trim()
+        );
+        if (dev) {
+          return {
+            deviceSn: dev.deviceSn,
+            model: dev.model || 'SUN-Hybrid-Inverter',
+            ratedKw: dev.ratedKw || 10,
+            loggerSn: dev.loggerSn || `LOG-${dev.deviceSn.slice(-6)}`,
+            stationId: String(plant.stationId),
+            stationName: plant.stationName,
+            accountId: acc.id,
+            accountName: acc.name,
+            status: dev.status || 'ONLINE',
+          };
+        }
+        const cfgInv = acc.inverters?.find(
+          (inv: InverterConfig) => String(inv.sn).trim() === String(selectedInverterSn).trim()
+        );
+        if (cfgInv) {
+          return {
+            deviceSn: cfgInv.sn,
+            model: cfgInv.model || 'SUN-Hybrid-Inverter',
+            ratedKw: cfgInv.ratedKw || 10,
+            loggerSn: `LOG-${cfgInv.sn.slice(-6)}`,
+            stationId: String(plant.stationId),
+            stationName: plant.stationName,
+            accountId: acc.id,
+            accountName: acc.name,
+            status: 'ONLINE',
+          };
+        }
       }
     }
-  }, [selectedStationId, selectedInverterSn, selectedInverter]);
+    return null;
+  }, [availableInverters, selectedInverterSn, accounts]);
 
 
 
@@ -293,17 +362,17 @@ export default function AnalyticsDashboardPage() {
           cap += p.installedCapacityKw || 0;
         });
       });
-      return cap;
+      return cap > 0 ? cap : 120;
     }
-    return selectedPlant?.installedCapacityKw || selectedAccount?.capacityKw || 0;
+    return selectedPlant?.installedCapacityKw || selectedAccount?.capacityKw || 120;
   }, [isFleetView, accounts, selectedPlant, selectedAccount]);
 
   // Effective capacity when isolated to a single inverter or plant
   const effectiveCapacityKw = useMemo(() => {
     if (selectedInverter) {
-      return selectedInverter.ratedKw || 0;
+      return selectedInverter.ratedKw || baseCapacityKw || 120;
     }
-    return baseCapacityKw;
+    return baseCapacityKw || 120;
   }, [selectedInverter, baseCapacityKw]);
 
   // Active Title reflecting isolation
@@ -327,13 +396,19 @@ export default function AnalyticsDashboardPage() {
     return Math.min(1.0, selectedInverter.ratedKw / (baseCapacityKw || selectedInverter.ratedKw));
   }, [selectedInverter, baseCapacityKw]);
 
-  // Telemetry Fetcher
+  // Telemetry Fetcher (SN-isolated, AbortController race-safe)
   const fetchAnalyticsData = useCallback(
     async (
       dateVal: AnalyticsDatePickerValue = dateSelection,
       forceReload: boolean = false
     ) => {
-      const targetKeyAtStart = `${isFleetView ? 'FLEET' : selectedAccountId}:${selectedStationId}:${dateVal.preset}:${dateVal.selectedDate}`;
+      const snAtStart = selectedInverterSn && selectedInverterSn !== 'ALL' ? String(selectedInverterSn).trim() : 'ALL';
+      const targetKeyAtStart = inverterCacheKey(
+        isFleetView ? 'FLEET' : selectedAccountId,
+        selectedStationId,
+        snAtStart,
+        `${dateVal.preset}:${dateVal.selectedDate}`
+      );
 
       if (inFlightControllerRef.current) {
         if (!forceReload && targetKeyAtStart === displayedTargetKey) {
@@ -358,24 +433,39 @@ export default function AnalyticsDashboardPage() {
         const stationParam =
           selectedStationId !== 'ALL' ? `&station_id=${encodeURIComponent(selectedStationId)}` : '';
         const dateParam = `&date=${encodeURIComponent(dateVal.selectedDate)}`;
-        const res = await fetch(`/api/deye/history?range=${apiRange}&step=5${dateParam}${stationParam}`, {
+        const deviceSnParam =
+          snAtStart !== 'ALL' ? `&device_sn=${encodeURIComponent(snAtStart)}` : '';
+        const res = await fetch(`/api/deye/history?range=${apiRange}&step=5${dateParam}${stationParam}${deviceSnParam}`, {
           signal: controller.signal,
         });
 
         if (res.ok) {
-          const json = await res.json();
+          const json = await res.json() as {
+            data?: unknown;
+            appliedRatio?: unknown;
+            deviceSn?: unknown;
+          };
           if (controller.signal.aborted) return;
           if (json.data && Array.isArray(json.data)) {
             telemetryCache.set(`analytics:${targetKeyAtStart}`, json.data);
-            setHourlyData(json.data);
+            const backendRatio =
+              typeof json.appliedRatio === 'number' && Number.isFinite(json.appliedRatio)
+                ? json.appliedRatio
+                : null;
+            if (snAtStart !== 'ALL') {
+              setServerScale({ sn: snAtStart, ratio: backendRatio ?? -1 });
+            } else {
+              setServerScale(null);
+            }
+            setHourlyData(json.data as HourlyEnergyPoint[]);
             setDisplayedTargetKey(targetKeyAtStart);
             setIsDataLoaded(true);
             setIsPlantSwitching(false);
             setLastRefreshedAt(new Date());
           }
         }
-      } catch (err: any) {
-        if (err?.name !== 'AbortError') {
+      } catch (err: unknown) {
+        if ((err as Error)?.name !== 'AbortError') {
           log.error('Failed to load telemetry history for analytics', err);
         }
       } finally {
@@ -387,16 +477,22 @@ export default function AnalyticsDashboardPage() {
         }
       }
     },
-    [isFleetView, selectedAccountId, selectedStationId, dateSelection, displayedTargetKey, setIsPlantSwitching]
+    [isFleetView, selectedAccountId, selectedStationId, selectedInverterSn, dateSelection, displayedTargetKey, setIsPlantSwitching]
   );
 
   useEffect(() => {
     fetchAnalyticsData(dateSelection);
-  }, [fetchAnalyticsData, dateSelection]);
+    return () => {
+      inFlightControllerRef.current?.abort();
+    };
+  }, [fetchAnalyticsData, dateSelection, selectedInverterSn]);
 
-  // Scale raw hourly telemetry according to inverter isolation if active
+  // Scale raw hourly telemetry according to inverter isolation if active.
+  // SN series from the backend is already scaled (appliedRatio): render as-is.
+  // Local inverterPowerRatio applies only as a fallback when no backend ratio exists.
   const isolatedHourlyData = useMemo(() => {
     if (!selectedInverter) return hourlyData;
+    if (serverScale && serverScale.sn === selectedInverterSn) return hourlyData;
     return hourlyData.map((pt) => {
       const solar = pt.solarYieldKw !== null ? Number((pt.solarYieldKw * inverterPowerRatio).toFixed(2)) : null;
       const load = pt.loadDemandKw !== null ? Number((pt.loadDemandKw * inverterPowerRatio).toFixed(2)) : null;
@@ -410,7 +506,7 @@ export default function AnalyticsDashboardPage() {
         gridFlowKw: grid,
       };
     });
-  }, [hourlyData, selectedInverter, inverterPowerRatio]);
+  }, [hourlyData, selectedInverter, selectedInverterSn, serverScale, inverterPowerRatio]);
 
   // Dynamic Battery Detection (Zero-state for pure grid-tied solar plants)
   const hasBattery = useMemo<boolean>(() => {
@@ -552,8 +648,8 @@ export default function AnalyticsDashboardPage() {
     document.body.removeChild(link);
   };
 
-  // Synchronization overlay check
-  const isTargetPending = currentTargetKey !== displayedTargetKey || !isDataLoaded;
+  // Synchronization overlay check - never dismiss prematurely before accounts and telemetry settle
+  const isTargetPending = currentTargetKey !== displayedTargetKey || !isDataLoaded || accountLoading;
   const showOverlay = isPlantSwitching || isTargetPending || syncing;
 
   return (
@@ -632,10 +728,41 @@ export default function AnalyticsDashboardPage() {
                   </div>
                 }
               >
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline cursor-help">
-                  Enterprise Analytics Dashboard
-                </h1>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline cursor-help">
+                    Enterprise Analytics Dashboard
+                  </h1>
+                  {selectedInverterSn && selectedInverterSn !== 'ALL' && (
+                    <Badge className="bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 text-[11px] font-mono px-2 py-0.5 gap-1 shadow-xs animate-in fade-in-50">
+                      <Cpu className="w-3 h-3 text-cyan-400" />
+                      Inverter Isolated
+                    </Badge>
+                  )}
+                </div>
               </HoverInfo>
+
+              {/* Active Inverter Isolation Banner */}
+              {selectedInverterSn && selectedInverterSn !== 'ALL' && (
+                <div className="mt-2.5 flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs shadow-xs animate-in fade-in-50">
+                  <Cpu className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span className="font-semibold text-cyan-300">Active Inverter Isolation:</span>
+                  <span className="font-mono bg-cyan-950/70 px-2 py-0.5 rounded border border-cyan-500/30 text-cyan-200 font-medium">
+                    {selectedInverter?.model || 'Deye Inverter'} · SN: {selectedInverter?.deviceSn || selectedInverterSn}
+                  </span>
+                  <span className="text-muted-foreground font-mono text-[11px]">
+                    ({effectiveCapacityKw} kW rated · Station: {selectedInverter?.stationName || selectedPlant?.stationName || selectedStationId})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedInverterSn('ALL')}
+                    className="ml-auto flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer border border-border/50 shrink-0"
+                    title="Clear inverter isolation and view all plant inverters"
+                  >
+                    <X className="w-3 h-3" />
+                    <span>Clear Isolation</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -682,11 +809,11 @@ export default function AnalyticsDashboardPage() {
 
 
       {/* Primary KPI Ribbon (Key Performance & Efficiency Metrics - Scaled to Plant / Inverter) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8 gap-3.5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8 gap-3 sm:gap-3.5">
         {/* KPI 1: Solar Generation */}
         <Card className="border-amber-500/30 bg-gradient-to-b from-amber-500/[0.04] to-card shadow-sm hover:border-amber-500/50 transition-colors">
           <HoverInfo
-            className="block w-full h-full p-4 space-y-2 cursor-help"
+            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
             title={selectedInverter ? "Inverter Solar Yield" : "Total Solar Generation"}
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
@@ -707,15 +834,15 @@ export default function AnalyticsDashboardPage() {
             }
           >
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
                 {selectedInverter ? 'Inverter Yield' : 'Total Yield'}
               </span>
-              <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
-                <Sun className="w-4 h-4" />
+              <div className="p-1 sm:p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
+                <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
             <div>
-              <div className="text-2xl font-bold font-mono text-amber-500 tracking-tight">
+              <div className="text-xl sm:text-2xl font-bold font-mono text-amber-500 tracking-tight">
                 {timeRange === '12M'
                   ? `${(analyticsSummary.totalSolarYieldKwh / 1000).toFixed(2)} MWh`
                   : `${analyticsSummary.totalSolarYieldKwh} kWh`}
@@ -727,7 +854,7 @@ export default function AnalyticsDashboardPage() {
         {/* KPI 2: Self Consumption Ratio */}
         <Card className="border-emerald-500/30 bg-gradient-to-b from-emerald-500/[0.04] to-card shadow-sm hover:border-emerald-500/50 transition-colors">
           <HoverInfo
-            className="block w-full h-full p-4 space-y-2 cursor-help"
+            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
             title="Self-Consumption Ratio"
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
@@ -748,15 +875,15 @@ export default function AnalyticsDashboardPage() {
             }
           >
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
                 Self-Consumption
               </span>
-              <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500">
-                <Zap className="w-4 h-4" />
+              <div className="p-1 sm:p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500">
+                <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
             <div>
-              <div className="text-2xl font-bold font-mono text-emerald-500 tracking-tight">
+              <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-500 tracking-tight">
                 {analyticsSummary.selfConsumptionPct}%
               </div>
             </div>
@@ -766,7 +893,7 @@ export default function AnalyticsDashboardPage() {
         {/* KPI 3: Battery Storage ESS */}
         <Card className="border-cyan-500/30 bg-gradient-to-b from-cyan-500/[0.04] to-card shadow-sm hover:border-cyan-500/50 transition-colors">
           <HoverInfo
-            className="block w-full h-full p-4 space-y-2 cursor-help"
+            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
             title="Battery Storage ESS"
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
@@ -789,15 +916,15 @@ export default function AnalyticsDashboardPage() {
             }
           >
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
                 Battery ESS
               </span>
-              <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
-                <BatteryCharging className="w-4 h-4" />
+              <div className="p-1 sm:p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
+                <BatteryCharging className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
             <div>
-              <div className="text-2xl font-bold font-mono text-cyan-400 tracking-tight">
+              <div className="text-xl sm:text-2xl font-bold font-mono text-cyan-400 tracking-tight">
                 {analyticsSummary.currentSocPct.toFixed(1)}% <span className="text-xs text-muted-foreground font-normal">SOC</span>
               </div>
             </div>
@@ -807,7 +934,7 @@ export default function AnalyticsDashboardPage() {
         {/* KPI 4: Grid Balance & Feed-in */}
         <Card className="border-purple-500/30 bg-gradient-to-b from-purple-500/[0.04] to-card shadow-sm hover:border-purple-500/50 transition-colors">
           <HoverInfo
-            className="block w-full h-full p-4 space-y-2 cursor-help"
+            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
             title="Grid Net Balance"
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
@@ -828,15 +955,15 @@ export default function AnalyticsDashboardPage() {
             }
           >
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
                 Grid Exchange
               </span>
-              <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
-                <TrendingUp className="w-4 h-4" />
+              <div className="p-1 sm:p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
+                <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
             <div>
-              <div className="text-2xl font-bold font-mono text-purple-400 tracking-tight">
+              <div className="text-xl sm:text-2xl font-bold font-mono text-purple-400 tracking-tight">
                 {analyticsSummary.netGridBalanceKwh >= 0 ? `+${analyticsSummary.netGridBalanceKwh}` : analyticsSummary.netGridBalanceKwh} kWh
               </div>
             </div>
@@ -846,7 +973,7 @@ export default function AnalyticsDashboardPage() {
         {/* KPI 5: Performance Ratio (PR) / Utilization */}
         <Card className="border-blue-500/30 bg-gradient-to-b from-blue-500/[0.04] to-card shadow-sm hover:border-blue-500/50 transition-colors">
           <HoverInfo
-            className="block w-full h-full p-4 space-y-2 cursor-help"
+            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
             title="Performance Ratio (PR) / Utilization"
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
@@ -867,15 +994,15 @@ export default function AnalyticsDashboardPage() {
             }
           >
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
                 PR / Utilization
               </span>
-              <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
-                <Gauge className="w-4 h-4" />
+              <div className="p-1 sm:p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
+                <Gauge className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
             <div>
-              <div className="text-2xl font-bold font-mono text-blue-400 tracking-tight">
+              <div className="text-xl sm:text-2xl font-bold font-mono text-blue-400 tracking-tight">
                 {analyticsSummary.performanceRatioPct}%
               </div>
             </div>
@@ -885,7 +1012,7 @@ export default function AnalyticsDashboardPage() {
         {/* KPI 6: Inverter Efficiency */}
         <Card className="border-emerald-500/30 bg-gradient-to-b from-emerald-500/[0.04] to-card shadow-sm hover:border-emerald-500/50 transition-colors">
           <HoverInfo
-            className="block w-full h-full p-4 space-y-2 cursor-help"
+            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
             title="Inverter Efficiency"
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
@@ -906,15 +1033,15 @@ export default function AnalyticsDashboardPage() {
             }
           >
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
                 Inverter Efficiency
               </span>
-              <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
-                <Cpu className="w-4 h-4" />
+              <div className="p-1 sm:p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+                <Cpu className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
             <div>
-              <div className="text-2xl font-bold font-mono text-emerald-400 tracking-tight">
+              <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-400 tracking-tight">
                 {analyticsSummary.inverterEfficiencyPct}%
               </div>
             </div>
@@ -924,7 +1051,7 @@ export default function AnalyticsDashboardPage() {
         {/* KPI 7: PV Module Efficiency */}
         <Card className="border-amber-500/30 bg-gradient-to-b from-amber-500/[0.04] to-card shadow-sm hover:border-amber-500/50 transition-colors">
           <HoverInfo
-            className="block w-full h-full p-4 space-y-2 cursor-help"
+            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
             title="PV Module Efficiency"
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
@@ -945,15 +1072,15 @@ export default function AnalyticsDashboardPage() {
             }
           >
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
                 PV Module Efficiency
               </span>
-              <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
-                <Layers className="w-4 h-4" />
+              <div className="p-1 sm:p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
+                <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
             <div>
-              <div className="text-2xl font-bold font-mono text-amber-500 tracking-tight">
+              <div className="text-xl sm:text-2xl font-bold font-mono text-amber-500 tracking-tight">
                 {analyticsSummary.pvModuleEfficiencyPct}%
               </div>
             </div>
@@ -963,7 +1090,7 @@ export default function AnalyticsDashboardPage() {
         {/* KPI 8: ESG & Avoided CO2 */}
         <Card className="border-teal-600/30 bg-gradient-to-b from-teal-600/[0.04] to-card shadow-sm hover:border-teal-600/50 transition-colors">
           <HoverInfo
-            className="block w-full h-full p-4 space-y-2 cursor-help"
+            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
             title="Carbon Offset (ESG)"
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
@@ -984,15 +1111,15 @@ export default function AnalyticsDashboardPage() {
             }
           >
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
                 Carbon Offset
               </span>
-              <div className="p-1.5 rounded-lg bg-teal-600/10 text-teal-400">
-                <Leaf className="w-4 h-4" />
+              <div className="p-1 sm:p-1.5 rounded-lg bg-teal-600/10 text-teal-400">
+                <Leaf className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             </div>
             <div>
-              <div className="text-2xl font-bold font-mono text-teal-400 tracking-tight">
+              <div className="text-xl sm:text-2xl font-bold font-mono text-teal-400 tracking-tight">
                 {analyticsSummary.co2AvoidedKg} kg
               </div>
             </div>
@@ -1003,13 +1130,32 @@ export default function AnalyticsDashboardPage() {
       {/* Main Analytics Charts Section */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
         {/* Main High-Resolution Generation Profile Chart (8 Cols) */}
-        <Card className="xl:col-span-8 border-border/70 shadow-sm flex flex-col justify-between">
+        <Card className="xl:col-span-8 border-border/70 shadow-sm flex flex-col justify-between min-w-0 overflow-hidden">
           <CardHeader className="pb-3 border-b border-border/40">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
               <div>
                 <HoverInfo
                   title="Diurnal Profile Sampling"
-                  content="High-frequency 5-minute sampling of solar production, facility consumption, and storage flows."
+                  content={
+                    <div className="space-y-1.5 text-[11px]">
+                      <p>High-frequency 5-minute sampling of solar production, facility consumption, and storage flows.</p>
+                      <div className="pt-1 border-t border-border/50 text-amber-400 font-mono font-medium">
+                        {dateSelection.preset === 'TODAY'
+                          ? `Real-time 5-minute sampling · ${formatHumanDate(dateSelection.selectedDate)}`
+                          : dateSelection.preset === 'YESTERDAY'
+                          ? `Full 24h recorded curve · Yesterday (${formatHumanDate(dateSelection.selectedDate)})`
+                          : dateSelection.preset === '7D'
+                          ? `7-Day rolling envelope ending ${formatHumanDate(dateSelection.selectedDate)}`
+                          : dateSelection.preset === '30D'
+                          ? `30-Day monthly envelope ending ${formatHumanDate(dateSelection.selectedDate)}`
+                          : dateSelection.preset === 'THIS_MONTH'
+                          ? `Calendar month envelope (${formatHumanDate(dateSelection.selectedDate, { month: 'long', year: 'numeric' })})`
+                          : dateSelection.preset === '12M'
+                          ? '12-Month seasonal diurnal profile'
+                          : `Historical 24h recorded profile · ${formatHumanDate(dateSelection.selectedDate)}`}
+                      </div>
+                    </div>
+                  }
                   showIcon
                 >
                   <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-help">
@@ -1017,25 +1163,10 @@ export default function AnalyticsDashboardPage() {
                     {selectedInverter ? `Inverter Generation Profile (${selectedInverter.model})` : 'Diurnal Generation & Industrial Load Profile'}
                   </CardTitle>
                 </HoverInfo>
-                <p className="text-xs text-muted-foreground mt-0.5 font-mono">
-                  {dateSelection.preset === 'TODAY'
-                    ? `Real-time 5-minute sampling · ${formatHumanDate(dateSelection.selectedDate)}`
-                    : dateSelection.preset === 'YESTERDAY'
-                    ? `Full 24h recorded curve · Yesterday (${formatHumanDate(dateSelection.selectedDate)})`
-                    : dateSelection.preset === '7D'
-                    ? `7-Day rolling envelope ending ${formatHumanDate(dateSelection.selectedDate)}`
-                    : dateSelection.preset === '30D'
-                    ? `30-Day monthly envelope ending ${formatHumanDate(dateSelection.selectedDate)}`
-                    : dateSelection.preset === 'THIS_MONTH'
-                    ? `Calendar month envelope (${formatHumanDate(dateSelection.selectedDate, { month: 'long', year: 'numeric' })})`
-                    : dateSelection.preset === '12M'
-                    ? '12-Month seasonal diurnal profile'
-                    : `Historical 24h recorded profile · ${formatHumanDate(dateSelection.selectedDate)}`}
-                </p>
               </div>
 
-              {/* Stream filter toggles */}
-              <div className="flex flex-wrap items-center gap-1.5">
+              {/* Stream filter toggles - Strictly 1x4 (on sm+) or 2x2 (on smaller), without clipping */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 w-full sm:w-auto shrink-0">
                 {[
                   { id: 'ALL', label: 'All Streams', desc: 'Display solar production, load demand, and grid net streams simultaneously.' },
                   { id: 'SOLAR_LOAD', label: 'Solar & Load', desc: 'Compare live solar generation against facility consumption directly.' },
@@ -1046,13 +1177,14 @@ export default function AnalyticsDashboardPage() {
                     key={filter.id}
                     title={filter.label}
                     content={filter.desc}
+                    className="w-full flex justify-center"
                   >
                     <button
                       onClick={() => setStreamFilter(filter.id as StreamFilter)}
-                      className={`px-2.5 py-1 text-[11px] font-medium rounded-md border transition-all cursor-pointer ${
+                      className={`w-full px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-all cursor-pointer whitespace-nowrap text-center justify-center ${
                         streamFilter === filter.id
-                          ? 'bg-muted border-primary/40 text-foreground font-semibold'
-                          : 'border-transparent text-muted-foreground hover:bg-muted/50'
+                          ? 'bg-card border-primary/50 text-foreground font-semibold shadow-xs ring-1 ring-primary/20'
+                          : 'bg-transparent border-border/60 text-muted-foreground hover:text-foreground hover:border-border hover:bg-card/40'
                       }`}
                     >
                       {filter.label}
@@ -1104,47 +1236,12 @@ export default function AnalyticsDashboardPage() {
                   </span>
                 </HoverInfo>
               </div>
-
-              <div className="flex items-center gap-3 text-[11px]">
-                <HoverInfo
-                  title="Clear-Sky Theoretical Model"
-                  content={TELEMETRY_DESCRIPTIONS.analytics.clearSkyModel}
-                >
-                  <button
-                    onClick={() => setShowSolarModel(!showSolarModel)}
-                    className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                      showSolarModel
-                        ? 'border-amber-500/40 text-amber-500 bg-amber-500/10'
-                        : 'border-border text-muted-foreground'
-                    }`}
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    Clear-Sky Model
-                  </button>
-                </HoverInfo>
-                <HoverInfo
-                  title="Peak Tariff Window"
-                  content={TELEMETRY_DESCRIPTIONS.analytics.peakWindow}
-                >
-                  <button
-                    onClick={() => setShowPeakWindow(!showPeakWindow)}
-                    className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                      showPeakWindow
-                        ? 'border-purple-500/40 text-purple-400 bg-purple-500/10'
-                        : 'border-border text-muted-foreground'
-                    }`}
-                  >
-                    <Clock className="w-3 h-3" />
-                    Peak Tariff Window
-                  </button>
-                </HoverInfo>
-              </div>
             </div>
           </CardHeader>
 
           <CardContent className="pt-4 pb-2">
-            <div className="h-[340px] sm:h-[380px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[340px] sm:h-[380px] w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 850, height: 380 }}>
                 <AreaChart data={diurnalChartData} margin={{ top: 24, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorSolar" x1="0" y1="0" x2="0" y2="1">
@@ -1205,49 +1302,6 @@ export default function AnalyticsDashboardPage() {
                       );
                     }}
                   />
-
-                  {/* Peak tariff zone indication */}
-                  {showPeakWindow && (
-                    <ReferenceLine
-                      x="17:00"
-                      stroke="#a855f7"
-                      strokeDasharray="3 3"
-                      label={{
-                        value: 'Peak Tariff Start (17:00)',
-                        fill: '#c084fc',
-                        fontSize: 10,
-                        position: 'insideTop',
-                        dy: 4,
-                      }}
-                    />
-                  )}
-                  {showPeakWindow && (
-                    <ReferenceLine
-                      x="21:00"
-                      stroke="#a855f7"
-                      strokeDasharray="3 3"
-                      label={{
-                        value: 'Peak End (21:00)',
-                        fill: '#c084fc',
-                        fontSize: 10,
-                        position: 'insideTop',
-                        dy: 4,
-                      }}
-                    />
-                  )}
-
-                  {/* Clear Sky Theoretical Model */}
-                  {showSolarModel && (
-                    <Line
-                      type="monotone"
-                      dataKey="clearSkyKw"
-                      name="Theoretical Clear-Sky"
-                      stroke="#fbbf24"
-                      strokeDasharray="4 4"
-                      strokeWidth={1.5}
-                      dot={false}
-                    />
-                  )}
 
                   {/* Solar Curve */}
                   {(streamFilter === 'ALL' || streamFilter === 'SOLAR_LOAD') && (
@@ -1311,7 +1365,7 @@ export default function AnalyticsDashboardPage() {
         </Card>
 
         {/* Energy Distribution & Self-Consumption Sankey/Donut Card (4 Cols) */}
-        <Card className="xl:col-span-4 border-border/70 shadow-sm flex flex-col justify-between">
+        <Card className="xl:col-span-4 border-border/70 shadow-sm flex flex-col justify-between min-w-0 overflow-hidden">
           <CardHeader className="pb-2 border-b border-border/40">
             <HoverInfo
               title="Energy Partition & Autarky"
@@ -1327,8 +1381,8 @@ export default function AnalyticsDashboardPage() {
 
           <CardContent className="pt-4 space-y-4">
             {/* Donut Chart */}
-            <div className="h-[210px] w-full relative flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[210px] w-full min-w-0 relative flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 280, height: 210 }}>
                 <PieChart>
                   <Pie
                     data={energyDistributionData}
@@ -1460,7 +1514,7 @@ export default function AnalyticsDashboardPage() {
       {/* Secondary Analytics Row: Multi-Period Yield Comparison & Battery Health Dynamics */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Multi-Period Generation & Yield Comparison (BarChart) - 7 Cols */}
-        <Card className="lg:col-span-7 border-border/70 shadow-sm">
+        <Card className="lg:col-span-7 border-border/70 shadow-sm min-w-0 overflow-hidden">
           <CardHeader className="pb-3 border-b border-border/40">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <div>
@@ -1489,10 +1543,10 @@ export default function AnalyticsDashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="pt-4 pb-2">
-            <div className="h-[290px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[290px] w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 600, height: 290 }}>
                 {timeRange === '12M' ? (
-                  <BarChart data={monthlyPoints12M} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <BarChart key="hist-bar-12m" data={monthlyPoints12M} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border) / 0.4)" />
                     <XAxis
                       dataKey="month"
@@ -1528,12 +1582,13 @@ export default function AnalyticsDashboardPage() {
                         );
                       }}
                     />
-                    <Bar dataKey="solarYieldMwh" name="Solar Yield" fill={COLORS.solar} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="loadDemandMwh" name="Facility Demand" fill={COLORS.load} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="gridExportMwh" name="Grid Export" fill={COLORS.gridExport} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="solarYieldMwh" name="Solar Yield" fill={COLORS.solar} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="loadDemandMwh" name="Facility Demand" fill={COLORS.load} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="gridExportMwh" name="Grid Export" fill={COLORS.gridExport} radius={[4, 4, 0, 0]} isAnimationActive={false} />
                   </BarChart>
                 ) : (
                   <BarChart
+                    key="hist-bar-daily"
                     data={timeRange === '30D' ? dailyPoints30D : dailyPoints7D}
                     margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                   >
@@ -1573,9 +1628,9 @@ export default function AnalyticsDashboardPage() {
                         );
                       }}
                     />
-                    <Bar dataKey="solarYieldKwh" name="Solar Yield" fill={COLORS.solar} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="loadDemandKwh" name="Load Demand" fill={COLORS.load} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="gridExportKwh" name="Grid Export" fill={COLORS.gridExport} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="solarYieldKwh" name="Solar Yield" fill={COLORS.solar} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="loadDemandKwh" name="Load Demand" fill={COLORS.load} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="gridExportKwh" name="Grid Export" fill={COLORS.gridExport} radius={[4, 4, 0, 0]} isAnimationActive={false} />
                   </BarChart>
                 )}
               </ResponsiveContainer>
@@ -1584,7 +1639,7 @@ export default function AnalyticsDashboardPage() {
         </Card>
 
         {/* Battery Storage Dynamics & Cycling Depth (Always rendered as ESS Dynamics, showing 0 / Standby when idle) */}
-        <Card className="lg:col-span-5 border-border/70 shadow-sm flex flex-col justify-between">
+        <Card className="lg:col-span-5 border-border/70 shadow-sm flex flex-col justify-between min-w-0 overflow-hidden">
           <CardHeader className="pb-3 border-b border-border/40">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <div>
@@ -1614,8 +1669,8 @@ export default function AnalyticsDashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="pt-4 pb-2">
-            <div className="h-[290px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[290px] w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 450, height: 290 }}>
                 <ComposedChart data={batteryCurveData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorSoc" x1="0" y1="0" x2="0" y2="1">
@@ -1679,6 +1734,7 @@ export default function AnalyticsDashboardPage() {
                     fill="url(#colorSoc)"
                     stroke={COLORS.battery}
                     strokeWidth={2}
+                    isAnimationActive={false}
                   />
                   <Line
                     yAxisId="power"
@@ -1688,6 +1744,7 @@ export default function AnalyticsDashboardPage() {
                     stroke="#a855f7"
                     strokeWidth={1.8}
                     dot={false}
+                    isAnimationActive={false}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
