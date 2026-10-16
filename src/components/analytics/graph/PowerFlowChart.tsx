@@ -77,21 +77,21 @@ export function PowerFlowChart({
           content={
             <div className="text-[11px] space-y-1 min-w-[160px]">
               <p className="text-muted-foreground">Instantaneous photovoltaic DC to AC generation sampled across current 5-minute interval.</p>
-              <div className="pt-1 border-t border-border/50 text-emerald-400 font-mono font-medium">
+              <div className="pt-1 border-t border-border/50 text-yellow-400 font-mono font-medium">
                 Peak: {peakPv.toFixed(1)} kW
               </div>
             </div>
           }
         >
-          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/30">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
                 PV Power ({currentLivePoint.hour})
               </span>
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 motion-safe:animate-ping" />
+              <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 motion-safe:animate-ping" />
             </div>
             <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-lg sm:text-xl font-bold font-mono text-emerald-500">
+              <span className="text-lg sm:text-xl font-bold font-mono text-yellow-500">
                 {currentLivePoint.solarYieldKw !== null ? currentLivePoint.solarYieldKw.toFixed(2) : '0.00'}
               </span>
               <span className="text-[10px] text-muted-foreground font-mono">kW</span>
@@ -106,21 +106,21 @@ export function PowerFlowChart({
           content={
             <div className="text-[11px] space-y-1 min-w-[160px]">
               <p className="text-muted-foreground">Aggregated electrical consumption demands across on-site circuits and equipment.</p>
-              <div className="pt-1 border-t border-border/50 text-yellow-400 font-mono font-medium">
+              <div className="pt-1 border-t border-border/50 text-purple-400 font-mono font-medium">
                 Peak: {peakLoad.toFixed(1)} kW
               </div>
             </div>
           }
         >
-          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/30">
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/30">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
                 Load ({currentLivePoint.hour})
               </span>
-              <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
+              <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
             </div>
             <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-lg sm:text-xl font-bold font-mono text-yellow-500">
+              <span className="text-lg sm:text-xl font-bold font-mono text-purple-400">
                 {currentLivePoint.loadDemandKw !== null ? currentLivePoint.loadDemandKw.toFixed(2) : '0.00'}
               </span>
               <span className="text-[10px] text-muted-foreground font-mono">kW</span>
@@ -135,21 +135,21 @@ export function PowerFlowChart({
           content={
             <div className="text-[11px] space-y-1 min-w-[160px]">
               <p className="text-muted-foreground">Net power flow through bidirectional utility meter (+ export / - import).</p>
-              <div className="pt-1 border-t border-border/50 text-purple-400 font-mono font-medium">
+              <div className="pt-1 border-t border-border/50 text-emerald-400 font-mono font-medium">
                 Direction: {(currentLivePoint.gridExportKw ?? 0) >= 0 ? 'Surplus Export' : 'Grid Import'}
               </div>
             </div>
           }
         >
-          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/30">
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
                 Grid Flow ({currentLivePoint.hour})
               </span>
-              <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             </div>
             <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-lg sm:text-xl font-bold font-mono text-purple-500">
+              <span className="text-lg sm:text-xl font-bold font-mono text-emerald-500">
                 {currentLivePoint.gridExportKw !== null
                   ? `${currentLivePoint.gridExportKw > 0 ? '+' : ''}${currentLivePoint.gridExportKw.toFixed(2)}`
                   : '0.00'}
@@ -285,10 +285,10 @@ export function PowerFlowChart({
             </div>
             <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Solar Yield
+                <span className="h-2.5 w-2.5 rounded-full bg-yellow-500" /> Solar Yield
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" /> Facility Load
+                <span className="h-2.5 w-2.5 rounded-full bg-purple-500" /> Facility Load
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Net Grid Flow
@@ -300,15 +300,15 @@ export function PowerFlowChart({
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="pvGreenGrad" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="pvYellowGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={COLOR_PV} stopOpacity={chartRenderMode === 'area' ? 0.35 : 0.08} />
                     <stop offset="95%" stopColor={COLOR_PV} stopOpacity={0} />
                   </linearGradient>
-                  <linearGradient id="loadYellowGrad" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="loadPurpleGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={COLOR_LOAD} stopOpacity={chartRenderMode === 'area' ? 0.30 : 0.08} />
                     <stop offset="95%" stopColor={COLOR_LOAD} stopOpacity={0} />
                   </linearGradient>
-                  <linearGradient id="gridPurpleGrad" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="gridGreenGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={COLOR_GRID} stopOpacity={chartRenderMode === 'area' ? 0.25 : 0.08} />
                     <stop offset="95%" stopColor={COLOR_GRID} stopOpacity={0} />
                   </linearGradient>
@@ -331,12 +331,12 @@ export function PowerFlowChart({
                 <ReferenceLine y={0} stroke="currentColor" className="opacity-30" />
                 <ReferenceLine
                   x={nowSlotStr}
-                  stroke={COLOR_GRID}
+                  stroke="#94a3b8"
                   strokeDasharray="4 4"
                   strokeWidth={1.5}
                   label={{
                     value: `● Now (${nowExactTimeStr})`,
-                    fill: '#c084fc',
+                    fill: '#94a3b8',
                     fontSize: 10,
                     position: 'top',
                   }}
@@ -347,7 +347,7 @@ export function PowerFlowChart({
                   name="PV Power (kW)"
                   stroke={COLOR_PV}
                   strokeWidth={2}
-                  fill="url(#pvGreenGrad)"
+                  fill="url(#pvYellowGrad)"
                   dot={false}
                   activeDot={{ r: 4.5, stroke: COLOR_PV, strokeWidth: 2, fill: '#fff' }}
                   connectNulls={false}
@@ -359,7 +359,7 @@ export function PowerFlowChart({
                   name="Consumption (kW)"
                   stroke={COLOR_LOAD}
                   strokeWidth={2}
-                  fill="url(#loadYellowGrad)"
+                  fill="url(#loadPurpleGrad)"
                   dot={false}
                   activeDot={{ r: 4.5, stroke: COLOR_LOAD, strokeWidth: 2, fill: '#fff' }}
                   connectNulls={false}
@@ -371,7 +371,7 @@ export function PowerFlowChart({
                   name="Grid Power (kW, +export/-import)"
                   stroke={COLOR_GRID}
                   strokeWidth={1.8}
-                  fill="url(#gridPurpleGrad)"
+                  fill="url(#gridGreenGrad)"
                   dot={false}
                   activeDot={{ r: 4.5, stroke: COLOR_GRID, strokeWidth: 2, fill: '#fff' }}
                   connectNulls={false}
@@ -410,7 +410,7 @@ export function PowerFlowChart({
                 Solar Yield — Continuous 5-Minute Generation Profile
               </span>
             </HoverInfo>
-            <Badge variant="outline" className="text-[10px] font-mono border-amber-500/30 text-amber-500 bg-amber-500/10 px-1.5 py-0">
+            <Badge variant="outline" className="text-[10px] font-mono border-yellow-500/30 text-yellow-500 bg-yellow-500/10 px-1.5 py-0">
               Dynamic Scale: {pvYDomain[0]} kW → {pvYDomain[1]} kW (+18% Headroom)
             </Badge>
           </div>
@@ -466,7 +466,7 @@ export function PowerFlowChart({
                 Facility Load — Continuous 5-Minute Industrial Load Demand Profile
               </span>
             </HoverInfo>
-            <Badge variant="outline" className="text-[10px] font-mono border-indigo-500/30 text-indigo-400 bg-indigo-500/10 px-1.5 py-0">
+            <Badge variant="outline" className="text-[10px] font-mono border-purple-500/30 text-purple-400 bg-purple-500/10 px-1.5 py-0">
               Dynamic Scale: {consumptionYDomain[0]} kW → {consumptionYDomain[1]} kW (+18% Headroom)
             </Badge>
           </div>

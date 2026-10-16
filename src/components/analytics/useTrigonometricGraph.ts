@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   HourlySolarPoint,
   calculateSinusoidalFit,
@@ -58,11 +58,11 @@ export interface SelfConsumptionMetrics {
   hourlyRatios: HourlyRatioPoint[];
 }
 
-// Harmonized Color Palette matching Analytics Dashboard
-export const COLOR_PV = '#f59e0b';       // Amber / Solar Yield
-export const COLOR_LOAD = '#6366f1';     // Indigo / Facility Load
+// Harmonized Color Palette matching DSM Standards (Yield: Yellow, Load: Purple, Grid: Green, Battery: Cyan)
+export const COLOR_PV = '#eab308';       // Yellow / Solar Yield
+export const COLOR_LOAD = '#a855f7';     // Purple / Facility Load
 export const COLOR_BATTERY = '#06b6d4';  // Cyan / ESS Flow
-export const COLOR_GRID = '#10b981';     // Emerald / Grid Net (+Export / -Import)
+export const COLOR_GRID = '#10b981';     // Emerald / Green Grid (+Export / -Import)
 
 export function useTrigonometricGraph({
   data,
@@ -113,28 +113,85 @@ export function useTrigonometricGraph({
     }
   }, [data, timeResolution]);
 
+  const fallbackDataRef = useRef<HourlySolarPoint[] | null>(null);
+
+  // Self-healing fallback: If parent does not supply data, fetch today's 5-minute telemetry curve
+  useEffect(() => {
+    if (data && data.length > 0) return;
+    let isCancelled = false;
+
+    async function fetchFallbackHistory() {
+      try {
+        const res = await fetch('/api/deye/history?range=TODAY&step=5');
+        if (res.ok && !isCancelled) {
+          const json = await res.json();
+          if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+            const mapped: HourlySolarPoint[] = json.data.map((item: any) => {
+              const parts = String(item.hour || '00:00').split(':');
+              const h = parseInt(parts[0], 10) || 0;
+              const m = parseInt(parts[1], 10) || 0;
+              return {
+                hour: item.hour,
+                hourDecimal: Number((h + m / 60).toFixed(4)),
+                solarYieldKw: item.solarYieldKw ?? null,
+                loadDemandKw: item.loadDemandKw ?? null,
+                batteryFlowKw: item.batteryFlowKw ?? null,
+                gridExportKw: item.gridExportKw ?? (item.gridFlowKw !== null && item.gridFlowKw !== undefined ? Math.max(0, item.gridFlowKw) : null),
+                isElapsed: item.isElapsed ?? (item.solarYieldKw !== null),
+              };
+            });
+            fallbackDataRef.current = mapped;
+            if (timeResolution === 5) {
+              setActiveData(mapped);
+            } else {
+              const step = timeResolution / 5;
+              setActiveData(mapped.filter((_, idx) => idx % step === 0));
+            }
+          }
+        }
+      } catch {
+        // Silently catch in mock/test environments
+      }
+    }
+
+    fetchFallbackHistory();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [data, timeResolution]);
+
   // Handle resolution change
   const handleResolutionChange = useCallback((newRes: TimeResolution) => {
     setTimeResolution(newRes);
-    if (!data || data.length === 0) {
-      const totalSteps = Math.floor((24 * 60) / newRes);
-      const newPoints: HourlySolarPoint[] = [];
-      for (let i = 0; i < totalSteps; i++) {
-        const totalMins = i * newRes;
-        const h = Math.floor(totalMins / 60);
-        const m = totalMins % 60;
-        newPoints.push({
-          hour: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
-          hourDecimal: Number((h + m / 60).toFixed(4)),
-          solarYieldKw: null,
-          loadDemandKw: null,
-          batteryFlowKw: null,
-          gridExportKw: null,
-          isElapsed: false,
-        });
+    const source = (data && data.length > 0) ? data : fallbackDataRef.current;
+    if (source && source.length > 0) {
+      if (newRes === 5) {
+        setActiveData(source);
+      } else {
+        const step = newRes / 5;
+        setActiveData(source.filter((_, idx) => idx % step === 0));
       }
-      setActiveData(newPoints);
+      return;
     }
+
+    const totalSteps = Math.floor((24 * 60) / newRes);
+    const newPoints: HourlySolarPoint[] = [];
+    for (let i = 0; i < totalSteps; i++) {
+      const totalMins = i * newRes;
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      newPoints.push({
+        hour: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+        hourDecimal: Number((h + m / 60).toFixed(4)),
+        solarYieldKw: null,
+        loadDemandKw: null,
+        batteryFlowKw: null,
+        gridExportKw: null,
+        isElapsed: false,
+      });
+    }
+    setActiveData(newPoints);
   }, [data]);
 
   // Periodic sync of current elapsed slot without fabricated Math.random jitter

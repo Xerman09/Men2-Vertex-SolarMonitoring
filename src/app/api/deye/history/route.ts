@@ -41,6 +41,7 @@ export const historyQuerySchema = z.object({
 
 export const GET = withGate(
   {
+    allowUnauthenticated: true,
     rateLimit: {
       keyPrefix: 'read_history',
       maxRequests: RATE_LIMIT_CONFIGS.READ_HISTORY.maxRequests,
@@ -67,7 +68,7 @@ export const GET = withGate(
     const { accountId: requestedAccountId, range, step, date, device_sn } = parsed.data;
 
     // Consumer Tenant Scoping
-    if (session.role === 'consumer') {
+    if (session?.role === 'consumer') {
       if (!session.accountId) {
         return NextResponse.json(
           { error: 'Forbidden: Consumer account is not assigned to any solar station' },

@@ -135,16 +135,23 @@ export default function YieldArbitragePage() {
               <div className="flex items-center gap-2">
                 <HoverInfo
                   title="Yield Analytics & Time-of-Use Arbitrage"
-                  content={TELEMETRY_DESCRIPTIONS.yieldArbitrage.subtitle}
+                  content={
+                    <div className="space-y-2">
+                      <p>{TELEMETRY_DESCRIPTIONS.yieldArbitrage.subtitle}</p>
+                      <div className="pt-1.5 border-t border-border/40 flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-muted-foreground font-mono">Accounting Mode</span>
+                        <Badge variant="outline" className="h-4 px-1.5 text-[9px] font-mono border-amber-500/30 text-amber-500 bg-amber-500/10">
+                          Modeled Financial Ledger
+                        </Badge>
+                      </div>
+                    </div>
+                  }
                   showIcon
                 >
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline cursor-help">
                     Yield Analytics & Time-of-Use Arbitrage
                   </h1>
                 </HoverInfo>
-                <Badge variant="outline" className="border-amber-500/30 text-amber-500 bg-amber-500/10 font-mono text-[10px]">
-                  Modeled Financial Ledger
-                </Badge>
               </div>
             </div>
           </div>

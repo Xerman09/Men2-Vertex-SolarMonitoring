@@ -33,6 +33,7 @@ import {
   ArrowDown,
 } from 'lucide-react';
 import { StationSummary, AggregatedFleetSummary, FleetMatrixNode, PlantInfo, DeviceInfo } from '@/lib/types';
+import { HourlySolarPoint } from '@/lib/trigonometric-math';
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -83,16 +84,18 @@ export default function EnergyFlowDashboard() {
   const [forceCharge, setForceCharge] = useState(false);
   const [exportLimiter, setExportLimiter] = useState(false);
   const [manualPolling, setManualPolling] = useState(false);
-  const [mainTab, setMainTab] = useState<'synoptics' | 'compact-flow' | 'trigonometric'>('synoptics');
+  const [mainTab, setMainTab] = useState<'synoptics' | 'compact-flow' | 'trigonometric'>('trigonometric');
   const [compactSearchQuery, setCompactSearchQuery] = useState('');
 
-  // Synchronize mainTab with URL query parameter (e.g. ?mode=vertical)
+  // Synchronize mainTab with URL query parameter (e.g. ?mode=synoptics, ?mode=vertical, ?mode=trig)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const mode = params.get('mode') || params.get('view') || params.get('tab');
       if (mode === 'vertical' || mode === 'compact' || mode === 'compact-flow') {
         setMainTab('compact-flow');
+      } else if (mode === 'synoptics' || mode === 'realtime') {
+        setMainTab('synoptics');
       } else if (mode === 'trig' || mode === 'trigonometric') {
         setMainTab('trigonometric');
       }
@@ -105,8 +108,8 @@ export default function EnergyFlowDashboard() {
       const url = new URL(window.location.href);
       if (newTab === 'compact-flow') {
         url.searchParams.set('mode', 'vertical');
-      } else if (newTab === 'trigonometric') {
-        url.searchParams.set('mode', 'trig');
+      } else if (newTab === 'synoptics') {
+        url.searchParams.set('mode', 'synoptics');
       } else {
         url.searchParams.delete('mode');
         url.searchParams.delete('view');
@@ -374,9 +377,73 @@ export default function EnergyFlowDashboard() {
     }
   }, [isFleetView, selectedAccountId, selectedStationId, selectedAccount, selectedInverterSn, snScoped, currentTargetKey, displayedTargetKey, setIsPlantSwitching, setFetchingDeye]);
 
+  const [historyPoints, setHistoryPoints] = useState<HourlySolarPoint[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const historyControllerRef = useRef<AbortController | null>(null);
+
+  const fetchHistoryTelemetry = useCallback(async () => {
+    if (historyControllerRef.current) {
+      historyControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    historyControllerRef.current = controller;
+
+    try {
+      setHistoryLoading(true);
+      let url = '/api/deye/history?range=TODAY&step=5';
+      if (!isFleetView && selectedAccountId) {
+        url += `&accountId=${encodeURIComponent(selectedAccountId)}`;
+      }
+      if (selectedStationId && selectedStationId !== 'ALL') {
+        url += `&station_id=${encodeURIComponent(selectedStationId)}`;
+      }
+      if (snScoped && selectedInverterSn) {
+        url += `&device_sn=${encodeURIComponent(selectedInverterSn.trim())}`;
+      }
+      const res = await fetch(url, { signal: controller.signal });
+      if (res.ok) {
+        const json = await res.json();
+        if (controller.signal.aborted) return;
+        if (json.data && Array.isArray(json.data)) {
+          const mapped: HourlySolarPoint[] = json.data.map((item: any) => {
+            const parts = String(item.hour || '00:00').split(':');
+            const h = parseInt(parts[0], 10) || 0;
+            const m = parseInt(parts[1], 10) || 0;
+            return {
+              hour: item.hour,
+              hourDecimal: Number((h + m / 60).toFixed(4)),
+              solarYieldKw: item.solarYieldKw ?? null,
+              loadDemandKw: item.loadDemandKw ?? null,
+              batteryFlowKw: item.batteryFlowKw ?? null,
+              gridExportKw: item.gridExportKw ?? (item.gridFlowKw !== null && item.gridFlowKw !== undefined ? Math.max(0, item.gridFlowKw) : null),
+              isElapsed: item.isElapsed ?? (item.solarYieldKw !== null),
+            };
+          });
+          setHistoryPoints(mapped);
+        }
+      }
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') {
+        log.error('Failed to load history telemetry', e);
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        historyControllerRef.current = null;
+        setHistoryLoading(false);
+      }
+    }
+  }, [isFleetView, selectedAccountId, selectedStationId, snScoped, selectedInverterSn]);
+
   useEffect(() => {
     fetchTelemetry(true);
-  }, [currentTargetKey, fetchTelemetry]);
+    fetchHistoryTelemetry();
+  }, [currentTargetKey, fetchTelemetry, fetchHistoryTelemetry]);
+
+  useEffect(() => {
+    if (mainTab === 'trigonometric' && historyPoints.length === 0 && !historyLoading) {
+      fetchHistoryTelemetry();
+    }
+  }, [mainTab, historyPoints.length, historyLoading, fetchHistoryTelemetry]);
 
   usePolling(() => fetchTelemetry(false), {
     intervalMs: 3500,
@@ -387,7 +454,7 @@ export default function EnergyFlowDashboard() {
   const triggerManualPoll = async () => {
     setManualPolling(true);
     setFetchingDeye(true, isFleetView ? 'Polling DeyeCloud Fleet Telemetry...' : 'Polling Station Telemetry...');
-    await fetchTelemetry(true);
+    await Promise.all([fetchTelemetry(true), fetchHistoryTelemetry()]);
     setManualPolling(false);
     setFetchingDeye(false, null);
   };
@@ -605,11 +672,24 @@ export default function EnergyFlowDashboard() {
             <HoverInfo
               title="Energy Synoptics Loop"
               content={
-                isFleetView
-                  ? `Real-time multi-site energy flow across ${totalAccounts} configured DeyeCloud accounts.`
-                  : selectedPlant
-                  ? `Real-time hybrid inverter loop for ${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp).`
-                  : `Real-time aggregated telemetry across all ${selectedAccount?.plants?.length || 1} plants (${totalCapacity.toFixed(0)} kWp total capacity).`
+                <div className="space-y-2">
+                  <p>
+                    {isFleetView
+                      ? `Real-time multi-site energy flow across ${totalAccounts} configured DeyeCloud accounts.`
+                      : selectedPlant
+                      ? `Real-time hybrid inverter loop for ${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp).`
+                      : `Real-time aggregated telemetry across all ${selectedAccount?.plants?.length || 1} plants (${totalCapacity.toFixed(0)} kWp total capacity).`}
+                  </p>
+                  <div className="pt-1.5 border-t border-border/40 flex items-center justify-between gap-2">
+                    <span className="text-[10px] text-muted-foreground font-mono">Architecture Mode</span>
+                    <Badge
+                      variant="outline"
+                      className="h-4 px-1.5 text-[9px] font-black uppercase tracking-wider border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono"
+                    >
+                      {isFleetView ? 'Multi-Account Bus' : selectedStationId === 'ALL' ? `All ${selectedAccount?.plants?.length || 1} Plants Bus` : 'Hybrid Plant'}
+                    </Badge>
+                  </div>
+                </div>
               }
               showIcon
             >
@@ -621,12 +701,6 @@ export default function EnergyFlowDashboard() {
                   : `${selectedAccount?.name || 'Selected Site'} Synoptics`}
               </h1>
             </HoverInfo>
-            <Badge
-              variant="outline"
-              className="h-5 px-2 text-[10px] font-black uppercase tracking-widest border-emerald-500/30 text-emerald-500 bg-emerald-500/10"
-            >
-              {isFleetView ? 'Multi-Account Bus' : selectedStationId === 'ALL' ? `All ${selectedAccount?.plants?.length || 1} Plants Bus` : 'Hybrid Plant'}
-            </Badge>
           </div>
         </div>
 
@@ -1004,15 +1078,15 @@ export default function EnergyFlowDashboard() {
         </Card>
       </div>
 
-      {/* Main Subsystem View Switcher (Synoptic Flow vs Compact Vertical vs Trigonometric) */}
+      {/* Main Subsystem View Switcher (Trigonometric Analytics vs Compact Vertical vs Synoptic Flow) */}
       <Tabs value={mainTab} onValueChange={(v) => handleTabChange(v as 'synoptics' | 'compact-flow' | 'trigonometric')} className="w-full space-y-6">
         <TabsList className="bg-muted/60 p-1 rounded-xl h-auto border border-border/50 gap-1 inline-flex w-fit max-w-full overflow-x-auto">
           <TabsTrigger
-            value="synoptics"
+            value="trigonometric"
             className="gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all"
           >
-            <Zap className="h-4 w-4 text-amber-500" />
-            <span>Real-time Synoptic Power Flow</span>
+            <Waves className="h-4 w-4 text-cyan-500" />
+            <span>Trigonometric & Harmonic Analytics</span>
           </TabsTrigger>
 
           <TabsTrigger
@@ -1024,270 +1098,23 @@ export default function EnergyFlowDashboard() {
           </TabsTrigger>
 
           <TabsTrigger
-            value="trigonometric"
+            value="synoptics"
             className="gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all"
           >
-            <Waves className="h-4 w-4 text-cyan-500" />
-            <span>Trigonometric & Harmonic Analytics</span>
+            <Zap className="h-4 w-4 text-amber-500" />
+            <span>Real-time Synoptic Power Flow</span>
           </TabsTrigger>
         </TabsList>
 
         {/* ============================================================ */}
-        {/* TAB 1: REAL-TIME SYNOPTIC POWER FLOW                         */}
+        {/* TAB 1: EMBEDDED TRIGONOMETRIC & HARMONIC ANALYTICS           */}
         {/* ============================================================ */}
-        <TabsContent value="synoptics" className="space-y-6 m-0">
-          <Card className="border-border/60 bg-card/80 p-6 lg:p-8 shadow-sm relative overflow-hidden">
-            {/* In-place synoptics reload veil during plant switching or syncing */}
-            {isDataPlacementLoading && (
-              <div className="absolute inset-0 z-30 bg-background/65 backdrop-blur-xs flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
-                <div className="relative flex items-center justify-center mb-3">
-                  <div className="w-12 h-12 rounded-full border-3 border-primary/20 border-t-primary animate-spin" />
-                  <div className="absolute w-7 h-7 rounded-full border-2 border-amber-500/20 border-b-amber-500 animate-spin" style={{ animationDirection: 'reverse' }} />
-                  <Zap className="h-4 w-4 text-amber-500 absolute" />
-                </div>
-                <span className="text-xs font-bold uppercase tracking-wider text-foreground font-headline">
-                  Syncing Synoptics for {switchingPlantName || selectedPlant?.stationName || (hasNoPlants ? 'Solar Plant' : 'Selected Plant')}...
-                </span>
-                <span className="text-[11px] text-muted-foreground font-mono mt-1 text-center">
-                  Recalibrating real-time PV generation, ESS battery flow & grid telemetry
-                </span>
-              </div>
-            )}
-
-            {/* Header & Interactive Control Toggles */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-border/60">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
-                  <Cpu size={18} />
-                </div>
-                <div>
-                  <HoverInfo
-                    title="Energy Flow Architecture"
-                    content="Dynamic balance between PV harvest, battery storage, facility load, and grid interconnect."
-                    showIcon
-                  >
-                    <h2 className="text-base sm:text-lg font-bold text-foreground cursor-help">
-                      {isFleetView
-                        ? 'Multi-Site Aggregated Energy Flow Architecture'
-                        : selectedPlant
-                        ? `Energy Flow · ${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp)`
-                        : `Energy Flow · ${selectedAccount?.name || 'Inverter Hub'}`}
-                    </h2>
-                  </HoverInfo>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <Button
-                  variant={forceCharge ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setForceCharge(!forceCharge)}
-                  className={`gap-1.5 text-xs font-semibold ${
-                    forceCharge ? 'bg-cyan-500 hover:bg-cyan-600 text-white' : ''
-                  }`}
-                >
-                  <BatteryCharging size={14} />
-                  <span>Force Grid Charge</span>
-                </Button>
-
-                <Button
-                  variant={exportLimiter ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setExportLimiter(!exportLimiter)}
-                  className={`gap-1.5 text-xs font-semibold ${
-                    exportLimiter ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''
-                  }`}
-                >
-                  <SlidersHorizontal size={14} />
-                  <span>Zero-Export Limiter</span>
-                </Button>
-              </div>
-            </div>
-
-            {/* Synoptic Power Flow Architectural Diagram */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center py-6">
-              {/* Left: Solar PV Array */}
-              <HoverInfo
-                title={isFleetView ? 'Combined PV Generation' : 'Solar PV Array'}
-                content={TELEMETRY_DESCRIPTIONS.energyFlow.solarNode}
-                side="bottom"
-              >
-                <div className="flex flex-col items-center cursor-help">
-                  <div className="w-56 p-5 bg-card rounded-2xl border-2 border-amber-500/50 shadow-md flex flex-col items-center text-center">
-                    <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-2">
-                      <Sun size={26} />
-                    </div>
-                    <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
-                      {isFleetView ? 'Combined PV Generation' : 'Solar PV Array'}
-                    </span>
-                    <span className="font-mono text-2xl text-amber-500 font-bold my-1">
-                      {solarKw.toFixed(1)} kW
-                    </span>
-                    <span className="text-[11px] text-muted-foreground font-mono">
-                      {totalCapacity.toFixed(0)} kWp Nameplate
-                    </span>
-                  </div>
-                </div>
-              </HoverInfo>
-
-              {/* Center: Core Hybrid Inverter Hub */}
-              <HoverInfo
-                title="Deye Smart Hybrid Inverter Hub"
-                content={TELEMETRY_DESCRIPTIONS.energyFlow.inverterNode}
-                side="bottom"
-              >
-                <div className="flex flex-col items-center cursor-help">
-                  <div className="w-72 p-6 bg-card rounded-3xl border-2 border-cyan-500/60 shadow-lg flex flex-col items-center text-center relative">
-                    <div className="absolute -top-3 px-3 py-0.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider font-mono">
-                      {isFleetView ? 'Multi-Site Hub' : selectedPlant ? 'Plant Hybrid Hub' : 'Core Hybrid Inverter'}
-                    </div>
-                    <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-2 mt-1">
-                      <Cpu size={32} />
-                    </div>
-                    <span className="text-base font-bold text-foreground">
-                      {isFleetView
-                        ? 'Deye Multi-Account Fleet'
-                        : selectedPlant
-                        ? selectedPlant.stationName
-                        : 'Deye Hybrid Inverter'}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground font-mono mt-0.5">
-                      {isFleetView
-                        ? `${totalAccounts} Accounts · ${nodes.length} Inverters`
-                        : selectedPlant
-                        ? `Station ID: ${selectedPlant.stationId}`
-                        : `SN: ${nodes[0]?.deviceSn || '--'}`}
-                    </span>
-                    <div className="w-full grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-border/60">
-                      <div className="bg-muted/40 p-2 rounded-xl border border-border/40">
-                        <span className="text-[10px] text-muted-foreground block font-mono">
-                          {isFleetView ? 'Inverters' : 'Status'}
-                        </span>
-                        <span className="font-mono text-sm text-emerald-500 font-bold">
-                          {isFleetView ? `${nodes.length} Units` : nodes[0]?.status || (isLive ? 'ONLINE' : 'SYNCED')}
-                        </span>
-                      </div>
-                      <div className="bg-muted/40 p-2 rounded-xl border border-border/40">
-                        <span className="text-[10px] text-muted-foreground block font-mono">
-                          {isFleetView ? 'Active Sites' : 'Daily Yield'}
-                        </span>
-                        <span className="font-mono text-sm text-foreground font-bold">
-                          {isFleetView ? `${liveAccountsCount} / ${totalAccounts} Sites` : `${dailyYield.toFixed(1)} kWh`}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </HoverInfo>
-
-              {/* Right: 3 Output Sinks (Battery, Demand, Grid) */}
-              <div className="flex flex-col gap-3">
-                {/* Battery ESS Node */}
-                <HoverInfo
-                  title="Storage Battery (ESS)"
-                  content={batterySoc > 0 ? "Active LiFePO4 battery energy storage bank." : TELEMETRY_DESCRIPTIONS.energyFlow.batteryNode}
-                  side="left"
-                >
-                  <div className="p-3.5 bg-card rounded-2xl border border-cyan-500/40 flex items-center justify-between shadow-2xs cursor-help">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-500">
-                        <BatteryCharging size={20} />
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-foreground block">
-                          {isFleetView ? 'Combined Battery Fleet' : 'Storage Battery (ESS)'}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground font-mono">
-                          {batterySoc > 0
-                            ? `${batterySoc.toFixed(1)}% SOC · LiFePO4`
-                            : 'Not Installed · ESS Expansion Ready'}
-                        </span>
-                      </div>
-                    </div>
-                    <span className="font-mono text-sm text-cyan-500 font-bold ml-4">
-                      {batterySoc > 0 || Math.abs(batteryKw) > 0.05
-                        ? `${batteryKw >= 0 ? `+${batteryKw.toFixed(1)}` : batteryKw.toFixed(1)} kW`
-                        : 'Standby'}
-                    </span>
-                  </div>
-                </HoverInfo>
-
-                {/* Facility Demand Node */}
-                <HoverInfo
-                  title="Industrial Facility Consumption"
-                  content={TELEMETRY_DESCRIPTIONS.energyFlow.loadNode}
-                  side="left"
-                >
-                  <div className="p-3.5 bg-card rounded-2xl border border-border/60 flex items-center justify-between shadow-2xs cursor-help">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
-                        <Building2 size={20} />
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-foreground block">
-                          {isFleetView ? 'Total Facility Demand' : 'Industrial Facility Load'}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">
-                          Machine Lines & Operations
-                        </span>
-                      </div>
-                    </div>
-                    <span className="font-mono text-sm text-foreground font-bold ml-4">
-                      {loadKw.toFixed(1)} kW
-                    </span>
-                  </div>
-                </HoverInfo>
-
-                {/* Utility Grid Dispatch */}
-                <HoverInfo
-                  title="Utility Grid Interconnection"
-                  content={TELEMETRY_DESCRIPTIONS.energyFlow.gridNode}
-                  side="left"
-                >
-                  <div className="p-3.5 bg-card rounded-2xl border border-emerald-500/40 flex items-center justify-between shadow-2xs cursor-help">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                        <Zap size={20} />
-                      </div>
-                      <div>
-                        <span className="text-xs font-semibold text-foreground block">
-                          {isFleetView ? 'Net Utility Grid Feed-In' : 'Utility Grid Dispatch'}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground font-mono">
-                          {isFleetView ? 'Utility Interconnect' : 'Grid Tied Interconnection'}
-                        </span>
-                      </div>
-                    </div>
-                    <span className="font-mono text-sm text-emerald-500 font-bold ml-4">
-                      {gridKw >= 0 ? `+${gridKw.toFixed(1)}` : gridKw.toFixed(1)} kW
-                    </span>
-                  </div>
-                </HoverInfo>
-              </div>
-            </div>
-
-            {/* Balancing Footer Telemetry */}
-            <div className="mt-4 pt-4 border-t border-border/60 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/40 text-xs">
-                <span className="text-muted-foreground font-mono">Grid Phase Angle</span>
-                <span className="font-mono font-bold text-emerald-500 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {gridKw !== 0 ? 'Synchronized' : 'Standby'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/40 text-xs">
-                <span className="text-muted-foreground font-mono">Gateway Connection</span>
-                <span className="font-mono font-bold text-foreground">
-                  {isLive ? 'Live Sub-minute' : 'Direct Cloud Sync'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/40 text-xs">
-                <span className="text-muted-foreground font-mono">Daily Harvest Aggregate</span>
-                <span className="font-mono font-bold text-amber-500">
-                  {dailyYield.toFixed(1)} kWh
-                </span>
-              </div>
-            </div>
-          </Card>
+        <TabsContent value="trigonometric" className="space-y-6 m-0">
+          <TrigonometricHistoryGraph
+            data={historyPoints.length > 0 ? historyPoints : undefined}
+            installedCapacityKw={totalCapacity > 0 ? totalCapacity : 120}
+            loading={isDataPlacementLoading || historyLoading}
+          />
         </TabsContent>
 
         {/* ============================================================ */}
@@ -1782,10 +1609,261 @@ export default function EnergyFlowDashboard() {
         </TabsContent>
 
         {/* ============================================================ */}
-        {/* TAB 3: EMBEDDED TRIGONOMETRIC & HARMONIC ANALYTICS           */}
+        {/* TAB 3: REAL-TIME SYNOPTIC POWER FLOW                         */}
         {/* ============================================================ */}
-        <TabsContent value="trigonometric" className="space-y-6 m-0">
-          <TrigonometricHistoryGraph installedCapacityKw={totalCapacity} loading={isDataPlacementLoading} />
+        <TabsContent value="synoptics" className="space-y-6 m-0">
+          <Card className="border-border/60 bg-card/80 p-6 lg:p-8 shadow-sm relative overflow-hidden">
+            {/* In-place synoptics reload veil during plant switching or syncing */}
+            {isDataPlacementLoading && (
+              <div className="absolute inset-0 z-30 bg-background/65 backdrop-blur-xs flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
+                <div className="relative flex items-center justify-center mb-3">
+                  <div className="w-12 h-12 rounded-full border-3 border-primary/20 border-t-primary animate-spin" />
+                  <div className="absolute w-7 h-7 rounded-full border-2 border-amber-500/20 border-b-amber-500 animate-spin" style={{ animationDirection: 'reverse' }} />
+                  <Zap className="h-4 w-4 text-amber-500 absolute" />
+                </div>
+                <span className="text-xs font-bold uppercase tracking-wider text-foreground font-headline">
+                  Syncing Synoptics for {switchingPlantName || selectedPlant?.stationName || (hasNoPlants ? 'Solar Plant' : 'Selected Plant')}...
+                </span>
+                <span className="text-[11px] text-muted-foreground font-mono mt-1 text-center">
+                  Recalibrating real-time PV generation, ESS battery flow & grid telemetry
+                </span>
+              </div>
+            )}
+
+            {/* Header & Interactive Control Toggles */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-border/60">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
+                  <Cpu size={18} />
+                </div>
+                <div>
+                  <HoverInfo
+                    title="Energy Flow Architecture"
+                    content="Dynamic balance between PV harvest, battery storage, facility load, and grid interconnect."
+                    showIcon
+                  >
+                    <h2 className="text-base sm:text-lg font-bold text-foreground cursor-help">
+                      {isFleetView
+                        ? 'Multi-Site Aggregated Energy Flow Architecture'
+                        : selectedPlant
+                        ? `Energy Flow · ${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp)`
+                        : `Energy Flow · ${selectedAccount?.name || 'Inverter Hub'}`}
+                    </h2>
+                  </HoverInfo>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <Button
+                  variant={forceCharge ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setForceCharge(!forceCharge)}
+                  className={`gap-1.5 text-xs font-semibold ${
+                    forceCharge ? 'bg-cyan-500 hover:bg-cyan-600 text-white' : ''
+                  }`}
+                >
+                  <BatteryCharging size={14} />
+                  <span>Force Grid Charge</span>
+                </Button>
+
+                <Button
+                  variant={exportLimiter ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setExportLimiter(!exportLimiter)}
+                  className={`gap-1.5 text-xs font-semibold ${
+                    exportLimiter ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''
+                  }`}
+                >
+                  <SlidersHorizontal size={14} />
+                  <span>Zero-Export Limiter</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Synoptic Power Flow Architectural Diagram */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center py-6">
+              {/* Left: Solar PV Array */}
+              <HoverInfo
+                title={isFleetView ? 'Combined PV Generation' : 'Solar PV Array'}
+                content={TELEMETRY_DESCRIPTIONS.energyFlow.solarNode}
+                side="bottom"
+              >
+                <div className="flex flex-col items-center cursor-help">
+                  <div className="w-56 p-5 bg-card rounded-2xl border-2 border-amber-500/50 shadow-md flex flex-col items-center text-center">
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-2">
+                      <Sun size={26} />
+                    </div>
+                    <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
+                      {isFleetView ? 'Combined PV Generation' : 'Solar PV Array'}
+                    </span>
+                    <span className="font-mono text-2xl text-amber-500 font-bold my-1">
+                      {solarKw.toFixed(1)} kW
+                    </span>
+                    <span className="text-[11px] text-muted-foreground font-mono">
+                      {totalCapacity.toFixed(0)} kWp Nameplate
+                    </span>
+                  </div>
+                </div>
+              </HoverInfo>
+
+              {/* Center: Core Hybrid Inverter Hub */}
+              <HoverInfo
+                title="Deye Smart Hybrid Inverter Hub"
+                content={TELEMETRY_DESCRIPTIONS.energyFlow.inverterNode}
+                side="bottom"
+              >
+                <div className="flex flex-col items-center cursor-help">
+                  <div className="w-72 p-6 bg-card rounded-3xl border-2 border-cyan-500/60 shadow-lg flex flex-col items-center text-center relative">
+                    <div className="absolute -top-3 px-3 py-0.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider font-mono">
+                      {isFleetView ? 'Multi-Site Hub' : selectedPlant ? 'Plant Hybrid Hub' : 'Core Hybrid Inverter'}
+                    </div>
+                    <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-2 mt-1">
+                      <Cpu size={32} />
+                    </div>
+                    <span className="text-base font-bold text-foreground">
+                      {isFleetView
+                        ? 'Deye Multi-Account Fleet'
+                        : selectedPlant
+                        ? selectedPlant.stationName
+                        : 'Deye Hybrid Inverter'}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                      {isFleetView
+                        ? `${totalAccounts} Accounts · ${nodes.length} Inverters`
+                        : selectedPlant
+                        ? `Station ID: ${selectedPlant.stationId}`
+                        : `SN: ${nodes[0]?.deviceSn || '--'}`}
+                    </span>
+                    <div className="w-full grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-border/60">
+                      <div className="bg-muted/40 p-2 rounded-xl border border-border/40">
+                        <span className="text-[10px] text-muted-foreground block font-mono">
+                          {isFleetView ? 'Inverters' : 'Status'}
+                        </span>
+                        <span className="font-mono text-sm text-emerald-500 font-bold">
+                          {isFleetView ? `${nodes.length} Units` : nodes[0]?.status || (isLive ? 'ONLINE' : 'SYNCED')}
+                        </span>
+                      </div>
+                      <div className="bg-muted/40 p-2 rounded-xl border border-border/40">
+                        <span className="text-[10px] text-muted-foreground block font-mono">
+                          {isFleetView ? 'Active Sites' : 'Daily Yield'}
+                        </span>
+                        <span className="font-mono text-sm text-foreground font-bold">
+                          {isFleetView ? `${liveAccountsCount} / ${totalAccounts} Sites` : `${dailyYield.toFixed(1)} kWh`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </HoverInfo>
+
+              {/* Right: 3 Output Sinks (Battery, Demand, Grid) */}
+              <div className="flex flex-col gap-3">
+                {/* Battery ESS Node */}
+                <HoverInfo
+                  title="Storage Battery (ESS)"
+                  content={batterySoc > 0 ? "Active LiFePO4 battery energy storage bank." : TELEMETRY_DESCRIPTIONS.energyFlow.batteryNode}
+                  side="left"
+                >
+                  <div className="p-3.5 bg-card rounded-2xl border border-cyan-500/40 flex items-center justify-between shadow-2xs cursor-help">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-500">
+                        <BatteryCharging size={20} />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-foreground block">
+                          {isFleetView ? 'Combined Battery Fleet' : 'Storage Battery (ESS)'}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          {batterySoc > 0
+                            ? `${batterySoc.toFixed(1)}% SOC · LiFePO4`
+                            : 'Not Installed · ESS Expansion Ready'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="font-mono text-sm text-cyan-500 font-bold ml-4">
+                      {batterySoc > 0 || Math.abs(batteryKw) > 0.05
+                        ? `${batteryKw >= 0 ? `+${batteryKw.toFixed(1)}` : batteryKw.toFixed(1)} kW`
+                        : 'Standby'}
+                    </span>
+                  </div>
+                </HoverInfo>
+
+                {/* Facility Demand Node */}
+                <HoverInfo
+                  title="Industrial Facility Consumption"
+                  content={TELEMETRY_DESCRIPTIONS.energyFlow.loadNode}
+                  side="left"
+                >
+                  <div className="p-3.5 bg-card rounded-2xl border border-border/60 flex items-center justify-between shadow-2xs cursor-help">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+                        <Building2 size={20} />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-foreground block">
+                          {isFleetView ? 'Total Facility Demand' : 'Industrial Facility Load'}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          Machine Lines & Operations
+                        </span>
+                      </div>
+                    </div>
+                    <span className="font-mono text-sm text-foreground font-bold ml-4">
+                      {loadKw.toFixed(1)} kW
+                    </span>
+                  </div>
+                </HoverInfo>
+
+                {/* Utility Grid Dispatch */}
+                <HoverInfo
+                  title="Utility Grid Interconnection"
+                  content={TELEMETRY_DESCRIPTIONS.energyFlow.gridNode}
+                  side="left"
+                >
+                  <div className="p-3.5 bg-card rounded-2xl border border-emerald-500/40 flex items-center justify-between shadow-2xs cursor-help">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                        <Zap size={20} />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-foreground block">
+                          {isFleetView ? 'Net Utility Grid Feed-In' : 'Utility Grid Dispatch'}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          {isFleetView ? 'Utility Interconnect' : 'Grid Tied Interconnection'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="font-mono text-sm text-emerald-500 font-bold ml-4">
+                      {gridKw >= 0 ? `+${gridKw.toFixed(1)}` : gridKw.toFixed(1)} kW
+                    </span>
+                  </div>
+                </HoverInfo>
+              </div>
+            </div>
+
+            {/* Balancing Footer Telemetry */}
+            <div className="mt-4 pt-4 border-t border-border/60 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/40 text-xs">
+                <span className="text-muted-foreground font-mono">Grid Phase Angle</span>
+                <span className="font-mono font-bold text-emerald-500 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {gridKw !== 0 ? 'Synchronized' : 'Standby'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/40 text-xs">
+                <span className="text-muted-foreground font-mono">Gateway Connection</span>
+                <span className="font-mono font-bold text-foreground">
+                  {isLive ? 'Live Sub-minute' : 'Direct Cloud Sync'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/40 text-xs">
+                <span className="text-muted-foreground font-mono">Daily Harvest Aggregate</span>
+                <span className="font-mono font-bold text-amber-500">
+                  {dailyYield.toFixed(1)} kWh
+                </span>
+              </div>
+            </div>
+          </Card>
         </TabsContent>
       </Tabs>
 

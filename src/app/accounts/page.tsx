@@ -90,7 +90,48 @@ export default function AccountsManagementPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <HoverInfo
                   title="Fleet & Operations Directory"
-                  content={TELEMETRY_DESCRIPTIONS.pageHeaders.accountsManagement}
+                  content={
+                    <div className="space-y-2">
+                      <p>{TELEMETRY_DESCRIPTIONS.pageHeaders.accountsManagement}</p>
+                      <div className="pt-1.5 border-t border-border/40 space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-muted-foreground font-mono">Access Level</span>
+                          <Badge
+                            variant="outline"
+                            className={`font-mono text-[9px] h-4 px-1.5 ${
+                              isAdmin
+                                ? 'border-amber-500/30 text-amber-500 bg-amber-500/10'
+                                : isConsumer
+                                ? 'border-emerald-500/30 text-emerald-500 bg-emerald-500/10'
+                                : 'border-primary/30 text-primary bg-primary/10'
+                            }`}
+                          >
+                            {isAdmin
+                              ? 'Admin (Database 2-Way Sync)'
+                              : isConsumer
+                              ? `Consumer Account (${user?.name || user?.email || 'Active'})`
+                              : 'Viewer (Read-Only Mode)'}
+                          </Badge>
+                        </div>
+                        {directusInfo && (
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] text-muted-foreground font-mono">Sync Channel</span>
+                            <Badge
+                              variant="outline"
+                              className={`font-mono text-[9px] h-4 px-1.5 flex items-center gap-1 ${
+                                directusInfo.connected
+                                  ? 'border-cyan-500/30 text-cyan-500 bg-cyan-500/10'
+                                  : 'border-amber-500/30 text-amber-500 bg-amber-500/10'
+                              }`}
+                            >
+                              <Database size={9} />
+                              <span>Database: {directusInfo.connected ? 'Live Sync' : 'Cached Fallback'}</span>
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  }
                   showIcon
                 >
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline cursor-help">
@@ -101,35 +142,6 @@ export default function AccountsManagementPage() {
                       : 'Solar Fleet & Plants Directory'}
                   </h1>
                 </HoverInfo>
-                <Badge
-                  variant="outline"
-                  className={`font-mono text-[10px] ${
-                    isAdmin
-                      ? 'border-amber-500/30 text-amber-500 bg-amber-500/10'
-                      : isConsumer
-                      ? 'border-emerald-500/30 text-emerald-500 bg-emerald-500/10'
-                      : 'border-primary/30 text-primary bg-primary/10'
-                  }`}
-                >
-                  {isAdmin
-                    ? 'Admin (Database 2-Way Sync)'
-                    : isConsumer
-                    ? `Consumer Account (${user?.name || user?.email || 'Active'})`
-                    : 'Viewer (Read-Only Mode)'}
-                </Badge>
-                {directusInfo && (
-                  <Badge
-                    variant="outline"
-                    className={`font-mono text-[10px] flex items-center gap-1 ${
-                      directusInfo.connected
-                        ? 'border-cyan-500/30 text-cyan-500 bg-cyan-500/10'
-                        : 'border-amber-500/30 text-amber-500 bg-amber-500/10'
-                    }`}
-                  >
-                    <Database size={10} />
-                    <span>Database: {directusInfo.connected ? 'Live Sync' : 'Cached Fallback'}</span>
-                  </Badge>
-                )}
               </div>
             </div>
           </div>
