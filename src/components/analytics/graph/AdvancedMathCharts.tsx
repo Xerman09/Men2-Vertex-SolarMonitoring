@@ -110,10 +110,10 @@ export function AdvancedMathCharts({
             }
           >
             <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono block">
                 Sinusoidal Goodness R²
               </span>
-              <span className="text-base sm:text-lg font-bold font-mono text-cyan-500">
+              <span className="text-sm sm:text-base font-bold font-mono text-cyan-500">
                 {fitResults.rSquared}
               </span>
             </div>
@@ -132,10 +132,10 @@ export function AdvancedMathCharts({
             }
           >
             <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono block">
                 Peak Sun Hours (PSH)
               </span>
-              <span className="text-base sm:text-lg font-bold font-mono text-amber-500">
+              <span className="text-sm sm:text-base font-bold font-mono text-amber-500">
                 {fitResults.peakSunHours} h
               </span>
             </div>
@@ -154,10 +154,10 @@ export function AdvancedMathCharts({
             }
           >
             <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono block">
                 Solar Noon Phase Shift
               </span>
-              <span className="text-base sm:text-lg font-bold font-mono text-foreground">
+              <span className="text-sm sm:text-base font-bold font-mono text-foreground">
                 {fitResults.phaseShiftHours > 0 ? `+${fitResults.phaseShiftHours}` : fitResults.phaseShiftHours} h
               </span>
             </div>
@@ -176,19 +176,19 @@ export function AdvancedMathCharts({
             }
           >
             <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono block">
                 Harvest Model Efficiency
               </span>
-              <span className="text-base sm:text-lg font-bold font-mono text-emerald-500">
+              <span className="text-sm sm:text-base font-bold font-mono text-emerald-500">
                 {fitResults.harvestEfficiencyPct}%
               </span>
             </div>
           </HoverInfo>
         </div>
 
-        <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
+        <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={fitResults.theoreticalPoints} margin={{ top: 24, right: 14, left: -12, bottom: 0 }}>
+            <AreaChart data={fitResults.theoreticalPoints} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
               <defs>
                 <linearGradient id="solarActualYellowGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={COLOR_PV} stopOpacity={0.35} />
@@ -196,17 +196,17 @@ export function AdvancedMathCharts({
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-              <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[10px] opacity-60" />
-              <YAxis domain={sinusoidalYDomain} stroke="currentColor" className="text-[10px] opacity-60" unit="kW" />
+              <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
+              <YAxis domain={sinusoidalYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
               <Tooltip
                 contentStyle={{
                   backgroundColor: 'rgba(23, 31, 51, 0.95)',
-                  borderRadius: '0.75rem',
+                  borderRadius: '0.5rem',
                   border: '1px solid rgba(255,255,255,0.1)',
-                  fontSize: '12px',
+                  fontSize: '11px',
                 }}
               />
-              <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+              <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
               <ReferenceLine
                 isFront
                 x={nowSlotStr}
@@ -275,21 +275,21 @@ export function AdvancedMathCharts({
           </HoverInfo>
         </div>
 
-        <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
+        <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={fourierData} margin={{ top: 24, right: 14, left: -12, bottom: 0 }}>
+            <LineChart data={fourierData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-              <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[10px] opacity-60" />
-              <YAxis domain={fourierYDomain} stroke="currentColor" className="text-[10px] opacity-60" unit="kW" />
+              <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
+              <YAxis domain={fourierYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
               <Tooltip
                 contentStyle={{
                   backgroundColor: 'rgba(23, 31, 51, 0.95)',
-                  borderRadius: '0.75rem',
+                  borderRadius: '0.5rem',
                   border: '1px solid rgba(255,255,255,0.1)',
-                  fontSize: '12px',
+                  fontSize: '11px',
                 }}
               />
-              <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+              <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
               <ReferenceLine
                 isFront
                 x={nowSlotStr}
@@ -359,12 +359,12 @@ export function AdvancedMathCharts({
           </Badge>
         </div>
 
-        <div className={compact ? 'h-[240px] w-full' : 'h-[290px] w-full'}>
+        <div className={compact ? 'h-[280px] w-full' : 'h-[360px] w-full'}>
           <ResponsiveContainer width="100%" height="100%">
             <RadarChart cx="50%" cy="50%" outerRadius="80%" data={polarData.filter((_, idx) => idx % (timeResolution === 5 ? 12 : 1) === 0)}>
               <PolarGrid stroke="currentColor" className="opacity-20" />
-              <PolarAngleAxis dataKey="hourLabel" stroke="currentColor" className="text-[10px] opacity-70" />
-              <PolarRadiusAxis angle={30} domain={[0, 140]} stroke="currentColor" className="text-[9px] opacity-50" />
+              <PolarAngleAxis dataKey="hourLabel" stroke="currentColor" className="text-[9px] font-mono opacity-75" />
+              <PolarRadiusAxis angle={30} domain={[0, 140]} stroke="currentColor" className="text-[8.5px] font-mono opacity-60" />
               <Radar
                 name="Solar Generation"
                 dataKey="solarHarvestRadius"
@@ -386,13 +386,13 @@ export function AdvancedMathCharts({
                 fill="#06b6d4"
                 fillOpacity={0.25}
               />
-              <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+              <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: 'rgba(23, 31, 51, 0.95)',
-                  borderRadius: '0.75rem',
+                  borderRadius: '0.5rem',
                   border: '1px solid rgba(255,255,255,0.1)',
-                  fontSize: '12px',
+                  fontSize: '11px',
                 }}
               />
             </RadarChart>
@@ -472,22 +472,22 @@ export function AdvancedMathCharts({
         </div>
       </div>
 
-      <div className={compact ? 'h-[210px] w-full' : 'h-[250px] w-full'}>
+      <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={acResults.waveform} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+          <LineChart data={acResults.waveform} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-            <XAxis dataKey="timeMs" stroke="currentColor" className="text-[10px] opacity-60" unit="ms" />
-            <YAxis stroke="currentColor" className="text-[10px] opacity-60" unit="V" />
+            <XAxis dataKey="timeMs" stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="ms" />
+            <YAxis stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="V" />
             <Tooltip
               contentStyle={{
                 backgroundColor: 'rgba(23, 31, 51, 0.95)',
-                borderRadius: '0.75rem',
+                borderRadius: '0.5rem',
                 border: '1px solid rgba(255,255,255,0.1)',
-                fontSize: '12px',
+                fontSize: '11px',
               }}
             />
             <ReferenceLine y={0} stroke="currentColor" className="opacity-30" />
-            <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+            <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
             <Line
               type="monotone"
               dataKey="voltagePhaseA"
@@ -539,10 +539,10 @@ export function AdvancedMathCharts({
           }
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-            <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
+            <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground block">
               Active Power P
             </span>
-            <span className="text-base sm:text-lg font-bold font-mono text-emerald-500">
+            <span className="text-sm sm:text-base font-bold font-mono text-emerald-500">
               {acResults.metrics.activePowerKw} kW
             </span>
           </div>
@@ -561,10 +561,10 @@ export function AdvancedMathCharts({
           }
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-            <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
+            <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground block">
               Reactive Power Q
             </span>
-            <span className="text-base sm:text-lg font-bold font-mono text-amber-500">
+            <span className="text-sm sm:text-base font-bold font-mono text-amber-500">
               {acResults.metrics.reactivePowerKvar} kVAR
             </span>
           </div>
@@ -583,10 +583,10 @@ export function AdvancedMathCharts({
           }
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-            <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
+            <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground block">
               Apparent Power S
             </span>
-            <span className="text-base sm:text-lg font-bold font-mono text-cyan-500">
+            <span className="text-sm sm:text-base font-bold font-mono text-cyan-500">
               {acResults.metrics.apparentPowerKva} kVA
             </span>
           </div>
@@ -605,10 +605,10 @@ export function AdvancedMathCharts({
           }
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-            <span className="text-[9.5px] font-mono uppercase tracking-wider text-muted-foreground block">
+            <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground block">
               Grid Synchronicity
             </span>
-            <span className="text-base sm:text-lg font-bold font-mono text-foreground">
+            <span className="text-sm sm:text-base font-bold font-mono text-foreground">
               60.00 Hz
             </span>
           </div>

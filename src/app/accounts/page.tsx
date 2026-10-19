@@ -284,6 +284,20 @@ export default function AccountsManagementPage() {
                           Auto-Discovered
                         </Badge>
                       )}
+                      {(account.isDemo || account.id === 'men2-facility-2' || account.id === 'men2-facility-3') && (
+                        <Badge variant="warning" className="text-[10px] font-mono">
+                          DEMO ACCOUNT
+                        </Badge>
+                      )}
+                      {account.status === 'OFFLINE' ? (
+                        <Badge variant="destructive" className="text-[10px] font-mono">
+                          DISABLED
+                        </Badge>
+                      ) : (
+                        <Badge variant="success" className="text-[10px] font-mono">
+                          ACTIVE
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground flex-wrap font-mono">
                       <span>ID: {account.id}</span>

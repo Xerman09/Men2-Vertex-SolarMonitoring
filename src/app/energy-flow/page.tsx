@@ -510,7 +510,7 @@ export default function EnergyFlowDashboard() {
 
   const isTargetPending = currentTargetKey !== displayedTargetKey || !isDataLoaded;
   const isReloadingPlant = isPlantSwitching || isTargetPending;
-  const showFullReloadOverlay = isReloadingPlant || isSyncingNoPlants || syncing || (isTargetPending && loading);
+  const showFullReloadOverlay = (isReloadingPlant || isSyncingNoPlants || (isTargetPending && loading)) && !isFetchingDeye && !syncing;
   const isDataPlacementLoading = isReloadingPlant || isSyncingNoPlants || syncing;
 
   // Group inverter nodes by plant / station
@@ -755,6 +755,16 @@ export default function EnergyFlowDashboard() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <Link href="/fleet">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 h-8 text-xs font-semibold"
+            >
+              <LayoutGrid className="h-3.5 w-3.5 text-primary" />
+              <span>Fleet Monitoring</span>
+            </Button>
+          </Link>
           <Button
             variant="outline"
             size="sm"

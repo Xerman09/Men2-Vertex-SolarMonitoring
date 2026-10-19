@@ -76,10 +76,14 @@ export const GET = withGate(
         });
       }
 
-      // Admin & Viewer roles receive registered accounts and Directus sync status
+      // Demo accounts are restricted exclusively to the admin account
+      const authorizedAccounts = session.role === 'admin'
+        ? accounts
+        : accounts.filter((a) => !a.isDemo && a.id !== 'men2-facility-2' && a.id !== 'men2-facility-3');
+
       return NextResponse.json({
-        total: accounts.length,
-        accounts,
+        total: authorizedAccounts.length,
+        accounts: authorizedAccounts,
         directus,
       });
     } catch (error) {

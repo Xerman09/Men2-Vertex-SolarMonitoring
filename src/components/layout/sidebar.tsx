@@ -19,6 +19,7 @@ import {
   Sparkles,
   LayoutGrid,
   BarChart3,
+  X,
 } from 'lucide-react';
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
@@ -52,6 +53,12 @@ export function Sidebar() {
       label: 'Analytics Dashboard',
       href: '/analytics',
       icon: BarChart3,
+    },
+    {
+      label: 'Fleet Monitoring',
+      href: '/fleet',
+      icon: LayoutGrid,
+      badge: totalAccounts > 1 ? `${totalAccounts} Acc` : undefined,
     },
     {
       label: 'Energy Flow & Fleet',
@@ -92,7 +99,7 @@ export function Sidebar() {
         <button
           type="button"
           onClick={closeMobile}
-          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden animate-in fade-in-50 cursor-default"
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 lg:hidden animate-in fade-in-50 cursor-default"
           aria-label="Close navigation sidebar overlay"
         />
       )}
@@ -101,8 +108,12 @@ export function Sidebar() {
         role="navigation"
         aria-label="Navigation sidebar"
         className={`fixed left-0 top-0 h-full bg-sidebar text-sidebar-foreground z-50 flex flex-col justify-between border-r border-sidebar-border shadow-sm transition-all duration-300 ${
-          collapsed ? 'w-[72px]' : 'w-72'
-        } ${mobileOpen ? 'translate-x-0 !w-72' : 'translate-x-0'}`}
+          collapsed ? 'lg:w-[72px]' : 'lg:w-72'
+        } ${
+          mobileOpen
+            ? 'translate-x-0 w-72 shadow-2xl'
+            : '-translate-x-full lg:translate-x-0 w-72'
+        }`}
       >
         <div className="flex flex-col">
           {/* Brand Header */}
@@ -112,7 +123,7 @@ export function Sidebar() {
             }`}
           >
             {collapsed && !mobileOpen ? (
-              /* When closed/collapsed, clicking the top Sun icon opens the sidebar */
+              /* When closed/collapsed on desktop, clicking the top Sun icon opens the sidebar */
               <button
                 type="button"
                 onClick={() => setCollapsed(false)}
@@ -158,11 +169,11 @@ export function Sidebar() {
                       setCollapsed(true);
                     }
                   }}
-                  aria-label="Collapse sidebar to icon rail"
-                  title="Collapse sidebar"
+                  aria-label={mobileOpen ? 'Close navigation drawer' : 'Collapse sidebar to icon rail'}
+                  title={mobileOpen ? 'Close navigation drawer' : 'Collapse sidebar'}
                   className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors cursor-pointer"
                 >
-                  <ChevronLeft size={16} />
+                  {mobileOpen ? <X size={16} /> : <ChevronLeft size={16} />}
                 </button>
               </div>
             )}
@@ -289,10 +300,10 @@ export function Sidebar() {
         )}
       </aside>
 
-      {/* Spacer to offset fixed sidebar so content is never covered */}
+      {/* Spacer to offset fixed sidebar on desktop so content is never covered */}
       <div
-        className={`shrink-0 transition-all duration-300 ${
-          collapsed && !mobileOpen ? 'w-[72px]' : 'w-72'
+        className={`hidden lg:block shrink-0 transition-all duration-300 ${
+          collapsed ? 'w-[72px]' : 'w-72'
         }`}
       />
     </>

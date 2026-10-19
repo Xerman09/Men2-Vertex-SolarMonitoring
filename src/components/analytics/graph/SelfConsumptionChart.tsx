@@ -34,9 +34,9 @@ export function SelfConsumptionChart({
   return (
     <div className={compact ? 'space-y-3' : 'space-y-4'}>
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <HoverInfo
-          className="block w-full cursor-help"
+          className="block w-full cursor-help h-full"
           title="Utilization Rate"
           content={
             <div className="text-[11px] space-y-1 min-w-[160px]">
@@ -47,14 +47,14 @@ export function SelfConsumptionChart({
             </div>
           }
         >
-          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Utilization Rate</span>
-            <span className="text-lg sm:text-xl font-bold font-mono text-emerald-500">{selfConsumptionMetrics.utilizationPct}%</span>
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30 flex flex-col items-center justify-center text-center h-full min-h-[58px] gap-0.5">
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono font-medium block">Utilization Rate</span>
+            <span className="text-sm sm:text-base font-bold font-mono text-emerald-500">{selfConsumptionMetrics.utilizationPct}%</span>
           </div>
         </HoverInfo>
 
         <HoverInfo
-          className="block w-full cursor-help"
+          className="block w-full cursor-help h-full"
           title="Self-Consumption"
           content={
             <div className="text-[11px] space-y-1 min-w-[160px]">
@@ -65,14 +65,14 @@ export function SelfConsumptionChart({
             </div>
           }
         >
-          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/30">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Self-Consumption</span>
-            <span className="text-lg sm:text-xl font-bold font-mono text-yellow-500">{selfConsumptionMetrics.productionPct}%</span>
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/30 flex flex-col items-center justify-center text-center h-full min-h-[58px] gap-0.5">
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono font-medium block">Self-Consumption</span>
+            <span className="text-sm sm:text-base font-bold font-mono text-yellow-500">{selfConsumptionMetrics.productionPct}%</span>
           </div>
         </HoverInfo>
 
         <HoverInfo
-          className="block w-full cursor-help"
+          className="block w-full cursor-help h-full"
           title="Self-Consumed kWh"
           content={
             <div className="text-[11px] space-y-1 min-w-[160px]">
@@ -83,14 +83,14 @@ export function SelfConsumptionChart({
             </div>
           }
         >
-          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Self-Consumed kWh</span>
-            <span className="text-lg sm:text-xl font-bold font-mono text-emerald-400">{selfConsumptionMetrics.selfConsumedKwh}</span>
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30 flex flex-col items-center justify-center text-center h-full min-h-[58px] gap-0.5">
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono font-medium block">Self-Consumed kWh</span>
+            <span className="text-sm sm:text-base font-bold font-mono text-emerald-400">{selfConsumptionMetrics.selfConsumedKwh}</span>
           </div>
         </HoverInfo>
 
         <HoverInfo
-          className="block w-full cursor-help"
+          className="block w-full cursor-help h-full"
           title="Grid Import"
           content={
             <div className="text-[11px] space-y-1 min-w-[160px]">
@@ -101,20 +101,20 @@ export function SelfConsumptionChart({
             </div>
           }
         >
-          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/30">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Grid Import</span>
-            <span className="text-lg sm:text-xl font-bold font-mono text-purple-400">{selfConsumptionMetrics.totalImportKwh}</span>
+          <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/30 flex flex-col items-center justify-center text-center h-full min-h-[58px] gap-0.5">
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono font-medium block">Grid Import</span>
+            <span className="text-sm sm:text-base font-bold font-mono text-purple-400">{selfConsumptionMetrics.totalImportKwh}</span>
           </div>
         </HoverInfo>
       </div>
 
       {/* Ratio definition cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {/* Utilization */}
-        <div className="p-2.5 sm:p-3 rounded-lg bg-card border border-emerald-500/20 space-y-2">
+        <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/20 flex flex-col justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <div className="p-1 rounded-md bg-emerald-500/10 border border-emerald-500/20">
-              <Zap className="h-3.5 w-3.5 text-emerald-500" />
+            <div className="p-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+              <Zap className="h-3 w-3 text-emerald-500" />
             </div>
             <div>
               <HoverInfo
@@ -122,29 +122,35 @@ export function SelfConsumptionChart({
                 content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.selfConsumptionUtilization}
                 showIcon
               >
-                <span className="text-xs sm:text-sm font-bold text-foreground block cursor-help">
+                <span className="text-xs font-semibold text-foreground block cursor-help">
                   Utilization — PV to Import
                 </span>
               </HoverInfo>
             </div>
           </div>
-          <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden">
+          <div className="w-full bg-muted/50 rounded-full h-1.5 overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all"
               style={{ width: `${Math.min(100, selfConsumptionMetrics.utilizationPct)}%` }}
             />
           </div>
-          <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-            <span>PV Covered: <strong className="text-emerald-500">{selfConsumptionMetrics.utilizationPct}%</strong></span>
-            <span>Grid Import: <strong className="text-purple-400">{(100 - selfConsumptionMetrics.utilizationPct).toFixed(1)}%</strong></span>
+          <div className="flex flex-col gap-0.5 text-[9.5px] text-muted-foreground font-mono">
+            <div className="flex items-center justify-between">
+              <span>PV Covered:</span>
+              <strong className="text-emerald-500">{selfConsumptionMetrics.utilizationPct}%</strong>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Grid Import:</span>
+              <strong className="text-purple-400">{(100 - selfConsumptionMetrics.utilizationPct).toFixed(1)}%</strong>
+            </div>
           </div>
         </div>
 
         {/* Production self-consumption */}
-        <div className="p-2.5 sm:p-3 rounded-lg bg-card border border-yellow-500/20 space-y-2">
+        <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/20 flex flex-col justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <div className="p-1 rounded-md bg-yellow-500/10 border border-yellow-500/20">
-              <TrendingUp className="h-3.5 w-3.5 text-yellow-500" />
+            <div className="p-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20">
+              <TrendingUp className="h-3 w-3 text-yellow-500" />
             </div>
             <div>
               <HoverInfo
@@ -152,31 +158,37 @@ export function SelfConsumptionChart({
                 content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.selfConsumptionProduction}
                 showIcon
               >
-                <span className="text-xs sm:text-sm font-bold text-foreground block cursor-help">
+                <span className="text-xs font-semibold text-foreground block cursor-help">
                   Production — Consumption to Export
                 </span>
               </HoverInfo>
             </div>
           </div>
-          <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden">
+          <div className="w-full bg-muted/50 rounded-full h-1.5 overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-yellow-600 to-yellow-400 rounded-full transition-all"
               style={{ width: `${Math.min(100, selfConsumptionMetrics.productionPct)}%` }}
             />
           </div>
-          <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-            <span>Self-Consumed: <strong className="text-purple-400">{selfConsumptionMetrics.productionPct}%</strong></span>
-            <span>Exported: <strong className="text-emerald-400">{(100 - selfConsumptionMetrics.productionPct).toFixed(1)}%</strong></span>
+          <div className="flex flex-col gap-0.5 text-[9.5px] text-muted-foreground font-mono">
+            <div className="flex items-center justify-between">
+              <span>Self-Consumed:</span>
+              <strong className="text-purple-400">{selfConsumptionMetrics.productionPct}%</strong>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Exported:</span>
+              <strong className="text-emerald-400">{(100 - selfConsumptionMetrics.productionPct).toFixed(1)}%</strong>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Continuous ratios chart */}
-      <div className="space-y-1.5">
-        <span className="text-xs font-semibold text-foreground">5-Minute Continuous Ratios (%)</span>
-        <div className={compact ? 'h-[180px] w-full' : 'h-[230px] w-full'}>
+      <div className="space-y-1">
+        <span className="text-[11px] font-semibold text-foreground uppercase tracking-wider">5-Minute Continuous Ratios (%)</span>
+        <div className={compact ? 'h-[270px] w-full' : 'h-[360px] w-full'}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={selfConsumptionMetrics.hourlyRatios} margin={{ top: 24, right: 14, left: -12, bottom: 0 }}>
+            <AreaChart data={selfConsumptionMetrics.hourlyRatios} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
               <defs>
                 <linearGradient id="utilGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={COLOR_PV} stopOpacity={0.35} />
@@ -188,10 +200,10 @@ export function SelfConsumptionChart({
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-              <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[10px] opacity-60" />
-              <YAxis domain={[0, 100]} stroke="currentColor" className="text-[10px] opacity-60" unit="%" />
-              <Tooltip contentStyle={{ backgroundColor: 'rgba(23,31,51,0.95)', borderRadius: '0.75rem', border: '1px solid rgba(255,255,255,0.1)', fontSize: '12px' }} />
-              <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+              <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
+              <YAxis domain={[0, 100]} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="%" />
+              <Tooltip contentStyle={{ backgroundColor: 'rgba(23,31,51,0.95)', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.1)', fontSize: '11px' }} />
+              <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
               <ReferenceLine
                 isFront
                 x={nowSlotStr}

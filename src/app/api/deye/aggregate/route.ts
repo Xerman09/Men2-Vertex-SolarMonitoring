@@ -64,8 +64,9 @@ export const GET = withGate(
         return snFilteredOrNotFound(aggregate, parsed.data.device_sn);
       }
 
-      // Admin & Viewer roles can view full fleet aggregate summary
-      const aggregate = await accountManager.getAggregatedFleetSummary();
+      // Admin role can view full fleet aggregate summary including demo accounts.
+      // Non-admin roles only aggregate production accounts.
+      const aggregate = await accountManager.getAggregatedFleetSummary(undefined, session.role);
       return snFilteredOrNotFound(aggregate, parsed.data.device_sn);
     } catch (error) {
       log.error('Error aggregating fleet', error, { route: 'aggregate' });

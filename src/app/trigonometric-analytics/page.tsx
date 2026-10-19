@@ -71,7 +71,7 @@ export default function TrigonometricAnalyticsPage() {
   const inFlightControllerRef = React.useRef<AbortController | null>(null);
 
   const isTargetPending = currentTargetKey !== displayedTargetKey || !isDataLoaded;
-  const showOverlay = isPlantSwitching || isTargetPending || isSyncingNoPlants || syncing;
+  const showOverlay = (isPlantSwitching || isTargetPending || isSyncingNoPlants) && !isFetchingDeye && !syncing;
 
   // Load telemetry data from API or fall back to simulated dataset
   const fetchHistoricalData = async (range: string = dateRange, forceReload: boolean = false) => {
