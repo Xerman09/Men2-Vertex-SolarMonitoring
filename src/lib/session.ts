@@ -217,3 +217,42 @@ export function requireAuthenticatedSession(
   return { allowed: true, status: 200 };
 }
 
+/**
+ * Standardized cookie setter for server responses, supporting __Host- prefix in production/HTTPS.
+ */
+export function applySessionCookies(
+  response: {
+    cookies: {
+      set: (options: {
+        name: string;
+        value: string;
+        httpOnly?: boolean;
+        secure?: boolean;
+        sameSite?: 'lax' | 'strict' | 'none';
+        path?: string;
+        maxAge?: number;
+      }) => void;
+    };
+  },
+  token: string,
+  req?: Request
+) {
+  const isHttps =
+    (req && (req.headers.get('x-forwarded-proto') === 'https' || req.url.startsWith('https:'))) ||
+    env.NODE_ENV === 'production';
+
+  const cookieOptions = {
+    value: token,
+    httpOnly: true,
+    secure: isHttps,
+    sameSite: 'lax' as const,
+    path: '/',
+    maxAge: DEFAULT_SESSION_TTL_SECONDS,
+  };
+
+  response.cookies.set({ name: SESSION_COOKIE_NAME, ...cookieOptions });
+  if (isHttps) {
+    response.cookies.set({ name: HOST_SESSION_COOKIE_NAME, ...cookieOptions });
+  }
+}
+

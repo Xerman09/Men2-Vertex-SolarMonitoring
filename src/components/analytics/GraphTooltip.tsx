@@ -80,3 +80,53 @@ export const CustomExactTooltip: React.FC<CustomExactTooltipProps> = ({ active, 
     </div>
   );
 };
+
+export interface NowReferenceLabelProps {
+  viewBox?: { x?: number; y?: number; width?: number; height?: number };
+}
+
+/**
+ * Custom non-clipping label renderer for ReferenceLine "Now" markers.
+ * Sits safely within the top chart margin with dynamic boundary collision avoidance.
+ */
+export function renderNowReferenceLabel(text: string, color: string = '#94a3b8') {
+  return function NowReferenceLabel({ viewBox }: NowReferenceLabelProps) {
+    if (!viewBox || typeof viewBox.x !== 'number') return null;
+    const x = viewBox.x;
+    // viewBox.y represents margin.top. Position label 8px above the top grid line.
+    const y = typeof viewBox.y === 'number' ? Math.max(12, viewBox.y - 7) : 14;
+    const width = viewBox.width || 0;
+
+    // Boundary-aware text anchoring so text never clips off left or right edges
+    let textAnchor: 'start' | 'middle' | 'end' = 'middle';
+    let dx = 0;
+    if (x < 35) {
+      textAnchor = 'start';
+      dx = 4;
+    } else if (width > 0 && x > width - 35) {
+      textAnchor = 'end';
+      dx = -4;
+    }
+
+    return (
+      <g className="recharts-reference-line-label select-none pointer-events-none">
+        <text
+          x={x + dx}
+          y={y}
+          textAnchor={textAnchor}
+          fill={color}
+          fontSize={10}
+          fontFamily="ui-monospace, monospace"
+          fontWeight={600}
+          stroke="currentColor"
+          strokeWidth={3}
+          paintOrder="stroke fill"
+          strokeLinejoin="round"
+          className="select-none text-card dark:text-slate-950"
+        >
+          {text}
+        </text>
+      </g>
+    );
+  };
+}

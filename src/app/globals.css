@@ -520,3 +520,8 @@
 .animate-shimmer {
   animation: shimmer 1.8s infinite;
 }
+
+/* Ensure chart labels and reference markers are never clipped by SVG viewport */
+.recharts-surface {
+  overflow: visible !important;
+}

@@ -143,6 +143,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         const accEmail = (acc.email || '').trim().toLowerCase();
 
         return (
+          (acc.userId && String(acc.userId) === String(user.id)) ||
           (userAccId &&
             (accDirectusId === userAccId ||
               accId === userAccId ||
@@ -156,7 +157,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         );
       });
 
-      return matched.length > 0 ? matched : rawAccounts;
+      return matched;
     }
     return rawAccounts;
   }, [rawAccounts, isConsumer, user]);
@@ -206,7 +207,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     if (!hasCachedData) {
       setIsPlantSwitchingState(true);
       setSwitchingPlantName(plantName);
-      setFetchingDeye(true, `Syncing ${plantName} Telemetry...`);
+      setFetchingDeye(true, `Synchronizing ${plantName} Telemetry...`);
     }
 
     setSelectedStationId(String(id));
@@ -256,7 +257,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     if (!hasCachedData) {
       setIsPlantSwitchingState(true);
       setSwitchingPlantName(plantName);
-      setFetchingDeye(true, `Syncing ${plantName} Telemetry...`);
+      setFetchingDeye(true, `Synchronizing ${plantName} Telemetry...`);
     }
 
     if (isConsumer && accounts.length > 0) {

@@ -25,10 +25,10 @@ import {
   Unlock,
   KeyRound,
   Eye,
-  Database,
   X,
   Mail,
   LogOut,
+  AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAccount } from '@/lib/account-context';
@@ -37,6 +37,7 @@ import { useRole } from '@/lib/role-context';
 import { ModeToggle } from '@/components/theme/ModeToggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ConnectDeyeModal } from '@/components/account/ConnectDeyeModal';
 
 import { InverterConfig } from '@/lib/types';
 
@@ -73,12 +74,33 @@ export function Header({
     isPlantSwitching,
     switchingPlantName,
   } = useAccount();
-  const { role, isAdmin, isConsumer, isViewer, user, showAuthModal, setShowAuthModal, login, logout } = useRole();
+  const {
+    role,
+    isAdmin,
+    isConsumer,
+    isViewer,
+    user,
+    showAuthModal,
+    setShowAuthModal,
+    authModalTab,
+    setAuthModalTab,
+    setShowConnectModal,
+    login,
+    register,
+    logout,
+  } = useRole();
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [regError, setRegError] = useState('');
+  const [regLoading, setRegLoading] = useState(false);
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
@@ -132,6 +154,17 @@ export function Header({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const [isJustSynced, setIsJustSynced] = useState(false);
+
+  useEffect(() => {
+    if (!lastSyncedAt) return;
+    setIsJustSynced(true);
+    const timer = setTimeout(() => {
+      setIsJustSynced(false);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [lastSyncedAt]);
 
   const displayTitle = isFleetView
     ? `Global Fleet Aggregate (${totalAccounts} Accounts)`
@@ -556,66 +589,60 @@ export function Header({
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 motion-safe:animate-ping shrink-0 hidden md:inline-block" />
             </div>
-          ) : lastSyncedAt && Date.now() - lastSyncedAt.getTime() < 4000 ? (
-            <div className="hidden md:flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-mono text-emerald-400 animate-in fade-in duration-300 shrink-0">
-              <CheckCircle2 size={12} className="text-emerald-400" />
-              <span className="hidden lg:inline">DeyeCloud</span>
-              <span>Synced</span>
-            </div>
           ) : null}
 
-          {/* Database Connection Indicator */}
-          {directusStatus && (
-            <div
-              className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-card border border-border/60 text-xs font-mono shrink-0"
-              title={`Cloud Database: ${directusStatus.connected ? 'Connected (Two-way live sync)' : 'Offline (Using cached fallback)'}`}
-            >
-              <Database size={12} className={directusStatus.connected ? 'text-cyan-500' : 'text-amber-500'} />
-              <span className="text-foreground font-medium">Database</span>
-              <span
-                className={`text-[10px] font-semibold ${
-                  directusStatus.connected ? 'text-cyan-500' : 'text-amber-500'
-                }`}
-              >
-                {directusStatus.connected ? 'Live' : 'Cached'}
-              </span>
-            </div>
-          )}
-
-          {/* Cloud Bus State Indicator & Quick Sync */}
-          <div className="hidden md:flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 rounded-xl bg-card border border-border/60 text-xs font-mono shrink-0">
+          {/* Quick Telemetry & Hardware Sync Button */}
+          <button
+            onClick={() => syncLivePlants()}
+            disabled={syncing || isFetchingDeye}
+            title={
+              isJustSynced
+                ? `DeyeCloud: Synced successfully! (${pingMs}ms)${directusStatus ? ` • Database: ${directusStatus.connected ? 'Live Sync' : 'Cached'}` : ''}`
+                : `DeyeCloud: ${isLiveApi || liveAccountsCount > 0 ? 'Live Bus' : 'Simulation'} (${pingMs}ms)${directusStatus ? ` • Database: ${directusStatus.connected ? 'Live Sync' : 'Cached'}` : ''} • Click to sync`
+            }
+            aria-label="Sync telemetry and cloud hardware"
+            className={`relative flex items-center justify-center w-8 h-8 rounded-xl border transition-all cursor-pointer disabled:opacity-50 shrink-0 ${
+              isJustSynced
+                ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-500 dark:text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
+                : syncing || isFetchingDeye
+                ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.3)]'
+                : 'bg-card hover:bg-muted/70 border-border/60 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {isJustSynced ? (
+              <CheckCircle2 size={13} className="text-emerald-500 dark:text-emerald-400 animate-in zoom-in-75 duration-300" />
+            ) : (
+              <RefreshCw
+                size={13}
+                className={syncing || isFetchingDeye ? 'animate-spin text-primary' : 'transition-transform hover:rotate-45'}
+              />
+            )}
             <span
-              className={`w-2 h-2 rounded-full shrink-0 ${
+              className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ${
                 isFetchingDeye || syncing
                   ? 'bg-cyan-400 motion-safe:animate-ping'
+                  : isJustSynced
+                  ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]'
                   : isLiveApi || liveAccountsCount > 0
-                  ? 'bg-emerald-500 motion-safe:animate-pulse'
+                  ? 'bg-emerald-500'
                   : 'bg-amber-500'
               }`}
             />
-            <span className="text-foreground font-medium hidden xl:inline">
-              {isFetchingDeye || syncing
-                ? 'Syncing...'
-                : isLiveApi || liveAccountsCount > 0
-                ? 'DeyeCloud Bus'
-                : 'Simulation'}
-            </span>
-            <span className="text-muted-foreground text-[10px] shrink-0 font-mono">
-              {pingMs}ms
-            </span>
-            <button
-              onClick={() => syncLivePlants()}
-              disabled={syncing || isFetchingDeye}
-              title="Sync latest plant names and hardware from DeyeCloud"
-              className="ml-0.5 p-0.5 sm:p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-primary transition-colors cursor-pointer disabled:opacity-50 shrink-0"
-            >
-              <RefreshCw size={11} className={syncing || isFetchingDeye ? 'animate-spin text-primary' : ''} />
-            </button>
-          </div>
+          </button>
 
           {/* Role Mode Toggle Button (Admin vs Consumer vs Sign In) */}
           {user ? (
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0">
+              {isConsumer && (
+                <button
+                  onClick={() => setShowConnectModal(true)}
+                  title="Link or add your DeyeCloud solar station"
+                  className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 text-xs font-semibold transition-all cursor-pointer shrink-0"
+                >
+                  <Radio size={12} className="shrink-0 animate-pulse" />
+                  <span className="hidden sm:inline">Connect Deye</span>
+                </button>
+              )}
               <div
                 className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl text-xs font-semibold shrink-0 ${
                   isAdmin
@@ -644,13 +671,19 @@ export function Header({
                 setLoginEmail('');
                 setLoginPassword('');
                 setLoginError('');
+                setRegName('');
+                setRegEmail('');
+                setRegPassword('');
+                setRegConfirmPassword('');
+                setRegError('');
+                setAuthModalTab('signin');
                 setShowAuthModal(true);
               }}
-              title="Sign in to your solar monitoring account"
+              title="Sign in or register for solar monitoring"
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60 text-xs font-medium transition-colors cursor-pointer shrink-0"
             >
               <User size={13} className="text-primary shrink-0" />
-              <span className="hidden sm:inline">Sign In</span>
+              <span className="hidden sm:inline">Sign In / Register</span>
               <Lock size={11} className="text-muted-foreground shrink-0" />
             </button>
           )}
@@ -708,7 +741,7 @@ export function Header({
         </div>
       </div>
 
-      {/* Administrator Login Modal */}
+      {/* Auth Modal (Sign In / Register) */}
       {showAuthModal && (
         <div
           role="dialog"
@@ -730,93 +763,259 @@ export function Header({
                 <User size={20} />
               </div>
               <div>
-                <h3 id="auth-modal-title" className="text-base font-bold text-foreground">Sign In</h3>
-                <p className="text-xs text-muted-foreground">Monitor and manage your solar plants</p>
+                <h3 id="auth-modal-title" className="text-base font-bold text-foreground">
+                  {authModalTab === 'signin' ? 'Sign In' : 'Create Account'}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {authModalTab === 'signin'
+                    ? 'Access your registered solar plant dashboard'
+                    : 'Customer self-service portal registration'}
+                </p>
               </div>
             </div>
 
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setLoginLoading(true);
-                setLoginError('');
-                const res = await login(loginEmail, loginPassword);
-                setLoginLoading(false);
-                if (!res.success) {
-                  setLoginError(res.error || 'Invalid credentials');
-                }
-              }}
-              className="space-y-3.5"
-            >
-              <div>
-                <label htmlFor="header-login-email" className="block text-xs font-semibold text-muted-foreground mb-1">
-                  Username or Email
-                </label>
-                <div className="relative">
-                  <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    id="header-login-email"
-                    type="text"
-                    autoFocus
-                    required
-                    placeholder="Username or email address"
-                    value={loginEmail}
-                    onChange={(e) => {
-                      setLoginEmail(e.target.value);
-                      if (loginError) setLoginError('');
-                    }}
-                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-background border border-border/70 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                  />
-                </div>
-              </div>
+            {/* Tab Switcher */}
+            <div className="flex rounded-xl bg-muted/60 p-1 mb-4 border border-border/50">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthModalTab('signin');
+                  setLoginError('');
+                }}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  authModalTab === 'signin'
+                    ? 'bg-background text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthModalTab('register');
+                  setRegError('');
+                }}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  authModalTab === 'register'
+                    ? 'bg-background text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Create Account
+              </button>
+            </div>
 
-              <div>
-                <label htmlFor="header-login-password" className="block text-xs font-semibold text-muted-foreground mb-1">
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            {authModalTab === 'signin' ? (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setLoginLoading(true);
+                  setLoginError('');
+                  const res = await login(loginEmail, loginPassword);
+                  setLoginLoading(false);
+                  if (!res.success) {
+                    setLoginError(res.error || 'Invalid credentials');
+                  }
+                }}
+                className="space-y-3.5"
+              >
+                <div>
+                  <label htmlFor="header-login-email" className="block text-xs font-semibold text-muted-foreground mb-1">
+                    Username or Email
+                  </label>
+                  <div className="relative">
+                    <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      id="header-login-email"
+                      type="text"
+                      autoFocus
+                      required
+                      placeholder="Username or email address"
+                      value={loginEmail}
+                      onChange={(e) => {
+                        setLoginEmail(e.target.value);
+                        if (loginError) setLoginError('');
+                      }}
+                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-background border border-border/70 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="header-login-password" className="block text-xs font-semibold text-muted-foreground mb-1">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      id="header-login-password"
+                      type="password"
+                      required
+                      placeholder="••••••••••••"
+                      value={loginPassword}
+                      onChange={(e) => {
+                        setLoginPassword(e.target.value);
+                        if (loginError) setLoginError('');
+                      }}
+                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-background border border-border/70 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                    />
+                  </div>
+                  {loginError && (
+                    <p className="text-xs text-rose-500 font-medium mt-1.5 flex items-center gap-1">
+                      <AlertCircle size={13} className="shrink-0" />
+                      <span>{loginError}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowAuthModal(false)}
+                    className="flex-1 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={loginLoading || !loginEmail.trim() || !loginPassword}
+                    className="flex-1 text-xs font-semibold bg-primary text-primary-foreground"
+                  >
+                    {loginLoading ? 'Signing in...' : 'Sign In'}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (regPassword !== regConfirmPassword) {
+                    setRegError('Passwords do not match.');
+                    return;
+                  }
+                  if (regPassword.length < 6) {
+                    setRegError('Password must be at least 6 characters.');
+                    return;
+                  }
+                  setRegLoading(true);
+                  setRegError('');
+                  const res = await register({
+                    email: regEmail.trim(),
+                    password: regPassword,
+                    fullName: regName.trim() || undefined,
+                  });
+                  setRegLoading(false);
+                  if (!res.success) {
+                    setRegError(res.error || 'Failed to create account.');
+                  }
+                }}
+                className="space-y-3"
+              >
+                <div>
+                  <label htmlFor="header-reg-name" className="block text-xs font-semibold text-muted-foreground mb-1">
+                    Full Name / Company
+                  </label>
                   <input
-                    id="header-login-password"
-                    type="password"
+                    id="header-reg-name"
+                    type="text"
                     required
-                    placeholder="••••••••••••"
-                    value={loginPassword}
-                    onChange={(e) => {
-                      setLoginPassword(e.target.value);
-                      if (loginError) setLoginError('');
-                    }}
-                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-background border border-border/70 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                    placeholder="e.g. John Doe"
+                    value={regName}
+                    onChange={(e) => setRegName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-background border border-border/70 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
                   />
                 </div>
-                {loginError && (
-                  <p className="text-xs text-rose-500 font-medium mt-1.5 flex items-center gap-1">
-                    <span>{loginError}</span>
+
+                <div>
+                  <label htmlFor="header-reg-email" className="block text-xs font-semibold text-muted-foreground mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    id="header-reg-email"
+                    type="email"
+                    required
+                    placeholder="john@example.com"
+                    value={regEmail}
+                    onChange={(e) => {
+                      setRegEmail(e.target.value);
+                      if (regError) setRegError('');
+                    }}
+                    className="w-full px-3 py-2 rounded-xl bg-background border border-border/70 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label htmlFor="header-reg-pass" className="block text-xs font-semibold text-muted-foreground mb-1">
+                      Password
+                    </label>
+                    <input
+                      id="header-reg-pass"
+                      type="password"
+                      required
+                      placeholder="••••••••"
+                      value={regPassword}
+                      onChange={(e) => {
+                        setRegPassword(e.target.value);
+                        if (regError) setRegError('');
+                      }}
+                      className="w-full px-3 py-2 rounded-xl bg-background border border-border/70 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="header-reg-cpass" className="block text-xs font-semibold text-muted-foreground mb-1">
+                      Confirm
+                    </label>
+                    <input
+                      id="header-reg-cpass"
+                      type="password"
+                      required
+                      placeholder="••••••••"
+                      value={regConfirmPassword}
+                      onChange={(e) => {
+                        setRegConfirmPassword(e.target.value);
+                        if (regError) setRegError('');
+                      }}
+                      className="w-full px-3 py-2 rounded-xl bg-background border border-border/70 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                {regError && (
+                  <p className="text-xs text-rose-500 font-medium flex items-center gap-1">
+                    <AlertCircle size={13} className="shrink-0" />
+                    <span>{regError}</span>
                   </p>
                 )}
-              </div>
 
-              <div className="flex items-center gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowAuthModal(false)}
-                  className="flex-1 text-xs"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={loginLoading || !loginEmail.trim() || !loginPassword}
-                  className="flex-1 text-xs font-semibold bg-primary text-primary-foreground"
-                >
-                  {loginLoading ? 'Signing in...' : 'Sign In'}
-                </Button>
-              </div>
-            </form>
+                <div className="flex items-center gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowAuthModal(false)}
+                    className="flex-1 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={regLoading || !regEmail.trim() || !regPassword || !regName.trim()}
+                    className="flex-1 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                  >
+                    {regLoading ? 'Creating...' : 'Create Account'}
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
+
+      {/* Connect DeyeCloud Account Modal */}
+      <ConnectDeyeModal />
     </header>
   );
 }

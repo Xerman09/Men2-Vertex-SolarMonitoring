@@ -32,10 +32,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { HoverInfo } from '@/components/ui/tooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
+import { CustomerOnboardingCard } from '@/components/account/CustomerOnboardingCard';
 import { useStationAccounts } from './useStationAccounts';
 
 export default function AccountsManagementPage() {
-  const { isAdmin, isConsumer, isViewer, user, setShowAuthModal } = useRole();
+  const { isAdmin, isConsumer, isViewer, user, setShowAuthModal, setShowConnectModal } = useRole();
   const {
     displayAccounts,
     directusInfo,
@@ -168,6 +169,14 @@ export default function AccountsManagementPage() {
               <Plus size={16} />
               <span>Add Deye Account</span>
             </Button>
+          ) : isConsumer ? (
+            <Button
+              onClick={() => setShowConnectModal(true)}
+              className="gap-2 h-9 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white shadow-sm cursor-pointer"
+            >
+              <Radio size={14} className="animate-pulse" />
+              <span>Connect DeyeCloud</span>
+            </Button>
           ) : !user ? (
             <Button
               variant="outline"
@@ -180,6 +189,11 @@ export default function AccountsManagementPage() {
           ) : null}
         </div>
       </div>
+
+      {/* Customer Onboarding Banner when no stations connected */}
+      {isConsumer && displayAccounts.length === 0 && !loading && (
+        <CustomerOnboardingCard />
+      )}
 
       {/* Fleet Overview KPI Ribbon in VOS Format */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 w-full">
@@ -265,35 +279,9 @@ export default function AccountsManagementPage() {
                       <h2 className="text-lg font-bold text-foreground">
                         {account.name}
                       </h2>
-                      <Badge
-                        variant={
-                          account.status === 'ONLINE'
-                            ? 'success'
-                            : account.status === 'SIMULATED'
-                            ? 'info'
-                            : 'outline'
-                        }
-                        className="text-xs font-mono"
-                      >
-                        {account.status === 'ONLINE'
-                          ? '● Live DeyeCloud'
-                          : account.status === 'SIMULATED'
-                          ? '● Realistic Sim'
-                          : '○ Disabled'}
-                      </Badge>
                       {account.autoDiscovered && (
                         <Badge variant="outline" className="border-primary/30 text-primary bg-primary/10 text-[10px] font-mono">
                           Auto-Discovered
-                        </Badge>
-                      )}
-                      {account.source === 'directus' || account.directusId ? (
-                        <Badge variant="outline" className="border-cyan-500/30 text-cyan-500 bg-cyan-500/10 text-[10px] font-mono flex items-center gap-1">
-                          <Database size={9} />
-                          <span>DB {account.directusId ? `#${account.directusId}` : 'Synced'}</span>
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="border-border/60 text-muted-foreground text-[10px] font-mono">
-                          Cache
                         </Badge>
                       )}
                     </div>
@@ -540,7 +528,7 @@ export default function AccountsManagementPage() {
       </div>
 
       {/* MODAL: Add DeyeCloud Account in VOS Modal Format */}
-      {showAddAccountModal && (
+      {isAdmin && showAddAccountModal && (
         <div
           role="dialog"
           aria-modal="true"
@@ -696,7 +684,7 @@ export default function AccountsManagementPage() {
       )}
 
       {/* MODAL: Add Solar Plant in VOS Modal Format */}
-      {showAddPlantModal && (
+      {isAdmin && showAddPlantModal && (
         <div
           role="dialog"
           aria-modal="true"

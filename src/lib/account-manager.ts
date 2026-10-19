@@ -406,6 +406,7 @@ class DeyeAccountManager {
         app_secret: data.appSecret?.trim() || '',
         account_email: data.email?.trim() || '',
         account_password: data.password?.trim() || '',
+        user_id: data.userId ? Number(data.userId) || null : null,
         status: (data.enabled ?? true) ? 'OPTIMAL' : 'OFFLINE',
       };
 
@@ -436,6 +437,7 @@ class DeyeAccountManager {
     const newAccount: DeyeAccountConfig = {
       id,
       directusId,
+      userId: data.userId,
       name: data.name?.trim() || 'New Deye Site',
       enabled: data.enabled ?? true,
       baseUrl: safeBaseUrl,
@@ -496,8 +498,8 @@ class DeyeAccountManager {
       }
     }
 
-    // Persist registered user into iot_solar_users with hashed password
-    if (data.email) {
+    // Persist registered user into iot_solar_users with hashed password (skip if consumer linking)
+    if (data.email && !data.skipUserCreation) {
       try {
         await this.createItem(COLLECTIONS.USERS, {
           email: data.email.trim().toLowerCase(),
@@ -879,6 +881,7 @@ class DeyeAccountManager {
       summaries.push({
         id: acc.id,
         directusId: acc.directusId,
+        userId: acc.userId,
         name: acc.name,
         email: acc.email,
         enabled: acc.enabled !== false,

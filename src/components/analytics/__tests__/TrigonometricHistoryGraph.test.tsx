@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { RoleProvider } from '@/lib/role-context';
 import { TrigonometricHistoryGraph } from '../TrigonometricHistoryGraph';
+import { renderNowReferenceLabel } from '../GraphTooltip';
 import { HourlySolarPoint } from '@/lib/trigonometric-math';
 
 describe('TrigonometricHistoryGraph Component & Architecture', () => {
@@ -75,7 +76,7 @@ describe('TrigonometricHistoryGraph Component & Architecture', () => {
     expect(html).toContain('Battery');
   });
 
-  it('renders all telemetry power sub-view controls and style options', () => {
+  it('renders all telemetry power sub-view controls without style line/area option', () => {
     const html = renderToStaticMarkup(
       <RoleProvider>
         <TrigonometricHistoryGraph
@@ -89,9 +90,8 @@ describe('TrigonometricHistoryGraph Component & Architecture', () => {
     expect(html).toContain('PV');
     expect(html).toContain('Load');
     expect(html).toContain('Grid');
-    expect(html).toContain('Style:');
-    expect(html).toContain('Line');
-    expect(html).toContain('Area');
+    expect(html).not.toContain('Style:');
+    expect(html).not.toContain('Line');
   });
 
   it('renders live KPI badges with computed metrics when 5-minute telemetry is supplied', () => {
@@ -109,4 +109,39 @@ describe('TrigonometricHistoryGraph Component & Architecture', () => {
     expect(html).toContain('Grid Flow (');
     expect(html).toContain('Self-Consumption');
   });
+
+  describe('renderNowReferenceLabel non-clipping behavior', () => {
+    it('renders label with safe top margin and centered anchor in normal range', () => {
+      const LabelComp = renderNowReferenceLabel('● Now', '#94a3b8');
+      const html = renderToStaticMarkup(<LabelComp viewBox={{ x: 250, y: 24, width: 600, height: 200 }} />);
+
+      expect(html).toContain('● Now');
+      expect(html).toContain('text-anchor="middle"');
+      expect(html).toContain('y="17"');
+      expect(html).toContain('x="250"');
+    });
+
+    it('avoids left clipping when reference line is near left boundary', () => {
+      const LabelComp = renderNowReferenceLabel('● Now', '#94a3b8');
+      const html = renderToStaticMarkup(<LabelComp viewBox={{ x: 10, y: 24, width: 600, height: 200 }} />);
+
+      expect(html).toContain('text-anchor="start"');
+      expect(html).toContain('x="14"');
+    });
+
+    it('avoids right clipping when reference line is near right boundary', () => {
+      const LabelComp = renderNowReferenceLabel('● Now', '#94a3b8');
+      const html = renderToStaticMarkup(<LabelComp viewBox={{ x: 580, y: 24, width: 600, height: 200 }} />);
+
+      expect(html).toContain('text-anchor="end"');
+      expect(html).toContain('x="576"');
+    });
+
+    it('returns null if viewBox or viewBox.x is missing', () => {
+      const LabelComp = renderNowReferenceLabel('● Now', '#94a3b8');
+      expect(renderToStaticMarkup(<LabelComp viewBox={undefined} />)).toBe('');
+      expect(renderToStaticMarkup(<LabelComp viewBox={{ y: 24 }} />)).toBe('');
+    });
+  });
 });
+

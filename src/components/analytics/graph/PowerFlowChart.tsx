@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { HoverInfo } from '@/components/ui/tooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { HourlySolarPoint } from '@/lib/trigonometric-math';
-import { CustomExactTooltip } from '../GraphTooltip';
+import { CustomExactTooltip, renderNowReferenceLabel } from '../GraphTooltip';
 import {
   PowerSeriesPoint,
   PowerSubView,
@@ -34,7 +34,7 @@ interface PowerFlowChartProps {
   peakPv: number;
   peakLoad: number;
   powerSubView: PowerSubView;
-  chartRenderMode: ChartRenderMode;
+  chartRenderMode?: ChartRenderMode;
   timeResolution: TimeResolution;
   nowSlotStr: string;
   nowExactTimeStr: string;
@@ -44,7 +44,7 @@ interface PowerFlowChartProps {
   consumptionYDomain: [number, number];
   gridYDomain: [number, number];
   onSubViewChange: (view: PowerSubView) => void;
-  onRenderModeChange: (mode: ChartRenderMode) => void;
+  onRenderModeChange?: (mode: ChartRenderMode) => void;
 }
 
 export function PowerFlowChart({
@@ -54,7 +54,7 @@ export function PowerFlowChart({
   peakPv,
   peakLoad,
   powerSubView,
-  chartRenderMode,
+  chartRenderMode = 'area',
   timeResolution,
   nowSlotStr,
   nowExactTimeStr,
@@ -243,32 +243,6 @@ export function PowerFlowChart({
             </button>
           </HoverInfo>
         </div>
-
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-muted-foreground font-medium">Style:</span>
-          <div className="flex items-center gap-0.5 p-0.5 bg-muted/50 rounded-lg border border-border/50">
-            <button
-              onClick={() => onRenderModeChange('line')}
-              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
-                chartRenderMode === 'line'
-                  ? 'bg-background text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Line
-            </button>
-            <button
-              onClick={() => onRenderModeChange('area')}
-              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
-                chartRenderMode === 'area'
-                  ? 'bg-background text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Area
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Combined View */}
@@ -298,7 +272,7 @@ export function PowerFlowChart({
 
           <div className={compact ? 'h-[220px] w-full' : 'h-[280px] w-full'}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={powerSeriesData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+              <AreaChart data={powerSeriesData} margin={{ top: 24, right: 14, left: -12, bottom: 0 }}>
                 <defs>
                   <linearGradient id="pvYellowGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={COLOR_PV} stopOpacity={chartRenderMode === 'area' ? 0.35 : 0.08} />
@@ -330,16 +304,12 @@ export function PowerFlowChart({
                 <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                 <ReferenceLine y={0} stroke="currentColor" className="opacity-30" />
                 <ReferenceLine
+                  isFront
                   x={nowSlotStr}
                   stroke="#94a3b8"
                   strokeDasharray="4 4"
                   strokeWidth={1.5}
-                  label={{
-                    value: `● Now (${nowExactTimeStr})`,
-                    fill: '#94a3b8',
-                    fontSize: 10,
-                    position: 'top',
-                  }}
+                  label={renderNowReferenceLabel(`● Now (${nowExactTimeStr})`, '#94a3b8')}
                 />
                 <Area
                   type="monotone"
@@ -416,7 +386,7 @@ export function PowerFlowChart({
           </div>
           <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={powerSeriesData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+              <AreaChart data={powerSeriesData} margin={{ top: 24, right: 14, left: -12, bottom: 0 }}>
                 <defs>
                   <linearGradient id="soloPvGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={COLOR_PV} stopOpacity={chartRenderMode === 'area' ? 0.45 : 0.12} />
@@ -429,11 +399,12 @@ export function PowerFlowChart({
                 <Tooltip content={<CustomExactTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                 <ReferenceLine
+                  isFront
                   x={nowSlotStr}
                   stroke={COLOR_PV}
                   strokeDasharray="4 4"
                   strokeWidth={1.5}
-                  label={{ value: `● Now (${nowExactTimeStr})`, fill: COLOR_PV, fontSize: 10, position: 'top' }}
+                  label={renderNowReferenceLabel(`● Now (${nowExactTimeStr})`, COLOR_PV)}
                 />
                 <Area
                   type="monotone"
@@ -472,7 +443,7 @@ export function PowerFlowChart({
           </div>
           <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={powerSeriesData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+              <AreaChart data={powerSeriesData} margin={{ top: 24, right: 14, left: -12, bottom: 0 }}>
                 <defs>
                   <linearGradient id="soloLoadGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={COLOR_LOAD} stopOpacity={chartRenderMode === 'area' ? 0.45 : 0.12} />
@@ -485,11 +456,12 @@ export function PowerFlowChart({
                 <Tooltip content={<CustomExactTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                 <ReferenceLine
+                  isFront
                   x={nowSlotStr}
                   stroke={COLOR_LOAD}
                   strokeDasharray="4 4"
                   strokeWidth={1.5}
-                  label={{ value: `● Now (${nowExactTimeStr})`, fill: COLOR_LOAD, fontSize: 10, position: 'top' }}
+                  label={renderNowReferenceLabel(`● Now (${nowExactTimeStr})`, COLOR_LOAD)}
                 />
                 <Area
                   type="monotone"
@@ -522,7 +494,7 @@ export function PowerFlowChart({
           </div>
           <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={powerSeriesData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+              <AreaChart data={powerSeriesData} margin={{ top: 24, right: 14, left: -12, bottom: 0 }}>
                 <defs>
                   <linearGradient id="soloGridGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={COLOR_GRID} stopOpacity={chartRenderMode === 'area' ? 0.45 : 0.12} />
@@ -536,11 +508,12 @@ export function PowerFlowChart({
                 <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                 <ReferenceLine y={0} stroke="currentColor" className="opacity-40" />
                 <ReferenceLine
+                  isFront
                   x={nowSlotStr}
                   stroke={COLOR_GRID}
                   strokeDasharray="4 4"
                   strokeWidth={1.5}
-                  label={{ value: `● Now (${nowExactTimeStr})`, fill: COLOR_GRID, fontSize: 10, position: 'top' }}
+                  label={renderNowReferenceLabel(`● Now (${nowExactTimeStr})`, COLOR_GRID)}
                 />
                 <Area
                   type="monotone"

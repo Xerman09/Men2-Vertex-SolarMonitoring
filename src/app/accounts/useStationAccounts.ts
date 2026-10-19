@@ -50,7 +50,7 @@ export function useStationAccounts() {
     fetchingStage,
     setFetchingDeye,
   } = useAccount();
-  const { isConsumer, user } = useRole();
+  const { isConsumer, isAdmin, user } = useRole();
   const [accounts, setAccounts] = useState<AccountSummary[]>(contextAccounts || []);
   const [directusInfo, setDirectusInfo] = useState<{ connected: boolean; lastChecked: string; error?: string } | null>(
     directusStatus || null
@@ -177,6 +177,7 @@ export function useStationAccounts() {
   }, [fetchAccounts, refreshContextAccounts, safeTimeout, setFetchingDeye]);
 
   const handleToggleAccount = useCallback(async (account: AccountSummary) => {
+    if (!isAdmin) return;
     try {
       const newEnabled = account.status === 'OFFLINE';
       const res = await fetch('/api/deye/accounts', {
@@ -191,9 +192,10 @@ export function useStationAccounts() {
     } catch (e) {
       log.error('Toggle error', e);
     }
-  }, [fetchAccounts, refreshContextAccounts]);
+  }, [fetchAccounts, isAdmin, refreshContextAccounts]);
 
   const handleDeleteAccount = useCallback(async (id: string, name: string) => {
+    if (!isAdmin) return;
     if (!confirm(`Are you sure you want to delete the account "${name}" and all its registered plants?`)) {
       return;
     }
@@ -208,10 +210,14 @@ export function useStationAccounts() {
     } catch (e) {
       log.error('Delete error', e);
     }
-  }, [fetchAccounts, refreshContextAccounts]);
+  }, [fetchAccounts, isAdmin, refreshContextAccounts]);
 
   const handleAddAccountSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) {
+      setAddMessage({ text: 'Unauthorized: Only administrators can add accounts.', isError: true });
+      return;
+    }
     setAdding(true);
     setAddMessage(null);
 
@@ -253,10 +259,11 @@ export function useStationAccounts() {
     } finally {
       setAdding(false);
     }
-  }, [addForm, fetchAccounts, refreshContextAccounts, safeTimeout]);
+  }, [addForm, fetchAccounts, isAdmin, refreshContextAccounts, safeTimeout]);
 
   const handleAddPlantSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) return;
     setSavingPlant(true);
 
     const devices: DeviceInfo[] = [];
@@ -333,7 +340,7 @@ export function useStationAccounts() {
     } finally {
       setSavingPlant(false);
     }
-  }, [fetchAccounts, plantForm, refreshContextAccounts, selectedAccountIdForPlant]);
+  }, [fetchAccounts, isAdmin, plantForm, refreshContextAccounts, selectedAccountIdForPlant]);
 
   const displayAccounts = useMemo(() => {
     if (isConsumer && user) {

@@ -55,21 +55,21 @@ export const GET = withGate(
           ? session.accountId.replace('station-', '')
           : session.accountId;
 
-        const consumerAccounts = session.accountId
-          ? accounts.filter((a) => {
-              return (
-                a.id === session.accountId ||
+        const consumerAccounts = accounts.filter((a) => {
+          return (
+            (session.accountId &&
+              (a.id === session.accountId ||
                 a.directusId === session.accountId ||
                 (cleanSessionId && (a.directusId === cleanSessionId || a.id === cleanSessionId)) ||
-                (session.email && a.email?.toLowerCase() === session.email.toLowerCase()) ||
                 a.plants?.some(
                   (p) =>
                     String(p.stationId) === cleanSessionId ||
                     `station-${p.stationId}` === session.accountId
-                )
-              );
-            })
-          : [];
+                ))) ||
+            (a.userId && String(a.userId) === String(session.userId)) ||
+            (session.email && a.email && a.email.toLowerCase() === session.email.toLowerCase())
+          );
+        });
         return NextResponse.json({
           total: consumerAccounts.length,
           accounts: consumerAccounts,

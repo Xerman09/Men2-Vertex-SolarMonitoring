@@ -21,6 +21,7 @@ import {
 } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { HoverInfo } from '@/components/ui/tooltip';
+import { renderNowReferenceLabel } from '../GraphTooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import {
   SinusoidalFitResult,
@@ -187,7 +188,7 @@ export function AdvancedMathCharts({
 
         <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={fitResults.theoreticalPoints} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+            <AreaChart data={fitResults.theoreticalPoints} margin={{ top: 24, right: 14, left: -12, bottom: 0 }}>
               <defs>
                 <linearGradient id="solarActualYellowGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={COLOR_PV} stopOpacity={0.35} />
@@ -206,7 +207,13 @@ export function AdvancedMathCharts({
                 }}
               />
               <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-              <ReferenceLine x={nowSlotStr} stroke="#64748b" strokeDasharray="3 3" label={{ value: 'Now', fill: '#94a3b8', fontSize: 10, position: 'top' }} />
+              <ReferenceLine
+                isFront
+                x={nowSlotStr}
+                stroke="#64748b"
+                strokeDasharray="3 3"
+                label={renderNowReferenceLabel('● Now', '#94a3b8')}
+              />
               <Area
                 type="monotone"
                 dataKey="actualSolarKw"
@@ -270,7 +277,7 @@ export function AdvancedMathCharts({
 
         <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={fourierData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+            <LineChart data={fourierData} margin={{ top: 24, right: 14, left: -12, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
               <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[10px] opacity-60" />
               <YAxis domain={fourierYDomain} stroke="currentColor" className="text-[10px] opacity-60" unit="kW" />
@@ -283,7 +290,13 @@ export function AdvancedMathCharts({
                 }}
               />
               <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-              <ReferenceLine x={nowSlotStr} stroke="#64748b" strokeDasharray="3 3" />
+              <ReferenceLine
+                isFront
+                x={nowSlotStr}
+                stroke="#64748b"
+                strokeDasharray="3 3"
+                label={renderNowReferenceLabel('● Now', '#94a3b8')}
+              />
               <Line
                 type="monotone"
                 dataKey="actualSolarKw"
