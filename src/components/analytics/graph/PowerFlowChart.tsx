@@ -85,16 +85,16 @@ export function PowerFlowChart({
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/30">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono">
                 PV Power ({currentLivePoint.hour})
               </span>
               <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 motion-safe:animate-ping" />
             </div>
             <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-lg sm:text-xl font-bold font-mono text-yellow-500">
+              <span className="text-sm sm:text-base font-bold font-mono text-yellow-500">
                 {currentLivePoint.solarYieldKw !== null ? currentLivePoint.solarYieldKw.toFixed(2) : '0.00'}
               </span>
-              <span className="text-[10px] text-muted-foreground font-mono">kW</span>
+              <span className="text-[9px] text-muted-foreground font-mono">kW</span>
             </div>
           </div>
         </HoverInfo>
@@ -114,16 +114,16 @@ export function PowerFlowChart({
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/30">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono">
                 Load ({currentLivePoint.hour})
               </span>
               <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
             </div>
             <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-lg sm:text-xl font-bold font-mono text-purple-400">
+              <span className="text-sm sm:text-base font-bold font-mono text-purple-400">
                 {currentLivePoint.loadDemandKw !== null ? currentLivePoint.loadDemandKw.toFixed(2) : '0.00'}
               </span>
-              <span className="text-[10px] text-muted-foreground font-mono">kW</span>
+              <span className="text-[9px] text-muted-foreground font-mono">kW</span>
             </div>
           </div>
         </HoverInfo>
@@ -143,18 +143,18 @@ export function PowerFlowChart({
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono">
                 Grid Flow ({currentLivePoint.hour})
               </span>
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             </div>
             <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-lg sm:text-xl font-bold font-mono text-emerald-500">
+              <span className="text-sm sm:text-base font-bold font-mono text-emerald-500">
                 {currentLivePoint.gridExportKw !== null
                   ? `${currentLivePoint.gridExportKw > 0 ? '+' : ''}${currentLivePoint.gridExportKw.toFixed(2)}`
                   : '0.00'}
               </span>
-              <span className="text-[10px] text-muted-foreground font-mono">kW</span>
+              <span className="text-[9px] text-muted-foreground font-mono">kW</span>
             </div>
           </div>
         </HoverInfo>
@@ -174,18 +174,18 @@ export function PowerFlowChart({
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-cyan-500/30">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono">
                 Battery ({currentLivePoint.hour})
               </span>
               <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
             </div>
             <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-lg sm:text-xl font-bold font-mono text-cyan-500">
+              <span className="text-sm sm:text-base font-bold font-mono text-cyan-500">
                 {currentLivePoint.batteryFlowKw !== null
                   ? `${currentLivePoint.batteryFlowKw > 0 ? '+' : ''}${currentLivePoint.batteryFlowKw.toFixed(2)}`
                   : '0.00'}
               </span>
-              <span className="text-[10px] text-muted-foreground font-mono">kW</span>
+              <span className="text-[9px] text-muted-foreground font-mono">kW</span>
             </div>
           </div>
         </HoverInfo>
@@ -270,9 +270,9 @@ export function PowerFlowChart({
             </div>
           </div>
 
-          <div className={compact ? 'h-[220px] w-full' : 'h-[280px] w-full'}>
+          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={powerSeriesData} margin={{ top: 24, right: 14, left: -12, bottom: 0 }}>
+              <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
                   <linearGradient id="pvYellowGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={COLOR_PV} stopOpacity={chartRenderMode === 'area' ? 0.35 : 0.08} />
@@ -292,16 +292,16 @@ export function PowerFlowChart({
                   dataKey="hour"
                   ticks={majorXTicks}
                   stroke="currentColor"
-                  className="text-[10px] opacity-60"
+                  className="text-[9px] font-mono opacity-75"
                 />
                 <YAxis
                   domain={combinedYDomain}
                   stroke="currentColor"
-                  className="text-[10px] opacity-60"
+                  className="text-[9px] font-mono opacity-75"
                   unit="kW"
                 />
                 <Tooltip content={<CustomExactTooltip />} />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
                 <ReferenceLine y={0} stroke="currentColor" className="opacity-30" />
                 <ReferenceLine
                   isFront
@@ -384,9 +384,9 @@ export function PowerFlowChart({
               Dynamic Scale: {pvYDomain[0]} kW → {pvYDomain[1]} kW (+18% Headroom)
             </Badge>
           </div>
-          <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
+          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={powerSeriesData} margin={{ top: 24, right: 14, left: -12, bottom: 0 }}>
+              <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
                   <linearGradient id="soloPvGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={COLOR_PV} stopOpacity={chartRenderMode === 'area' ? 0.45 : 0.12} />
@@ -394,10 +394,10 @@ export function PowerFlowChart({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[10px] opacity-60" />
-                <YAxis domain={pvYDomain} stroke="currentColor" className="text-[10px] opacity-60" unit="kW" />
+                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
+                <YAxis domain={pvYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
                 <Tooltip content={<CustomExactTooltip />} />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
                 <ReferenceLine
                   isFront
                   x={nowSlotStr}
@@ -441,9 +441,9 @@ export function PowerFlowChart({
               Dynamic Scale: {consumptionYDomain[0]} kW → {consumptionYDomain[1]} kW (+18% Headroom)
             </Badge>
           </div>
-          <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
+          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={powerSeriesData} margin={{ top: 24, right: 14, left: -12, bottom: 0 }}>
+              <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
                   <linearGradient id="soloLoadGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={COLOR_LOAD} stopOpacity={chartRenderMode === 'area' ? 0.45 : 0.12} />
@@ -451,10 +451,10 @@ export function PowerFlowChart({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[10px] opacity-60" />
-                <YAxis domain={consumptionYDomain} stroke="currentColor" className="text-[10px] opacity-60" unit="kW" />
+                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
+                <YAxis domain={consumptionYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
                 <Tooltip content={<CustomExactTooltip />} />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
                 <ReferenceLine
                   isFront
                   x={nowSlotStr}
@@ -492,9 +492,9 @@ export function PowerFlowChart({
               Dynamic Scale: {gridYDomain[0]} kW → {gridYDomain[1]} kW (+18% Head / +14% Foot)
             </Badge>
           </div>
-          <div className={compact ? 'h-[220px] w-full' : 'h-[270px] w-full'}>
+          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={powerSeriesData} margin={{ top: 24, right: 14, left: -12, bottom: 0 }}>
+              <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
                   <linearGradient id="soloGridGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={COLOR_GRID} stopOpacity={chartRenderMode === 'area' ? 0.45 : 0.12} />
@@ -502,10 +502,10 @@ export function PowerFlowChart({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[10px] opacity-60" />
-                <YAxis domain={gridYDomain} stroke="currentColor" className="text-[10px] opacity-60" unit="kW" />
+                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
+                <YAxis domain={gridYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
                 <Tooltip content={<CustomExactTooltip />} />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
                 <ReferenceLine y={0} stroke="currentColor" className="opacity-40" />
                 <ReferenceLine
                   isFront

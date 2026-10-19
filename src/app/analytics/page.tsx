@@ -654,7 +654,7 @@ export default function AnalyticsDashboardPage() {
 
   // Synchronization overlay check - never dismiss prematurely before accounts and telemetry settle
   const isTargetPending = !isCustomerEmpty && (currentTargetKey !== displayedTargetKey || !isDataLoaded || accountLoading);
-  const showOverlay = !isCustomerEmpty && (isPlantSwitching || isTargetPending || syncing);
+  const showOverlay = !isCustomerEmpty && (isPlantSwitching || isTargetPending) && !isFetchingDeye && !syncing;
 
   return (
     <div className="relative flex flex-col gap-6 w-full max-w-[1700px] mx-auto pb-16">

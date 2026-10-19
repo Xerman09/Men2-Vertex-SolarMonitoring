@@ -204,6 +204,16 @@ class DeyeAccountManager {
           mergedAccounts.push(accountConfig);
         }
 
+        // Also preserve local/cached disk accounts that aren't linked to a Directus config
+        for (const disk of diskAccounts) {
+          if (!mergedAccounts.some((m) => m.id === disk.id || (disk.directusId && m.directusId === disk.directusId))) {
+            mergedAccounts.push({
+              ...disk,
+              source: disk.source || 'cache',
+            });
+          }
+        }
+
         if (mergedAccounts.length > 0) {
           this.saveAccountsToFile(mergedAccounts);
           this.lastDirectusSyncAt = now;
@@ -816,7 +826,7 @@ class DeyeAccountManager {
    * Get sanitized summary of all accounts with their discovered plants and hardware counts.
    * Dynamically synchronizes plant names and devices from live Deye Cloud on a short TTL (30s) or when forced.
    */
-  public async getAccountsSummary(forceSync = false): Promise<AccountSummary[]> {
+  public async getAccountsSummary(forceSync = false, sessionRole?: string): Promise<AccountSummary[]> {
     // Synchronize with Directus (or fallback to cache if offline)
     await this.syncWithDirectus(forceSync);
 
@@ -886,6 +896,7 @@ class DeyeAccountManager {
         email: acc.email,
         enabled: acc.enabled !== false,
         admin: acc.admin,
+        isDemo: Boolean(acc.isDemo ?? (acc.id === 'men2-facility-2' || acc.id === 'men2-facility-3')),
         isLive,
         stationCount: plants.length,
         deviceCount: inverterCount + loggerCount,
@@ -907,16 +918,26 @@ class DeyeAccountManager {
       });
     }
 
+    if (sessionRole && sessionRole !== 'admin') {
+      return summaries.filter((s) => !s.isDemo);
+    }
+
     return summaries;
   }
 
   /**
    * Poll all accounts (or specific allowed accounts), plants, and inverters concurrently to compute fleet aggregate
    */
-  public async getAggregatedFleetSummary(accountIds?: string[]): Promise<AggregatedFleetSummary> {
+  public async getAggregatedFleetSummary(accountIds?: string[], sessionRole?: string): Promise<AggregatedFleetSummary> {
     const clients = this.getAllClients();
     const rawAccounts = this.loadAccounts(false);
-    return this.fleetAggregator.aggregateFleet(clients, rawAccounts, accountIds);
+    
+    // Demo accounts only accessible by admin account
+    let effectiveRaw = rawAccounts;
+    if (sessionRole && sessionRole !== 'admin') {
+      effectiveRaw = rawAccounts.filter((a) => !a.isDemo && a.id !== 'men2-facility-2' && a.id !== 'men2-facility-3');
+    }
+    return this.fleetAggregator.aggregateFleet(clients, effectiveRaw, accountIds);
   }
 }
 

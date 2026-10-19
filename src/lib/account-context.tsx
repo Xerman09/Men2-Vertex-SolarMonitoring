@@ -41,7 +41,7 @@ interface AccountContextType {
 const AccountContext = createContext<AccountContextType | undefined>(undefined);
 
 export function AccountProvider({ children }: { children: React.ReactNode }) {
-  const { role, isConsumer, user } = useRole();
+  const { role, isAdmin, isConsumer, user } = useRole();
   const [rawAccounts, setRawAccounts] = useState<AccountSummary[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('ALL');
   const [selectedStationId, setSelectedStationId] = useState<string>('ALL');
@@ -131,13 +131,18 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     refreshAccounts(false, true);
   }, [refreshAccounts]);
 
-  // If consumer role, strictly filter to their registered account only
+  // Demo accounts are strictly scoped to the admin account
   const accounts = useMemo(() => {
+    let list = rawAccounts;
+    if (!isAdmin) {
+      list = list.filter((acc) => !acc.isDemo && acc.id !== 'men2-facility-2' && acc.id !== 'men2-facility-3');
+    }
+
     if (isConsumer && user) {
       const userAccId = String(user.accountId || user.id || '').trim();
       const userEmail = (user.email || '').trim().toLowerCase();
 
-      const matched = rawAccounts.filter((acc) => {
+      const matched = list.filter((acc) => {
         const accId = String(acc.id || '');
         const accDirectusId = acc.directusId ? String(acc.directusId) : '';
         const accEmail = (acc.email || '').trim().toLowerCase();
@@ -159,8 +164,8 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 
       return matched;
     }
-    return rawAccounts;
-  }, [rawAccounts, isConsumer, user]);
+    return list;
+  }, [rawAccounts, isAdmin, isConsumer, user]);
 
   // When consumer logs in, pin selected account to their account ID
   useEffect(() => {

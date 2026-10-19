@@ -52,6 +52,7 @@ export function Header({
   isLiveApi = false,
   pingMs,
 }: HeaderProps) {
+  const { toggleMobileOpen } = useSidebar();
   const {
     accounts,
     selectedAccountId,
@@ -183,61 +184,75 @@ export function Header({
         </div>
       )}
 
-      <div className="h-16 w-full px-3 sm:px-5 lg:px-7 flex items-center justify-between gap-2 min-w-0">
-        {/* Left: Dynamic Brand / Workspace Selector */}
-        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink">
+      <div className="h-16 w-full px-3 sm:px-5 lg:px-7 flex items-center justify-between gap-2 sm:gap-4 min-w-0 flex-nowrap">
+        {/* Left: Dynamic Brand / Workspace Selector & Mobile Burger */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1 max-w-[240px] sm:max-w-[300px] md:max-w-[360px] lg:max-w-[380px]">
+          {/* Mobile Drawer Trigger (Burger) */}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={toggleMobileOpen}
+            className="lg:hidden rounded-xl h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent/60 shrink-0 cursor-pointer"
+            aria-label="Open navigation drawer"
+            title="Open navigation menu"
+          >
+            <Menu size={18} />
+          </Button>
+
           {/* Account Selector Dropdown */}
-          <div className="relative min-w-0 shrink" ref={dropdownRef}>
+          <div className="relative min-w-0 w-full" ref={dropdownRef}>
             <button
               onClick={() => setShowAccountDropdown(!showAccountDropdown)}
               aria-haspopup="listbox"
               aria-expanded={showAccountDropdown}
               aria-label="Select solar account or plant"
-              className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border cursor-pointer transition-all text-left shadow-2xs min-w-0 max-w-[210px] xs:max-w-[250px] sm:max-w-[300px] md:max-w-[360px] ${
+              className={`flex items-center justify-between gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border cursor-pointer transition-all text-left shadow-2xs min-w-0 w-full overflow-hidden ${
                 selectedInverterSn && selectedInverterSn !== 'ALL'
                   ? 'bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-500/40 ring-1 ring-cyan-500/20'
                   : 'bg-card/80 hover:bg-accent/60 border-border/60'
               }`}
             >
-              <div
-                className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                  selectedInverterSn && selectedInverterSn !== 'ALL'
-                    ? 'bg-cyan-500/20 text-cyan-400'
-                    : 'bg-primary/10 text-primary'
-                }`}
-              >
-                {isFleetView ? (
-                  <Globe size={14} />
-                ) : selectedInverterSn && selectedInverterSn !== 'ALL' ? (
-                  <Cpu size={14} className="text-cyan-400" />
-                ) : selectedPlant ? (
-                  <Building2 size={14} />
-                ) : (
-                  <Sun size={14} />
-                )}
-              </div>
-              <div className="flex flex-col min-w-0 shrink">
-                <span className="font-semibold text-xs text-foreground truncate block">
-                  {selectedInverterSn && selectedInverterSn !== 'ALL'
-                    ? `Inverter ${selectedInverterSn}`
-                    : displayTitle}
-                </span>
-                {selectedInverterSn && selectedInverterSn !== 'ALL' ? (
-                  <span className="text-[10px] text-cyan-400 font-medium leading-none truncate flex items-center gap-1 mt-0.5">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0" />
-                    {selectedPlant?.stationName || `Station ${selectedStationId}`} · Isolated
+              <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                <div
+                  className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                    selectedInverterSn && selectedInverterSn !== 'ALL'
+                      ? 'bg-cyan-500/20 text-cyan-400'
+                      : 'bg-primary/10 text-primary'
+                  }`}
+                >
+                  {isFleetView ? (
+                    <Globe size={14} />
+                  ) : selectedInverterSn && selectedInverterSn !== 'ALL' ? (
+                    <Cpu size={14} className="text-cyan-400" />
+                  ) : selectedPlant ? (
+                    <Building2 size={14} />
+                  ) : (
+                    <Sun size={14} />
+                  )}
+                </div>
+                <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
+                  <span className="font-semibold text-xs text-foreground truncate block w-full">
+                    {selectedInverterSn && selectedInverterSn !== 'ALL'
+                      ? `Inverter ${selectedInverterSn}`
+                      : displayTitle}
                   </span>
-                ) : !isFleetView && selectedPlant && selectedAccount ? (
-                  <span className="text-[10px] text-muted-foreground leading-none truncate block">
-                    {`${selectedAccount.name} · ${selectedPlant.installedCapacityKw} kWp`}
-                  </span>
-                ) : !isFleetView && !selectedPlant && selectedAccount ? (
-                  <span className="text-[10px] text-muted-foreground leading-none truncate block">
-                    {selectedAccount.plants?.length
-                      ? `${selectedAccount.plants.length} Plants · ${selectedAccount.capacityKw} kWp Total`
-                      : `${selectedAccount.capacityKw} kWp Total`}
-                  </span>
-                ) : null}
+                  {selectedInverterSn && selectedInverterSn !== 'ALL' ? (
+                    <span className="text-[10px] text-cyan-400 font-medium leading-none truncate flex items-center gap-1 mt-0.5 w-full">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0" />
+                      <span className="truncate">{selectedPlant?.stationName || `Station ${selectedStationId}`} · Isolated</span>
+                    </span>
+                  ) : !isFleetView && selectedPlant && selectedAccount ? (
+                    <span className="text-[10px] text-muted-foreground leading-none truncate block w-full">
+                      {`${selectedAccount.name} · ${selectedPlant.installedCapacityKw} kWp`}
+                    </span>
+                  ) : !isFleetView && !selectedPlant && selectedAccount ? (
+                    <span className="text-[10px] text-muted-foreground leading-none truncate block w-full">
+                      {selectedAccount.plants?.length
+                        ? `${selectedAccount.plants.length} Plants · ${selectedAccount.capacityKw} kWp Total`
+                        : `${selectedAccount.capacityKw} kWp Total`}
+                    </span>
+                  ) : null}
+                </div>
               </div>
               <ChevronDown
                 className={`text-muted-foreground transition-transform duration-200 ml-1 shrink-0 ${
@@ -576,15 +591,15 @@ export function Header({
         </div>
 
         {/* Right: Telemetry Health, Directus Status, Role Toggle, Clock, Theme Mode Toggle, Notifications */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 shrink-0 flex-nowrap">
           {/* Prominent Live Data Fetching Indicator */}
           {isFetchingDeye || syncing ? (
             <div
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 rounded-xl bg-cyan-500/15 border border-cyan-500/40 text-xs font-mono text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)] motion-safe:animate-pulse shrink-0"
-              title="Active live data exchange with DeyeCloud OpenAPI"
+              className="flex items-center gap-1.5 px-2 sm:px-2.5 md:px-3 py-1 rounded-xl bg-cyan-500/15 border border-cyan-500/40 text-xs font-mono text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)] motion-safe:animate-pulse shrink-0"
+              title={`Active live data exchange with DeyeCloud OpenAPI: ${fetchingStage || 'Syncing Deye...'}`}
             >
               <RefreshCw size={12} className="animate-spin text-cyan-400 shrink-0" />
-              <span className="font-semibold truncate max-w-[90px] sm:max-w-[130px] md:max-w-[170px]">
+              <span className="font-semibold truncate max-w-[80px] sm:max-w-[110px] md:max-w-[140px] lg:max-w-[170px] hidden sm:inline">
                 {fetchingStage || 'Syncing Deye...'}
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 motion-safe:animate-ping shrink-0 hidden md:inline-block" />
@@ -632,7 +647,7 @@ export function Header({
 
           {/* Role Mode Toggle Button (Admin vs Consumer vs Sign In) */}
           {user ? (
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
               {isConsumer && (
                 <button
                   onClick={() => setShowConnectModal(true)}
@@ -640,7 +655,7 @@ export function Header({
                   className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 text-xs font-semibold transition-all cursor-pointer shrink-0"
                 >
                   <Radio size={12} className="shrink-0 animate-pulse" />
-                  <span className="hidden sm:inline">Connect Deye</span>
+                  <span className="hidden md:inline">Connect Deye</span>
                 </button>
               )}
               <div
@@ -652,7 +667,7 @@ export function Header({
                 title={`Logged in as ${user.email} (${isAdmin ? 'Admin' : 'Consumer'})`}
               >
                 {isAdmin ? <Shield size={13} className="shrink-0" /> : <User size={13} className="shrink-0" />}
-                <span className="hidden sm:inline font-mono text-[11px] truncate max-w-[80px] md:max-w-[120px]">
+                <span className="hidden md:inline font-mono text-[11px] truncate max-w-[70px] lg:max-w-[110px]">
                   {user.name || user.email?.split('@')[0] || (isAdmin ? 'Admin' : 'Consumer')}
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
@@ -680,11 +695,11 @@ export function Header({
                 setShowAuthModal(true);
               }}
               title="Sign in or register for solar monitoring"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60 text-xs font-medium transition-colors cursor-pointer shrink-0"
+              className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60 text-xs font-medium transition-colors cursor-pointer shrink-0"
             >
               <User size={13} className="text-primary shrink-0" />
-              <span className="hidden sm:inline">Sign In / Register</span>
-              <Lock size={11} className="text-muted-foreground shrink-0" />
+              <span className="hidden sm:inline">Sign In</span>
+              <Lock size={11} className="text-muted-foreground shrink-0 hidden sm:inline" />
             </button>
           )}
 

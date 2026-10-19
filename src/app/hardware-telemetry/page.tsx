@@ -72,7 +72,7 @@ export default function HardwareTelemetryPage() {
   const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
 
   const isTargetPending = currentTargetKey !== displayedTargetKey || !isDataLoaded;
-  const showOverlay = isPlantSwitching || isTargetPending || isSyncingNoPlants || syncing;
+  const showOverlay = (isPlantSwitching || isTargetPending || isSyncingNoPlants) && !isFetchingDeye && !syncing;
   const { setSafeTimeout } = useSafeTimeout();
 
   // Collect inverters from selected account or plant

@@ -58,9 +58,9 @@ export interface SelfConsumptionMetrics {
   hourlyRatios: HourlyRatioPoint[];
 }
 
-// Harmonized Color Palette matching DSM Standards (Yield: Yellow, Load: Purple, Grid: Green, Battery: Cyan)
-export const COLOR_PV = '#eab308';       // Yellow / Solar Yield
-export const COLOR_LOAD = '#a855f7';     // Purple / Facility Load
+// Harmonized Color Palette matching DSM Standards (Solar: Amber, Load: Indigo/Purple, Grid: Green, Battery: Cyan)
+export const COLOR_PV = '#f59e0b';       // Amber / Solar Yield (matches Analytics Dashboard COLORS.solar)
+export const COLOR_LOAD = '#6366f1';     // Indigo / Facility Load (matches Analytics Dashboard COLORS.load)
 export const COLOR_BATTERY = '#06b6d4';  // Cyan / ESS Flow
 export const COLOR_GRID = '#10b981';     // Emerald / Green Grid (+Export / -Import)
 

@@ -7,6 +7,8 @@ import { Header } from '@/components/layout/header';
 import { useRole } from '@/lib/role-context';
 import { Zap } from 'lucide-react';
 
+import { DeyeAccountLoadingOverlay } from '@/components/layout/DeyeAccountLoadingOverlay';
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -49,7 +51,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex w-full bg-background">
+    <div className="min-h-screen flex w-full bg-background relative">
+      <DeyeAccountLoadingOverlay />
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         <Header />

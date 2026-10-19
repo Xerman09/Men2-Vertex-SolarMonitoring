@@ -136,6 +136,7 @@ export interface DeyeAccountConfig {
   name: string;
   enabled: boolean;
   admin?: boolean;
+  isDemo?: boolean;
   baseUrl?: string;
   appId: string;
   appSecret: string;
@@ -159,6 +160,7 @@ export interface AccountSummary {
   email?: string;
   enabled?: boolean;
   admin?: boolean;
+  isDemo?: boolean;
   isLive: boolean;
   stationCount: number;
   deviceCount: number;

@@ -43,6 +43,8 @@ export class FleetAggregator {
     }
 
     const rawAccounts = allRawAccounts.filter((a) => a.enabled !== false);
+    const enabledAccountIds = new Set(rawAccounts.map((a) => a.id));
+    clients = clients.filter((c) => enabledAccountIds.has(c.accountId));
 
     const promises = clients.map(async (client) => {
       const accConfig = rawAccounts.find((a) => a.id === client.accountId);
@@ -152,12 +154,12 @@ export class FleetAggregator {
               ? liveKw
               : plantSum
               ? parseFloat(((plantSum.liveSolarPowerKw || 0) / (inverters.length || 1)).toFixed(2))
-              : 0;
+              : parseFloat(((item.station.liveSolarPowerKw || 0) / (inverters.length || 1)).toFixed(2));
             const assignedDailyKwh = dailyKwh > 0
               ? dailyKwh
               : plantSum
               ? parseFloat(((plantSum.dailyYieldKwh || 0) / (inverters.length || 1)).toFixed(2))
-              : 0;
+              : parseFloat(((item.station.dailyYieldKwh || 0) / (inverters.length || 1)).toFixed(2));
             const assignedGridKw = plantSum ? plantSum.gridPowerKw : item.station.gridPowerKw;
             const assignedConsKw = consKw > 0
               ? consKw
@@ -168,7 +170,7 @@ export class FleetAggregator {
 
             accSolarKw += assignedLiveKw;
             accDailyKwh += assignedDailyKwh;
-            accLifetimeMwh += lifetimeKwh > 0 ? lifetimeKwh / 1000 : (plantSum?.totalYieldMwh || 0);
+            accLifetimeMwh += lifetimeKwh > 0 ? lifetimeKwh / 1000 : (plantSum?.totalYieldMwh || item.station.totalYieldMwh || 0);
 
             nodes.push({
               accountId: client.accountId,
@@ -193,11 +195,13 @@ export class FleetAggregator {
           }
         }
 
-        // Use station solar kW if individual inverters weren't in current plant batch
+        // Use station solar kW and yield if individual inverters weren't in current plant batch
         const finalSolarKw = accSolarKw > 0 ? accSolarKw : item.station.liveSolarPowerKw;
+        const finalDailyKwh = accDailyKwh > 0 ? accDailyKwh : item.station.dailyYieldKwh;
+        const finalLifetimeMwh = accLifetimeMwh > 0 ? accLifetimeMwh : (item.station.totalYieldMwh || 0);
         totalSolarPowerKw += finalSolarKw;
-        totalDailyYieldKwh += accDailyKwh;
-        totalLifetimeYieldMwh += accLifetimeMwh;
+        totalDailyYieldKwh += finalDailyKwh;
+        totalLifetimeYieldMwh += finalLifetimeMwh;
 
         totalInverters += invCount;
         totalLoggers += logCount;
