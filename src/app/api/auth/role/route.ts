@@ -7,6 +7,7 @@ import { withGate, parseJsonBody } from '@/lib/gate';
 import { createLogger } from '@/lib/logger';
 import {
   createSessionToken,
+  applySessionCookies,
   SESSION_COOKIE_NAME,
   HOST_SESSION_COOKIE_NAME,
   DEFAULT_SESSION_TTL_SECONDS,
@@ -14,27 +15,6 @@ import {
 import { env } from '@/lib/env';
 
 const log = createLogger('AuthRole');
-
-function applySessionCookies(response: NextResponse, token: string, req: Request) {
-  const isHttps =
-    req.headers.get('x-forwarded-proto') === 'https' ||
-    req.url.startsWith('https:') ||
-    env.NODE_ENV === 'production';
-
-  const cookieOptions = {
-    value: token,
-    httpOnly: true,
-    secure: isHttps,
-    sameSite: 'lax' as const,
-    path: '/',
-    maxAge: DEFAULT_SESSION_TTL_SECONDS,
-  };
-
-  response.cookies.set({ name: SESSION_COOKIE_NAME, ...cookieOptions });
-  if (isHttps) {
-    response.cookies.set({ name: HOST_SESSION_COOKIE_NAME, ...cookieOptions });
-  }
-}
 
 export const POST = withGate(
   {

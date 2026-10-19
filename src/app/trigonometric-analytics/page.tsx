@@ -173,16 +173,10 @@ export default function TrigonometricAnalyticsPage() {
               <Zap className="h-5 w-5 text-amber-500 absolute animate-pulse" />
             </div>
             <div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-mono uppercase tracking-wider font-bold mb-1.5">
-                <RefreshCw size={10} className="animate-spin" />
-                <span>
-                  {isSyncingNoPlants ? 'Discovering Solar Plants...' : 'Station Re-Sync in Progress'}
-                </span>
-              </div>
               <h3 className="text-base font-bold text-foreground uppercase tracking-wider font-headline">
                 {isSyncingNoPlants
-                  ? fetchingStage || (selectedAccount ? `Scanning Plants for ${selectedAccount.name}...` : 'Syncing Solar Plants...')
-                  : `Syncing ${switchingPlantName || selectedPlant?.stationName || 'Plant'} Analytics`}
+                  ? fetchingStage || (selectedAccount ? `Scanning Plants for ${selectedAccount.name}...` : 'Synchronizing Solar Plants...')
+                  : `Synchronizing ${switchingPlantName || selectedPlant?.stationName || 'Plant'} Analytics`}
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
                 {isSyncingNoPlants

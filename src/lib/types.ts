@@ -132,6 +132,7 @@ export interface InverterConfig {
 export interface DeyeAccountConfig {
   id: string;
   directusId?: number | string;
+  userId?: number | string;
   name: string;
   enabled: boolean;
   admin?: boolean;
@@ -147,11 +148,13 @@ export interface DeyeAccountConfig {
   plants?: PlantInfo[];
   inverters?: InverterConfig[];
   source?: 'directus' | 'cache' | 'env';
+  skipUserCreation?: boolean;
 }
 
 export interface AccountSummary {
   id: string;
   directusId?: number | string;
+  userId?: number | string;
   name: string;
   email?: string;
   enabled?: boolean;
@@ -250,6 +253,7 @@ export interface SolarUser {
 export interface SolarDeyeCloudConfig {
   id: number;
   org_id?: number | null;
+  user_id?: number | null;
   profile_name: string;
   base_url: string;
   app_id: string;

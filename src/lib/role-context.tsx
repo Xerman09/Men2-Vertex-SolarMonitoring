@@ -28,8 +28,13 @@ interface RoleContextType {
   adminUser: AuthUser | null; // Backward compatibility alias
   showAuthModal: boolean;
   setShowAuthModal: (show: boolean) => void;
+  authModalTab: 'signin' | 'register';
+  setAuthModalTab: (tab: 'signin' | 'register') => void;
+  showConnectModal: boolean;
+  setShowConnectModal: (show: boolean) => void;
   login: (email: string, password: string) => Promise<{ success: boolean; role?: UserRole; error?: string }>;
   loginAsAdmin: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (data: { email: string; password: string; fullName?: string; username?: string }) => Promise<{ success: boolean; role?: UserRole; error?: string }>;
   logout: () => Promise<void>;
   logoutAdmin: () => Promise<void>;
 }
@@ -40,6 +45,8 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<UserRole>('viewer');
   const [user, setUser] = useState<AuthUser | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalTab, setAuthModalTab] = useState<'signin' | 'register'>('signin');
+  const [showConnectModal, setShowConnectModal] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Synchronize initial session state from server cookie (server-authoritative)
@@ -166,6 +173,32 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     [login]
   );
 
+  const register = useCallback(
+    async (
+      data: { email: string; password: string; fullName?: string; username?: string }
+    ): Promise<{ success: boolean; role?: UserRole; error?: string }> => {
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const resData = await res.json();
+        if (res.ok && resData.success) {
+          applyRoleState('consumer', resData.user);
+          setShowAuthModal(false);
+          setShowConnectModal(true); // Open connect modal so user can link their DeyeCloud account
+          return { success: true, role: 'consumer' };
+        }
+        return { success: false, error: resData.error || 'Registration failed' };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Registration service error';
+        return { success: false, error: msg };
+      }
+    },
+    [applyRoleState]
+  );
+
   const logout = useCallback(async () => {
     try {
       await fetch('/api/auth/session', { method: 'POST' });
@@ -190,8 +223,13 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       adminUser: user,
       showAuthModal,
       setShowAuthModal,
+      authModalTab,
+      setAuthModalTab,
+      showConnectModal,
+      setShowConnectModal,
       login,
       loginAsAdmin,
+      register,
       logout,
       logoutAdmin,
     }),
@@ -200,8 +238,11 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       isInitialized,
       user,
       showAuthModal,
+      authModalTab,
+      showConnectModal,
       login,
       loginAsAdmin,
+      register,
       logout,
       logoutAdmin,
     ]

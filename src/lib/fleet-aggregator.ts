@@ -204,7 +204,12 @@ export class FleetAggregator {
 
         accountSummaries.push({
           id: client.accountId,
+          directusId: accConfig?.directusId,
+          userId: accConfig?.userId,
           name: client.accountName,
+          email: accConfig?.email,
+          enabled: accConfig?.enabled,
+          admin: accConfig?.admin,
           isLive: item.isLive,
           stationCount: plants.length,
           deviceCount: invCount + logCount,
@@ -224,7 +229,12 @@ export class FleetAggregator {
       } else {
         accountSummaries.push({
           id: client.accountId,
+          directusId: accConfig?.directusId,
+          userId: accConfig?.userId,
           name: client.accountName,
+          email: accConfig?.email,
+          enabled: accConfig?.enabled,
+          admin: accConfig?.admin,
           isLive: false,
           stationCount: plants.length,
           deviceCount: 0,

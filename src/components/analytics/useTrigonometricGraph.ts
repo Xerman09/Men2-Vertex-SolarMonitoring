@@ -94,7 +94,7 @@ export function useTrigonometricGraph({
 
   const [activeData, setActiveData] = useState<HourlySolarPoint[]>(initialData);
   const [isLiveStreaming, setIsLiveStreaming] = useState(true);
-  const [chartRenderMode, setChartRenderMode] = useState<ChartRenderMode>('line');
+  const [chartRenderMode, setChartRenderMode] = useState<ChartRenderMode>('area');
   const [activeTab, setActiveTab] = useState<ChartTab>('power');
   const [powerSubView, setPowerSubView] = useState<PowerSubView>('combined');
   const [acVoltage, setAcVoltage] = useState(230);

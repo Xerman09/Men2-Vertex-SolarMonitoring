@@ -16,19 +16,33 @@ import {
   AlertCircle,
   Building2,
   TrendingUp,
+  User,
+  Radio,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useRole();
+  const { login, register } = useRole();
 
+  const [activeTab, setActiveTab] = useState<'signin' | 'register'>('signin');
+
+  // Sign In fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Register fields
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [regLoading, setRegLoading] = useState(false);
+  const [regError, setRegError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +65,44 @@ export default function LoginPage() {
       setError(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regEmail.trim() || !regPassword || !regName.trim()) {
+      setRegError('Please complete all required fields.');
+      return;
+    }
+    if (regPassword !== regConfirmPassword) {
+      setRegError('Passwords do not match.');
+      return;
+    }
+    if (regPassword.length < 6) {
+      setRegError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    setRegLoading(true);
+    setRegError('');
+
+    try {
+      const res = await register({
+        email: regEmail.trim(),
+        password: regPassword,
+        fullName: regName.trim(),
+      });
+      if (res.success) {
+        // Direct new customer to analytics where the Connect Deye prompt will guide them
+        router.replace('/analytics?onboarding=true');
+      } else {
+        setRegError(res.error || 'Failed to create account.');
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
+      setRegError(message);
+    } finally {
+      setRegLoading(false);
     }
   };
 
@@ -80,7 +132,7 @@ export default function LoginPage() {
 
             <div className="space-y-4">
               <h2 className="text-2xl font-bold tracking-tight text-foreground leading-snug">
-                Mission Control & Photovoltaic Synoptics
+                Mission Control &amp; Photovoltaic Synoptics
               </h2>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 High-frequency inverter telemetry, battery state-of-charge profiling, and multi-tenant plant monitoring.
@@ -104,8 +156,8 @@ export default function LoginPage() {
                   <Building2 size={13} />
                 </div>
                 <div>
-                  <span className="font-semibold text-foreground block">Isolated Plant Scoping</span>
-                  <span>Consumers monitor only plants registered to their database account.</span>
+                  <span className="font-semibold text-foreground block">Customer Plant Scoping</span>
+                  <span>Customers monitor strictly their personal DeyeCloud stations.</span>
                 </div>
               </div>
 
@@ -114,8 +166,8 @@ export default function LoginPage() {
                   <Shield size={13} />
                 </div>
                 <div>
-                  <span className="font-semibold text-foreground block">Database-Driven Security</span>
-                  <span>Role and access verified directly against cloud database records.</span>
+                  <span className="font-semibold text-foreground block">Direct DeyeCloud Link</span>
+                  <span>Auto-discover inverters and loggers with your developer keys.</span>
                 </div>
               </div>
             </div>
@@ -134,100 +186,269 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Right / Sign In Form */}
+        {/* Right / Auth Form Panel */}
         <div className="lg:col-span-7 p-8 lg:p-12 flex flex-col justify-center">
           <div className="max-w-md mx-auto w-full">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold tracking-tight text-foreground font-headline">
-                Sign In to Portal
-              </h2>
-              <p className="text-xs text-muted-foreground mt-1">
-                Enter your registered database username or email to access monitoring.
-              </p>
+            {/* Tab Switcher */}
+            <div className="flex rounded-2xl bg-muted/70 p-1 mb-6 border border-border/60">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('signin');
+                  setError('');
+                }}
+                className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                  activeTab === 'signin'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('register');
+                  setRegError('');
+                }}
+                className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                  activeTab === 'register'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Create Account
+              </button>
             </div>
 
-            {error && (
-              <div className="mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5 text-xs text-rose-500 animate-in fade-in-50">
-                <AlertCircle size={15} className="shrink-0 mt-0.5" />
-                <span className="font-medium leading-relaxed">{error}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="login-username" className="block text-xs font-semibold text-foreground mb-1.5">
-                  Username or Email
-                </label>
-                <div className="relative">
-                  <Mail
-                    size={16}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <input
-                    id="login-username"
-                    type="text"
-                    required
-                    autoFocus
-                    placeholder="Username or email address"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      if (error) setError('');
-                    }}
-                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-background border border-border/80 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-2xs"
-                  />
+            {activeTab === 'signin' ? (
+              <>
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold tracking-tight text-foreground font-headline">
+                    Sign In to Portal
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enter your registered email or username to access your solar monitoring.
+                  </p>
                 </div>
-              </div>
 
-              <div>
-                <label htmlFor="login-password" className="block text-xs font-semibold text-foreground mb-1.5">
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock
-                    size={16}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <input
-                    id="login-password"
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    placeholder="••••••••••••"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (error) setError('');
-                    }}
-                    className="w-full pl-10 pr-11 py-2.5 rounded-xl bg-background border border-border/80 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-2xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                </div>
-              </div>
+                {error && (
+                  <div className="mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5 text-xs text-rose-500 animate-in fade-in-50">
+                    <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                    <span className="font-medium leading-relaxed">{error}</span>
+                  </div>
+                )}
 
-              <div className="pt-2">
-                <Button
-                  type="submit"
-                  disabled={loading || !email.trim() || !password}
-                  className="w-full py-2.5 h-11 text-xs font-semibold uppercase tracking-wider bg-primary hover:bg-primary/90 text-primary-foreground shadow-md transition-all cursor-pointer"
-                >
-                  {loading ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                      <span>Authenticating...</span>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label htmlFor="login-username" className="block text-xs font-semibold text-foreground mb-1.5">
+                      Username or Email
+                    </label>
+                    <div className="relative">
+                      <Mail
+                        size={16}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                      />
+                      <input
+                        id="login-username"
+                        type="text"
+                        required
+                        autoFocus
+                        placeholder="Username or email address"
+                        value={email}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          if (error) setError('');
+                        }}
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-background border border-border/80 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-2xs"
+                      />
                     </div>
-                  ) : (
-                    <span>Sign In to Dashboard</span>
-                  )}
-                </Button>
-              </div>
-            </form>
+                  </div>
+
+                  <div>
+                    <label htmlFor="login-password" className="block text-xs font-semibold text-foreground mb-1.5">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <Lock
+                        size={16}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                      />
+                      <input
+                        id="login-password"
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        placeholder="••••••••••••"
+                        value={password}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (error) setError('');
+                        }}
+                        className="w-full pl-10 pr-11 py-2.5 rounded-xl bg-background border border-border/80 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-2xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <Button
+                      type="submit"
+                      disabled={loading || !email.trim() || !password}
+                      className="w-full py-2.5 h-11 text-xs font-semibold uppercase tracking-wider bg-primary hover:bg-primary/90 text-primary-foreground shadow-md transition-all cursor-pointer"
+                    >
+                      {loading ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                          <span>Authenticating...</span>
+                        </div>
+                      ) : (
+                        <span>Sign In to Dashboard</span>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <>
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold tracking-tight text-foreground font-headline">
+                    Create Customer Account
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Register your customer portal profile to link and monitor your solar plants.
+                  </p>
+                </div>
+
+                {regError && (
+                  <div className="mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5 text-xs text-rose-500 animate-in fade-in-50">
+                    <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                    <span className="font-medium leading-relaxed">{regError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+                  <div>
+                    <label htmlFor="reg-name" className="block text-xs font-semibold text-foreground mb-1.5">
+                      Full Name or Company
+                    </label>
+                    <div className="relative">
+                      <User
+                        size={16}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                      />
+                      <input
+                        id="reg-name"
+                        type="text"
+                        required
+                        autoFocus
+                        placeholder="e.g. John Doe"
+                        value={regName}
+                        onChange={(e) => setRegName(e.target.value)}
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-background border border-border/80 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-2xs font-sans"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="reg-email" className="block text-xs font-semibold text-foreground mb-1.5">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail
+                        size={16}
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                      />
+                      <input
+                        id="reg-email"
+                        type="email"
+                        required
+                        placeholder="john@example.com"
+                        value={regEmail}
+                        onChange={(e) => {
+                          setRegEmail(e.target.value);
+                          if (regError) setRegError('');
+                        }}
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-background border border-border/80 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-2xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="reg-password" className="block text-xs font-semibold text-foreground mb-1.5">
+                        Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="reg-password"
+                          type={showRegPassword ? 'text' : 'password'}
+                          required
+                          placeholder="••••••••"
+                          value={regPassword}
+                          onChange={(e) => {
+                            setRegPassword(e.target.value);
+                            if (regError) setRegError('');
+                          }}
+                          className="w-full px-3 py-2.5 rounded-xl bg-background border border-border/80 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-2xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="reg-confirm-password" className="block text-xs font-semibold text-foreground mb-1.5">
+                        Confirm Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="reg-confirm-password"
+                          type={showRegPassword ? 'text' : 'password'}
+                          required
+                          placeholder="••••••••"
+                          value={regConfirmPassword}
+                          onChange={(e) => {
+                            setRegConfirmPassword(e.target.value);
+                            if (regError) setRegError('');
+                          }}
+                          className="w-full px-3 py-2.5 rounded-xl bg-background border border-border/80 text-sm font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-2xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowRegPassword(!showRegPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer p-1"
+                          aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showRegPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <Button
+                      type="submit"
+                      disabled={regLoading || !regEmail.trim() || !regPassword || !regName.trim()}
+                      className="w-full py-2.5 h-11 text-xs font-semibold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all cursor-pointer"
+                    >
+                      {regLoading ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span>Creating Account...</span>
+                        </div>
+                      ) : (
+                        <span>Create Account &amp; Proceed</span>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
         </div>
       </div>

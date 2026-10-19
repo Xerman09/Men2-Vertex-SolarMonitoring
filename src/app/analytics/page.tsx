@@ -55,6 +55,7 @@ import {
 } from 'recharts';
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
+import { CustomerOnboardingCard } from '@/components/account/CustomerOnboardingCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -143,7 +144,7 @@ export default function AnalyticsDashboardPage() {
     syncLivePlants,
   } = useAccount();
 
-  const { isAdmin } = useRole();
+  const { isAdmin, isConsumer, user } = useRole();
 
   // Active temporal configurations
   const [dateSelection, setDateSelection] = useState<AnalyticsDatePickerValue>(() => ({
@@ -648,9 +649,12 @@ export default function AnalyticsDashboardPage() {
     document.body.removeChild(link);
   };
 
+  // Customer onboarding check: if consumer has 0 accounts linked, show onboarding and prevent infinite overlay
+  const isCustomerEmpty = isConsumer && !accountLoading && accounts.length === 0;
+
   // Synchronization overlay check - never dismiss prematurely before accounts and telemetry settle
-  const isTargetPending = currentTargetKey !== displayedTargetKey || !isDataLoaded || accountLoading;
-  const showOverlay = isPlantSwitching || isTargetPending || syncing;
+  const isTargetPending = !isCustomerEmpty && (currentTargetKey !== displayedTargetKey || !isDataLoaded || accountLoading);
+  const showOverlay = !isCustomerEmpty && (isPlantSwitching || isTargetPending || syncing);
 
   return (
     <div className="relative flex flex-col gap-6 w-full max-w-[1700px] mx-auto pb-16">
@@ -804,9 +808,10 @@ export default function AnalyticsDashboardPage() {
         </div>
       </div>
 
-
-
-
+      {/* Customer Onboarding Banner when no stations connected */}
+      {isCustomerEmpty && (
+        <CustomerOnboardingCard className="mb-2" />
+      )}
 
       {/* Primary KPI Ribbon (Key Performance & Efficiency Metrics - Scaled to Plant / Inverter) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8 gap-3 sm:gap-3.5">
@@ -1529,17 +1534,11 @@ export default function AnalyticsDashboardPage() {
                   </CardTitle>
                 </HoverInfo>
               </div>
-              <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10 font-mono text-[10px]">
-                {selectedInverter
-                  ? `Inverter: ${selectedInverter.deviceSn}`
-                  : dateSelection.preset === '12M'
-                  ? '12 Months Seasonal'
-                  : dateSelection.preset === '30D' || dateSelection.preset === 'THIS_MONTH'
-                  ? '30 Days Envelope'
-                  : dateSelection.preset === '7D'
-                  ? '7 Days Rolling'
-                  : `Ending ${formatHumanDate(dateSelection.selectedDate)} (7-Day Rolling)`}
-              </Badge>
+              {selectedInverter && (
+                <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10 font-mono text-[10px]">
+                  Inverter: {selectedInverter.deviceSn}
+                </Badge>
+              )}
             </div>
           </CardHeader>
           <CardContent className="pt-4 pb-2">
@@ -1654,18 +1653,16 @@ export default function AnalyticsDashboardPage() {
                   </CardTitle>
                 </HoverInfo>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant="outline"
-                  className={`font-mono text-[10px] ${
-                    hasBattery
-                      ? 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10'
-                      : 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10'
-                  }`}
-                >
-                  {hasBattery ? 'Lithium LFP' : 'ESS Standby (0.0% SOC)'}
-                </Badge>
-              </div>
+              {hasBattery && (
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className="border-cyan-500/30 text-cyan-400 bg-cyan-500/10 font-mono text-[10px]"
+                  >
+                    Lithium LFP
+                  </Badge>
+                </div>
+              )}
             </div>
           </CardHeader>
           <CardContent className="pt-4 pb-2">

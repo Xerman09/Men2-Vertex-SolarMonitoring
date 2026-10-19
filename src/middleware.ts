@@ -79,7 +79,9 @@ export async function middleware(req: NextRequest) {
 
   // 3. Multi-Account Management API Protection (Mutations & Sync)
   if (
-    (pathname.startsWith('/api/deye/accounts') && ['POST', 'PUT', 'DELETE'].includes(method)) ||
+    (pathname.startsWith('/api/deye/accounts') &&
+      !pathname.startsWith('/api/deye/accounts/connect') &&
+      ['POST', 'PUT', 'DELETE'].includes(method)) ||
     pathname.startsWith('/api/deye/accounts/sync')
   ) {
     const token = extractSessionToken(req.cookies);
@@ -90,6 +92,22 @@ export async function middleware(req: NextRequest) {
         NextResponse.json(
           { error: 'Administrator privileges required for solar gateway account modifications' },
           { status: 403 }
+        ),
+        requestOrigin
+      );
+    }
+  }
+
+  // 3.5. Customer Direct DeyeCloud Account Link (Model 3)
+  if (pathname.startsWith('/api/deye/accounts/connect') && method === 'POST') {
+    const token = extractSessionToken(req.cookies);
+    const session = await verifySessionToken(token);
+
+    if (!session || (session.role !== 'admin' && session.role !== 'consumer')) {
+      return applyCorsHeaders(
+        NextResponse.json(
+          { error: 'Authentication required to link DeyeCloud account' },
+          { status: 401 }
         ),
         requestOrigin
       );

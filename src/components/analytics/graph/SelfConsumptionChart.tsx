@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import { Zap, TrendingUp } from 'lucide-react';
 import { HoverInfo } from '@/components/ui/tooltip';
+import { renderNowReferenceLabel } from '../GraphTooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { SelfConsumptionMetrics, COLOR_PV, COLOR_LOAD } from '../useTrigonometricGraph';
 
@@ -175,7 +176,7 @@ export function SelfConsumptionChart({
         <span className="text-xs font-semibold text-foreground">5-Minute Continuous Ratios (%)</span>
         <div className={compact ? 'h-[180px] w-full' : 'h-[230px] w-full'}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={selfConsumptionMetrics.hourlyRatios} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+            <AreaChart data={selfConsumptionMetrics.hourlyRatios} margin={{ top: 24, right: 14, left: -12, bottom: 0 }}>
               <defs>
                 <linearGradient id="utilGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={COLOR_PV} stopOpacity={0.35} />
@@ -191,7 +192,13 @@ export function SelfConsumptionChart({
               <YAxis domain={[0, 100]} stroke="currentColor" className="text-[10px] opacity-60" unit="%" />
               <Tooltip contentStyle={{ backgroundColor: 'rgba(23,31,51,0.95)', borderRadius: '0.75rem', border: '1px solid rgba(255,255,255,0.1)', fontSize: '12px' }} />
               <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-              <ReferenceLine x={nowSlotStr} stroke="#64748b" strokeDasharray="3 3" />
+              <ReferenceLine
+                isFront
+                x={nowSlotStr}
+                stroke="#64748b"
+                strokeDasharray="3 3"
+                label={renderNowReferenceLabel('● Now', '#94a3b8')}
+              />
               <Area
                 type="monotone"
                 dataKey="utilizationPct"

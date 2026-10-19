@@ -4,7 +4,6 @@ import React from 'react';
 import { Radio, Pause, Play, RefreshCw, Zap, TrendingUp, Sun, Waves, Compass, Activity } from 'lucide-react';
 import { CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { HoverInfo } from '@/components/ui/tooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
@@ -49,15 +48,6 @@ export function GraphHeaderControls({
                   5-Minute Telemetry & Power Curves
                 </CardTitle>
               </HoverInfo>
-              <Badge variant="outline" className="border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono text-[10px] px-1.5 py-0 flex items-center gap-1">
-                <span className="relative flex h-1.5 w-1.5">
-                  {isLiveStreaming && (
-                    <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  )}
-                  <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${isLiveStreaming ? 'bg-emerald-500' : 'bg-muted-foreground'}`} />
-                </span>
-                {isLiveStreaming ? `LIVE (${timeResolution}m)` : 'PAUSED'}
-              </Badge>
             </div>
           </div>
         </div>
