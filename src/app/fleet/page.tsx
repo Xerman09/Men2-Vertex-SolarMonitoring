@@ -30,6 +30,7 @@ import {
   Maximize2,
   Minimize2,
   Power,
+  Globe,
 } from 'lucide-react';
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
@@ -555,7 +556,7 @@ export default function FleetMonitoringPage() {
 
       {/* Main Content: THE ACCOUNT GRID (Default) with progressive expansion to Plants and Inverters */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="animate-pulse bg-card/60 border-border/50 h-72 rounded-2xl" />
           ))}
@@ -580,8 +581,8 @@ export default function FleetMonitoringPage() {
           </Button>
         </div>
       ) : (
-        /* THE HIERARCHICAL GRID: Defaults to each account's separate totals in a grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
+        /* THE HIERARCHICAL GRID: Defaults to each account's separate totals in a grid (Never 1 col) */
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 items-stretch">
           {filteredTree.map((accGroup) => {
             const isAccExpanded = expandedAccountIds.has(accGroup.account.id);
             const accUtilization = accGroup.capacityKw > 0
@@ -605,142 +606,111 @@ export default function FleetMonitoringPage() {
                     isAccExpanded ? 'bg-muted/40 border-b border-border/50' : 'hover:bg-muted/20'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2 shrink-0">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <Badge variant="outline" className="text-[10px] font-mono py-0 text-muted-foreground">
-                          ID: {accGroup.account.id}
-                        </Badge>
-                        {accGroup.isDemo && (
-                          <Badge variant="warning" className="text-[9px] font-mono py-0">
-                            DEMO ACCOUNT
-                          </Badge>
-                        )}
-                        {accGroup.account.status === 'OFFLINE' ? (
-                          <Badge variant="destructive" className="text-[9px] font-mono py-0">
-                            DISABLED
-                          </Badge>
-                        ) : (
-                          <Badge variant="success" className="text-[9px] font-mono py-0">
-                            ACTIVE
-                          </Badge>
-                        )}
-                        <span className="text-[10px] text-muted-foreground font-mono">
-                          {accGroup.plants.length} Plants • {accGroup.invertersCount} Inverters
-                        </span>
-                      </div>
-
-                      <h2 className="text-base sm:text-lg font-bold text-foreground truncate mt-1">
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    {/* Row 1: Account Name + Actions (Disable/Enable & Expand) in a single row */}
+                    <div className="flex items-center justify-between gap-2">
+                      <h2 className="text-base sm:text-lg font-bold text-foreground truncate min-w-0 flex-1">
                         {accGroup.account.name}
                       </h2>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isAdmin && (
+                          <Button
+                            variant={accGroup.account.status === 'OFFLINE' ? 'outline' : 'secondary'}
+                            size="xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleAccount(accGroup.account);
+                            }}
+                            title={accGroup.account.status === 'OFFLINE' ? 'Enable Account' : 'Disable Account'}
+                            className="h-7 px-2 text-xs gap-1 font-semibold cursor-pointer"
+                          >
+                            <Power
+                              size={12}
+                              className={accGroup.account.status === 'OFFLINE' ? 'text-muted-foreground' : 'text-emerald-500'}
+                            />
+                            <span className="hidden sm:inline">
+                              {accGroup.account.status === 'OFFLINE' ? 'Enable' : 'Disable'}
+                            </span>
+                          </Button>
+                        )}
+
+                        {/* Expand/Collapse Indicator Button */}
+                        <Button
+                          variant={isAccExpanded ? 'secondary' : 'outline'}
+                          size="xs"
+                          onClick={(e) => toggleAccountExpand(accGroup.account.id, e)}
+                          className="shrink-0 text-xs gap-1 font-semibold cursor-pointer"
+                        >
+                          {isAccExpanded ? (
+                            <>
+                              <ChevronUp size={14} />
+                              <span>Collapse Plants</span>
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown size={14} />
+                              <span>Expand Plants ({accGroup.plants.length})</span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {isAdmin && (
-                        <Button
-                          variant={accGroup.account.status === 'OFFLINE' ? 'outline' : 'secondary'}
-                          size="xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleAccount(accGroup.account);
-                          }}
-                          title={accGroup.account.status === 'OFFLINE' ? 'Enable Account' : 'Disable Account'}
-                          className="h-7 px-2 text-xs gap-1 font-semibold cursor-pointer"
-                        >
-                          <Power
-                            size={12}
-                            className={accGroup.account.status === 'OFFLINE' ? 'text-muted-foreground' : 'text-emerald-500'}
-                          />
-                          <span className="hidden sm:inline">
-                            {accGroup.account.status === 'OFFLINE' ? 'Enable' : 'Disable'}
-                          </span>
-                        </Button>
+                    {/* Row 2: Status badge and plant/inverter count (ID hidden) */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {accGroup.isDemo && (
+                        <Badge variant="warning" className="text-[9px] font-mono py-0">
+                          DEMO ACCOUNT
+                        </Badge>
                       )}
-
-                      {/* Expand/Collapse Indicator Button */}
-                      <Button
-                        variant={isAccExpanded ? 'secondary' : 'outline'}
-                        size="xs"
-                        onClick={(e) => toggleAccountExpand(accGroup.account.id, e)}
-                        className="shrink-0 text-xs gap-1 font-semibold"
-                      >
-                        {isAccExpanded ? (
-                          <>
-                            <ChevronUp size={14} />
-                            <span>Collapse Plants</span>
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown size={14} />
-                            <span>Expand Plants ({accGroup.plants.length})</span>
-                          </>
-                        )}
-                      </Button>
+                      {accGroup.account.status === 'OFFLINE' ? (
+                        <Badge variant="destructive" className="text-[9px] font-mono py-0">
+                          DISABLED
+                        </Badge>
+                      ) : (
+                        <Badge variant="success" className="text-[9px] font-mono py-0">
+                          ACTIVE
+                        </Badge>
+                      )}
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {accGroup.plants.length} Plants • {accGroup.invertersCount} Inverters
+                      </span>
                     </div>
                   </div>
 
-                  {/* ACCOUNT TOTALS & COMPACT DIURNAL CURVE */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-stretch flex-1">
-                    {/* Vertical 3 Totals + Utilization Bar */}
-                    <div className="md:col-span-5 flex flex-col justify-between gap-2.5">
-                      {/* 3 TOTALS (VERTICAL) */}
-                      <div className="flex flex-col gap-1.5 flex-1 justify-between">
-                        <div className="bg-muted/30 p-2 rounded-lg border border-border/40 flex-1 flex flex-col items-center justify-center text-center">
-                          <span className="text-[8.5px] uppercase tracking-wider font-mono text-muted-foreground block">
-                            Live Solar Output
-                          </span>
-                          <div className="text-sm font-bold font-mono text-amber-500 mt-0.5 flex items-baseline gap-0.5">
-                            {accGroup.livePowerKw.toFixed(1)}
-                            <span className="text-[8.5px] font-normal text-muted-foreground">kW</span>
-                          </div>
-                        </div>
-
-                        <div className="bg-muted/30 p-2 rounded-lg border border-border/40 flex-1 flex flex-col items-center justify-center text-center">
-                          <span className="text-[8.5px] uppercase tracking-wider font-mono text-muted-foreground block">
-                            Daily Harvest
-                          </span>
-                          <div className="text-sm font-bold font-mono text-emerald-500 mt-0.5 flex items-baseline gap-0.5">
-                            {accGroup.dailyYieldKwh.toFixed(1)}
-                            <span className="text-[8.5px] font-normal text-muted-foreground">kWh</span>
-                          </div>
-                        </div>
-
-                        <div className="bg-muted/30 p-2 rounded-lg border border-border/40 flex-1 flex flex-col items-center justify-center text-center">
-                          <span className="text-[8.5px] uppercase tracking-wider font-mono text-muted-foreground block">
-                            Installed Capacity
-                          </span>
-                          <div className="text-sm font-bold font-mono text-foreground mt-0.5 flex items-baseline gap-0.5">
-                            {accGroup.capacityKw.toFixed(0)}
-                            <span className="text-[8.5px] font-normal text-muted-foreground">kWp</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Account Capacity Utilization Bar */}
-                      <div className="pt-0.5">
-                        <div className="flex items-center justify-between text-[9px] mb-1 font-mono">
-                          <span className="text-muted-foreground">Fleet Utilization</span>
-                          <span className="font-semibold text-foreground">{accUtilization.toFixed(1)}%</span>
-                        </div>
-                        <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all duration-500"
-                            style={{ width: `${accUtilization}%` }}
-                          />
-                        </div>
-                      </div>
+                  {/* ACCOUNT HARVEST & UTILIZATION STRIP */}
+                  <div className="flex items-center justify-between text-[10px] font-mono p-1.5 rounded-lg bg-muted/20 border border-border/40 gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="text-muted-foreground truncate">Harvest:</span>
+                      <span className="font-bold text-emerald-500 whitespace-nowrap">
+                        {accGroup.dailyYieldKwh.toFixed(1)} <span className="text-[8px] font-normal text-muted-foreground">kWh</span>
+                      </span>
                     </div>
 
-                    {/* Diurnal Solar Curve stretched to cover whole card */}
-                    <div className="md:col-span-7 flex flex-col h-full min-h-[160px]">
-                      <PlantSolarCurve
-                        capacityKw={accGroup.capacityKw}
-                        livePowerKw={accGroup.livePowerKw}
-                        dailyYieldKwh={accGroup.dailyYieldKwh}
-                        className="h-full flex-1"
-                        showLabels={true}
-                      />
+                    <div className="flex items-center gap-2 shrink-0 justify-end">
+                      <span className="text-muted-foreground whitespace-nowrap">
+                        Util: <span className="font-semibold text-foreground">{accUtilization.toFixed(1)}%</span>
+                      </span>
+                      <div className="h-1.5 w-14 sm:w-20 bg-muted/60 rounded-full overflow-hidden shrink-0">
+                        <div
+                          className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all duration-500"
+                          style={{ width: `${accUtilization}%` }}
+                        />
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Diurnal Solar Curve stretched to cover whole card */}
+                  <div className="flex flex-col flex-1 min-h-[140px] w-full">
+                    <PlantSolarCurve
+                      capacityKw={accGroup.capacityKw}
+                      livePowerKw={accGroup.livePowerKw}
+                      dailyYieldKwh={accGroup.dailyYieldKwh}
+                      className="h-full flex-1 w-full"
+                      showLabels={true}
+                    />
                   </div>
                 </div>
 
@@ -759,8 +729,8 @@ export default function FleetMonitoringPage() {
                       </span>
                     </div>
 
-                    {/* PLANTS GRID */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
+                    {/* PLANTS GRID (Never 1 col) */}
+                    <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 items-stretch">
                       {accGroup.plants.map((pGroup) => {
                         const isPlantExpanded = expandedPlantKeys.has(pGroup.plantKey);
                         const plantUtil = pGroup.capacityKw > 0
@@ -834,64 +804,38 @@ export default function FleetMonitoringPage() {
 
                             {/* PLANT SEPARATE TOTALS & INDIVIDUAL GRAPH */}
                             <div className="p-3 flex-1 flex flex-col justify-between gap-2.5">
-                              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-stretch flex-1">
-                                {/* Column 1: Plant Vertical 3 Totals */}
-                                <div className="sm:col-span-5 flex flex-col justify-between gap-2">
-                                  {/* Plant Numeric Totals (Vertical) */}
-                                  <div className="flex flex-col gap-1.5 flex-1 justify-between">
-                                    <div className="bg-muted/30 p-1.5 rounded-lg border border-border/40 flex-1 flex flex-col items-center justify-center text-center min-h-[38px]">
-                                      <span className="text-[8px] uppercase font-mono text-muted-foreground block">
-                                        Live Power
-                                      </span>
-                                      <span className="text-[11px] font-bold font-mono text-amber-500">
-                                        {pGroup.livePowerKw.toFixed(1)} kW
-                                      </span>
-                                    </div>
-
-                                    <div className="bg-muted/30 p-1.5 rounded-lg border border-border/40 flex-1 flex flex-col items-center justify-center text-center min-h-[38px]">
-                                      <span className="text-[8px] uppercase font-mono text-muted-foreground block">
-                                        Daily Harvest
-                                      </span>
-                                      <span className="text-[11px] font-bold font-mono text-emerald-500">
-                                        {pGroup.dailyYieldKwh.toFixed(1)} kWh
-                                      </span>
-                                    </div>
-
-                                    <div className="bg-muted/30 p-1.5 rounded-lg border border-border/40 flex-1 flex flex-col items-center justify-center text-center min-h-[38px]">
-                                      <span className="text-[8px] uppercase font-mono text-muted-foreground block">
-                                        Capacity
-                                      </span>
-                                      <span className="text-[11px] font-bold font-mono text-foreground">
-                                        {pGroup.capacityKw.toFixed(0)} kWp
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {/* Capacity Utilization Progress Bar */}
-                                  <div className="pt-0.5">
-                                    <div className="flex items-center justify-between text-[9px] mb-0.5 font-mono">
-                                      <span className="text-muted-foreground">Capacity Factor</span>
-                                      <span className="font-semibold text-foreground">{plantUtil.toFixed(1)}%</span>
-                                    </div>
-                                    <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden">
-                                      <div
-                                        className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full"
-                                        style={{ width: `${plantUtil}%` }}
-                                      />
-                                    </div>
-                                  </div>
+                              {/* Plant Harvest & Capacity Factor Strip */}
+                              <div className="flex items-center justify-between text-[10px] font-mono p-1.5 rounded-lg bg-muted/20 border border-border/40 gap-2 shrink-0">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                  <span className="text-muted-foreground truncate">Harvest:</span>
+                                  <span className="font-bold text-emerald-500 whitespace-nowrap">
+                                    {pGroup.dailyYieldKwh.toFixed(1)} <span className="text-[8px] font-normal text-muted-foreground">kWh</span>
+                                  </span>
                                 </div>
 
-                                {/* Column 2: Plant's Diurnal Solar Arc Curve */}
-                                <div className="sm:col-span-7 flex flex-col h-full min-h-[145px]">
-                                  <PlantSolarCurve
-                                    capacityKw={pGroup.capacityKw}
-                                    livePowerKw={pGroup.livePowerKw}
-                                    dailyYieldKwh={pGroup.dailyYieldKwh}
-                                    className="h-full flex-1"
-                                    showLabels={true}
-                                  />
+                                <div className="flex items-center gap-2 shrink-0 justify-end">
+                                  <span className="text-muted-foreground whitespace-nowrap">
+                                    Util: <span className="font-semibold text-foreground">{plantUtil.toFixed(1)}%</span>
+                                  </span>
+                                  <div className="h-1.5 w-12 sm:w-16 bg-muted/60 rounded-full overflow-hidden shrink-0">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full"
+                                      style={{ width: `${plantUtil}%` }}
+                                    />
+                                  </div>
                                 </div>
+                              </div>
+
+                              {/* Plant's Diurnal Solar Arc Curve - FULL WIDTH */}
+                              <div className="flex flex-col flex-1 min-h-[140px] w-full">
+                                <PlantSolarCurve
+                                  capacityKw={pGroup.capacityKw}
+                                  livePowerKw={pGroup.livePowerKw}
+                                  dailyYieldKwh={pGroup.dailyYieldKwh}
+                                  className="h-full flex-1 w-full"
+                                  showLabels={true}
+                                />
                               </div>
 
                               {/* EXPAND INVERTERS BUTTON */}
@@ -926,8 +870,8 @@ export default function FleetMonitoringPage() {
                                   <span>{pGroup.inverters.length} Inverter Nodes Active</span>
                                 </div>
 
-                                {/* INVERTERS GRID */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-stretch">
+                                {/* INVERTERS GRID (Never 1 col) */}
+                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 items-stretch">
                                   {pGroup.inverters.map((inv) => {
                                     const isCopied = copiedSn === inv.deviceSn;
                                     const isFault = inv.status === 'FAULT';
@@ -988,7 +932,7 @@ export default function FleetMonitoringPage() {
                                             ratedKw={inv.ratedKw}
                                             liveSolarPowerKw={inv.liveSolarPowerKw}
                                             dailyYieldKwh={inv.dailyYieldKwh}
-                                            height={52}
+                                            height={58}
                                             className="w-full"
                                           />
                                         </div>
