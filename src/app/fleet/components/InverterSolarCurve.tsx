@@ -5,6 +5,35 @@ import React, { useState, useMemo, useId } from 'react';
 // Exact Color Palette from Analytics Dashboard (src/app/analytics/page.tsx)
 const COLOR_SOLAR = '#f59e0b'; // Amber-500 / Solar Gold
 
+// Helper to determine clean rounded Y-axis max
+function getNiceMax(val: number): number {
+  if (val <= 5) return 5;
+  if (val <= 10) return 10;
+  if (val <= 20) return 20;
+  if (val <= 30) return 30;
+  if (val <= 50) return 50;
+  if (val <= 75) return 75;
+  if (val <= 100) return 100;
+  if (val <= 150) return 150;
+  if (val <= 200) return 200;
+  const factor = Math.pow(10, Math.floor(Math.log10(val)));
+  return Math.ceil(val / factor) * factor;
+}
+
+function formatYAxisLabel(val: number): string {
+  if (val >= 1000) {
+    const k = val / 1000;
+    return `${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}M`;
+  }
+  if (val >= 100) {
+    return Math.round(val).toString();
+  }
+  if (val % 1 === 0) {
+    return val.toString();
+  }
+  return val.toFixed(1);
+}
+
 interface InverterSolarCurveProps {
   ratedKw: number;
   liveSolarPowerKw: number;
@@ -17,7 +46,7 @@ export function InverterSolarCurve({
   ratedKw,
   liveSolarPowerKw,
   dailyYieldKwh = 0,
-  height = 42,
+  height = 54,
   className = '',
 }: InverterSolarCurveProps) {
   const [hoveredPoint, setHoveredPoint] = useState<{ hour: number; power: number; x: number; y: number } | null>(null);
@@ -65,12 +94,15 @@ export function InverterSolarCurve({
   }, [ratedKw, liveSolarPowerKw, nowHour]);
 
   const width = 240;
-  const paddingX = 5;
+  const svgHeight = 42;
+  const paddingX = 4;
   const paddingY = 3;
   const plotWidth = width - paddingX * 2;
-  const plotHeight = height - paddingY * 2;
+  const plotHeight = svgHeight - paddingY * 2;
 
-  const maxPower = Math.max(ratedKw || 50, ...points.map((p) => p.power), liveSolarPowerKw, 10);
+  const maxPower = useMemo(() => {
+    return Math.max(ratedKw || 50, liveSolarPowerKw || 0);
+  }, [ratedKw, liveSolarPowerKw]);
 
   const coords = useMemo(() => {
     return points.map((p, idx) => {
@@ -132,109 +164,155 @@ export function InverterSolarCurve({
   return (
     <div className={`relative w-full select-none ${className}`}>
       <div
-        className="relative w-full overflow-hidden rounded-md bg-card/70 border border-border/40 p-0.5"
-        style={{ height: `${height}px`, maxHeight: `${height}px` }}
+        className="relative w-full overflow-hidden rounded-md bg-card/70 border border-border/40 p-1 flex items-stretch gap-1"
+        style={{ height: `${height}px`, minHeight: `${height}px` }}
       >
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          preserveAspectRatio="none"
-          className="w-full h-full overflow-visible cursor-crosshair block"
-          onMouseLeave={() => setHoveredPoint(null)}
-        >
-          <defs>
-            {/* Exact colorSolar from Analytics Dashboard: #f59e0b (0.8 opacity down to 0) */}
-            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={COLOR_SOLAR} stopOpacity={0.8} />
-              <stop offset="95%" stopColor={COLOR_SOLAR} stopOpacity={0.0} />
-            </linearGradient>
-          </defs>
+        {/* Inverter Mini Y-Axis Column */}
+        <div className="flex flex-col justify-between items-end pr-1 text-[7px] font-mono text-muted-foreground/80 shrink-0 select-none pb-3 pt-0.5 w-7 sm:w-8 border-r border-border/30">
+          <div className="flex items-center justify-end w-full leading-none">
+            <span className="font-semibold text-foreground/90">{formatYAxisLabel(maxPower)}</span>
+          </div>
+          <div className="flex items-center justify-end w-full leading-none text-muted-foreground/70">
+            <span>{formatYAxisLabel(maxPower * 0.5)}</span>
+          </div>
+          <div className="flex items-center justify-end w-full leading-none text-muted-foreground/70">
+            <span>0</span>
+          </div>
+        </div>
 
-          {/* Dotted reference line matching Analytics */}
-          <line
-            x1={paddingX}
-            y1={paddingY + plotHeight * 0.5}
-            x2={width - paddingX}
-            y2={paddingY + plotHeight * 0.5}
-            stroke="hsl(var(--border) / 0.3)"
-            strokeDasharray="2 3"
-            strokeWidth="1"
-            vectorEffect="non-scaling-stroke"
-          />
+        {/* Chart Drawing Area + Mini Time Hints */}
+        <div className="relative flex-1 min-w-0 min-h-0 flex flex-col justify-between">
+          <svg
+            viewBox={`0 0 ${width} ${svgHeight}`}
+            preserveAspectRatio="none"
+            className="w-full flex-1 overflow-visible cursor-crosshair block"
+            onMouseLeave={() => setHoveredPoint(null)}
+          >
+            <defs>
+              {/* Exact colorSolar from Analytics Dashboard: #f59e0b (0.8 opacity down to 0) */}
+              <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={COLOR_SOLAR} stopOpacity={0.8} />
+                <stop offset="95%" stopColor={COLOR_SOLAR} stopOpacity={0.0} />
+              </linearGradient>
+            </defs>
 
-          {/* Area Fill */}
-          <path
-            d={svgPaths.areaPath}
-            fill={`url(#${gradId})`}
-          />
-
-          {/* Power Curve Line */}
-          <path
-            d={svgPaths.linePath}
-            fill="none"
-            stroke={COLOR_SOLAR}
-            strokeWidth="1.75"
-            strokeLinecap="round"
-            vectorEffect="non-scaling-stroke"
-          />
-
-          {/* Vertical 'Now' Reference Line */}
-          <line
-            x1={nowCoord.x}
-            y1={paddingY}
-            x2={nowCoord.x}
-            y2={paddingY + plotHeight}
-            stroke="#94a3b8"
-            strokeDasharray="2 2"
-            strokeWidth="1"
-            vectorEffect="non-scaling-stroke"
-          />
-
-          {/* Current Live Operating Point */}
-          <g transform={`translate(${nowCoord.x}, ${nowCoord.y})`}>
-            <circle r="3" fill={COLOR_SOLAR} className="animate-ping opacity-60" />
-            <circle r="2" fill={COLOR_SOLAR} stroke="hsl(var(--background))" strokeWidth="1" />
-          </g>
-
-          {/* Interactive Hover Hit Areas (only elapsed hours, no future values!) */}
-          {coords.filter((c) => !c.isFuture).map((c) => (
-            <rect
-              key={c.hour}
-              x={c.x - plotWidth / 48}
-              y={0}
-              width={plotWidth / 24}
-              height={height}
-              fill="transparent"
-              className="cursor-pointer"
-              onMouseEnter={() =>
-                setHoveredPoint({ hour: c.hour, power: c.power, x: c.x, y: c.y })
-              }
+            {/* Top limit grid line */}
+            <line
+              x1={paddingX}
+              y1={paddingY}
+              x2={width - paddingX}
+              y2={paddingY}
+              stroke="hsl(var(--border) / 0.15)"
+              strokeDasharray="2 3"
+              strokeWidth="1"
+              vectorEffect="non-scaling-stroke"
             />
-          ))}
 
-          {/* Hover Indicator */}
-          {hoveredPoint && (
-            <g transform={`translate(${hoveredPoint.x}, ${hoveredPoint.y})`}>
-              <line
-                x1={0}
-                y1={paddingY - hoveredPoint.y}
-                x2={0}
-                y2={height - paddingY - hoveredPoint.y}
-                stroke={COLOR_SOLAR}
-                strokeWidth="1"
-                strokeDasharray="2 2"
-                vectorEffect="non-scaling-stroke"
-              />
-              <circle r="2.5" fill="hsl(var(--background))" stroke={COLOR_SOLAR} strokeWidth="1.5" />
+            {/* Dotted reference line matching Analytics */}
+            <line
+              x1={paddingX}
+              y1={paddingY + plotHeight * 0.5}
+              x2={width - paddingX}
+              y2={paddingY + plotHeight * 0.5}
+              stroke="hsl(var(--border) / 0.3)"
+              strokeDasharray="2 3"
+              strokeWidth="1"
+              vectorEffect="non-scaling-stroke"
+            />
+
+            {/* Baseline reference */}
+            <line
+              x1={paddingX}
+              y1={paddingY + plotHeight}
+              x2={width - paddingX}
+              y2={paddingY + plotHeight}
+              stroke="hsl(var(--border) / 0.4)"
+              strokeWidth="1"
+              vectorEffect="non-scaling-stroke"
+            />
+
+            {/* Area Fill */}
+            <path
+              d={svgPaths.areaPath}
+              fill={`url(#${gradId})`}
+            />
+
+            {/* Power Curve Line */}
+            <path
+              d={svgPaths.linePath}
+              fill="none"
+              stroke={COLOR_SOLAR}
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+
+            {/* Vertical 'Now' Reference Line */}
+            <line
+              x1={nowCoord.x}
+              y1={paddingY}
+              x2={nowCoord.x}
+              y2={paddingY + plotHeight}
+              stroke="#94a3b8"
+              strokeDasharray="2 2"
+              strokeWidth="1"
+              vectorEffect="non-scaling-stroke"
+            />
+
+            {/* Current Live Operating Point */}
+            <g transform={`translate(${nowCoord.x}, ${nowCoord.y})`}>
+              <circle r="3" fill={COLOR_SOLAR} className="animate-ping opacity-60" />
+              <circle r="2" fill={COLOR_SOLAR} stroke="hsl(var(--background))" strokeWidth="1" />
             </g>
-          )}
-        </svg>
+
+            {/* Interactive Hover Hit Areas (only elapsed hours, no future values!) */}
+            {coords.filter((c) => !c.isFuture).map((c) => (
+              <rect
+                key={c.hour}
+                x={c.x - plotWidth / 48}
+                y={0}
+                width={plotWidth / 24}
+                height={svgHeight}
+                fill="transparent"
+                className="cursor-pointer"
+                onMouseEnter={() =>
+                  setHoveredPoint({ hour: c.hour, power: c.power, x: c.x, y: c.y })
+                }
+              />
+            ))}
+
+            {/* Hover Indicator */}
+            {hoveredPoint && (
+              <g transform={`translate(${hoveredPoint.x}, ${hoveredPoint.y})`}>
+                <line
+                  x1={0}
+                  y1={paddingY - hoveredPoint.y}
+                  x2={0}
+                  y2={plotHeight + paddingY - hoveredPoint.y}
+                  stroke={COLOR_SOLAR}
+                  strokeWidth="1"
+                  strokeDasharray="2 2"
+                  vectorEffect="non-scaling-stroke"
+                />
+                <circle r="2.5" fill="hsl(var(--background))" stroke={COLOR_SOLAR} strokeWidth="1.5" />
+              </g>
+            )}
+          </svg>
+
+          {/* Mini time hints */}
+          <div className="flex items-center justify-between text-[6.5px] font-mono text-muted-foreground/50 px-0.5 pt-0.5 border-t border-border/20 leading-none">
+            <span>06:00</span>
+            <span>12:00</span>
+            <span>18:00</span>
+          </div>
+        </div>
 
         {/* Hover Tooltip Overlay: smaller letters/numbers, clearly visible */}
         {hoveredPoint && (
           <div
             className="absolute top-0.5 pointer-events-none z-10 px-1.5 py-0.5 rounded bg-popover/95 text-foreground border border-border/80 shadow-xs text-[8px] font-mono -translate-x-1/2 flex items-center gap-1"
             style={{
-              left: `${Math.max(10, Math.min(90, (hoveredPoint.hour / 23) * 100))}%`,
+              left: `${Math.max(20, Math.min(85, 12 + ((hoveredPoint.x) / width) * 85))}%`,
             }}
           >
             <span className="size-1 rounded-full bg-amber-500 inline-block" />
