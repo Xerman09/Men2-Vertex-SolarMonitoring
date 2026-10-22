@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useId } from 'react';
+import { Clock } from 'lucide-react';
 
 // Exact Color Palette from Analytics Dashboard (src/app/analytics/page.tsx)
 const COLOR_SOLAR = '#f59e0b'; // Amber-500 / Solar Gold
@@ -307,17 +308,40 @@ export function InverterSolarCurve({
           </div>
         </div>
 
-        {/* Hover Tooltip Overlay: smaller letters/numbers, clearly visible */}
+        {/* Hover Tooltip Overlay: identical to Analytics Dashboard CustomExactTooltip */}
         {hoveredPoint && (
           <div
-            className="absolute top-0.5 pointer-events-none z-10 px-1.5 py-0.5 rounded bg-popover/95 text-foreground border border-border/80 shadow-xs text-[8px] font-mono -translate-x-1/2 flex items-center gap-1"
+            className="absolute pointer-events-none z-50 rounded-xl border border-border/80 bg-background/95 p-2 text-xs shadow-xl backdrop-blur-md min-w-[190px] font-mono transition-all duration-75"
             style={{
-              left: `${Math.max(20, Math.min(85, 12 + ((hoveredPoint.x) / width) * 85))}%`,
+              top: '2px',
+              left: hoveredPoint.x > width * 0.5 ? '4px' : undefined,
+              right: hoveredPoint.x <= width * 0.5 ? '4px' : undefined,
             }}
           >
-            <span className="size-1 rounded-full bg-amber-500 inline-block" />
-            <span className="font-bold text-amber-500">{hoveredPoint.power.toFixed(1)} kW</span>
-            <span className="text-muted-foreground text-[7.5px]">@{String(hoveredPoint.hour).padStart(2, '0')}:00</span>
+            <div className="flex items-center justify-between border-b border-border/50 pb-1 font-mono text-[10px]">
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3 w-3 text-muted-foreground" />
+                <span className="font-bold text-foreground">
+                  {String(hoveredPoint.hour).padStart(2, '0')}:00
+                </span>
+              </div>
+              <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 font-semibold flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block motion-safe:animate-pulse" />
+                5-Min Telemetry
+              </span>
+            </div>
+            <div className="pt-1.5 space-y-1 font-mono text-[10px]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <span className="h-2 w-2 rounded-full inline-block shrink-0 bg-[#f59e0b]" />
+                  Inverter PV Power:
+                </span>
+                <span className="font-bold text-foreground">
+                  {hoveredPoint.power.toFixed(2)}
+                  <span className="text-[9px] font-normal text-muted-foreground ml-1">kW</span>
+                </span>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -56,7 +56,8 @@ export default function LoginPage() {
       if (res.success) {
         const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
         const redirectParam = searchParams?.get('redirect');
-        router.replace(redirectParam || '/analytics');
+        const defaultTarget = '/fleet';
+        router.replace(redirectParam || defaultTarget);
       } else {
         setError(res.error || 'Invalid username/email or password.');
       }
