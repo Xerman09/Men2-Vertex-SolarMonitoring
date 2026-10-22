@@ -50,15 +50,15 @@ export function Sidebar() {
     badge?: string;
   }> = [
     {
-      label: 'Analytics Dashboard',
-      href: '/analytics',
-      icon: BarChart3,
-    },
-    {
       label: 'Fleet Monitoring',
       href: '/fleet',
       icon: LayoutGrid,
       badge: totalAccounts > 1 ? `${totalAccounts} Acc` : undefined,
+    },
+    {
+      label: 'Analytics Dashboard',
+      href: '/analytics',
+      icon: BarChart3,
     },
     {
       label: 'Energy Flow & Fleet',
@@ -136,7 +136,7 @@ export function Sidebar() {
             ) : (
               <div className="flex items-center justify-between w-full">
                 <Link
-                  href="/analytics"
+                  href="/fleet"
                   className="flex items-center gap-2.5 overflow-hidden group select-none"
                   title="VOSolar Telemetry"
                 >
@@ -189,8 +189,8 @@ export function Sidebar() {
           >
             {navItems.map((item) => {
               const isActive =
-                item.href === '/analytics'
-                  ? pathname === '/' || pathname.startsWith('/analytics')
+                item.href === '/fleet'
+                  ? pathname === '/' || pathname.startsWith('/fleet')
                   : pathname.startsWith(item.href);
               const Icon = item.icon;
               const isIconOnly = collapsed && !mobileOpen;

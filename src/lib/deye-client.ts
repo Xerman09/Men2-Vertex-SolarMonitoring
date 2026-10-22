@@ -545,7 +545,7 @@ export class DeyeCloudClient {
     const cacheKey = stationId || 'ALL';
     const now = Date.now();
     const cached = this.cachedStationSummary.get(cacheKey);
-    if (cached && now - cached.timestamp < 4000) {
+    if (cached && now - cached.timestamp < 20000) {
       return cached.result;
     }
 
@@ -680,7 +680,7 @@ export class DeyeCloudClient {
     if (!deviceSnList || deviceSnList.length === 0) return result;
 
     const now = Date.now();
-    if (this.cachedBatchDevices && now - this.cachedBatchDevices.timestamp < 4000) {
+    if (this.cachedBatchDevices && now - this.cachedBatchDevices.timestamp < 20000) {
       return this.cachedBatchDevices.result;
     }
 

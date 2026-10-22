@@ -22,7 +22,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (!user && !isLoginPage) {
       router.replace('/login');
     } else if (user && isLoginPage) {
-      router.replace('/analytics');
+      router.replace('/fleet');
     }
   }, [user, isLoginPage, isInitialized, router]);
 

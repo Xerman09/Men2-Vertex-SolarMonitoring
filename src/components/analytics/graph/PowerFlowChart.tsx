@@ -309,7 +309,7 @@ export function PowerFlowChart({
                   stroke="#94a3b8"
                   strokeDasharray="4 4"
                   strokeWidth={1.5}
-                  label={renderNowReferenceLabel(`● Now (${nowExactTimeStr})`, '#94a3b8')}
+                  label={renderNowReferenceLabel(`● Now (${nowExactTimeStr})`, '#94a3b8') as any}
                 />
                 <Area
                   type="monotone"
@@ -404,7 +404,7 @@ export function PowerFlowChart({
                   stroke={COLOR_PV}
                   strokeDasharray="4 4"
                   strokeWidth={1.5}
-                  label={renderNowReferenceLabel(`● Now (${nowExactTimeStr})`, COLOR_PV)}
+                  label={renderNowReferenceLabel(`● Now (${nowExactTimeStr})`, COLOR_PV) as any}
                 />
                 <Area
                   type="monotone"
@@ -461,7 +461,7 @@ export function PowerFlowChart({
                   stroke={COLOR_LOAD}
                   strokeDasharray="4 4"
                   strokeWidth={1.5}
-                  label={renderNowReferenceLabel(`● Now (${nowExactTimeStr})`, COLOR_LOAD)}
+                  label={renderNowReferenceLabel(`● Now (${nowExactTimeStr})`, COLOR_LOAD) as any}
                 />
                 <Area
                   type="monotone"
@@ -513,7 +513,7 @@ export function PowerFlowChart({
                   stroke={COLOR_GRID}
                   strokeDasharray="4 4"
                   strokeWidth={1.5}
-                  label={renderNowReferenceLabel(`● Now (${nowExactTimeStr})`, COLOR_GRID)}
+                  label={renderNowReferenceLabel(`● Now (${nowExactTimeStr})`, COLOR_GRID) as any}
                 />
                 <Area
                   type="monotone"

@@ -212,7 +212,7 @@ export function AdvancedMathCharts({
                 x={nowSlotStr}
                 stroke="#64748b"
                 strokeDasharray="3 3"
-                label={renderNowReferenceLabel('● Now', '#94a3b8')}
+                label={renderNowReferenceLabel('● Now', '#94a3b8') as any}
               />
               <Area
                 type="monotone"
@@ -295,7 +295,7 @@ export function AdvancedMathCharts({
                 x={nowSlotStr}
                 stroke="#64748b"
                 strokeDasharray="3 3"
-                label={renderNowReferenceLabel('● Now', '#94a3b8')}
+                label={renderNowReferenceLabel('● Now', '#94a3b8') as any}
               />
               <Line
                 type="monotone"

@@ -525,3 +525,11 @@
 .recharts-surface {
   overflow: visible !important;
 }
+
+/* Fleet 3-Column Drill-Down Grid Alignment */
+@media (min-width: 1024px) {
+  .fleet-cell {
+    grid-column: var(--cell-col);
+    grid-row: var(--cell-row);
+  }
+}

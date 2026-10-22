@@ -49,6 +49,7 @@ const log = createLogger('DeyeAccountManager');
  */
 class DeyeAccountManager {
   private accountsCache: DeyeAccountConfig[] | null = null;
+  private cachedFleetSummary: Map<string, { data: AggregatedFleetSummary; timestamp: number }> = new Map();
   private clientRegistry: ClientRegistry = clientRegistry;
   private fleetAggregator: FleetAggregator = fleetAggregator;
   private lastLoadedAt: number = 0;
@@ -117,6 +118,9 @@ class DeyeAccountManager {
    * 3. Local disk cache: deye-accounts.json
    */
   public async syncWithDirectus(force = false): Promise<DeyeAccountConfig[]> {
+    if (force) {
+      this.cachedFleetSummary.clear();
+    }
     const now = Date.now();
     if (!force && this.accountsCache && now - this.lastDirectusSyncAt < 10000) {
       return this.accountsCache;
@@ -325,6 +329,7 @@ class DeyeAccountManager {
    * Save accounts list to deye-accounts.json with atomic write
    */
   public saveAccountsToFile(accounts: DeyeAccountConfig[]): boolean {
+    this.cachedFleetSummary.clear();
     const success = FileAccountCache.saveAccountsToFile(accounts);
     if (success) {
       this.accountsCache = accounts.filter((acc) => acc.enabled !== false);
@@ -926,9 +931,21 @@ class DeyeAccountManager {
   }
 
   /**
-   * Poll all accounts (or specific allowed accounts), plants, and inverters concurrently to compute fleet aggregate
+   * Poll all accounts (or specific allowed accounts), plants, and inverters concurrently to compute fleet aggregate.
+   * Cached for 20s in server memory to eliminate redundant DeyeCloud API traffic.
    */
   public async getAggregatedFleetSummary(accountIds?: string[], sessionRole?: string): Promise<AggregatedFleetSummary> {
+    const roleKey = sessionRole || 'admin';
+    const accKey = (accountIds || []).slice().sort().join(',');
+    const cacheKey = `${roleKey}:${accKey}`;
+    const now = Date.now();
+    const TTL_MS = 20000; // 20-second cache window
+
+    const cached = this.cachedFleetSummary.get(cacheKey);
+    if (cached && now - cached.timestamp < TTL_MS) {
+      return cached.data;
+    }
+
     const clients = this.getAllClients();
     const rawAccounts = this.loadAccounts(false);
     
@@ -937,7 +954,13 @@ class DeyeAccountManager {
     if (sessionRole && sessionRole !== 'admin') {
       effectiveRaw = rawAccounts.filter((a) => !a.isDemo && a.id !== 'men2-facility-2' && a.id !== 'men2-facility-3');
     }
-    return this.fleetAggregator.aggregateFleet(clients, effectiveRaw, accountIds);
+    const result = await this.fleetAggregator.aggregateFleet(clients, effectiveRaw, accountIds);
+    this.cachedFleetSummary.set(cacheKey, { data: result, timestamp: Date.now() });
+    return result;
+  }
+
+  public invalidateFleetCache(): void {
+    this.cachedFleetSummary.clear();
   }
 }
 
