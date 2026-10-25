@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useId } from 'react';
+import { HoverInfo } from '@/components/ui/tooltip';
 import { Clock } from 'lucide-react';
 
 // Exact Color Palette from Analytics Dashboard (src/app/analytics/page.tsx)
@@ -175,7 +176,7 @@ export function InverterSolarCurve({
   return (
     <div className={`relative w-full select-none ${className}`}>
       <div
-        className="relative w-full overflow-hidden rounded-md bg-card/70 border border-border/40 p-1 flex items-stretch gap-1"
+        className="relative w-full overflow-visible rounded-md bg-card/70 border border-border/40 p-1 flex items-stretch gap-1"
         style={{ height: `${height}px`, minHeight: `${height}px` }}
       >
         {/* Inverter Mini Y-Axis Column */}
@@ -318,36 +319,71 @@ export function InverterSolarCurve({
           </div>
         </div>
 
-        {/* Vertical Utilization Column Beside Graph (matches PlantSolarCurve) */}
-        <div className="flex flex-col items-center justify-between shrink-0 select-none border-l border-border/30 pl-1 sm:pl-1.5 w-7 sm:w-8 h-full py-0.5">
-          <span className="text-[7px] uppercase tracking-wider font-mono text-muted-foreground font-semibold leading-none">
-            Util
-          </span>
+        {/* Vertical Utilization Column Beside Graph with Hover Tooltip */}
+        <HoverInfo
+          title="Inverter Operating Status"
+          content={
+            <div className="text-[11px] space-y-1 min-w-[150px]">
+              <p className="text-muted-foreground">Inverter load utilization relative to rated capacity.</p>
+              <div className="pt-1 border-t border-border/50 flex justify-between font-mono">
+                <span className="text-muted-foreground">Live Power:</span>
+                <span className="font-bold text-amber-500">{liveSolarPowerKw.toFixed(2)} kW</span>
+              </div>
+              {dailyYieldKwh > 0 && (
+                <div className="flex justify-between font-mono">
+                  <span className="text-muted-foreground">Daily Yield:</span>
+                  <span className="font-bold text-foreground">{dailyYieldKwh.toFixed(1)} kWh</span>
+                </div>
+              )}
+              {ratedKw > 0 && (
+                <div className="flex justify-between font-mono">
+                  <span className="text-muted-foreground">Rated Cap:</span>
+                  <span className="font-semibold text-foreground">{ratedKw} kW</span>
+                </div>
+              )}
+              <div className="flex justify-between font-mono pt-0.5 border-t border-border/40">
+                <span className="text-muted-foreground">Utilization:</span>
+                <span
+                  className={`font-bold ${
+                    isFault ? 'text-destructive' : isStandby ? 'text-amber-500' : 'text-emerald-500'
+                  }`}
+                >
+                  {currentLoadPct.toFixed(1)}%
+                </span>
+              </div>
+            </div>
+          }
+        >
+          <div className="flex flex-col items-center justify-between shrink-0 select-none border-l border-border/30 pl-1 sm:pl-1.5 w-7 sm:w-8 h-full py-0.5 cursor-help">
+            <span className="text-[7px] uppercase tracking-wider font-mono text-muted-foreground font-semibold leading-none">
+              Util
+            </span>
 
-          {/* Vertical Progress Gauge Track */}
-          <div className="w-1.5 sm:w-2 flex-1 my-1 bg-muted/60 rounded-full overflow-hidden relative border border-border/20 flex flex-col justify-end">
-            <div
-              className={`w-full rounded-full transition-all duration-300 ${
-                isFault
-                  ? 'bg-destructive'
-                  : isStandby
-                  ? 'bg-amber-500'
-                  : 'bg-emerald-500'
+            {/* Vertical Progress Gauge Track */}
+            <div className="w-1.5 sm:w-2 flex-1 my-1 bg-muted/60 rounded-full overflow-hidden relative border border-border/20 flex flex-col justify-end">
+              <div
+                className={`w-full rounded-full transition-all duration-300 ${
+                  isFault
+                    ? 'bg-destructive'
+                    : isStandby
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+                }`}
+                style={{ height: `${Math.max(4, Math.min(100, currentLoadPct))}%` }}
+              />
+            </div>
+
+            <span
+              className={`text-[7.5px] sm:text-[8px] font-mono font-bold leading-none ${
+                isFault ? 'text-destructive' : isStandby ? 'text-amber-500' : 'text-emerald-500'
               }`}
-              style={{ height: `${Math.max(4, Math.min(100, currentLoadPct))}%` }}
-            />
+            >
+              {currentLoadPct.toFixed(0)}%
+            </span>
           </div>
+        </HoverInfo>
 
-          <span
-            className={`text-[7.5px] sm:text-[8px] font-mono font-bold leading-none ${
-              isFault ? 'text-destructive' : isStandby ? 'text-amber-500' : 'text-emerald-500'
-            }`}
-          >
-            {currentLoadPct.toFixed(0)}%
-          </span>
-        </div>
-
-        {/* Hover Tooltip Overlay: identical to Analytics Dashboard CustomExactTooltip */}
+        {/* Hover Tooltip Overlay: exact timestamp and power */}
         {hoveredPoint && (
           <div
             className="absolute pointer-events-none z-50 rounded-xl border border-border/80 bg-background/95 p-2 text-xs shadow-xl backdrop-blur-md min-w-[190px] font-mono transition-all duration-75"
@@ -380,6 +416,18 @@ export function InverterSolarCurve({
                   <span className="text-[9px] font-normal text-muted-foreground ml-1">kW</span>
                 </span>
               </div>
+              {dailyYieldKwh > 0 && (
+                <div className="flex items-center justify-between gap-2 pt-0.5 border-t border-border/30 text-muted-foreground">
+                  <span>Daily Yield:</span>
+                  <span className="font-semibold text-foreground">{dailyYieldKwh.toFixed(1)} kWh</span>
+                </div>
+              )}
+              {ratedKw > 0 && (
+                <div className="flex items-center justify-between gap-2 text-muted-foreground">
+                  <span>Rated Cap:</span>
+                  <span className="font-semibold text-foreground">{ratedKw} kW</span>
+                </div>
+              )}
             </div>
           </div>
         )}

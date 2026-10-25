@@ -14,7 +14,6 @@ import {
   Filter,
   RefreshCw,
   AlertTriangle,
-  Sliders,
   Copy,
   Check,
   Sun,
@@ -768,7 +767,7 @@ export default function FleetMonitoringPage() {
                     </div>
 
                     {/* Diurnal Solar Curve with Live Telemetry & Vertical Utilization */}
-                    <div className="flex flex-col h-[150px] w-full pt-1 shrink-0">
+                    <div className="flex flex-col h-[160px] w-full pt-1 shrink-0">
                       <PlantSolarCurve
                         capacityKw={accGroup.capacityKw}
                         livePowerKw={accGroup.livePowerKw}
@@ -780,22 +779,6 @@ export default function FleetMonitoringPage() {
                         className="h-full flex-1 w-full"
                         showLabels={true}
                       />
-                    </div>
-
-                    {/* Summary metrics footer */}
-                    <div className="pt-2 border-t border-border/40 grid grid-cols-3 gap-2 text-center shrink-0">
-                      <div className="p-1.5 rounded-lg bg-muted/30">
-                        <div className="text-[9px] uppercase font-mono text-muted-foreground">Live</div>
-                        <div className="text-xs font-bold text-amber-500 font-mono">{accGroup.livePowerKw.toFixed(1)} kW</div>
-                      </div>
-                      <div className="p-1.5 rounded-lg bg-muted/30">
-                        <div className="text-[9px] uppercase font-mono text-muted-foreground">Yield</div>
-                        <div className="text-xs font-bold text-foreground font-mono">{accGroup.dailyYieldKwh.toFixed(1)} kWh</div>
-                      </div>
-                      <div className="p-1.5 rounded-lg bg-muted/30">
-                        <div className="text-[9px] uppercase font-mono text-muted-foreground">Capacity</div>
-                        <div className="text-xs font-bold text-muted-foreground font-mono">{accGroup.capacityKw.toFixed(0)} kW</div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -835,8 +818,8 @@ export default function FleetMonitoringPage() {
                     </div>
                   </div>
 
-                  {/* Diurnal Solar Curve with Live Telemetry */}
-                  <div className="flex flex-col h-[160px] w-full pt-1 shrink-0">
+                  {/* Diurnal Solar Curve with Live Telemetry at Top of Graph */}
+                  <div className="flex flex-col h-[180px] w-full pt-1 shrink-0">
                     <PlantSolarCurve
                       capacityKw={accGroup.capacityKw}
                       livePowerKw={accGroup.livePowerKw}
@@ -848,34 +831,6 @@ export default function FleetMonitoringPage() {
                       className="h-full flex-1 w-full"
                       showLabels={true}
                     />
-                  </div>
-
-                  {/* Account Totals Grid */}
-                  <div className="grid grid-cols-2 gap-2 pt-1 font-mono">
-                    <div className="p-2.5 rounded-xl bg-muted/30 border border-border/40">
-                      <div className="text-[10px] uppercase text-muted-foreground">Live Generation</div>
-                      <div className="text-sm font-bold text-amber-500 mt-0.5">{accGroup.livePowerKw.toFixed(2)} kW</div>
-                      <div className="text-[9px] text-muted-foreground mt-0.5">{accUtilization.toFixed(0)}% utilization</div>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-muted/30 border border-border/40">
-                      <div className="text-[10px] uppercase text-muted-foreground">Today's Yield</div>
-                      <div className="text-sm font-bold text-foreground mt-0.5">{accGroup.dailyYieldKwh.toFixed(2)} kWh</div>
-                      <div className="text-[9px] text-muted-foreground mt-0.5">from midnight</div>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-muted/30 border border-border/40">
-                      <div className="text-[10px] uppercase text-muted-foreground">Installed Capacity</div>
-                      <div className="text-sm font-bold text-foreground mt-0.5">{accGroup.capacityKw.toFixed(1)} kW</div>
-                      <div className="text-[9px] text-muted-foreground mt-0.5">{accGroup.invertersCount} inverters total</div>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-muted/30 border border-border/40">
-                      <div className="text-[10px] uppercase text-muted-foreground">Facility Demand</div>
-                      <div className="text-sm font-bold text-indigo-400 mt-0.5">
-                        {typeof accGroup.demandKw === 'number' ? `${accGroup.demandKw.toFixed(1)} kW` : '—'}
-                      </div>
-                      <div className="text-[9px] text-muted-foreground mt-0.5">
-                        {typeof accGroup.gridPowerKw === 'number' ? `Grid: ${accGroup.gridPowerKw.toFixed(1)} kW` : 'Standby'}
-                      </div>
-                    </div>
                   </div>
                 </div>
 
@@ -992,7 +947,7 @@ export default function FleetMonitoringPage() {
                           <span>2 & 3. Inverters ({activePlant.inverters.length})</span>
                         </div>
                         <span className="text-[10px] font-mono text-muted-foreground">
-                          {activePlant.plant.stationName} • {activePlant.livePowerKw.toFixed(1)} kW Live
+                          {activePlant.plant.stationName}
                         </span>
                       </div>
                     </>
@@ -1062,8 +1017,6 @@ export default function FleetMonitoringPage() {
 
                                 <div className="flex items-center gap-1 shrink-0">
                                   <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground group-hover:text-primary transition-colors">
-                                    <Cpu size={12} />
-                                    <span>{numInverters} inv</span>
                                     <ChevronDown size={14} className="transition-transform duration-200 group-hover:translate-y-0.5" />
                                   </div>
                                 </div>
@@ -1083,13 +1036,6 @@ export default function FleetMonitoringPage() {
                                   className="w-full"
                                   showLabels={false}
                                 />
-                              </div>
-
-                              {/* Plant Quick Numbers */}
-                              <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border/30 text-muted-foreground">
-                                <span>Live: <strong className="text-amber-500">{pGroup.livePowerKw.toFixed(1)} kW</strong></span>
-                                <span>Yield: <strong className="text-foreground">{pGroup.dailyYieldKwh.toFixed(1)} kWh</strong></span>
-                                <span>Cap: <strong className="text-foreground">{pGroup.capacityKw.toFixed(0)} kW</strong></span>
                               </div>
                             </div>
                           );
@@ -1159,28 +1105,8 @@ export default function FleetMonitoringPage() {
                             historyPoints={telemetryHistory ?? undefined}
                             height={135}
                             className="w-full"
-                            showLabels={true}
+                            showLabels={false}
                           />
-                        </div>
-
-                        {/* Quick Metrics */}
-                        <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-xs">
-                          <div className="p-2 rounded-xl bg-muted/30 border border-border/40">
-                            <div className="text-[9px] uppercase text-muted-foreground">Live Power</div>
-                            <div className="text-sm font-bold text-amber-500 mt-0.5">{activePlant.livePowerKw.toFixed(2)} kW</div>
-                          </div>
-                          <div className="p-2 rounded-xl bg-muted/30 border border-border/40">
-                            <div className="text-[9px] uppercase text-muted-foreground">Daily Yield</div>
-                            <div className="text-sm font-bold text-foreground mt-0.5">{activePlant.dailyYieldKwh.toFixed(2)} kWh</div>
-                          </div>
-                          <div className="p-2 rounded-xl bg-muted/30 border border-border/40">
-                            <div className="text-[9px] uppercase text-muted-foreground">Capacity</div>
-                            <div className="text-sm font-bold text-foreground mt-0.5">{activePlant.capacityKw.toFixed(1)} kW</div>
-                          </div>
-                          <div className="p-2 rounded-xl bg-muted/30 border border-border/40">
-                            <div className="text-[9px] uppercase text-muted-foreground">Inverters</div>
-                            <div className="text-sm font-bold text-foreground mt-0.5">{activePlant.inverters.length} Units</div>
-                          </div>
                         </div>
                       </div>
 
@@ -1247,9 +1173,6 @@ export default function FleetMonitoringPage() {
                                         {op.plant.stationName}
                                       </h4>
                                     </div>
-                                    <div className="text-[10px] font-mono text-muted-foreground shrink-0">
-                                      {op.inverters.length} inv
-                                    </div>
                                   </div>
 
                                   {/* Plant Diurnal Solar Arc Graph */}
@@ -1266,12 +1189,6 @@ export default function FleetMonitoringPage() {
                                       className="w-full"
                                       showLabels={false}
                                     />
-                                  </div>
-
-                                  <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border/30 text-muted-foreground">
-                                    <span>Live: <strong className="text-amber-500">{op.livePowerKw.toFixed(1)} kW</strong></span>
-                                    <span>Yield: <strong className="text-foreground">{op.dailyYieldKwh.toFixed(1)} kWh</strong></span>
-                                    <span>Cap: <strong className="text-foreground">{op.capacityKw.toFixed(0)} kW</strong></span>
                                   </div>
                                 </div>
                               );
@@ -1300,7 +1217,7 @@ export default function FleetMonitoringPage() {
                             return (
                               <div
                                 key={inv.deviceSn}
-                                className="p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 transition-all shadow-xs flex flex-col justify-between gap-2.5 min-h-[190px]"
+                                className="p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 transition-all shadow-xs flex flex-col justify-between gap-2 min-h-0"
                               >
                                 {/* Inverter Header */}
                                 <div className="flex items-start justify-between gap-2">
@@ -1323,7 +1240,7 @@ export default function FleetMonitoringPage() {
                                       </button>
                                     </div>
                                     <div className="text-[10px] text-muted-foreground truncate mt-0.5">
-                                      {inv.model} ({inv.ratedKw} kW) • <span className="font-mono text-foreground/80">#{invIndex + 1} of {activePlant.plant.stationName}</span>
+                                      {inv.model} • <span className="font-mono text-foreground/80">#{invIndex + 1} of {activePlant.plant.stationName}</span>
                                     </div>
                                   </div>
 
@@ -1358,30 +1275,12 @@ export default function FleetMonitoringPage() {
                                   />
                                 </div>
 
-                                {/* Inverter Telemetry Live Power & Details */}
-                                <div className="space-y-1.5">
-                                  <div className="flex items-baseline justify-between font-mono">
-                                    <div>
-                                      <span className="text-base font-bold text-amber-500">
-                                        {inv.liveSolarPowerKw.toFixed(2)}
-                                      </span>
-                                      <span className="text-[10px] text-muted-foreground ml-1">kW live</span>
-                                    </div>
-                                    <div className="text-right">
-                                      <span className="text-xs font-semibold text-foreground">
-                                        {inv.dailyYieldKwh.toFixed(1)}
-                                      </span>
-                                      <span className="text-[10px] text-muted-foreground ml-1">kWh today</span>
-                                    </div>
-                                  </div>
-
-                                  {/* Battery SoC or Logger info */}
+                                {/* Battery SoC or Logger info */}
+                                {(inv.batterySoc > 0 || inv.loggerSn) && (
                                   <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground pt-1 border-t border-border/40">
                                     <span>
-                                      {inv.batterySoc > 0 ? (
+                                      {inv.batterySoc > 0 && (
                                         <span className="text-emerald-500 font-semibold">⚡ Battery {inv.batterySoc}%</span>
-                                      ) : (
-                                        <span>Grid-Tied ({inv.ratedKw} kW)</span>
                                       )}
                                     </span>
                                     {inv.loggerSn && (
@@ -1390,21 +1289,7 @@ export default function FleetMonitoringPage() {
                                       </span>
                                     )}
                                   </div>
-                                </div>
-
-                                {/* Deep Link Action */}
-                                <div className="pt-0.5">
-                                  <Button
-                                    variant="outline"
-                                    size="xs"
-                                    onClick={() => navigateToDevice(accGroup.account.id, activePlant.plant.stationId, inv.deviceSn, '/hardware-telemetry')}
-                                    className="w-full text-[10px] h-6 px-1.5 gap-1 hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer"
-                                    title="View Hardware Telemetry"
-                                  >
-                                    <Sliders size={10} />
-                                    <span>Telemetry</span>
-                                  </Button>
-                                </div>
+                                )}
                               </div>
                             );
                           })}

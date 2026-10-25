@@ -582,6 +582,10 @@ export function PlantSolarCurve({
                   <span className="text-muted-foreground">Rated Cap:</span>
                   <span className="font-semibold text-foreground">{capacityKw.toFixed(0)} kWp</span>
                 </div>
+                <div className="flex justify-between font-mono">
+                  <span className="text-muted-foreground">Daily Yield:</span>
+                  <span className="font-bold text-foreground">{dailyYieldKwh.toFixed(1)} kWh</span>
+                </div>
                 <div className="flex justify-between font-mono pt-0.5 border-t border-border/40">
                   <span className="text-muted-foreground">Utilization:</span>
                   <span className="font-bold text-amber-500">{currentUtil.toFixed(1)}%</span>
@@ -661,6 +665,12 @@ export function PlantSolarCurve({
                   <span className="text-[10px] font-normal text-muted-foreground ml-1">kW</span>
                 </span>
               </div>
+              {(dailyYieldKwh > 0 || capacityKw > 0) && (
+                <div className="pt-1.5 border-t border-border/40 flex items-center justify-between text-[10px] text-muted-foreground">
+                  {capacityKw > 0 && <span>Cap: <strong className="text-foreground">{capacityKw.toFixed(0)} kW</strong></span>}
+                  {dailyYieldKwh > 0 && <span>Yield: <strong className="text-foreground">{dailyYieldKwh.toFixed(1)} kWh</strong></span>}
+                </div>
+              )}
             </div>
           </div>
         )}
