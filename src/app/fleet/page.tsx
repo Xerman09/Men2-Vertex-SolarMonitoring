@@ -714,7 +714,7 @@ export default function FleetMonitoringPage() {
            - Unexpanded accounts display in 3 columns across desktop.
            - Expanded accounts become: Account (1st col), Plants (2nd col), and Inverters (3rd col).
         */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 items-stretch">
           {filteredTree.map((accGroup) => {
             const isAccExpanded = expandedAccountIds.has(accGroup.account.id);
             const accUtilization = accGroup.capacityKw > 0
@@ -726,23 +726,22 @@ export default function FleetMonitoringPage() {
               return (
                 <div
                   key={accGroup.account.id}
-                  className="rounded-2xl border border-border/70 bg-card hover:border-border hover:shadow-sm transition-all duration-200 overflow-hidden col-span-1 h-full flex flex-col justify-between"
+                  onClick={(e) => toggleAccountExpand(accGroup.account.id, e)}
+                  className="rounded-2xl border border-border/70 bg-card hover:border-primary/50 hover:shadow-md transition-all duration-200 overflow-hidden col-span-1 h-full min-h-[350px] flex flex-col justify-between cursor-pointer select-none group"
+                  title="Click card to expand account"
                 >
-                  <div
-                    onClick={(e) => toggleAccountExpand(accGroup.account.id, e)}
-                    className="p-4 cursor-pointer select-none transition-colors hover:bg-muted/20 flex flex-col justify-between h-full gap-3.5"
-                  >
+                  <div className="p-4 flex flex-col justify-between h-full gap-3.5">
                     <div className="flex flex-col gap-1.5 shrink-0">
-                      {/* Row 1: Account Name + Expand Button */}
+                      {/* Row 1: Account Name + Expand Indicator */}
                       <div className="flex items-center justify-between gap-2">
-                        <h2 className="text-base sm:text-lg font-bold text-foreground truncate min-w-0 flex-1">
+                        <h2 className="text-base sm:text-lg font-bold text-foreground truncate min-w-0 flex-1 group-hover:text-primary transition-colors">
                           {accGroup.account.name}
                         </h2>
-                        <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
+                        <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground group-hover:text-primary transition-colors">
                           <span className="text-[11px] font-mono font-medium hidden sm:inline">
-                            Expand ({accGroup.plants.length} Plants)
+                            {accGroup.plants.length} Plants
                           </span>
-                          <ChevronDown size={16} className="transition-transform duration-200" />
+                          <ChevronDown size={16} className="transition-transform duration-200 group-hover:translate-y-0.5" />
                         </div>
                       </div>
 
@@ -763,13 +762,13 @@ export default function FleetMonitoringPage() {
                           </Badge>
                         )}
                         <span className="text-[10px] text-muted-foreground font-mono">
-                          {accGroup.plants.length} Plants • {accGroup.invertersCount} Inverters
+                          {accGroup.invertersCount} Inverters Total
                         </span>
                       </div>
                     </div>
 
                     {/* Diurnal Solar Curve with Live Telemetry & Vertical Utilization */}
-                    <div className="flex flex-col flex-1 min-h-[140px] w-full pt-1">
+                    <div className="flex flex-col h-[150px] w-full pt-1 shrink-0">
                       <PlantSolarCurve
                         capacityKw={accGroup.capacityKw}
                         livePowerKw={accGroup.livePowerKw}
@@ -784,7 +783,7 @@ export default function FleetMonitoringPage() {
                     </div>
 
                     {/* Summary metrics footer */}
-                    <div className="pt-2 border-t border-border/40 grid grid-cols-3 gap-2 text-center">
+                    <div className="pt-2 border-t border-border/40 grid grid-cols-3 gap-2 text-center shrink-0">
                       <div className="p-1.5 rounded-lg bg-muted/30">
                         <div className="text-[9px] uppercase font-mono text-muted-foreground">Live</div>
                         <div className="text-xs font-bold text-amber-500 font-mono">{accGroup.livePowerKw.toFixed(1)} kW</div>
@@ -834,14 +833,18 @@ export default function FleetMonitoringPage() {
                 className="col-span-1 md:col-span-2 lg:col-span-3 rounded-2xl border border-primary/40 bg-card shadow-md ring-1 ring-primary/20 overflow-hidden transition-all duration-300 flex flex-col"
               >
                 {/* Account Top Banner with Title, Metadata, and Collapse Action */}
-                <div className="px-4 py-3 bg-muted/40 border-b border-border/50 flex items-center justify-between gap-3 flex-wrap">
+                <div
+                  onClick={(e) => toggleAccountExpand(accGroup.account.id, e)}
+                  className="px-4 py-3 bg-muted/40 hover:bg-muted/60 border-b border-border/50 flex items-center justify-between gap-3 flex-wrap cursor-pointer select-none transition-colors group"
+                  title="Click to collapse account back to grid"
+                >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="p-1.5 rounded-lg bg-primary/10 text-primary border border-primary/20 shrink-0">
                       <Building2 size={18} />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="text-base font-bold text-foreground truncate">
+                        <h2 className="text-base font-bold text-foreground truncate group-hover:text-primary transition-colors">
                           {accGroup.account.name}
                         </h2>
                         {accGroup.isDemo && (
@@ -865,36 +868,15 @@ export default function FleetMonitoringPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    {/* Toggle all inverters for this account */}
-                    {accGroup.plants.length > 0 && (
-                      <Button
-                        variant="outline"
-                        size="xs"
-                        onClick={() => {
-                          setExpandedPlantKeys((prev) => {
-                            const next = new Set(prev);
-                            if (allPlantsInAccExpanded) {
-                              accGroup.plants.forEach((p) => next.delete(p.plantKey));
-                            } else {
-                              accGroup.plants.forEach((p) => next.add(p.plantKey));
-                            }
-                            return next;
-                          });
-                        }}
-                        className="text-[10px] font-mono h-7 px-2.5 gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground"
-                        title={allPlantsInAccExpanded ? 'Collapse all plant inverters for this account' : 'Expand all plant inverters for this account'}
-                      >
-                        <Cpu size={12} />
-                        <span>{allPlantsInAccExpanded ? 'Collapse All Inverters' : 'Expand All Inverters'}</span>
-                      </Button>
-                    )}
-
+                  <div className="flex items-center gap-3 shrink-0">
                     {isAdmin && (
                       <Button
                         variant="outline"
                         size="xs"
-                        onClick={() => handleToggleAccount(accGroup.account)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleAccount(accGroup.account);
+                        }}
                         className={`text-[10px] font-mono h-7 px-2 gap-1 cursor-pointer ${
                           accGroup.account.status === 'OFFLINE'
                             ? 'border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10'
@@ -906,15 +888,10 @@ export default function FleetMonitoringPage() {
                         <span>{accGroup.account.status === 'OFFLINE' ? 'Enable' : 'Disable'}</span>
                       </Button>
                     )}
-                    <Button
-                      variant="outline"
-                      size="xs"
-                      onClick={(e) => toggleAccountExpand(accGroup.account.id, e)}
-                      className="h-7 text-xs font-medium gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
-                    >
-                      <span>Collapse</span>
-                      <ChevronUp size={14} />
-                    </Button>
+                    <div className="flex items-center gap-1.5 text-muted-foreground group-hover:text-primary transition-colors">
+                      <span className="text-xs font-mono font-medium hidden sm:inline">Collapse</span>
+                      <ChevronUp size={16} />
+                    </div>
                   </div>
                 </div>
 
@@ -1052,15 +1029,17 @@ export default function FleetMonitoringPage() {
                         <React.Fragment key={pGroup.plantKey}>
                           {/* COLUMN 2: PLANT CARD (Spans its inverter rows so next plant is pushed down) */}
                           <div
+                            onClick={() => togglePlantExpand(pGroup.plantKey)}
                             style={{
                               '--cell-col': 2,
                               '--cell-row': `${startRow} / span ${rowSpan}`,
                             } as React.CSSProperties}
-                            className={`fleet-cell rounded-2xl border transition-all duration-200 p-3.5 flex flex-col justify-between gap-3 ${
+                            className={`fleet-cell rounded-2xl border transition-all duration-200 p-3.5 flex flex-col justify-between gap-3 cursor-pointer select-none group min-h-[200px] ${
                               isPlantExpanded
                                 ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20 shadow-xs'
-                                : 'border-border/60 bg-card hover:border-border hover:bg-muted/20'
+                                : 'border-border/60 bg-card hover:border-primary/40 hover:bg-muted/20 hover:shadow-xs'
                             } ${rowSpan <= 2 ? 'h-full' : 'h-fit lg:self-start lg:sticky lg:top-4'}`}
+                            title={`Click to ${isPlantExpanded ? 'collapse' : 'expand'} inverters for ${pGroup.plant.stationName}`}
                           >
                             {/* Plant Header */}
                             <div className="flex items-start justify-between gap-2">
@@ -1091,26 +1070,27 @@ export default function FleetMonitoringPage() {
                                     {pGroup.status.toLowerCase()}
                                   </Badge>
                                 </div>
-                                <h4 className="text-sm font-bold text-foreground truncate mt-0.5" title={pGroup.plant.stationName}>
+                                <h4 className="text-sm font-bold text-foreground truncate mt-0.5 group-hover:text-primary transition-colors" title={pGroup.plant.stationName}>
                                   {pGroup.plant.stationName}
                                 </h4>
                               </div>
 
                               <div className="flex items-center gap-1 shrink-0">
-                                <Badge
-                                  variant={isPlantExpanded ? 'default' : 'secondary'}
-                                  className="text-[9px] font-mono py-0.5 gap-1 cursor-pointer"
-                                  onClick={(e) => togglePlantExpand(pGroup.plantKey, e)}
-                                >
-                                  <Cpu size={10} />
+                                <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground group-hover:text-primary transition-colors">
+                                  <Cpu size={12} />
                                   <span>{numInverters} inv</span>
-                                  {isPlantExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                                </Badge>
+                                  <ChevronDown
+                                    size={14}
+                                    className={`transition-transform duration-200 ${
+                                      isPlantExpanded ? 'rotate-180 text-primary' : ''
+                                    }`}
+                                  />
+                                </div>
                               </div>
                             </div>
 
                             {/* Plant Diurnal Solar Arc Curve */}
-                            <div className="w-full">
+                            <div className="w-full h-[85px] flex items-center justify-center">
                               <PlantSolarCurve
                                 capacityKw={pGroup.capacityKw}
                                 livePowerKw={pGroup.livePowerKw}
@@ -1119,7 +1099,7 @@ export default function FleetMonitoringPage() {
                                 gridPowerKw={pGroup.gridPowerKw}
                                 utilizationPct={plantUtil}
                                 historyPoints={telemetryHistory ?? undefined}
-                                height={100}
+                                height={80}
                                 className="w-full"
                                 showLabels={false}
                               />
@@ -1130,29 +1110,6 @@ export default function FleetMonitoringPage() {
                               <span>Live: <strong className="text-amber-500">{pGroup.livePowerKw.toFixed(1)} kW</strong></span>
                               <span>Yield: <strong className="text-foreground">{pGroup.dailyYieldKwh.toFixed(1)} kWh</strong></span>
                               <span>Cap: <strong className="text-foreground">{pGroup.capacityKw.toFixed(0)} kW</strong></span>
-                            </div>
-
-                            {/* Expand / Collapse Inverters Toggle Button */}
-                            <div className="pt-0.5">
-                              <Button
-                                variant={isPlantExpanded ? 'secondary' : 'outline'}
-                                size="xs"
-                                onClick={(e) => togglePlantExpand(pGroup.plantKey, e)}
-                                disabled={numInverters === 0}
-                                className="w-full text-[11px] h-7 px-2 gap-1.5 cursor-pointer justify-center font-medium"
-                              >
-                                {isPlantExpanded ? (
-                                  <>
-                                    <ChevronUp size={13} />
-                                    <span>Collapse Inverters ({numInverters})</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <ChevronDown size={13} />
-                                    <span>Expand Inverters ({numInverters})</span>
-                                  </>
-                                )}
-                              </Button>
                             </div>
                           </div>
 
@@ -1171,7 +1128,7 @@ export default function FleetMonitoringPage() {
                                     '--cell-col': 3,
                                     '--cell-row': `${startRow + invIndex}`,
                                   } as React.CSSProperties}
-                                  className="fleet-cell p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 transition-all shadow-xs flex flex-col justify-between gap-2.5"
+                                  className="fleet-cell p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 transition-all shadow-xs flex flex-col justify-between gap-2.5 min-h-[200px] h-full"
                                 >
                                   {/* Inverter Header */}
                                   <div className="flex items-start justify-between gap-1.5">
@@ -1275,7 +1232,7 @@ export default function FleetMonitoringPage() {
                                 '--cell-col': 3,
                                 '--cell-row': `${startRow}`,
                               } as React.CSSProperties}
-                              className="fleet-cell h-full min-h-[140px] rounded-2xl border border-dashed border-border/70 p-4 flex flex-col items-center justify-center text-center text-muted-foreground"
+                              className="fleet-cell h-full min-h-[200px] rounded-2xl border border-dashed border-border/70 p-4 flex flex-col items-center justify-center text-center text-muted-foreground"
                             >
                               <Cpu size={20} className="mb-1 text-muted-foreground/60" />
                               <span className="text-xs font-semibold text-foreground">No Inverters Configured</span>
@@ -1284,17 +1241,17 @@ export default function FleetMonitoringPage() {
                           ) : (
                             /* COLLAPSED PLACEHOLDER IN COLUMN 3 (Row = startRow) */
                             <div
-                              onClick={(e) => togglePlantExpand(pGroup.plantKey, e)}
+                              onClick={() => togglePlantExpand(pGroup.plantKey)}
                               style={{
                                 '--cell-col': 3,
                                 '--cell-row': `${startRow}`,
                               } as React.CSSProperties}
-                              className="fleet-cell h-full min-h-[140px] rounded-2xl border border-dashed border-border/70 hover:border-primary/50 hover:bg-primary/5 transition-all p-4 flex flex-col items-center justify-center text-center cursor-pointer group select-none shadow-2xs"
+                              className="fleet-cell h-full min-h-[200px] rounded-2xl border border-dashed border-border/70 hover:border-primary/50 hover:bg-primary/5 transition-all p-4 flex flex-col items-center justify-center text-center cursor-pointer group select-none shadow-2xs"
                               title={`Click to open ${numInverters} inverters for ${pGroup.plant.stationName}`}
                             >
                               <div className="flex flex-col items-center gap-2 text-muted-foreground group-hover:text-foreground">
-                                <div className="p-2 rounded-lg bg-muted/40 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                                  <Cpu size={20} />
+                                <div className="p-2 rounded-xl bg-muted/40 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                                  <Cpu size={22} />
                                 </div>
                                 <div className="space-y-0.5">
                                   <div className="text-xs font-bold font-mono text-foreground">
@@ -1304,10 +1261,10 @@ export default function FleetMonitoringPage() {
                                     {pGroup.livePowerKw.toFixed(1)} kW live • {pGroup.capacityKw.toFixed(0)} kW capacity
                                   </div>
                                 </div>
-                                <Badge variant="outline" className="text-[10px] font-mono mt-1 gap-1 group-hover:border-primary/40 group-hover:text-primary transition-colors py-0.5">
-                                  <span>Expand Inverters</span>
-                                  <ChevronDown size={11} />
-                                </Badge>
+                                <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground group-hover:text-primary transition-colors mt-0.5">
+                                  <span>Click card to inspect</span>
+                                  <ChevronDown size={13} className="group-hover:translate-y-0.5 transition-transform" />
+                                </div>
                               </div>
                             </div>
                           )}
