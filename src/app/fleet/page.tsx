@@ -1206,42 +1206,75 @@ export default function FleetMonitoringPage() {
 
                       {/* Other Plants Switcher (if account has more than 1 plant) */}
                       {otherPlants.length > 0 && (
-                        <div className="space-y-1.5 pt-1">
+                        <div className="space-y-2 pt-1">
                           <div className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground flex items-center justify-between">
                             <span>Other Plants ({otherPlants.length})</span>
                             <span className="text-[9px]">Click to switch</span>
                           </div>
-                          <div className="flex flex-col gap-1.5">
-                            {otherPlants.map((op) => (
-                              <div
-                                key={op.plantKey}
-                                onClick={() => {
-                                  setExpandedPlantKeys((prev) => {
-                                    const next = new Set(prev);
-                                    accGroup.plants.forEach((p) => next.delete(p.plantKey));
-                                    next.add(op.plantKey);
-                                    return next;
-                                  });
-                                }}
-                                className="p-2.5 rounded-xl border border-border/60 bg-card hover:border-primary/50 hover:bg-primary/5 transition-all flex items-center justify-between gap-2 cursor-pointer select-none group"
-                                title={`Switch view to ${op.plant.stationName}`}
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-xs font-bold text-foreground truncate group-hover:text-primary transition-colors">
-                                    {op.plant.stationName}
+                          <div className="flex flex-col gap-2">
+                            {otherPlants.map((op) => {
+                              const opUtil =
+                                op.capacityKw > 0
+                                  ? Math.min(100, (op.livePowerKw / op.capacityKw) * 100)
+                                  : 0;
+                              return (
+                                <div
+                                  key={op.plantKey}
+                                  onClick={() => {
+                                    setExpandedPlantKeys((prev) => {
+                                      const next = new Set(prev);
+                                      accGroup.plants.forEach((p) => next.delete(p.plantKey));
+                                      next.add(op.plantKey);
+                                      return next;
+                                    });
+                                  }}
+                                  className="p-3 rounded-2xl border border-border/60 bg-card hover:border-primary/50 hover:bg-muted/20 hover:shadow-xs transition-all flex flex-col gap-2 cursor-pointer select-none group"
+                                  title={`Switch view to ${op.plant.stationName}`}
+                                >
+                                  <div className="flex items-start justify-between gap-1.5">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-[10px] font-mono text-muted-foreground">ID: {op.plant.stationId}</span>
+                                        <Badge
+                                          variant={op.status === 'FAULT' ? 'destructive' : op.status === 'STANDBY' ? 'warning' : 'success'}
+                                          className="text-[9px] font-mono py-0 shrink-0 capitalize"
+                                        >
+                                          {op.status.toLowerCase()}
+                                        </Badge>
+                                      </div>
+                                      <h4 className="text-xs font-bold text-foreground truncate mt-0.5 group-hover:text-primary transition-colors">
+                                        {op.plant.stationName}
+                                      </h4>
+                                    </div>
+                                    <div className="text-[10px] font-mono text-muted-foreground shrink-0">
+                                      {op.inverters.length} inv
+                                    </div>
                                   </div>
-                                  <div className="text-[10px] font-mono text-muted-foreground">
-                                    {op.inverters.length} inv • {op.livePowerKw.toFixed(1)} kW
+
+                                  {/* Plant Diurnal Solar Arc Graph */}
+                                  <div className="w-full h-[65px] flex items-center justify-center">
+                                    <PlantSolarCurve
+                                      capacityKw={op.capacityKw}
+                                      livePowerKw={op.livePowerKw}
+                                      dailyYieldKwh={op.dailyYieldKwh}
+                                      demandKw={op.demandKw}
+                                      gridPowerKw={op.gridPowerKw}
+                                      utilizationPct={opUtil}
+                                      historyPoints={telemetryHistory ?? undefined}
+                                      height={60}
+                                      className="w-full"
+                                      showLabels={false}
+                                    />
+                                  </div>
+
+                                  <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border/30 text-muted-foreground">
+                                    <span>Live: <strong className="text-amber-500">{op.livePowerKw.toFixed(1)} kW</strong></span>
+                                    <span>Yield: <strong className="text-foreground">{op.dailyYieldKwh.toFixed(1)} kWh</strong></span>
+                                    <span>Cap: <strong className="text-foreground">{op.capacityKw.toFixed(0)} kW</strong></span>
                                   </div>
                                 </div>
-                                <Badge
-                                  variant={op.status === 'FAULT' ? 'destructive' : op.status === 'STANDBY' ? 'warning' : 'success'}
-                                  className="text-[9px] font-mono py-0 shrink-0"
-                                >
-                                  {op.status.toLowerCase()}
-                                </Badge>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -1310,8 +1343,19 @@ export default function FleetMonitoringPage() {
                                   </Badge>
                                 </div>
 
+                                {/* Inverter Solar Curve Graph */}
+                                <div className="w-full h-[65px] flex items-center justify-center py-0.5">
+                                  <InverterSolarCurve
+                                    ratedKw={inv.ratedKw}
+                                    liveSolarPowerKw={inv.liveSolarPowerKw}
+                                    dailyYieldKwh={inv.dailyYieldKwh}
+                                    height={58}
+                                    className="w-full"
+                                  />
+                                </div>
+
                                 {/* Inverter Telemetry Live Power Bar & Numbers */}
-                                <div className="space-y-2">
+                                <div className="space-y-1.5">
                                   <div className="flex items-baseline justify-between font-mono">
                                     <div>
                                       <span className="text-base font-bold text-amber-500">
@@ -1328,7 +1372,7 @@ export default function FleetMonitoringPage() {
                                   </div>
 
                                   {/* Capacity Utilization Progress Bar */}
-                                  <div className="space-y-1">
+                                  <div className="space-y-0.5">
                                     <div className="flex justify-between text-[9px] font-mono text-muted-foreground">
                                       <span>Rated {inv.ratedKw} kW</span>
                                       <span>{loadPct.toFixed(0)}% load</span>
