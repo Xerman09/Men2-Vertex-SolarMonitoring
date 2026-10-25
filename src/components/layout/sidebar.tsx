@@ -9,14 +9,9 @@ import {
   TrendingUp,
   ShieldCheck,
   ChevronLeft,
-  ChevronRight,
   Sun,
-  BatteryCharging,
-  Radio,
   Building2,
   Activity,
-  Layers,
-  Sparkles,
   LayoutGrid,
   BarChart3,
   X,
@@ -29,8 +24,8 @@ import { useSidebar } from './sidebar-context';
 export function Sidebar() {
   const pathname = usePathname();
   const { collapsed, setCollapsed, mobileOpen, closeMobile } = useSidebar();
-  const { totalAccounts, liveAccountsCount, isFleetView } = useAccount();
-  const { isAdmin, isViewer } = useRole();
+  const { totalAccounts } = useAccount();
+  const { isAdmin } = useRole();
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -254,50 +249,6 @@ export function Sidebar() {
           </nav>
         </div>
 
-        {/* Footer Section */}
-        {!collapsed || mobileOpen ? (
-          <div className="p-3.5 m-3 rounded-2xl bg-card/70 border border-sidebar-border shadow-xs animate-in fade-in duration-200">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-border/50">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 font-mono">
-                <Radio size={12} className="text-emerald-500 motion-safe:animate-pulse" /> Edge Bus Sync
-              </span>
-              <span className="text-[10px] font-mono text-emerald-500 font-bold">
-                {liveAccountsCount > 0 ? `${liveAccountsCount}/${totalAccounts} Live` : 'Local Sim'}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-muted/40 p-2 rounded-xl border border-border/40">
-                <span className="text-[10px] text-muted-foreground block mb-0.5">
-                  Topology
-                </span>
-                <div className="flex items-baseline gap-1">
-                  <span className="font-mono text-sm font-bold text-foreground">
-                    {totalAccounts}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">Accounts</span>
-                </div>
-              </div>
-              <div className="bg-muted/40 p-2 rounded-xl border border-border/40">
-                <span className="text-[10px] text-muted-foreground block mb-0.5">
-                  Analytics
-                </span>
-                <div className="flex items-baseline gap-1">
-                  <span className="font-mono text-sm font-bold text-cyan-500">
-                    Trig Fit
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* Subtle Status Indicator in Compact Icon Rail (Expand button removed) */
-          <div className="p-3 flex flex-col items-center justify-center pb-4">
-            <div
-              className="w-2.5 h-2.5 rounded-full bg-emerald-500 motion-safe:animate-pulse"
-              title="Edge Bus Online"
-            />
-          </div>
-        )}
       </aside>
 
       {/* Spacer to offset fixed sidebar on desktop so content is never covered */}
