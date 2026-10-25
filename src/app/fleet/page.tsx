@@ -726,10 +726,10 @@ export default function FleetMonitoringPage() {
                 <div
                   key={accGroup.account.id}
                   onClick={(e) => toggleAccountExpand(accGroup.account.id, e)}
-                  className="rounded-2xl border border-border/70 bg-card hover:border-primary/50 hover:shadow-md transition-all duration-200 overflow-hidden col-span-1 h-full min-h-[350px] flex flex-col justify-between cursor-pointer select-none group"
+                  className="rounded-2xl border border-border/70 bg-card hover:border-primary/50 hover:shadow-md transition-all duration-200 overflow-hidden col-span-1 flex flex-col cursor-pointer select-none group"
                   title="Click card to expand account"
                 >
-                  <div className="p-4 flex flex-col justify-between h-full gap-3.5">
+                  <div className="p-4 flex flex-col h-full gap-2.5">
                     <div className="flex flex-col gap-1.5 shrink-0">
                       {/* Row 1: Account Name + Expand Indicator */}
                       <div className="flex items-center justify-between gap-2">
@@ -767,7 +767,7 @@ export default function FleetMonitoringPage() {
                     </div>
 
                     {/* Diurnal Solar Curve with Live Telemetry & Vertical Utilization */}
-                    <div className="flex flex-col h-[160px] w-full pt-1 shrink-0">
+                    <div className="flex flex-col flex-1 w-full min-h-[160px] pt-1">
                       <PlantSolarCurve
                         capacityKw={accGroup.capacityKw}
                         livePowerKw={accGroup.livePowerKw}
