@@ -404,8 +404,8 @@ export function PlantSolarCurve({
 
       {/* Full-height graph container covering the whole card (overflow-visible for tooltips) */}
       <div
-        className="relative w-full overflow-visible rounded-lg bg-card/70 border border-border/50 p-1.5 flex-1 flex flex-col justify-between min-h-[120px]"
-        style={heightStyle}
+        className="relative w-full overflow-visible rounded-lg bg-card/70 border border-border/50 p-1.5 flex-1 flex flex-col justify-between min-h-0"
+        style={heightStyle ? heightStyle : { minHeight: '100px' }}
       >
         {/* Main Plot Area: Y-Axis Column on Left + Chart Canvas in Center + Vertical Utilization on Right */}
         <div className="flex flex-1 min-h-0 w-full gap-1 items-stretch">
@@ -428,7 +428,7 @@ export function PlantSolarCurve({
             <svg
               viewBox={`0 0 ${width} ${svgHeight}`}
               preserveAspectRatio="none"
-              className="w-full flex-1 overflow-visible cursor-crosshair block min-h-[65px]"
+              className="w-full flex-1 overflow-visible cursor-crosshair block min-h-0"
               onMouseMove={handleMouseMove}
               onMouseLeave={() => setHoveredPoint(null)}
             >

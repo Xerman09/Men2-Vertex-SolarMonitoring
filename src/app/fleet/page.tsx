@@ -1070,7 +1070,7 @@ export default function FleetMonitoringPage() {
                               </div>
 
                               {/* Plant Diurnal Solar Arc Curve */}
-                              <div className="w-full h-[85px] flex items-center justify-center">
+                              <div className="w-full pt-1">
                                 <PlantSolarCurve
                                   capacityKw={pGroup.capacityKw}
                                   livePowerKw={pGroup.livePowerKw}
@@ -1079,7 +1079,7 @@ export default function FleetMonitoringPage() {
                                   gridPowerKw={pGroup.gridPowerKw}
                                   utilizationPct={plantUtil}
                                   historyPoints={telemetryHistory ?? undefined}
-                                  height={80}
+                                  height={85}
                                   className="w-full"
                                   showLabels={false}
                                 />
@@ -1148,7 +1148,7 @@ export default function FleetMonitoringPage() {
                         </div>
 
                         {/* Diurnal Solar Curve for Active Plant */}
-                        <div className="flex flex-col h-[130px] w-full pt-1 shrink-0">
+                        <div className="w-full pt-1 shrink-0">
                           <PlantSolarCurve
                             capacityKw={activePlant.capacityKw}
                             livePowerKw={activePlant.livePowerKw}
@@ -1157,7 +1157,8 @@ export default function FleetMonitoringPage() {
                             gridPowerKw={activePlant.gridPowerKw}
                             utilizationPct={activePlant.capacityKw > 0 ? Math.min(100, (activePlant.livePowerKw / activePlant.capacityKw) * 100) : 0}
                             historyPoints={telemetryHistory ?? undefined}
-                            className="h-full flex-1 w-full"
+                            height={135}
+                            className="w-full"
                             showLabels={true}
                           />
                         </div>
@@ -1252,7 +1253,7 @@ export default function FleetMonitoringPage() {
                                   </div>
 
                                   {/* Plant Diurnal Solar Arc Graph */}
-                                  <div className="w-full h-[65px] flex items-center justify-center">
+                                  <div className="w-full pt-1">
                                     <PlantSolarCurve
                                       capacityKw={op.capacityKw}
                                       livePowerKw={op.livePowerKw}
@@ -1261,7 +1262,7 @@ export default function FleetMonitoringPage() {
                                       gridPowerKw={op.gridPowerKw}
                                       utilizationPct={opUtil}
                                       historyPoints={telemetryHistory ?? undefined}
-                                      height={60}
+                                      height={75}
                                       className="w-full"
                                       showLabels={false}
                                     />
@@ -1299,7 +1300,7 @@ export default function FleetMonitoringPage() {
                             return (
                               <div
                                 key={inv.deviceSn}
-                                className="p-4 rounded-2xl bg-card border border-border/70 hover:border-primary/50 transition-all shadow-xs flex flex-col justify-between gap-3 min-h-[200px]"
+                                className="p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 transition-all shadow-xs flex flex-col justify-between gap-2.5 min-h-[190px]"
                               >
                                 {/* Inverter Header */}
                                 <div className="flex items-start justify-between gap-2">
@@ -1343,18 +1344,21 @@ export default function FleetMonitoringPage() {
                                   </Badge>
                                 </div>
 
-                                {/* Inverter Solar Curve Graph */}
-                                <div className="w-full h-[65px] flex items-center justify-center py-0.5">
+                                {/* Inverter Solar Curve Graph with Vertical Utilization Gauge Beside It */}
+                                <div className="w-full py-0.5">
                                   <InverterSolarCurve
                                     ratedKw={inv.ratedKw}
                                     liveSolarPowerKw={inv.liveSolarPowerKw}
                                     dailyYieldKwh={inv.dailyYieldKwh}
-                                    height={58}
+                                    height={70}
+                                    isFault={isFault}
+                                    isStandby={isStandby}
+                                    loadPct={loadPct}
                                     className="w-full"
                                   />
                                 </div>
 
-                                {/* Inverter Telemetry Live Power Bar & Numbers */}
+                                {/* Inverter Telemetry Live Power & Details */}
                                 <div className="space-y-1.5">
                                   <div className="flex items-baseline justify-between font-mono">
                                     <div>
@@ -1371,33 +1375,13 @@ export default function FleetMonitoringPage() {
                                     </div>
                                   </div>
 
-                                  {/* Capacity Utilization Progress Bar */}
-                                  <div className="space-y-0.5">
-                                    <div className="flex justify-between text-[9px] font-mono text-muted-foreground">
-                                      <span>Rated {inv.ratedKw} kW</span>
-                                      <span>{loadPct.toFixed(0)}% load</span>
-                                    </div>
-                                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                                      <div
-                                        className={`h-full rounded-full transition-all duration-300 ${
-                                          isFault
-                                            ? 'bg-destructive'
-                                            : isStandby
-                                            ? 'bg-amber-500'
-                                            : 'bg-emerald-500'
-                                        }`}
-                                        style={{ width: `${Math.max(2, loadPct)}%` }}
-                                      />
-                                    </div>
-                                  </div>
-
                                   {/* Battery SoC or Logger info */}
                                   <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground pt-1 border-t border-border/40">
                                     <span>
                                       {inv.batterySoc > 0 ? (
                                         <span className="text-emerald-500 font-semibold">⚡ Battery {inv.batterySoc}%</span>
                                       ) : (
-                                        <span>Grid-Tied</span>
+                                        <span>Grid-Tied ({inv.ratedKw} kW)</span>
                                       )}
                                     </span>
                                     {inv.loggerSn && (

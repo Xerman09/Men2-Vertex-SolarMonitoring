@@ -41,18 +41,28 @@ interface InverterSolarCurveProps {
   dailyYieldKwh?: number;
   height?: number;
   className?: string;
+  isFault?: boolean;
+  isStandby?: boolean;
+  loadPct?: number;
 }
 
 export function InverterSolarCurve({
   ratedKw,
   liveSolarPowerKw,
   dailyYieldKwh = 0,
-  height = 54,
+  height = 68,
   className = '',
+  isFault = false,
+  isStandby = false,
+  loadPct,
 }: InverterSolarCurveProps) {
   const [hoveredPoint, setHoveredPoint] = useState<{ hour: number; power: number; x: number; y: number } | null>(null);
   const rawId = useId();
   const gradId = `invSolarGrad-${rawId.replace(/:/g, '')}`;
+
+  const currentLoadPct = loadPct !== undefined
+    ? loadPct
+    : (ratedKw > 0 ? Math.min(100, (liveSolarPowerKw / ratedKw) * 100) : 0);
 
   const nowHour = useMemo(() => {
     return new Date().getHours() + new Date().getMinutes() / 60;
@@ -306,6 +316,35 @@ export function InverterSolarCurve({
             <span>12:00</span>
             <span>18:00</span>
           </div>
+        </div>
+
+        {/* Vertical Utilization Column Beside Graph (matches PlantSolarCurve) */}
+        <div className="flex flex-col items-center justify-between shrink-0 select-none border-l border-border/30 pl-1 sm:pl-1.5 w-7 sm:w-8 h-full py-0.5">
+          <span className="text-[7px] uppercase tracking-wider font-mono text-muted-foreground font-semibold leading-none">
+            Util
+          </span>
+
+          {/* Vertical Progress Gauge Track */}
+          <div className="w-1.5 sm:w-2 flex-1 my-1 bg-muted/60 rounded-full overflow-hidden relative border border-border/20 flex flex-col justify-end">
+            <div
+              className={`w-full rounded-full transition-all duration-300 ${
+                isFault
+                  ? 'bg-destructive'
+                  : isStandby
+                  ? 'bg-amber-500'
+                  : 'bg-emerald-500'
+              }`}
+              style={{ height: `${Math.max(4, Math.min(100, currentLoadPct))}%` }}
+            />
+          </div>
+
+          <span
+            className={`text-[7.5px] sm:text-[8px] font-mono font-bold leading-none ${
+              isFault ? 'text-destructive' : isStandby ? 'text-amber-500' : 'text-emerald-500'
+            }`}
+          >
+            {currentLoadPct.toFixed(0)}%
+          </span>
         </div>
 
         {/* Hover Tooltip Overlay: identical to Analytics Dashboard CustomExactTooltip */}
