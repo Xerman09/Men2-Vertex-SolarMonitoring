@@ -826,6 +826,79 @@ export default function FleetMonitoringPage() {
             const allPlantsInAccExpanded =
               accGroup.plants.length > 0 &&
               accGroup.plants.every((p) => expandedPlantKeys.has(p.plantKey));
+            const anyPlantExpanded = accGroup.plants.some((p) => expandedPlantKeys.has(p.plantKey));
+
+            const renderAccountTotalsCard = (style?: React.CSSProperties, extraClasses: string = '') => (
+              <div
+                onClick={(e) => toggleAccountExpand(accGroup.account.id, e)}
+                style={style}
+                className={`p-4 flex flex-col justify-between gap-4 bg-card/60 hover:bg-card hover:border-primary/50 hover:shadow-md transition-all duration-200 rounded-2xl border border-border/70 lg:self-start lg:sticky lg:top-4 shadow-xs cursor-pointer select-none group ${extraClasses}`}
+                title="Click card to collapse account back to grid"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Building2 size={14} className="text-primary" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-foreground group-hover:text-primary transition-colors">
+                        Account Totals
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground group-hover:text-primary transition-colors">
+                      <span>Collapse</span>
+                      <ChevronUp size={13} className="transition-transform group-hover:-translate-y-0.5" />
+                    </div>
+                  </div>
+
+                  {/* Diurnal Solar Curve with Live Telemetry */}
+                  <div className="flex flex-col h-[160px] w-full pt-1 shrink-0">
+                    <PlantSolarCurve
+                      capacityKw={accGroup.capacityKw}
+                      livePowerKw={accGroup.livePowerKw}
+                      dailyYieldKwh={accGroup.dailyYieldKwh}
+                      demandKw={accGroup.demandKw}
+                      gridPowerKw={accGroup.gridPowerKw}
+                      utilizationPct={accUtilization}
+                      historyPoints={telemetryHistory ?? undefined}
+                      className="h-full flex-1 w-full"
+                      showLabels={true}
+                    />
+                  </div>
+
+                  {/* Account Totals Grid */}
+                  <div className="grid grid-cols-2 gap-2 pt-1 font-mono">
+                    <div className="p-2.5 rounded-xl bg-muted/30 border border-border/40">
+                      <div className="text-[10px] uppercase text-muted-foreground">Live Generation</div>
+                      <div className="text-sm font-bold text-amber-500 mt-0.5">{accGroup.livePowerKw.toFixed(2)} kW</div>
+                      <div className="text-[9px] text-muted-foreground mt-0.5">{accUtilization.toFixed(0)}% utilization</div>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-muted/30 border border-border/40">
+                      <div className="text-[10px] uppercase text-muted-foreground">Today's Yield</div>
+                      <div className="text-sm font-bold text-foreground mt-0.5">{accGroup.dailyYieldKwh.toFixed(2)} kWh</div>
+                      <div className="text-[9px] text-muted-foreground mt-0.5">from midnight</div>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-muted/30 border border-border/40">
+                      <div className="text-[10px] uppercase text-muted-foreground">Installed Capacity</div>
+                      <div className="text-sm font-bold text-foreground mt-0.5">{accGroup.capacityKw.toFixed(1)} kW</div>
+                      <div className="text-[9px] text-muted-foreground mt-0.5">{accGroup.invertersCount} inverters total</div>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-muted/30 border border-border/40">
+                      <div className="text-[10px] uppercase text-muted-foreground">Facility Demand</div>
+                      <div className="text-sm font-bold text-indigo-400 mt-0.5">
+                        {typeof accGroup.demandKw === 'number' ? `${accGroup.demandKw.toFixed(1)} kW` : '—'}
+                      </div>
+                      <div className="text-[9px] text-muted-foreground mt-0.5">
+                        {typeof accGroup.gridPowerKw === 'number' ? `Grid: ${accGroup.gridPowerKw.toFixed(1)} kW` : 'Standby'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[10px] font-mono text-muted-foreground border-t border-border/40 pt-2 flex items-center justify-between">
+                  <span>Account ID: {accGroup.account.id}</span>
+                  <span>{accGroup.plants.length} Plant Stations</span>
+                </div>
+              </div>
+            );
 
             return (
               <div
@@ -902,377 +975,429 @@ export default function FleetMonitoringPage() {
                       <Building2 size={13} className="text-primary" />
                       <span>1. Account Overview</span>
                     </div>
-                    <span className="text-[10px] font-mono text-muted-foreground">Live Telemetry</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">Click card to collapse</span>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-foreground font-mono uppercase tracking-wider text-[11px]">
-                      <Layers size={13} className="text-primary" />
-                      <span>2. Plants ({accGroup.plants.length})</span>
+                  {!anyPlantExpanded ? (
+                    <div className="col-span-2 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-foreground font-mono uppercase tracking-wider text-[11px]">
+                        <Layers size={13} className="text-primary" />
+                        <span>2. Plants ({accGroup.plants.length})</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-muted-foreground">
+                        Click any plant to expand inverters
+                      </span>
                     </div>
-                    <span className="text-[10px] font-mono text-muted-foreground">
-                      {plantLayouts.filter((p) => p.isPlantExpanded).length} expanded
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-foreground font-mono uppercase tracking-wider text-[11px]">
-                      <Cpu size={13} className="text-primary" />
-                      <span>3. Inverters ({accGroup.invertersCount})</span>
-                    </div>
-                    <span className="text-[10px] font-mono text-muted-foreground">Aligned per plant</span>
-                  </div>
-                </div>
-
-                {/* 3-COLUMN RE-ALIGNED GRID */}
-                <div
-                  className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 items-start"
-                  style={{
-                    gridTemplateRows: `repeat(${totalAccountRows}, minmax(min-content, auto))`,
-                  }}
-                >
-                  {/* COLUMN 1: ACCOUNT TOTALS & DIURNAL CURVE */}
-                  <div
-                    style={{
-                      '--cell-col': 1,
-                      '--cell-row': `1 / span ${totalAccountRows}`,
-                    } as React.CSSProperties}
-                    className="fleet-cell p-4 flex flex-col justify-between gap-4 bg-card/60 rounded-2xl border border-border/70 lg:self-start lg:sticky lg:top-4 shadow-xs"
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between border-b border-border/40 pb-2">
-                        <div className="flex items-center gap-1.5">
-                          <Building2 size={14} className="text-primary" />
-                          <span className="text-xs font-bold uppercase tracking-wider text-foreground">
-                            Account Totals
-                          </span>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-foreground font-mono uppercase tracking-wider text-[11px]">
+                          <Layers size={13} className="text-primary" />
+                          <span>2. Plants ({accGroup.plants.length})</span>
                         </div>
                         <span className="text-[10px] font-mono text-muted-foreground">
-                          Live Telemetry
+                          {plantLayouts.filter((p) => p.isPlantExpanded).length} expanded
                         </span>
                       </div>
 
-                      {/* Diurnal Solar Curve with Live Telemetry */}
-                      <div className="flex flex-col min-h-[170px] w-full pt-1">
-                        <PlantSolarCurve
-                          capacityKw={accGroup.capacityKw}
-                          livePowerKw={accGroup.livePowerKw}
-                          dailyYieldKwh={accGroup.dailyYieldKwh}
-                          demandKw={accGroup.demandKw}
-                          gridPowerKw={accGroup.gridPowerKw}
-                          utilizationPct={accUtilization}
-                          historyPoints={telemetryHistory ?? undefined}
-                          className="h-full flex-1 w-full"
-                          showLabels={true}
-                        />
-                      </div>
-
-                      {/* Account Totals Grid */}
-                      <div className="grid grid-cols-2 gap-2 pt-1 font-mono">
-                        <div className="p-2.5 rounded-xl bg-muted/30 border border-border/40">
-                          <div className="text-[10px] uppercase text-muted-foreground">Live Generation</div>
-                          <div className="text-sm font-bold text-amber-500 mt-0.5">{accGroup.livePowerKw.toFixed(2)} kW</div>
-                          <div className="text-[9px] text-muted-foreground mt-0.5">{accUtilization.toFixed(0)}% utilization</div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-foreground font-mono uppercase tracking-wider text-[11px]">
+                          <Cpu size={13} className="text-primary" />
+                          <span>3. Inverters ({accGroup.invertersCount})</span>
                         </div>
-                        <div className="p-2.5 rounded-xl bg-muted/30 border border-border/40">
-                          <div className="text-[10px] uppercase text-muted-foreground">Today's Yield</div>
-                          <div className="text-sm font-bold text-foreground mt-0.5">{accGroup.dailyYieldKwh.toFixed(2)} kWh</div>
-                          <div className="text-[9px] text-muted-foreground mt-0.5">from midnight</div>
-                        </div>
-                        <div className="p-2.5 rounded-xl bg-muted/30 border border-border/40">
-                          <div className="text-[10px] uppercase text-muted-foreground">Installed Capacity</div>
-                          <div className="text-sm font-bold text-foreground mt-0.5">{accGroup.capacityKw.toFixed(1)} kW</div>
-                          <div className="text-[9px] text-muted-foreground mt-0.5">{accGroup.invertersCount} inverters total</div>
-                        </div>
-                        <div className="p-2.5 rounded-xl bg-muted/30 border border-border/40">
-                          <div className="text-[10px] uppercase text-muted-foreground">Facility Demand</div>
-                          <div className="text-sm font-bold text-indigo-400 mt-0.5">
-                            {typeof accGroup.demandKw === 'number' ? `${accGroup.demandKw.toFixed(1)} kW` : '—'}
-                          </div>
-                          <div className="text-[9px] text-muted-foreground mt-0.5">
-                            {typeof accGroup.gridPowerKw === 'number' ? `Grid: ${accGroup.gridPowerKw.toFixed(1)} kW` : 'Standby'}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-[10px] font-mono text-muted-foreground border-t border-border/40 pt-2 flex items-center justify-between">
-                      <span>Account ID: {accGroup.account.id}</span>
-                      <span>{accGroup.plants.length} Plant Stations</span>
-                    </div>
-                  </div>
-
-                  {/* COLUMN 2 & COLUMN 3: PLANTS AND INVERTERS */}
-                  {accGroup.plants.length === 0 ? (
-                    <>
-                      <div
-                        style={{ '--cell-col': 2, '--cell-row': 1 } as React.CSSProperties}
-                        className="fleet-cell p-8 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-xl"
-                      >
-                        No plants found under this account.
-                      </div>
-                      <div
-                        style={{ '--cell-col': 3, '--cell-row': 1 } as React.CSSProperties}
-                        className="fleet-cell p-8 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-xl"
-                      >
-                        No inverters available.
+                        <span className="text-[10px] font-mono text-muted-foreground">Aligned per plant</span>
                       </div>
                     </>
-                  ) : (
-                    plantLayouts.map(({ pGroup, isPlantExpanded, startRow, rowSpan, numInverters }) => {
-                      const plantUtil =
-                        pGroup.capacityKw > 0
-                          ? Math.min(100, (pGroup.livePowerKw / pGroup.capacityKw) * 100)
-                          : 0;
+                  )}
+                </div>
 
-                      return (
-                        <React.Fragment key={pGroup.plantKey}>
-                          {/* COLUMN 2: PLANT CARD (Spans its inverter rows so next plant is pushed down) */}
-                          <div
-                            onClick={() => togglePlantExpand(pGroup.plantKey)}
-                            style={{
-                              '--cell-col': 2,
-                              '--cell-row': `${startRow} / span ${rowSpan}`,
-                            } as React.CSSProperties}
-                            className={`fleet-cell rounded-2xl border transition-all duration-200 p-3.5 flex flex-col justify-between gap-3 cursor-pointer select-none group min-h-[200px] ${
-                              isPlantExpanded
-                                ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20 shadow-xs'
-                                : 'border-border/60 bg-card hover:border-primary/40 hover:bg-muted/20 hover:shadow-xs'
-                            } ${rowSpan <= 2 ? 'h-full' : 'h-fit lg:self-start lg:sticky lg:top-4'}`}
-                            title={`Click to ${isPlantExpanded ? 'collapse' : 'expand'} inverters for ${pGroup.plant.stationName}`}
-                          >
-                            {/* Plant Header */}
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-[10px] font-mono text-muted-foreground">
-                                    ID: {pGroup.plant.stationId}
-                                  </span>
-                                  <Badge
-                                    variant={
-                                      pGroup.status === 'FAULT'
-                                        ? 'destructive'
-                                        : pGroup.status === 'STANDBY'
-                                        ? 'warning'
-                                        : 'success'
-                                    }
-                                    className="text-[9px] font-mono py-0 gap-1 capitalize"
-                                  >
-                                    <span
-                                      className={`size-1.5 rounded-full ${
-                                        pGroup.status === 'FAULT'
-                                          ? 'bg-destructive'
-                                          : pGroup.status === 'STANDBY'
-                                          ? 'bg-amber-500'
-                                          : 'bg-emerald-500 animate-pulse'
-                                      }`}
-                                    />
-                                    {pGroup.status.toLowerCase()}
-                                  </Badge>
-                                </div>
-                                <h4 className="text-sm font-bold text-foreground truncate mt-0.5 group-hover:text-primary transition-colors" title={pGroup.plant.stationName}>
-                                  {pGroup.plant.stationName}
-                                </h4>
-                              </div>
+                {/* EXPANDED CONTENT: WHEN NO PLANTS ARE EXPANDED, PLANTS CONSUME COLUMNS 2 & 3 */}
+                {!anyPlantExpanded ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 items-start">
+                    {/* COLUMN 1: ACCOUNT TOTALS & DIURNAL CURVE */}
+                    {renderAccountTotalsCard(undefined, "col-span-1")}
 
-                              <div className="flex items-center gap-1 shrink-0">
-                                <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground group-hover:text-primary transition-colors">
-                                  <Cpu size={12} />
-                                  <span>{numInverters} inv</span>
-                                  <ChevronDown
-                                    size={14}
-                                    className={`transition-transform duration-200 ${
-                                      isPlantExpanded ? 'rotate-180 text-primary' : ''
-                                    }`}
-                                  />
-                                </div>
-                              </div>
-                            </div>
+                    {/* COLUMNS 2 & 3: PLANTS CONSUMING BOTH COLUMNS IN A UNIFORM 2-COLUMN GRID */}
+                    <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                      {accGroup.plants.length === 0 ? (
+                        <div className="col-span-2 p-8 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-xl">
+                          No plants found under this account.
+                        </div>
+                      ) : (
+                        accGroup.plants.map((pGroup) => {
+                          const plantUtil =
+                            pGroup.capacityKw > 0
+                              ? Math.min(100, (pGroup.livePowerKw / pGroup.capacityKw) * 100)
+                              : 0;
+                          const numInverters = pGroup.inverters.length;
 
-                            {/* Plant Diurnal Solar Arc Curve */}
-                            <div className="w-full h-[85px] flex items-center justify-center">
-                              <PlantSolarCurve
-                                capacityKw={pGroup.capacityKw}
-                                livePowerKw={pGroup.livePowerKw}
-                                dailyYieldKwh={pGroup.dailyYieldKwh}
-                                demandKw={pGroup.demandKw}
-                                gridPowerKw={pGroup.gridPowerKw}
-                                utilizationPct={plantUtil}
-                                historyPoints={telemetryHistory ?? undefined}
-                                height={80}
-                                className="w-full"
-                                showLabels={false}
-                              />
-                            </div>
-
-                            {/* Plant Quick Numbers */}
-                            <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border/30 text-muted-foreground">
-                              <span>Live: <strong className="text-amber-500">{pGroup.livePowerKw.toFixed(1)} kW</strong></span>
-                              <span>Yield: <strong className="text-foreground">{pGroup.dailyYieldKwh.toFixed(1)} kWh</strong></span>
-                              <span>Cap: <strong className="text-foreground">{pGroup.capacityKw.toFixed(0)} kW</strong></span>
-                            </div>
-                          </div>
-
-                          {/* COLUMN 3: INVERTERS FOR THIS PLANT (OR PLACEHOLDER IF COLLAPSED) */}
-                          {isPlantExpanded && numInverters > 0 ? (
-                            pGroup.inverters.map((inv, invIndex) => {
-                              const isCopied = copiedSn === inv.deviceSn;
-                              const isFault = inv.status === 'FAULT';
-                              const isStandby = inv.status === 'STANDBY' || inv.liveSolarPowerKw === 0;
-                              const loadPct = Math.min(100, (inv.liveSolarPowerKw / (inv.ratedKw || 50)) * 100);
-
-                              return (
-                                <div
-                                  key={inv.deviceSn}
-                                  style={{
-                                    '--cell-col': 3,
-                                    '--cell-row': `${startRow + invIndex}`,
-                                  } as React.CSSProperties}
-                                  className="fleet-cell p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 transition-all shadow-xs flex flex-col justify-between gap-2.5 min-h-[200px] h-full"
-                                >
-                                  {/* Inverter Header */}
-                                  <div className="flex items-start justify-between gap-1.5">
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="font-mono font-bold text-xs text-foreground truncate">
-                                          {inv.deviceSn}
-                                        </span>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => handleCopySn(inv.deviceSn, e)}
-                                          className="p-0.5 text-muted-foreground hover:text-foreground rounded cursor-pointer"
-                                          title="Copy Serial Number"
-                                        >
-                                          {isCopied ? (
-                                            <Check size={11} className="text-emerald-500" />
-                                          ) : (
-                                            <Copy size={11} />
-                                          )}
-                                        </button>
-                                      </div>
-                                      <div className="text-[10px] text-muted-foreground truncate">
-                                        {inv.model} ({inv.ratedKw} kW) • <span className="font-mono text-foreground/80">#{invIndex + 1} of {pGroup.plant.stationName}</span>
-                                      </div>
-                                    </div>
-
+                          return (
+                            <div
+                              key={pGroup.plantKey}
+                              onClick={() => togglePlantExpand(pGroup.plantKey)}
+                              className="rounded-2xl border border-border/60 bg-card hover:border-primary/40 hover:bg-muted/20 hover:shadow-xs transition-all duration-200 p-3.5 flex flex-col justify-between gap-3 cursor-pointer select-none group min-h-[200px]"
+                              title={`Click to expand ${numInverters} inverters for ${pGroup.plant.stationName}`}
+                            >
+                              {/* Plant Header */}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[10px] font-mono text-muted-foreground">
+                                      ID: {pGroup.plant.stationId}
+                                    </span>
                                     <Badge
-                                      variant={isFault ? 'destructive' : isStandby ? 'warning' : 'success'}
-                                      className="text-[9px] font-mono py-0 gap-1 capitalize shrink-0"
+                                      variant={
+                                        pGroup.status === 'FAULT'
+                                          ? 'destructive'
+                                          : pGroup.status === 'STANDBY'
+                                          ? 'warning'
+                                          : 'success'
+                                      }
+                                      className="text-[9px] font-mono py-0 gap-1 capitalize"
                                     >
                                       <span
                                         className={`size-1.5 rounded-full ${
-                                          isFault
-                                            ? 'bg-destructive animate-ping'
-                                            : isStandby
+                                          pGroup.status === 'FAULT'
+                                            ? 'bg-destructive'
+                                            : pGroup.status === 'STANDBY'
                                             ? 'bg-amber-500'
                                             : 'bg-emerald-500 animate-pulse'
                                         }`}
                                       />
-                                      {inv.status.toLowerCase()}
+                                      {pGroup.status.toLowerCase()}
                                     </Badge>
                                   </div>
+                                  <h4 className="text-sm font-bold text-foreground truncate mt-0.5 group-hover:text-primary transition-colors" title={pGroup.plant.stationName}>
+                                    {pGroup.plant.stationName}
+                                  </h4>
+                                </div>
 
-                                  {/* Inverter Individual Diurnal Output Curve Graph */}
-                                  <div className="w-full">
-                                    <InverterSolarCurve
-                                      ratedKw={inv.ratedKw}
-                                      liveSolarPowerKw={inv.liveSolarPowerKw}
-                                      dailyYieldKwh={inv.dailyYieldKwh}
-                                      height={55}
-                                      className="w-full"
-                                    />
-                                  </div>
-
-                                  {/* Output Gauge Bar */}
-                                  <div className="space-y-0.5">
-                                    <div className="flex items-center justify-between text-[9px] font-mono">
-                                      <span className="text-muted-foreground">Output:</span>
-                                      <span className="font-bold text-amber-500">
-                                        {inv.liveSolarPowerKw.toFixed(1)} kW ({loadPct.toFixed(0)}%)
-                                      </span>
-                                    </div>
-                                    <div className="h-1 w-full bg-muted/60 rounded-full overflow-hidden">
-                                      <div
-                                        className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all duration-300"
-                                        style={{ width: `${loadPct}%` }}
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* Inverter Secondary Details & Paired Logger */}
-                                  <div className="flex items-center justify-between text-[9.5px] font-mono text-muted-foreground pt-1 border-t border-border/30">
-                                    <span>Yield: <strong className="text-amber-500">{inv.dailyYieldKwh.toFixed(1)} kWh</strong></span>
-                                    {inv.loggerSn && (
-                                      <span className="flex items-center gap-1 truncate max-w-[130px]" title={`Paired Logger: ${inv.loggerSn}`}>
-                                        <Radio size={10} className="shrink-0" />
-                                        {inv.loggerSn}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {/* Deep Link Action */}
-                                  <div className="pt-0.5">
-                                    <Button
-                                      variant="outline"
-                                      size="xs"
-                                      onClick={() => navigateToDevice(accGroup.account.id, pGroup.plant.stationId, inv.deviceSn, '/hardware-telemetry')}
-                                      className="w-full text-[10px] h-6 px-1.5 gap-1 hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer"
-                                      title="View Hardware Telemetry"
-                                    >
-                                      <Sliders size={10} />
-                                      <span>Telemetry</span>
-                                    </Button>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground group-hover:text-primary transition-colors">
+                                    <Cpu size={12} />
+                                    <span>{numInverters} inv</span>
+                                    <ChevronDown size={14} className="transition-transform duration-200 group-hover:translate-y-0.5" />
                                   </div>
                                 </div>
-                              );
-                            })
-                          ) : isPlantExpanded && numInverters === 0 ? (
-                            <div
-                              style={{
-                                '--cell-col': 3,
-                                '--cell-row': `${startRow}`,
-                              } as React.CSSProperties}
-                              className="fleet-cell h-full min-h-[200px] rounded-2xl border border-dashed border-border/70 p-4 flex flex-col items-center justify-center text-center text-muted-foreground"
-                            >
-                              <Cpu size={20} className="mb-1 text-muted-foreground/60" />
-                              <span className="text-xs font-semibold text-foreground">No Inverters Configured</span>
-                              <span className="text-[10px] font-mono mt-0.5">This plant station has 0 registered inverters</span>
+                              </div>
+
+                              {/* Plant Diurnal Solar Arc Curve */}
+                              <div className="w-full h-[85px] flex items-center justify-center">
+                                <PlantSolarCurve
+                                  capacityKw={pGroup.capacityKw}
+                                  livePowerKw={pGroup.livePowerKw}
+                                  dailyYieldKwh={pGroup.dailyYieldKwh}
+                                  demandKw={pGroup.demandKw}
+                                  gridPowerKw={pGroup.gridPowerKw}
+                                  utilizationPct={plantUtil}
+                                  historyPoints={telemetryHistory ?? undefined}
+                                  height={80}
+                                  className="w-full"
+                                  showLabels={false}
+                                />
+                              </div>
+
+                              {/* Plant Quick Numbers */}
+                              <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border/30 text-muted-foreground">
+                                <span>Live: <strong className="text-amber-500">{pGroup.livePowerKw.toFixed(1)} kW</strong></span>
+                                <span>Yield: <strong className="text-foreground">{pGroup.dailyYieldKwh.toFixed(1)} kWh</strong></span>
+                                <span>Cap: <strong className="text-foreground">{pGroup.capacityKw.toFixed(0)} kW</strong></span>
+                              </div>
                             </div>
-                          ) : (
-                            /* COLLAPSED PLACEHOLDER IN COLUMN 3 (Row = startRow) */
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* 3-COLUMN RE-ALIGNED GRID (WHEN AT LEAST ONE PLANT IS EXPANDED) */
+                  <div
+                    className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 items-start"
+                    style={{
+                      gridTemplateRows: `repeat(${totalAccountRows}, minmax(min-content, auto))`,
+                    }}
+                  >
+                    {/* COLUMN 1: ACCOUNT TOTALS & DIURNAL CURVE */}
+                    {renderAccountTotalsCard(
+                      {
+                        '--cell-col': 1,
+                        '--cell-row': `1 / span ${totalAccountRows}`,
+                      } as React.CSSProperties,
+                      "fleet-cell"
+                    )}
+
+                    {/* COLUMN 2 & COLUMN 3: PLANTS AND INVERTERS */}
+                    {accGroup.plants.length === 0 ? (
+                      <>
+                        <div
+                          style={{ '--cell-col': 2, '--cell-row': 1 } as React.CSSProperties}
+                          className="fleet-cell p-8 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-xl"
+                        >
+                          No plants found under this account.
+                        </div>
+                        <div
+                          style={{ '--cell-col': 3, '--cell-row': 1 } as React.CSSProperties}
+                          className="fleet-cell p-8 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-xl"
+                        >
+                          No inverters available.
+                        </div>
+                      </>
+                    ) : (
+                      plantLayouts.map(({ pGroup, isPlantExpanded, startRow, rowSpan, numInverters }) => {
+                        const plantUtil =
+                          pGroup.capacityKw > 0
+                            ? Math.min(100, (pGroup.livePowerKw / pGroup.capacityKw) * 100)
+                            : 0;
+
+                        return (
+                          <React.Fragment key={pGroup.plantKey}>
+                            {/* COLUMN 2: PLANT CARD (Spans its inverter rows so next plant is pushed down) */}
                             <div
                               onClick={() => togglePlantExpand(pGroup.plantKey)}
                               style={{
-                                '--cell-col': 3,
-                                '--cell-row': `${startRow}`,
+                                '--cell-col': 2,
+                                '--cell-row': `${startRow} / span ${rowSpan}`,
                               } as React.CSSProperties}
-                              className="fleet-cell h-full min-h-[200px] rounded-2xl border border-dashed border-border/70 hover:border-primary/50 hover:bg-primary/5 transition-all p-4 flex flex-col items-center justify-center text-center cursor-pointer group select-none shadow-2xs"
-                              title={`Click to open ${numInverters} inverters for ${pGroup.plant.stationName}`}
+                              className={`fleet-cell rounded-2xl border transition-all duration-200 p-3.5 flex flex-col justify-between gap-3 cursor-pointer select-none group min-h-[200px] h-fit self-start w-full ${
+                                isPlantExpanded
+                                  ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20 shadow-xs'
+                                  : 'border-border/60 bg-card hover:border-primary/40 hover:bg-muted/20 hover:shadow-xs'
+                              }`}
+                              title={`Click to ${isPlantExpanded ? 'collapse' : 'expand'} inverters for ${pGroup.plant.stationName}`}
                             >
-                              <div className="flex flex-col items-center gap-2 text-muted-foreground group-hover:text-foreground">
-                                <div className="p-2 rounded-xl bg-muted/40 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                                  <Cpu size={22} />
-                                </div>
-                                <div className="space-y-0.5">
-                                  <div className="text-xs font-bold font-mono text-foreground">
-                                    {numInverters} Inverter{numInverters !== 1 ? 's' : ''} Collapsed
+                              {/* Plant Header */}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[10px] font-mono text-muted-foreground">
+                                      ID: {pGroup.plant.stationId}
+                                    </span>
+                                    <Badge
+                                      variant={
+                                        pGroup.status === 'FAULT'
+                                          ? 'destructive'
+                                          : pGroup.status === 'STANDBY'
+                                          ? 'warning'
+                                          : 'success'
+                                      }
+                                      className="text-[9px] font-mono py-0 gap-1 capitalize"
+                                    >
+                                      <span
+                                        className={`size-1.5 rounded-full ${
+                                          pGroup.status === 'FAULT'
+                                            ? 'bg-destructive'
+                                            : pGroup.status === 'STANDBY'
+                                            ? 'bg-amber-500'
+                                            : 'bg-emerald-500 animate-pulse'
+                                        }`}
+                                      />
+                                      {pGroup.status.toLowerCase()}
+                                    </Badge>
                                   </div>
-                                  <div className="text-[11px] text-muted-foreground font-mono">
-                                    {pGroup.livePowerKw.toFixed(1)} kW live • {pGroup.capacityKw.toFixed(0)} kW capacity
-                                  </div>
+                                  <h4 className="text-sm font-bold text-foreground truncate mt-0.5 group-hover:text-primary transition-colors" title={pGroup.plant.stationName}>
+                                    {pGroup.plant.stationName}
+                                  </h4>
                                 </div>
-                                <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground group-hover:text-primary transition-colors mt-0.5">
-                                  <span>Click card to inspect</span>
-                                  <ChevronDown size={13} className="group-hover:translate-y-0.5 transition-transform" />
+
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground group-hover:text-primary transition-colors">
+                                    <Cpu size={12} />
+                                    <span>{numInverters} inv</span>
+                                    <ChevronDown
+                                      size={14}
+                                      className={`transition-transform duration-200 ${
+                                        isPlantExpanded ? 'rotate-180 text-primary' : ''
+                                      }`}
+                                    />
+                                  </div>
                                 </div>
                               </div>
+
+                              {/* Plant Diurnal Solar Arc Curve */}
+                              <div className="w-full h-[85px] flex items-center justify-center">
+                                <PlantSolarCurve
+                                  capacityKw={pGroup.capacityKw}
+                                  livePowerKw={pGroup.livePowerKw}
+                                  dailyYieldKwh={pGroup.dailyYieldKwh}
+                                  demandKw={pGroup.demandKw}
+                                  gridPowerKw={pGroup.gridPowerKw}
+                                  utilizationPct={plantUtil}
+                                  historyPoints={telemetryHistory ?? undefined}
+                                  height={80}
+                                  className="w-full"
+                                  showLabels={false}
+                                />
+                              </div>
+
+                              {/* Plant Quick Numbers */}
+                              <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border/30 text-muted-foreground">
+                                <span>Live: <strong className="text-amber-500">{pGroup.livePowerKw.toFixed(1)} kW</strong></span>
+                                <span>Yield: <strong className="text-foreground">{pGroup.dailyYieldKwh.toFixed(1)} kWh</strong></span>
+                                <span>Cap: <strong className="text-foreground">{pGroup.capacityKw.toFixed(0)} kW</strong></span>
+                              </div>
                             </div>
-                          )}
-                        </React.Fragment>
-                      );
-                    })
-                  )}
-                </div>
+
+                            {/* COLUMN 3: INVERTERS FOR THIS PLANT (OR PLACEHOLDER IF COLLAPSED) */}
+                            {isPlantExpanded && numInverters > 0 ? (
+                              pGroup.inverters.map((inv, invIndex) => {
+                                const isCopied = copiedSn === inv.deviceSn;
+                                const isFault = inv.status === 'FAULT';
+                                const isStandby = inv.status === 'STANDBY' || inv.liveSolarPowerKw === 0;
+                                const loadPct = Math.min(100, (inv.liveSolarPowerKw / (inv.ratedKw || 50)) * 100);
+
+                                return (
+                                  <div
+                                    key={inv.deviceSn}
+                                    style={{
+                                      '--cell-col': 3,
+                                      '--cell-row': `${startRow + invIndex}`,
+                                    } as React.CSSProperties}
+                                    className="fleet-cell p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 transition-all shadow-xs flex flex-col justify-between gap-2.5 min-h-[200px] h-fit self-start w-full"
+                                  >
+                                    {/* Inverter Header */}
+                                    <div className="flex items-start justify-between gap-1.5">
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="font-mono font-bold text-xs text-foreground truncate">
+                                            {inv.deviceSn}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => handleCopySn(inv.deviceSn, e)}
+                                            className="p-0.5 text-muted-foreground hover:text-foreground rounded cursor-pointer"
+                                            title="Copy Serial Number"
+                                          >
+                                            {isCopied ? (
+                                              <Check size={11} className="text-emerald-500" />
+                                            ) : (
+                                              <Copy size={11} />
+                                            )}
+                                          </button>
+                                        </div>
+                                        <div className="text-[10px] text-muted-foreground truncate">
+                                          {inv.model} ({inv.ratedKw} kW) • <span className="font-mono text-foreground/80">#{invIndex + 1} of {pGroup.plant.stationName}</span>
+                                        </div>
+                                      </div>
+
+                                      <Badge
+                                        variant={isFault ? 'destructive' : isStandby ? 'warning' : 'success'}
+                                        className="text-[9px] font-mono py-0 gap-1 capitalize shrink-0"
+                                      >
+                                        <span
+                                          className={`size-1.5 rounded-full ${
+                                            isFault
+                                              ? 'bg-destructive animate-ping'
+                                              : isStandby
+                                              ? 'bg-amber-500'
+                                              : 'bg-emerald-500 animate-pulse'
+                                          }`}
+                                        />
+                                        {inv.status.toLowerCase()}
+                                      </Badge>
+                                    </div>
+
+                                    {/* Inverter Individual Diurnal Output Curve Graph */}
+                                    <div className="w-full">
+                                      <InverterSolarCurve
+                                        ratedKw={inv.ratedKw}
+                                        liveSolarPowerKw={inv.liveSolarPowerKw}
+                                        dailyYieldKwh={inv.dailyYieldKwh}
+                                        height={55}
+                                        className="w-full"
+                                      />
+                                    </div>
+
+                                    {/* Output Gauge Bar */}
+                                    <div className="space-y-0.5">
+                                      <div className="flex items-center justify-between text-[9px] font-mono">
+                                        <span className="text-muted-foreground">Output:</span>
+                                        <span className="font-bold text-amber-500">
+                                          {inv.liveSolarPowerKw.toFixed(1)} kW ({loadPct.toFixed(0)}%)
+                                        </span>
+                                      </div>
+                                      <div className="h-1 w-full bg-muted/60 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all duration-300"
+                                          style={{ width: `${loadPct}%` }}
+                                        />
+                                      </div>
+                                    </div>
+
+                                    {/* Inverter Secondary Details & Paired Logger */}
+                                    <div className="flex items-center justify-between text-[9.5px] font-mono text-muted-foreground pt-1 border-t border-border/30">
+                                      <span>Yield: <strong className="text-amber-500">{inv.dailyYieldKwh.toFixed(1)} kWh</strong></span>
+                                      {inv.loggerSn && (
+                                        <span className="flex items-center gap-1 truncate max-w-[130px]" title={`Paired Logger: ${inv.loggerSn}`}>
+                                          <Radio size={10} className="shrink-0" />
+                                          {inv.loggerSn}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Deep Link Action */}
+                                    <div className="pt-0.5">
+                                      <Button
+                                        variant="outline"
+                                        size="xs"
+                                        onClick={() => navigateToDevice(accGroup.account.id, pGroup.plant.stationId, inv.deviceSn, '/hardware-telemetry')}
+                                        className="w-full text-[10px] h-6 px-1.5 gap-1 hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer"
+                                        title="View Hardware Telemetry"
+                                      >
+                                        <Sliders size={10} />
+                                        <span>Telemetry</span>
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : isPlantExpanded && numInverters === 0 ? (
+                              <div
+                                style={{
+                                  '--cell-col': 3,
+                                  '--cell-row': `${startRow}`,
+                                } as React.CSSProperties}
+                                className="fleet-cell h-fit self-start min-h-[200px] w-full rounded-2xl border border-dashed border-border/70 p-4 flex flex-col items-center justify-center text-center text-muted-foreground"
+                              >
+                                <Cpu size={20} className="mb-1 text-muted-foreground/60" />
+                                <span className="text-xs font-semibold text-foreground">No Inverters Configured</span>
+                                <span className="text-[10px] font-mono mt-0.5">This plant station has 0 registered inverters</span>
+                              </div>
+                            ) : (
+                              /* COLLAPSED PLACEHOLDER IN COLUMN 3 (Row = startRow) */
+                              <div
+                                onClick={() => togglePlantExpand(pGroup.plantKey)}
+                                style={{
+                                  '--cell-col': 3,
+                                  '--cell-row': `${startRow}`,
+                                } as React.CSSProperties}
+                                className="fleet-cell h-fit self-start min-h-[200px] w-full rounded-2xl border border-dashed border-border/70 hover:border-primary/50 hover:bg-primary/5 transition-all p-4 flex flex-col items-center justify-center text-center cursor-pointer group select-none shadow-2xs"
+                                title={`Click to open ${numInverters} inverters for ${pGroup.plant.stationName}`}
+                              >
+                                <div className="flex flex-col items-center gap-2 text-muted-foreground group-hover:text-foreground">
+                                  <div className="p-2 rounded-xl bg-muted/40 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                                    <Cpu size={22} />
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <div className="text-xs font-bold font-mono text-foreground">
+                                      {numInverters} Inverter{numInverters !== 1 ? 's' : ''} Collapsed
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground font-mono">
+                                      {pGroup.livePowerKw.toFixed(1)} kW live • {pGroup.capacityKw.toFixed(0)} kW capacity
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground group-hover:text-primary transition-colors mt-0.5">
+                                    <span>Click card to inspect</span>
+                                    <ChevronDown size={13} className="group-hover:translate-y-0.5 transition-transform" />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </React.Fragment>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
