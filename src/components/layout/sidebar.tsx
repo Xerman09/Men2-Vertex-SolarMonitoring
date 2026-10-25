@@ -102,7 +102,7 @@ export function Sidebar() {
       <aside
         role="navigation"
         aria-label="Navigation sidebar"
-        className={`fixed left-0 top-0 h-full bg-sidebar text-sidebar-foreground z-50 flex flex-col justify-between border-r border-sidebar-border shadow-sm transition-all duration-300 ${
+        className={`fixed left-0 top-0 h-full bg-sidebar text-sidebar-foreground z-50 flex flex-col justify-between border-r border-sidebar-border shadow-sm transition-[width,transform] duration-300 ease-in-out will-change-[width,transform] ${
           collapsed ? 'lg:w-[72px]' : 'lg:w-72'
         } ${
           mobileOpen
@@ -112,83 +112,85 @@ export function Sidebar() {
       >
         <div className="flex flex-col">
           {/* Brand Header */}
-          <div
-            className={`h-16 flex items-center border-b border-sidebar-border/70 bg-sidebar/50 transition-all ${
-              collapsed && !mobileOpen ? 'justify-center px-2' : 'justify-between px-4'
-            }`}
-          >
-            {collapsed && !mobileOpen ? (
-              /* When closed/collapsed on desktop, clicking the top Sun icon opens the sidebar */
+          <div className="h-16 flex items-center justify-between px-3.5 border-b border-sidebar-border/70 bg-sidebar/50 overflow-hidden shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
-                onClick={() => setCollapsed(false)}
-                className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 hover:bg-amber-500/20 hover:scale-105 active:scale-95 transition-all shadow-2xs cursor-pointer group"
-                title="Click to open sidebar"
-                aria-label="Open sidebar"
+                onClick={() => {
+                  if (collapsed && !mobileOpen) {
+                    setCollapsed(false);
+                  }
+                }}
+                className={`w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 shrink-0 transition-all duration-200 shadow-2xs group ${
+                  collapsed && !mobileOpen
+                    ? 'hover:bg-amber-500/20 hover:scale-105 active:scale-95 cursor-pointer'
+                    : 'cursor-default'
+                }`}
+                title={collapsed && !mobileOpen ? 'Click to open sidebar' : 'VOSolar Telemetry'}
+                aria-label={collapsed && !mobileOpen ? 'Open sidebar' : 'VOSolar Telemetry'}
               >
                 <Sun size={20} className="animate-spin-slow group-hover:rotate-45 transition-transform" />
               </button>
-            ) : (
-              <div className="flex items-center justify-between w-full">
-                <Link
-                  href="/fleet"
-                  className="flex items-center gap-2.5 overflow-hidden group select-none"
-                  title="VOSolar Telemetry"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 shrink-0 group-hover:scale-105 transition-transform shadow-2xs">
-                    <Sun size={20} className="animate-spin-slow" />
-                  </div>
-                  <div className="flex flex-col leading-tight animate-in fade-in duration-200">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-headline font-bold text-sm tracking-wider uppercase">
-                        VO<span className="text-primary">Solar</span>
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="text-[9px] px-1 py-0 h-4 border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono font-bold"
-                      >
-                        VOS
-                      </Badge>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground font-mono">
-                      Multi-Account Fleet
-                    </span>
-                  </div>
-                </Link>
 
-                <button
-                  onClick={() => {
-                    if (mobileOpen) {
-                      closeMobile();
-                    } else {
-                      setCollapsed(true);
-                    }
-                  }}
-                  aria-label={mobileOpen ? 'Close navigation drawer' : 'Collapse sidebar to icon rail'}
-                  title={mobileOpen ? 'Close navigation drawer' : 'Collapse sidebar'}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors cursor-pointer"
-                >
-                  {mobileOpen ? <X size={16} /> : <ChevronLeft size={16} />}
-                </button>
-              </div>
-            )}
+              <Link
+                href="/fleet"
+                onClick={() => {
+                  if (mobileOpen) closeMobile();
+                }}
+                className={`flex flex-col leading-tight whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out select-none ${
+                  collapsed && !mobileOpen
+                    ? 'max-w-0 opacity-0 -translate-x-3 pointer-events-none'
+                    : 'max-w-[150px] opacity-100 translate-x-0'
+                }`}
+                title="VOSolar Telemetry"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="font-headline font-bold text-sm tracking-wider uppercase">
+                    VO<span className="text-primary">Solar</span>
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] px-1 py-0 h-4 border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono font-bold"
+                  >
+                    VOS
+                  </Badge>
+                </div>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  Multi-Account Fleet
+                </span>
+              </Link>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (mobileOpen) {
+                  closeMobile();
+                } else {
+                  setCollapsed(true);
+                }
+              }}
+              aria-label={mobileOpen ? 'Close navigation drawer' : 'Collapse sidebar to icon rail'}
+              title={mobileOpen ? 'Close navigation drawer' : 'Collapse sidebar'}
+              className={`p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-all duration-300 ease-in-out shrink-0 cursor-pointer ${
+                collapsed && !mobileOpen
+                  ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none p-0 overflow-hidden'
+                  : 'max-w-8 opacity-100 translate-x-0'
+              }`}
+            >
+              {mobileOpen ? <X size={16} /> : <ChevronLeft size={16} />}
+            </button>
           </div>
 
-
-
           {/* Navigation Items (Always visible with icons) */}
-          <nav
-            className={`flex flex-col gap-1.5 pt-2 ${
-              collapsed && !mobileOpen ? 'px-2 items-center' : 'px-3'
-            }`}
-          >
+          <nav className="flex flex-col gap-1.5 pt-2 px-3">
             {navItems.map((item) => {
               const isActive =
                 item.href === '/fleet'
                   ? pathname === '/' || pathname.startsWith('/fleet')
                   : pathname.startsWith(item.href);
               const Icon = item.icon;
-              const isIconOnly = collapsed && !mobileOpen;
+              const isCollapsedMode = collapsed && !mobileOpen;
 
               return (
                 <Link
@@ -197,44 +199,48 @@ export function Sidebar() {
                   onClick={() => {
                     if (mobileOpen) closeMobile();
                   }}
-                  className={`relative flex items-center rounded-xl text-xs font-semibold transition-all group select-none ${
-                    isIconOnly
-                      ? 'w-11 h-11 justify-center'
-                      : 'gap-3 px-3 py-2.5 w-full'
-                  } ${
+                  className={`relative flex items-center rounded-xl text-xs font-semibold select-none h-11 px-2.5 transition-colors duration-200 group overflow-visible ${
                     isActive
                       ? 'bg-primary text-primary-foreground shadow-xs font-bold'
                       : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground'
                   }`}
                   aria-label={item.label}
                 >
-                  <Icon
-                    size={18}
-                    className={`shrink-0 transition-transform group-hover:scale-110 ${
-                      isActive
-                        ? 'text-primary-foreground'
-                        : 'text-muted-foreground group-hover:text-foreground'
-                    }`}
-                  />
+                  <div className="w-5 h-5 shrink-0 flex items-center justify-center">
+                    <Icon
+                      size={18}
+                      className={`shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+                        isActive
+                          ? 'text-primary-foreground'
+                          : 'text-muted-foreground group-hover:text-foreground'
+                      }`}
+                    />
+                  </div>
 
-                  {!isIconOnly ? (
-                    <div className="flex items-center justify-between w-full min-w-0">
-                      <span className="truncate">{item.label}</span>
-                      {item.badge && (
-                        <span
-                          className={`text-[9.5px] px-1.5 py-0.2 rounded font-mono shrink-0 ml-1.5 ${
-                            isActive
-                              ? 'bg-white/20 text-white font-bold'
-                              : 'bg-muted text-muted-foreground'
-                          }`}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    /* Floating Tooltip in compact icon rail mode */
-                    <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-popover text-popover-foreground text-xs font-semibold rounded-xl shadow-xl border border-border pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 flex items-center gap-2">
+                  <div
+                    className={`flex items-center justify-between min-w-0 ml-3 whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out ${
+                      isCollapsedMode
+                        ? 'max-w-0 opacity-0 -translate-x-3 pointer-events-none'
+                        : 'max-w-[190px] opacity-100 translate-x-0 flex-1'
+                    }`}
+                  >
+                    <span className="truncate">{item.label}</span>
+                    {item.badge && (
+                      <span
+                        className={`text-[9.5px] px-1.5 py-0.2 rounded font-mono shrink-0 ml-1.5 ${
+                          isActive
+                            ? 'bg-white/20 text-white font-bold'
+                            : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Floating Tooltip in compact icon rail mode */}
+                  {isCollapsedMode && (
+                    <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-popover text-popover-foreground text-xs font-semibold rounded-xl shadow-xl border border-border pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap z-50 flex items-center gap-2">
                       <span>{item.label}</span>
                       {item.badge && (
                         <span className="text-[9px] px-1 py-0.5 rounded bg-primary/15 text-primary font-mono font-bold">
@@ -249,11 +255,43 @@ export function Sidebar() {
           </nav>
         </div>
 
+        {/* Bottom Expand/Collapse Toggle in Icon Rail & Expanded Mode */}
+        <div className="p-3 border-t border-sidebar-border/40 flex items-center justify-center shrink-0">
+          <button
+            type="button"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className={`flex items-center rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors duration-200 cursor-pointer select-none ${
+              collapsed && !mobileOpen
+                ? 'w-10 h-10 justify-center'
+                : 'w-full gap-3 px-2.5 py-2'
+            }`}
+          >
+            <div className="w-5 h-5 shrink-0 flex items-center justify-center">
+              <ChevronLeft
+                size={16}
+                className={`transition-transform duration-300 ease-in-out ${
+                  collapsed && !mobileOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </div>
+            <div
+              className={`whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out ${
+                collapsed && !mobileOpen
+                  ? 'max-w-0 opacity-0 -translate-x-3 pointer-events-none'
+                  : 'max-w-[150px] opacity-100 translate-x-0'
+              }`}
+            >
+              <span>Collapse Sidebar</span>
+            </div>
+          </button>
+        </div>
       </aside>
 
       {/* Spacer to offset fixed sidebar on desktop so content is never covered */}
       <div
-        className={`hidden lg:block shrink-0 transition-all duration-300 ${
+        className={`hidden lg:block shrink-0 transition-[width] duration-300 ease-in-out will-change-[width] ${
           collapsed ? 'w-[72px]' : 'w-72'
         }`}
       />
