@@ -1,9 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Radio, Pause, Play, RefreshCw, Zap, TrendingUp, Sun, Waves, Compass, Activity } from 'lucide-react';
+import { Radio, Pause, Play, RefreshCw } from 'lucide-react';
 import { CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { HoverInfo } from '@/components/ui/tooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
@@ -13,22 +12,20 @@ interface GraphHeaderControlsProps {
   compact?: boolean;
   timeResolution: TimeResolution;
   isLiveStreaming: boolean;
-  activeTab: ChartTab;
+  activeTab?: ChartTab;
   onResolutionChange: (res: TimeResolution) => void;
   onToggleStreaming: () => void;
   onManualTick: () => void;
-  onTabChange: (tab: ChartTab) => void;
+  onTabChange?: (tab: ChartTab) => void;
 }
 
 export function GraphHeaderControls({
   compact = false,
   timeResolution,
   isLiveStreaming,
-  activeTab,
   onResolutionChange,
   onToggleStreaming,
   onManualTick,
-  onTabChange,
 }: GraphHeaderControlsProps) {
   return (
     <CardHeader className={compact ? 'py-2 px-3 sm:px-3.5 border-b border-border/50' : 'py-3 px-4 border-b border-border/50'}>
@@ -92,50 +89,6 @@ export function GraphHeaderControls({
             <span>Tick</span>
           </Button>
         </div>
-      </div>
-
-      {/* Subsystem Tabs */}
-      <div className="pt-2">
-        <Tabs value={activeTab} onValueChange={(v: string) => onTabChange(v as ChartTab)} className="w-full">
-          <TabsList className="bg-muted/50 p-0.5 rounded-lg h-auto border border-border/50 inline-flex w-fit max-w-full overflow-x-auto gap-0.5">
-            <HoverInfo title="Power Curves" content="High-resolution 5-minute sampling curves of PV solar generation, facility industrial load, and net utility exchange.">
-              <TabsTrigger value="power" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
-                <Zap className="h-3.5 w-3.5 text-yellow-500" />
-                <span>Power Curves</span>
-              </TabsTrigger>
-            </HoverInfo>
-            <HoverInfo title="Self-Consumption Analysis" content="Breakdown of solar self-consumption, local load coverage utilization, and export vs import ratios.">
-              <TabsTrigger value="selfconsumption" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
-                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-                <span>Self-Consumption</span>
-              </TabsTrigger>
-            </HoverInfo>
-            <HoverInfo title="Diurnal Curve Fitting" content="Theoretical sinusoidal clear-sky insolation curve fit and model deviation residual calculations.">
-              <TabsTrigger value="sinusoidal" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
-                <Sun className="h-3.5 w-3.5 text-amber-500" />
-                <span>Diurnal Fit</span>
-              </TabsTrigger>
-            </HoverInfo>
-            <HoverInfo title="Fourier Decomposition" content="Discrete Fourier decomposition of 24-hour diurnal cycle across fundamental and harmonic frequencies.">
-              <TabsTrigger value="fourier" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
-                <Waves className="h-3.5 w-3.5 text-cyan-500" />
-                <span>Fourier</span>
-              </TabsTrigger>
-            </HoverInfo>
-            <HoverInfo title="Polar Radar Phasor" content="360-degree circular phasor radar mapping 24-hour solar harvest lobes against industrial load demand.">
-              <TabsTrigger value="polar" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
-                <Compass className="h-3.5 w-3.5 text-indigo-500" />
-                <span>Polar Radar</span>
-              </TabsTrigger>
-            </HoverInfo>
-            <HoverInfo title="3-Phase AC Waveforms" content="Real-time 60Hz instantaneous 3-phase AC voltage & current sinusoidal waveforms with power factor metrics.">
-              <TabsTrigger value="waveform" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
-                <Activity className="h-3.5 w-3.5 text-emerald-500" />
-                <span>3-Phase AC</span>
-              </TabsTrigger>
-            </HoverInfo>
-          </TabsList>
-        </Tabs>
       </div>
     </CardHeader>
   );
