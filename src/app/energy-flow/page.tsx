@@ -38,6 +38,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { usePolling, useSafeTimeout } from '@/lib/usePolling';
 import { createLogger } from '@/lib/logger';
 import { telemetryCache, inverterCacheKey } from '@/lib/telemetry-cache';
+import { HoverInfo } from '@/components/ui/tooltip';
 
 const log = createLogger('Dashboard');
 
@@ -887,33 +888,36 @@ export default function EnergyFlowDashboard() {
         )}
 
         {/* Header & Status Indicator */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-border/60">
+        <div className="flex items-center justify-between gap-4 mb-6 pb-4 border-b border-border/60">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
               <Cpu size={18} />
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-foreground">
+            <HoverInfo
+              title="Power Flow Architecture"
+              content={
+                <div className="space-y-1.5 text-xs">
+                  <p className="text-muted-foreground leading-snug">
+                    Dynamic balance between solar generation, battery storage, site load & utility grid
+                  </p>
+                  <div className="pt-1.5 border-t border-border/40 flex items-center justify-between gap-2 text-[11px] font-mono">
+                    <span className="text-muted-foreground">Sync Status:</span>
+                    <span className="text-emerald-500 font-bold flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
+                      {isLive ? 'Live Cloud Sync' : 'Direct Gateway Sync'}
+                    </span>
+                  </div>
+                </div>
+              }
+            >
+              <h2 className="text-base sm:text-lg font-bold text-foreground cursor-help">
                 {isFleetView
                   ? 'Multi-Site Power Flow'
                   : selectedPlant
                   ? `Power Flow · ${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp)`
                   : `Power Flow · ${selectedAccount?.name || 'Inverter Hub'}`}
               </h2>
-              <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                Dynamic balance between solar generation, battery storage, site load & utility grid
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <Badge
-              variant="outline"
-              className="border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono text-xs gap-1.5 px-2.5 py-1"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
-              {isLive ? 'Live Cloud Sync' : 'Direct Gateway Sync'}
-            </Badge>
+            </HoverInfo>
           </div>
         </div>
 
