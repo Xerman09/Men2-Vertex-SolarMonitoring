@@ -4,10 +4,6 @@ import React from 'react';
 import {
   Zap,
   TrendingUp,
-  Sun,
-  Waves,
-  Compass,
-  Activity,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -44,56 +40,6 @@ export const GRAPH_NAV_ITEMS: GraphNavItem[] = [
     hoverTitle: 'Self-Consumption Analysis',
     description:
       'Breakdown of solar self-consumption, local load coverage utilization, and export vs import ratios.',
-  },
-  {
-    id: 'sinusoidal',
-    label: 'Diurnal Fit',
-    icon: Sun,
-    iconColor: 'text-amber-500',
-    hoverTitle: 'Diurnal Sinusoidal Curve Fit & Clear-Sky Model',
-    badge: 'R² Correlation Fit',
-    badgeColor: 'text-amber-500 border-amber-500/30 bg-amber-500/10',
-    description:
-      'Theoretical sinusoidal clear-sky insolation curve fit and model deviation residual calculations.',
-  },
-  {
-    id: 'fourier',
-    label: 'Fourier',
-    icon: Waves,
-    iconColor: 'text-cyan-500',
-    hoverTitle: 'Discrete Fourier Decomposition of 24-Hour Diurnal Cycle',
-    badge: 'Harmonics k = 1, 2, 3',
-    badgeColor: 'text-cyan-500 border-cyan-500/30 bg-cyan-500/10',
-    description:
-      'Discrete Fourier decomposition across fundamental (24h) and harmonic frequencies to model diurnal solar cycles.',
-  },
-  {
-    id: 'polar',
-    label: 'Polar Radar',
-    icon: Compass,
-    iconColor: 'text-indigo-500',
-    hoverTitle: '360-Degree Circular Phasor: Solar Lobe vs Load Profile',
-    badge: 'Polar Coordinates (r, θ)',
-    badgeColor: 'text-indigo-500 border-indigo-500/30 bg-indigo-500/10',
-    description:
-      '360-degree circular phasor radar mapping 24-hour solar harvest lobes against industrial load demand and battery energy flows.',
-  },
-  {
-    id: 'waveform',
-    label: '3-Phase AC',
-    icon: Activity,
-    iconColor: 'text-emerald-500',
-    hoverTitle: 'Three-Phase AC Instantaneous Waveforms & Harmonic Phasors',
-    badge: '60.00 Hz • Balanced',
-    badgeColor: 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10',
-    description:
-      'Real-time 60Hz instantaneous sinusoidal waveforms across Phase A, Phase B, Phase C, and Phase A Current with power factor cos(φ).',
-    details: [
-      'Phase A: Vm·sin(ωt) [0°]',
-      'Phase B: Vm·sin(ωt - 120°)',
-      'Phase C: Vm·sin(ωt + 120°)',
-      'Phase A Current: Im·sin(ωt - φ)',
-    ],
   },
 ];
 

@@ -9,7 +9,6 @@ import { GraphHeaderControls } from './graph/GraphHeaderControls';
 import { GraphVerticalNav } from './graph/GraphVerticalNav';
 import { PowerFlowChart } from './graph/PowerFlowChart';
 import { SelfConsumptionChart } from './graph/SelfConsumptionChart';
-import { AdvancedMathCharts } from './graph/AdvancedMathCharts';
 
 export interface TrigonometricHistoryGraphProps {
   data?: HourlySolarPoint[];
@@ -94,32 +93,6 @@ export function TrigonometricHistoryGraph({
             selfConsumptionMetrics={graph.selfConsumptionMetrics}
             majorXTicks={graph.majorXTicks}
             nowSlotStr={graph.nowSlotStr}
-          />
-        )}
-
-        {(graph.activeTab === 'sinusoidal' ||
-          graph.activeTab === 'fourier' ||
-          graph.activeTab === 'polar' ||
-          graph.activeTab === 'waveform') && (
-          <AdvancedMathCharts
-            compact={compact}
-            verticalNav={verticalNav}
-            activeTab={graph.activeTab}
-            timeResolution={graph.timeResolution}
-            nowSlotStr={graph.nowSlotStr}
-            majorXTicks={graph.majorXTicks}
-            fitResults={graph.fitResults}
-            fourierData={graph.fourierData}
-            polarData={graph.polarData}
-            acResults={graph.acResults}
-            sinusoidalYDomain={graph.sinusoidalYDomain}
-            fourierYDomain={graph.fourierYDomain}
-            acVoltage={graph.acVoltage}
-            acCurrent={graph.acCurrent}
-            powerFactor={graph.powerFactor}
-            onAcVoltageChange={graph.setAcVoltage}
-            onAcCurrentChange={graph.setAcCurrent}
-            onPowerFactorChange={graph.setPowerFactor}
           />
         )}
       </CardContent>

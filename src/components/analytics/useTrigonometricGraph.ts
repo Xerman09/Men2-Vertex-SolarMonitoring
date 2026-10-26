@@ -1,16 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import {
-  HourlySolarPoint,
-  calculateSinusoidalFit,
-  calculateFourierDecomposition,
-  calculatePolarCyclicalPoints,
-  generateThreePhaseACWaveforms,
-  SinusoidalFitResult,
-  FourierComponentPoint,
-  PolarCyclePoint,
-} from '@/lib/trigonometric-math';
-
-export type ThreePhaseACResult = ReturnType<typeof generateThreePhaseACWaveforms>;
+import { HourlySolarPoint } from '@/lib/trigonometric-math';
 import { usePolling } from '@/lib/usePolling';
 
 export interface UseTrigonometricGraphProps {
@@ -19,7 +8,7 @@ export interface UseTrigonometricGraphProps {
 }
 
 export type TimeResolution = 5 | 15 | 60;
-export type ChartTab = 'power' | 'selfconsumption' | 'sinusoidal' | 'fourier' | 'polar' | 'waveform';
+export type ChartTab = 'power' | 'selfconsumption';
 export type PowerSubView = 'combined' | 'pv' | 'consumption' | 'grid' | 'battery';
 export type ChartRenderMode = 'line' | 'area';
 
@@ -97,9 +86,6 @@ export function useTrigonometricGraph({
   const [chartRenderMode, setChartRenderMode] = useState<ChartRenderMode>('area');
   const [activeTab, setActiveTab] = useState<ChartTab>('power');
   const [powerSubView, setPowerSubView] = useState<PowerSubView>('combined');
-  const [acVoltage, setAcVoltage] = useState(230);
-  const [acCurrent, setAcCurrent] = useState(85);
-  const [powerFactor, setPowerFactor] = useState(0.98);
 
   // Sync with incoming parent data
   useEffect(() => {
@@ -256,23 +242,6 @@ export function useTrigonometricGraph({
   const nowSlotMinutes = Math.floor(now.getMinutes() / timeResolution) * timeResolution;
   const nowSlotStr = `${String(now.getHours()).padStart(2, '0')}:${String(nowSlotMinutes).padStart(2, '0')}`;
   const nowExactTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-  // Math engines
-  const fitResults: SinusoidalFitResult = useMemo(() => {
-    return calculateSinusoidalFit(activeData, installedCapacityKw);
-  }, [activeData, installedCapacityKw]);
-
-  const fourierData: FourierComponentPoint[] = useMemo(() => {
-    return calculateFourierDecomposition(activeData);
-  }, [activeData]);
-
-  const polarData: PolarCyclePoint[] = useMemo(() => {
-    return calculatePolarCyclicalPoints(activeData);
-  }, [activeData]);
-
-  const acResults: ThreePhaseACResult = useMemo(() => {
-    return generateThreePhaseACWaveforms(acVoltage, acCurrent, 60.0, powerFactor, 64);
-  }, [acVoltage, acCurrent, powerFactor]);
 
   // Exact power series data (PV, Consumption, Grid)
   const powerSeriesData: PowerSeriesPoint[] = useMemo(() => {
@@ -459,37 +428,6 @@ export function useTrigonometricGraph({
     return [minVal, maxVal];
   }, [powerSeriesData]);
 
-  const sinusoidalYDomain = useMemo<[number, number]>(() => {
-    const vals: number[] = [];
-    fitResults.theoreticalPoints.forEach((d) => {
-      if (d.actualSolarKw !== null) vals.push(d.actualSolarKw);
-      vals.push(d.sinusoidalClearSkyKw);
-    });
-    if (vals.length === 0) return [-8, 140];
-    const rawMax = Math.max(...vals, 20);
-    const topPad = Math.max(12, rawMax * 0.18);
-    const maxVal = Math.ceil((rawMax + topPad) / 10) * 10;
-    const minVal = -Math.max(6, Math.round(maxVal * 0.05));
-    return [minVal, maxVal];
-  }, [fitResults.theoreticalPoints]);
-
-  const fourierYDomain = useMemo<[number, number]>(() => {
-    const vals: number[] = [];
-    fourierData.forEach((d) => {
-      if (d.actualSolarKw !== null) vals.push(d.actualSolarKw);
-      vals.push(d.fundamentalHarmonicKw);
-      vals.push(d.fourierReconstructedKw);
-    });
-    if (vals.length === 0) return [-8, 140];
-    const rawMax = Math.max(...vals, 20);
-    const rawMin = Math.min(...vals, 0);
-    const span = Math.max(20, rawMax - rawMin);
-    const topPad = Math.max(12, span * 0.18);
-    const maxVal = Math.ceil((rawMax + topPad) / 10) * 10;
-    const minVal = rawMin < 0 ? Math.floor((rawMin - span * 0.14) / 10) * 10 : -Math.max(6, Math.round(maxVal * 0.05));
-    return [minVal, maxVal];
-  }, [fourierData]);
-
   return {
     timeResolution,
     activeData,
@@ -497,16 +435,9 @@ export function useTrigonometricGraph({
     chartRenderMode,
     activeTab,
     powerSubView,
-    acVoltage,
-    acCurrent,
-    powerFactor,
     currentLivePoint,
     nowSlotStr,
     nowExactTimeStr,
-    fitResults,
-    fourierData,
-    polarData,
-    acResults,
     powerSeriesData,
     selfConsumptionMetrics,
     peakPv,
@@ -517,8 +448,6 @@ export function useTrigonometricGraph({
     consumptionYDomain,
     gridYDomain,
     batteryYDomain,
-    sinusoidalYDomain,
-    fourierYDomain,
     // Actions
     setTimeResolution,
     handleResolutionChange,
@@ -526,9 +455,6 @@ export function useTrigonometricGraph({
     setChartRenderMode,
     setActiveTab,
     setPowerSubView,
-    setAcVoltage,
-    setAcCurrent,
-    setPowerFactor,
     handleManualTick,
   };
 }

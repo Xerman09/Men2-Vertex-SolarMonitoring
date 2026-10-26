@@ -48,10 +48,10 @@ describe('TrigonometricHistoryGraph Component & Architecture', () => {
     expect(html).toContain('5-Minute Telemetry &amp; Power Curves');
     expect(html).toContain('Power Curves');
     expect(html).toContain('Self-Consumption');
-    expect(html).toContain('Diurnal Fit');
-    expect(html).toContain('Fourier');
-    expect(html).toContain('Polar Radar');
-    expect(html).toContain('3-Phase AC');
+    expect(html).not.toContain('Diurnal Fit');
+    expect(html).not.toContain('Fourier');
+    expect(html).not.toContain('Polar Radar');
+    expect(html).not.toContain('3-Phase AC');
     // Verify resolution buttons
     expect(html).toContain('5m');
     expect(html).toContain('15m');
