@@ -19,6 +19,7 @@ import {
   Legend,
   ReferenceLine,
 } from 'recharts';
+import { Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { HoverInfo } from '@/components/ui/tooltip';
 import { renderNowReferenceLabel } from '../GraphTooltip';
@@ -240,32 +241,37 @@ export function AdvancedMathCharts({
   if (activeTab === 'fourier') {
     return (
       <div className={compact ? 'space-y-3' : 'space-y-4'}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-          <div>
-            <HoverInfo
-              title="Discrete Fourier Decomposition"
-              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.fourierDecomposition}
-              showIcon
-            >
-              <span className="text-xs font-semibold text-foreground cursor-help">
-                Discrete Fourier Decomposition of 24-Hour Diurnal Cycle
-              </span>
-            </HoverInfo>
-          </div>
-          <HoverInfo
-            title="Harmonic Phase Angles"
-            content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.fourierHarmonicPhases}
-            showIcon
-          >
-            <Badge variant="outline" className="text-cyan-500 border-cyan-500/30 bg-cyan-500/10 font-mono text-[10px] px-1.5 py-0 w-fit cursor-help">
-              Harmonics k = 1, 2, 3
-            </Badge>
-          </HoverInfo>
-        </div>
-
         <div className={`flex items-stretch gap-2.5 sm:gap-3 ${compact ? 'h-[260px]' : 'h-[340px]'}`}>
           {verticalNav}
-          <div className="flex-1 min-w-0 h-full">
+          <div className="flex-1 min-w-0 h-full relative">
+            <div className="absolute top-1.5 right-2 z-10">
+              <HoverInfo
+                title="Discrete Fourier Decomposition of 24-Hour Diurnal Cycle"
+                content={
+                  <div className="space-y-1.5 text-left min-w-[200px] max-w-xs">
+                    <div>
+                      <Badge variant="outline" className="text-cyan-500 border-cyan-500/30 bg-cyan-500/10 font-mono text-[10px] px-1.5 py-0">
+                        Harmonics k = 1, 2, 3
+                      </Badge>
+                    </div>
+                    <p className="text-muted-foreground text-[11px] leading-relaxed">
+                      {TELEMETRY_DESCRIPTIONS.trigonometricGraph.fourierDecomposition}
+                    </p>
+                    <p className="text-muted-foreground text-[11px] leading-relaxed pt-1 border-t border-border/50">
+                      {TELEMETRY_DESCRIPTIONS.trigonometricGraph.fourierHarmonicPhases}
+                    </p>
+                  </div>
+                }
+              >
+                <button
+                  type="button"
+                  className="p-1 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors cursor-help"
+                  aria-label="Fourier Decomposition Information"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </HoverInfo>
+            </div>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={fourierData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
@@ -333,26 +339,34 @@ export function AdvancedMathCharts({
   if (activeTab === 'polar') {
     return (
       <div className={compact ? 'space-y-3' : 'space-y-4'}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-          <div>
-            <HoverInfo
-              title="360-Degree Circular Phasor"
-              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.polarPhasor}
-              showIcon
-            >
-              <span className="text-xs font-semibold text-foreground cursor-help">
-                360-Degree Circular Phasor: Solar Lobe vs Load Profile
-              </span>
-            </HoverInfo>
-          </div>
-          <Badge variant="outline" className="text-indigo-500 border-indigo-500/30 bg-indigo-500/10 font-mono text-[10px] px-1.5 py-0 w-fit">
-            Polar Coordinates (r, θ)
-          </Badge>
-        </div>
-
-        <div className={`flex items-stretch gap-2.5 sm:gap-3 ${compact ? 'h-[280px]' : 'h-[360px]'}`}>
+        <div className={`flex items-stretch gap-2.5 sm:gap-3 ${compact ? 'h-[260px]' : 'h-[340px]'}`}>
           {verticalNav}
-          <div className="flex-1 min-w-0 h-full">
+          <div className="flex-1 min-w-0 h-full relative">
+            <div className="absolute top-1.5 right-2 z-10">
+              <HoverInfo
+                title="360-Degree Circular Phasor: Solar Lobe vs Load Profile"
+                content={
+                  <div className="space-y-1.5 text-left min-w-[200px] max-w-xs">
+                    <div>
+                      <Badge variant="outline" className="text-indigo-500 border-indigo-500/30 bg-indigo-500/10 font-mono text-[10px] px-1.5 py-0">
+                        Polar Coordinates (r, θ)
+                      </Badge>
+                    </div>
+                    <p className="text-muted-foreground text-[11px] leading-relaxed">
+                      {TELEMETRY_DESCRIPTIONS.trigonometricGraph.polarPhasor}
+                    </p>
+                  </div>
+                }
+              >
+                <button
+                  type="button"
+                  className="p-1 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors cursor-help"
+                  aria-label="Polar Phasor Information"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </HoverInfo>
+            </div>
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart cx="50%" cy="50%" outerRadius="80%" data={polarData.filter((_, idx) => idx % (timeResolution === 5 ? 12 : 1) === 0)}>
                 <PolarGrid stroke="currentColor" className="opacity-20" />
@@ -399,23 +413,6 @@ export function AdvancedMathCharts({
   // activeTab === 'waveform'
   return (
     <div className={compact ? 'space-y-3' : 'space-y-4'}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-        <div>
-          <HoverInfo
-            title="Three-Phase AC Instantaneous Waveforms"
-            content="Real-time 60Hz instantaneous sinusoidal waveforms across Phase A (0°), Phase B (-120°), Phase C (+120°), and Phase A Current with power factor phase shift φ."
-            showIcon
-          >
-            <span className="text-xs font-semibold text-foreground cursor-help">
-              Three-Phase AC Instantaneous Waveforms & Harmonic Phasors
-            </span>
-          </HoverInfo>
-        </div>
-        <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10 font-mono text-[10px] px-1.5 py-0 w-fit">
-          60.00 Hz • Balanced
-        </Badge>
-      </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-2.5 rounded-lg bg-card border border-border/60">
         <div>
           <label htmlFor="grid-rms-voltage-range" className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
@@ -468,7 +465,38 @@ export function AdvancedMathCharts({
 
       <div className={`flex items-stretch gap-2.5 sm:gap-3 ${compact ? 'h-[260px]' : 'h-[340px]'}`}>
         {verticalNav}
-        <div className="flex-1 min-w-0 h-full">
+        <div className="flex-1 min-w-0 h-full relative">
+          <div className="absolute top-1.5 right-2 z-10">
+            <HoverInfo
+              title="Three-Phase AC Instantaneous Waveforms & Harmonic Phasors"
+              content={
+                <div className="space-y-1.5 text-left min-w-[210px] max-w-xs">
+                  <div>
+                    <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10 font-mono text-[10px] px-1.5 py-0">
+                      60.00 Hz • Balanced
+                    </Badge>
+                  </div>
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
+                    Real-time 60Hz instantaneous sinusoidal waveforms across Phase A, Phase B, Phase C, and Phase A Current with power factor cos(φ).
+                  </p>
+                  <div className="pt-1.5 border-t border-border/50 space-y-0.5 font-mono text-[10px]">
+                    <div className="text-red-400">Phase A: Vm·sin(ωt) [0°]</div>
+                    <div className="text-blue-400">Phase B: Vm·sin(ωt - 120°)</div>
+                    <div className="text-emerald-400">Phase C: Vm·sin(ωt + 120°)</div>
+                    <div className="text-amber-400">Phase A Current: Im·sin(ωt - φ)</div>
+                  </div>
+                </div>
+              }
+            >
+              <button
+                type="button"
+                className="p-1 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors cursor-help"
+                aria-label="3-Phase AC Waveform Information"
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
+            </HoverInfo>
+          </div>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={acResults.waveform} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
@@ -483,7 +511,6 @@ export function AdvancedMathCharts({
                 }}
               />
               <ReferenceLine y={0} stroke="currentColor" className="opacity-30" />
-              <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
               <Line
                 type="monotone"
                 dataKey="voltagePhaseA"

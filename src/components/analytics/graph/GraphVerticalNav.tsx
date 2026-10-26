@@ -20,7 +20,10 @@ export interface GraphNavItem {
   icon: React.ComponentType<{ className?: string }>;
   iconColor: string;
   hoverTitle: string;
+  badge?: string;
+  badgeColor?: string;
   description: string;
+  details?: string[];
 }
 
 export const GRAPH_NAV_ITEMS: GraphNavItem[] = [
@@ -47,7 +50,9 @@ export const GRAPH_NAV_ITEMS: GraphNavItem[] = [
     label: 'Diurnal Fit',
     icon: Sun,
     iconColor: 'text-amber-500',
-    hoverTitle: 'Diurnal Curve Fitting',
+    hoverTitle: 'Diurnal Sinusoidal Curve Fit & Clear-Sky Model',
+    badge: 'R² Correlation Fit',
+    badgeColor: 'text-amber-500 border-amber-500/30 bg-amber-500/10',
     description:
       'Theoretical sinusoidal clear-sky insolation curve fit and model deviation residual calculations.',
   },
@@ -56,27 +61,39 @@ export const GRAPH_NAV_ITEMS: GraphNavItem[] = [
     label: 'Fourier',
     icon: Waves,
     iconColor: 'text-cyan-500',
-    hoverTitle: 'Fourier Decomposition',
+    hoverTitle: 'Discrete Fourier Decomposition of 24-Hour Diurnal Cycle',
+    badge: 'Harmonics k = 1, 2, 3',
+    badgeColor: 'text-cyan-500 border-cyan-500/30 bg-cyan-500/10',
     description:
-      'Discrete Fourier decomposition of 24-hour diurnal cycle across fundamental and harmonic frequencies.',
+      'Discrete Fourier decomposition across fundamental (24h) and harmonic frequencies to model diurnal solar cycles.',
   },
   {
     id: 'polar',
     label: 'Polar Radar',
     icon: Compass,
     iconColor: 'text-indigo-500',
-    hoverTitle: 'Polar Radar Phasor',
+    hoverTitle: '360-Degree Circular Phasor: Solar Lobe vs Load Profile',
+    badge: 'Polar Coordinates (r, θ)',
+    badgeColor: 'text-indigo-500 border-indigo-500/30 bg-indigo-500/10',
     description:
-      '360-degree circular phasor radar mapping 24-hour solar harvest lobes against industrial load demand.',
+      '360-degree circular phasor radar mapping 24-hour solar harvest lobes against industrial load demand and battery energy flows.',
   },
   {
     id: 'waveform',
     label: '3-Phase AC',
     icon: Activity,
     iconColor: 'text-emerald-500',
-    hoverTitle: '3-Phase AC Waveforms',
+    hoverTitle: 'Three-Phase AC Instantaneous Waveforms & Harmonic Phasors',
+    badge: '60.00 Hz • Balanced',
+    badgeColor: 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10',
     description:
-      'Real-time 60Hz instantaneous 3-phase AC voltage & current sinusoidal waveforms with power factor metrics.',
+      'Real-time 60Hz instantaneous sinusoidal waveforms across Phase A, Phase B, Phase C, and Phase A Current with power factor cos(φ).',
+    details: [
+      'Phase A: Vm·sin(ωt) [0°]',
+      'Phase B: Vm·sin(ωt - 120°)',
+      'Phase C: Vm·sin(ωt + 120°)',
+      'Phase A Current: Im·sin(ωt - φ)',
+    ],
   },
 ];
 
@@ -142,12 +159,40 @@ export function GraphVerticalNav({
           const Icon = item.icon;
           const isActive = activeTab === item.id;
 
+          const tooltipContent = (
+            <div className="space-y-1.5 text-left min-w-[200px] max-w-xs">
+              {item.badge && (
+                <div>
+                  <span
+                    className={`inline-block font-mono text-[9.5px] px-1.5 py-0.5 rounded border ${
+                      item.badgeColor || 'text-primary border-primary/30 bg-primary/10'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                </div>
+              )}
+              <p className="text-muted-foreground text-[11px] leading-relaxed">
+                {item.description}
+              </p>
+              {item.details && item.details.length > 0 && (
+                <div className="pt-1.5 border-t border-border/50 space-y-0.5 font-mono text-[10px]">
+                  {item.details.map((detail, idx) => (
+                    <div key={idx} className="text-muted-foreground">
+                      {detail}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+
           if (isCollapsed) {
             return (
               <HoverInfo
                 key={item.id}
                 title={item.hoverTitle}
-                content={item.description}
+                content={tooltipContent}
                 className="w-full flex justify-center"
               >
                 <button
@@ -173,7 +218,7 @@ export function GraphVerticalNav({
             <HoverInfo
               key={item.id}
               title={item.hoverTitle}
-              content={item.description}
+              content={tooltipContent}
               className="w-full block"
             >
               <button
