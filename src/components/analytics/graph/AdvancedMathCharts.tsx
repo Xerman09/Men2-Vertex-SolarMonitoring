@@ -19,6 +19,7 @@ import {
   Legend,
   ReferenceLine,
 } from 'recharts';
+import { Badge } from '@/components/ui/badge';
 import { HoverInfo } from '@/components/ui/tooltip';
 import { renderNowReferenceLabel } from '../GraphTooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
@@ -234,6 +235,29 @@ export function AdvancedMathCharts({
   if (activeTab === 'fourier') {
     return (
       <div className={compact ? 'space-y-3' : 'space-y-4'}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+          <div>
+            <HoverInfo
+              title="Discrete Fourier Decomposition"
+              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.fourierDecomposition}
+              showIcon
+            >
+              <span className="text-xs font-semibold text-foreground cursor-help">
+                Discrete Fourier Decomposition of 24-Hour Diurnal Cycle
+              </span>
+            </HoverInfo>
+          </div>
+          <HoverInfo
+            title="Harmonic Phase Angles"
+            content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.fourierHarmonicPhases}
+            showIcon
+          >
+            <Badge variant="outline" className="text-cyan-500 border-cyan-500/30 bg-cyan-500/10 font-mono text-[10px] px-1.5 py-0 w-fit cursor-help">
+              Harmonics k = 1, 2, 3
+            </Badge>
+          </HoverInfo>
+        </div>
+
         <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={fourierData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
@@ -301,6 +325,23 @@ export function AdvancedMathCharts({
   if (activeTab === 'polar') {
     return (
       <div className={compact ? 'space-y-3' : 'space-y-4'}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+          <div>
+            <HoverInfo
+              title="360-Degree Circular Phasor"
+              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.polarPhasor}
+              showIcon
+            >
+              <span className="text-xs font-semibold text-foreground cursor-help">
+                360-Degree Circular Phasor: Solar Lobe vs Load Profile
+              </span>
+            </HoverInfo>
+          </div>
+          <Badge variant="outline" className="text-indigo-500 border-indigo-500/30 bg-indigo-500/10 font-mono text-[10px] px-1.5 py-0 w-fit">
+            Polar Coordinates (r, θ)
+          </Badge>
+        </div>
+
         <div className={compact ? 'h-[280px] w-full' : 'h-[360px] w-full'}>
           <ResponsiveContainer width="100%" height="100%">
             <RadarChart cx="50%" cy="50%" outerRadius="80%" data={polarData.filter((_, idx) => idx % (timeResolution === 5 ? 12 : 1) === 0)}>
@@ -347,6 +388,23 @@ export function AdvancedMathCharts({
   // activeTab === 'waveform'
   return (
     <div className={compact ? 'space-y-3' : 'space-y-4'}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
+        <div>
+          <HoverInfo
+            title="Three-Phase AC Instantaneous Waveforms"
+            content="Real-time 60Hz instantaneous sinusoidal waveforms across Phase A (0°), Phase B (-120°), Phase C (+120°), and Phase A Current with power factor phase shift φ."
+            showIcon
+          >
+            <span className="text-xs font-semibold text-foreground cursor-help">
+              Three-Phase AC Instantaneous Waveforms & Harmonic Phasors
+            </span>
+          </HoverInfo>
+        </div>
+        <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10 font-mono text-[10px] px-1.5 py-0 w-fit">
+          60.00 Hz • Balanced
+        </Badge>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-2.5 rounded-lg bg-card border border-border/60">
         <div>
           <label htmlFor="grid-rms-voltage-range" className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
