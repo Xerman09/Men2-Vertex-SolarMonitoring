@@ -20,7 +20,7 @@ export interface UseTrigonometricGraphProps {
 
 export type TimeResolution = 5 | 15 | 60;
 export type ChartTab = 'power' | 'selfconsumption' | 'sinusoidal' | 'fourier' | 'polar' | 'waveform';
-export type PowerSubView = 'combined' | 'pv' | 'consumption' | 'grid';
+export type PowerSubView = 'combined' | 'pv' | 'consumption' | 'grid' | 'battery';
 export type ChartRenderMode = 'line' | 'area';
 
 export interface PowerSeriesPoint {
@@ -397,6 +397,7 @@ export function useTrigonometricGraph({
       if (d.pvPowerKw !== null) vals.push(d.pvPowerKw);
       if (d.consumptionKw !== null) vals.push(d.consumptionKw);
       if (d.gridPowerKw !== null) vals.push(d.gridPowerKw);
+      if (d.batteryFlowKw !== null) vals.push(d.batteryFlowKw);
     });
     if (vals.length === 0) return [-20, 140];
     const rawMax = Math.max(...vals);
@@ -442,6 +443,19 @@ export function useTrigonometricGraph({
     const botPad = Math.max(10, span * 0.14);
     const maxVal = Math.ceil((rawMax + topPad) / 10) * 10;
     const minVal = Math.floor((rawMin - botPad) / 10) * 10;
+    return [minVal, maxVal];
+  }, [powerSeriesData]);
+
+  const batteryYDomain = useMemo<[number, number]>(() => {
+    const vals = powerSeriesData.map((d) => d.batteryFlowKw).filter((v): v is number => v !== null);
+    if (vals.length === 0) return [-30, 30];
+    const rawMax = Math.max(...vals, 10);
+    const rawMin = Math.min(...vals, -10);
+    const span = Math.max(20, rawMax - rawMin);
+    const topPad = Math.max(8, span * 0.18);
+    const botPad = Math.max(8, span * 0.14);
+    const maxVal = Math.ceil((rawMax + topPad) / 5) * 5;
+    const minVal = Math.floor((rawMin - botPad) / 5) * 5;
     return [minVal, maxVal];
   }, [powerSeriesData]);
 
@@ -502,6 +516,7 @@ export function useTrigonometricGraph({
     pvYDomain,
     consumptionYDomain,
     gridYDomain,
+    batteryYDomain,
     sinusoidalYDomain,
     fourierYDomain,
     // Actions

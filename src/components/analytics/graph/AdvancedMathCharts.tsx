@@ -79,23 +79,6 @@ export function AdvancedMathCharts({
   if (activeTab === 'sinusoidal') {
     return (
       <div className={compact ? 'space-y-3' : 'space-y-4'}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 sm:p-2.5 rounded-lg bg-card border border-border/60">
-          <div>
-            <HoverInfo
-              title="Theoretical Clear-Sky Insolation Model"
-              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.sinusoidalModelNote}
-              showIcon
-            >
-              <span className="text-xs font-semibold text-foreground cursor-help">
-                Diurnal Sinusoidal Curve Fit & Clear-Sky Model
-              </span>
-            </HoverInfo>
-          </div>
-          <Badge variant="outline" className="text-cyan-500 border-cyan-500/30 bg-cyan-500/10 font-mono text-[10px] px-1.5 py-0 w-fit">
-            R² = {fitResults.rSquared}
-          </Badge>
-        </div>
-
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
           <HoverInfo
             className="block w-full cursor-help"

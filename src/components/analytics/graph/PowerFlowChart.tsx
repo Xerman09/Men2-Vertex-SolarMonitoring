@@ -12,8 +12,8 @@ import {
   Legend,
   ReferenceLine,
 } from 'recharts';
-import { Badge } from '@/components/ui/badge';
 import { HoverInfo } from '@/components/ui/tooltip';
+import { Layers } from 'lucide-react';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { HourlySolarPoint } from '@/lib/trigonometric-math';
 import { CustomExactTooltip, renderNowReferenceLabel } from '../GraphTooltip';
@@ -25,6 +25,7 @@ import {
   COLOR_PV,
   COLOR_LOAD,
   COLOR_GRID,
+  COLOR_BATTERY,
 } from '../useTrigonometricGraph';
 
 interface PowerFlowChartProps {
@@ -43,6 +44,7 @@ interface PowerFlowChartProps {
   pvYDomain: [number, number];
   consumptionYDomain: [number, number];
   gridYDomain: [number, number];
+  batteryYDomain?: [number, number];
   onSubViewChange: (view: PowerSubView) => void;
   onRenderModeChange?: (mode: ChartRenderMode) => void;
 }
@@ -63,6 +65,7 @@ export function PowerFlowChart({
   pvYDomain,
   consumptionYDomain,
   gridYDomain,
+  batteryYDomain = [-10, 10],
   onSubViewChange,
   onRenderModeChange,
 }: PowerFlowChartProps) {
@@ -133,10 +136,14 @@ export function PowerFlowChart({
           className="block w-full cursor-help"
           title={`Grid Exchange (${currentLivePoint.hour})`}
           content={
-            <div className="text-[11px] space-y-1 min-w-[160px]">
-              <p className="text-muted-foreground">Net power flow through bidirectional utility meter (+ export / - import).</p>
+            <div className="text-[11px] space-y-1.5 min-w-[200px]">
+              <p className="text-muted-foreground">Net power flow through bidirectional utility meter.</p>
+              <div className="pt-1 border-t border-border/50 text-[10.5px] space-y-0.5 font-mono">
+                <div className="text-emerald-400 font-medium">Positive (+): Clean Solar Export</div>
+                <div className="text-rose-400 font-medium">Negative (−): Utility Grid Import</div>
+              </div>
               <div className="pt-1 border-t border-border/50 text-emerald-400 font-mono font-medium">
-                Direction: {(currentLivePoint.gridExportKw ?? 0) >= 0 ? 'Surplus Export' : 'Grid Import'}
+                Direction: {(currentLivePoint.gridExportKw ?? 0) >= 0 ? 'Surplus Export (+)' : 'Grid Import (−)'}
               </div>
             </div>
           }
@@ -164,10 +171,14 @@ export function PowerFlowChart({
           className="block w-full cursor-help"
           title={`Battery ESS Flow (${currentLivePoint.hour})`}
           content={
-            <div className="text-[11px] space-y-1 min-w-[160px]">
+            <div className="text-[11px] space-y-1.5 min-w-[200px]">
               <p className="text-muted-foreground">Active charge or discharge rate across connected energy storage battery banks.</p>
+              <div className="pt-1 border-t border-border/50 text-[10.5px] space-y-0.5 font-mono">
+                <div className="text-cyan-400 font-medium">Positive (+): Charging ESS</div>
+                <div className="text-amber-400 font-medium">Negative (−): Discharging to Load</div>
+              </div>
               <div className="pt-1 border-t border-border/50 text-cyan-400 font-mono font-medium">
-                State: {(currentLivePoint.batteryFlowKw ?? 0) >= 0 ? 'Charging' : 'Discharging'}
+                State: {(currentLivePoint.batteryFlowKw ?? 0) >= 0 ? 'Charging (+)' : 'Discharging (−)'}
               </div>
             </div>
           }
@@ -191,55 +202,135 @@ export function PowerFlowChart({
         </HoverInfo>
       </div>
 
-      {/* Sub-view selector & Style Toggle */}
+      {/* Unified Interactive Legend & View Filter Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div className="flex items-center gap-0.5 p-0.5 bg-muted/50 rounded-lg border border-border/50 w-fit flex-wrap">
-          <HoverInfo title="Combined Vectors" content="Simultaneous overlay of PV generation, facility load demand, and net utility grid exchange.">
+        <div className="flex items-center gap-1.5 p-1 bg-muted/40 rounded-xl border border-border/60 w-fit flex-wrap">
+          <HoverInfo title="Combined Overlay" content="Simultaneous overlay of PV generation, facility load demand, net utility grid exchange, and battery ESS flow.">
             <button
+              type="button"
               onClick={() => onSubViewChange('combined')}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 powerSubView === 'combined'
-                  ? 'bg-background text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-background text-foreground shadow-xs border border-border/70'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
               }`}
             >
-              Combined
+              <Layers size={13} className={powerSubView === 'combined' ? 'text-primary' : 'text-muted-foreground'} />
+              <span>Combined</span>
             </button>
           </HoverInfo>
-          <HoverInfo title="Solar PV Profile" content="High-resolution solar PV generation. Captures cloud transients, irradiance changes, and MPPT dynamic tracking.">
+
+          <HoverInfo
+            title="Solar PV Generation"
+            content={
+              <div className="space-y-1 text-[11px] min-w-[200px]">
+                <p className="text-muted-foreground">{TELEMETRY_DESCRIPTIONS.trigonometricGraph.pvPowerSolo}</p>
+                <div className="pt-1 border-t border-border/50 text-yellow-500 font-mono text-[10.5px]">
+                  Peak Recorded: {peakPv.toFixed(1)} kW
+                </div>
+              </div>
+            }
+          >
             <button
-              onClick={() => onSubViewChange('pv')}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+              type="button"
+              onClick={() => onSubViewChange(powerSubView === 'pv' ? 'combined' : 'pv')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 powerSubView === 'pv'
-                  ? 'bg-background text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-yellow-500/15 text-yellow-500 border border-yellow-500/40 shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-yellow-500/5'
               }`}
             >
-              PV
+              <span className={`size-2 rounded-full bg-yellow-500 ${powerSubView === 'pv' ? 'ring-2 ring-yellow-500/40' : ''}`} />
+              <span>Solar Yield (kW)</span>
             </button>
           </HoverInfo>
-          <HoverInfo title="Facility Load Demand" content="Industrial facility electrical consumption. Reflects machinery stepping, cooling, and operational diurnal baselines.">
+
+          <HoverInfo
+            title="Facility Load Demand"
+            content={
+              <div className="space-y-1 text-[11px] min-w-[200px]">
+                <p className="text-muted-foreground">{TELEMETRY_DESCRIPTIONS.trigonometricGraph.consumptionSolo}</p>
+                <div className="pt-1 border-t border-border/50 text-purple-400 font-mono text-[10.5px]">
+                  Peak Demand: {peakLoad.toFixed(1)} kW
+                </div>
+              </div>
+            }
+          >
             <button
-              onClick={() => onSubViewChange('consumption')}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+              type="button"
+              onClick={() => onSubViewChange(powerSubView === 'consumption' ? 'combined' : 'consumption')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 powerSubView === 'consumption'
-                  ? 'bg-background text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-purple-500/15 text-purple-400 border border-purple-500/40 shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-purple-500/5'
               }`}
             >
-              Load
+              <span className={`size-2 rounded-full bg-purple-500 ${powerSubView === 'consumption' ? 'ring-2 ring-purple-500/40' : ''}`} />
+              <span>Facility Load (kW)</span>
             </button>
           </HoverInfo>
-          <HoverInfo title="Net Grid Flow" content="Two-way utility exchange balance. Positive (+) clean solar export vs negative (−) shortfall grid draw.">
+
+          <HoverInfo
+            title="Net Utility Grid Flow"
+            content={
+              <div className="space-y-1.5 text-[11px] min-w-[220px]">
+                <p className="text-muted-foreground">
+                  Isolate utility grid exchange balance. Click to view grid solo or return to combined view.
+                </p>
+                <div className="pt-1.5 border-t border-border/50 text-[10.5px] space-y-1 font-mono">
+                  <div className="flex items-center gap-1.5 text-emerald-400">
+                    <span className="font-bold">Positive (+)</span>: Clean Solar Export
+                  </div>
+                  <div className="flex items-center gap-1.5 text-rose-400">
+                    <span className="font-bold">Negative (−)</span>: Utility Grid Import
+                  </div>
+                </div>
+              </div>
+            }
+          >
             <button
-              onClick={() => onSubViewChange('grid')}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+              type="button"
+              onClick={() => onSubViewChange(powerSubView === 'grid' ? 'combined' : 'grid')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 powerSubView === 'grid'
-                  ? 'bg-background text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/40 shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-emerald-500/5'
               }`}
             >
-              Grid
+              <span className={`size-2 rounded-full bg-emerald-500 ${powerSubView === 'grid' ? 'ring-2 ring-emerald-500/40' : ''}`} />
+              <span>Net Grid Flow (kW)</span>
+            </button>
+          </HoverInfo>
+
+          <HoverInfo
+            title="Battery ESS Flow"
+            content={
+              <div className="space-y-1.5 text-[11px] min-w-[220px]">
+                <p className="text-muted-foreground">
+                  Isolate active battery charge and discharge telemetry. Click to view battery solo or return to combined view.
+                </p>
+                <div className="pt-1.5 border-t border-border/50 text-[10.5px] space-y-1 font-mono">
+                  <div className="flex items-center gap-1.5 text-cyan-400">
+                    <span className="font-bold">Positive (+)</span>: Charging ESS
+                  </div>
+                  <div className="flex items-center gap-1.5 text-amber-400">
+                    <span className="font-bold">Negative (−)</span>: Discharging to Load
+                  </div>
+                </div>
+              </div>
+            }
+          >
+            <button
+              type="button"
+              onClick={() => onSubViewChange(powerSubView === 'battery' ? 'combined' : 'battery')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                powerSubView === 'battery'
+                  ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/40 shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-cyan-500/5'
+              }`}
+            >
+              <span className={`size-2 rounded-full bg-cyan-500 ${powerSubView === 'battery' ? 'ring-2 ring-cyan-500/40' : ''}`} />
+              <span>Battery Flow (kW)</span>
             </button>
           </HoverInfo>
         </div>
@@ -248,28 +339,6 @@ export function PowerFlowChart({
       {/* Combined View */}
       {powerSubView === 'combined' && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold text-foreground">
-                5-Minute Continuous Telemetry — Solar Yield · Facility Load · Net Grid
-              </span>
-              <Badge variant="outline" className="text-[10px] font-mono border-border/70 text-muted-foreground bg-muted/40 px-1.5 py-0">
-                Dynamic Scale: {combinedYDomain[0]} kW → {combinedYDomain[1]} kW
-              </Badge>
-            </div>
-            <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-yellow-500" /> Solar Yield
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-purple-500" /> Facility Load
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Net Grid Flow
-              </span>
-            </div>
-          </div>
-
           <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
@@ -286,6 +355,10 @@ export function PowerFlowChart({
                     <stop offset="5%" stopColor={COLOR_GRID} stopOpacity={chartRenderMode === 'area' ? 0.25 : 0.08} />
                     <stop offset="95%" stopColor={COLOR_GRID} stopOpacity={0} />
                   </linearGradient>
+                  <linearGradient id="batteryCyanGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={COLOR_BATTERY} stopOpacity={chartRenderMode === 'area' ? 0.25 : 0.08} />
+                    <stop offset="95%" stopColor={COLOR_BATTERY} stopOpacity={0} />
+                  </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
                 <XAxis
@@ -301,7 +374,6 @@ export function PowerFlowChart({
                   unit="kW"
                 />
                 <Tooltip content={<CustomExactTooltip />} />
-                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
                 <ReferenceLine y={0} stroke="currentColor" className="opacity-30" />
                 <ReferenceLine
                   isFront
@@ -314,7 +386,7 @@ export function PowerFlowChart({
                 <Area
                   type="monotone"
                   dataKey="pvPowerKw"
-                  name="PV Power (kW)"
+                  name="Solar Yield (kW)"
                   stroke={COLOR_PV}
                   strokeWidth={2}
                   fill="url(#pvYellowGrad)"
@@ -326,7 +398,7 @@ export function PowerFlowChart({
                 <Area
                   type="monotone"
                   dataKey="consumptionKw"
-                  name="Consumption (kW)"
+                  name="Facility Load (kW)"
                   stroke={COLOR_LOAD}
                   strokeWidth={2}
                   fill="url(#loadPurpleGrad)"
@@ -338,7 +410,7 @@ export function PowerFlowChart({
                 <Area
                   type="monotone"
                   dataKey="gridPowerKw"
-                  name="Grid Power (kW, +export/-import)"
+                  name="Net Grid Flow (kW)"
                   stroke={COLOR_GRID}
                   strokeWidth={1.8}
                   fill="url(#gridGreenGrad)"
@@ -347,22 +419,20 @@ export function PowerFlowChart({
                   connectNulls={false}
                   isAnimationActive={false}
                 />
+                <Area
+                  type="monotone"
+                  dataKey="batteryFlowKw"
+                  name="Battery Flow (kW)"
+                  stroke={COLOR_BATTERY}
+                  strokeWidth={1.8}
+                  fill="url(#batteryCyanGrad)"
+                  dot={false}
+                  activeDot={{ r: 4.5, stroke: COLOR_BATTERY, strokeWidth: 2, fill: '#fff' }}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono">
-            <HoverInfo
-              title="Daily Telemetry Resolution"
-              content="288 distinct 5-minute sampling intervals covering 24 hours. Points up to current time reflect measured inverter values."
-            >
-              <span className="cursor-help">288 points/day (every {timeResolution} mins) • Elapsed: 00:00 → {nowSlotStr}</span>
-            </HoverInfo>
-            <HoverInfo
-              title="Unelapsed Intervals"
-              content="Future intervals through 23:55 remain pending and cleanly stop at the current time."
-            >
-              <span className="text-purple-400 cursor-help">Unelapsed: {nowSlotStr} → 23:55 (Pending)</span>
-            </HoverInfo>
           </div>
         </div>
       )}
@@ -370,20 +440,6 @@ export function PowerFlowChart({
       {/* Individual PV Power */}
       {powerSubView === 'pv' && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <HoverInfo
-              title="Solar PV Generation Profile"
-              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.pvPowerSolo}
-              showIcon
-            >
-              <span className="text-xs font-semibold text-foreground cursor-help">
-                Solar Yield — Continuous 5-Minute Generation Profile
-              </span>
-            </HoverInfo>
-            <Badge variant="outline" className="text-[10px] font-mono border-yellow-500/30 text-yellow-500 bg-yellow-500/10 px-1.5 py-0">
-              Dynamic Scale: {pvYDomain[0]} kW → {pvYDomain[1]} kW (+18% Headroom)
-            </Badge>
-          </div>
           <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
@@ -397,7 +453,6 @@ export function PowerFlowChart({
                 <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
                 <YAxis domain={pvYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
                 <Tooltip content={<CustomExactTooltip />} />
-                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
                 <ReferenceLine
                   isFront
                   x={nowSlotStr}
@@ -427,20 +482,6 @@ export function PowerFlowChart({
       {/* Individual Consumption */}
       {powerSubView === 'consumption' && (
         <div className="space-y-2.5">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <HoverInfo
-              title="Industrial Facility Load Profile"
-              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.consumptionSolo}
-              showIcon
-            >
-              <span className="text-xs font-semibold text-foreground cursor-help">
-                Facility Load — Continuous 5-Minute Industrial Load Demand Profile
-              </span>
-            </HoverInfo>
-            <Badge variant="outline" className="text-[10px] font-mono border-purple-500/30 text-purple-400 bg-purple-500/10 px-1.5 py-0">
-              Dynamic Scale: {consumptionYDomain[0]} kW → {consumptionYDomain[1]} kW (+18% Headroom)
-            </Badge>
-          </div>
           <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
@@ -454,7 +495,6 @@ export function PowerFlowChart({
                 <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
                 <YAxis domain={consumptionYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
                 <Tooltip content={<CustomExactTooltip />} />
-                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
                 <ReferenceLine
                   isFront
                   x={nowSlotStr}
@@ -484,14 +524,6 @@ export function PowerFlowChart({
       {/* Individual Grid Power */}
       {powerSubView === 'grid' && (
         <div className="space-y-2.5">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <span className="text-xs font-semibold text-foreground">
-              Grid Net — Continuous 5-Minute Net Exchange (+ Export / − Import)
-            </span>
-            <Badge variant="outline" className="text-[10px] font-mono border-emerald-500/30 text-emerald-400 bg-emerald-500/10 px-1.5 py-0">
-              Dynamic Scale: {gridYDomain[0]} kW → {gridYDomain[1]} kW (+18% Head / +14% Foot)
-            </Badge>
-          </div>
           <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
@@ -505,7 +537,6 @@ export function PowerFlowChart({
                 <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
                 <YAxis domain={gridYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
                 <Tooltip content={<CustomExactTooltip />} />
-                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
                 <ReferenceLine y={0} stroke="currentColor" className="opacity-40" />
                 <ReferenceLine
                   isFront
@@ -518,7 +549,7 @@ export function PowerFlowChart({
                 <Area
                   type="monotone"
                   dataKey="gridPowerKw"
-                  name="Grid Power (kW)"
+                  name="Net Grid Flow (kW)"
                   stroke={COLOR_GRID}
                   strokeWidth={2.5}
                   fill="url(#soloGridGrad)"
@@ -530,23 +561,48 @@ export function PowerFlowChart({
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex items-center gap-2 text-[10px] flex-wrap">
-            <HoverInfo
-              title="Clean Solar Feed-in Export (+)"
-              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.gridExportPositive}
-            >
-              <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-medium text-[9.5px] cursor-help">
-                Positive (+): Clean Solar Export
-              </span>
-            </HoverInfo>
-            <HoverInfo
-              title="Utility Grid Import (−)"
-              content={TELEMETRY_DESCRIPTIONS.trigonometricGraph.gridImportNegative}
-            >
-              <span className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 font-mono font-medium text-[9.5px] cursor-help">
-                Negative (−): Utility Grid Import
-              </span>
-            </HoverInfo>
+        </div>
+      )}
+
+      {/* Individual Battery ESS Power */}
+      {powerSubView === 'battery' && (
+        <div className="space-y-2.5">
+          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="soloBatteryGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={COLOR_BATTERY} stopOpacity={chartRenderMode === 'area' ? 0.45 : 0.12} />
+                    <stop offset="95%" stopColor={COLOR_BATTERY} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
+                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
+                <YAxis domain={batteryYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
+                <Tooltip content={<CustomExactTooltip />} />
+                <ReferenceLine y={0} stroke="currentColor" className="opacity-40" />
+                <ReferenceLine
+                  isFront
+                  x={nowSlotStr}
+                  stroke={COLOR_BATTERY}
+                  strokeDasharray="4 4"
+                  strokeWidth={1.5}
+                  label={renderNowReferenceLabel(`● Now (${nowExactTimeStr})`, COLOR_BATTERY) as any}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="batteryFlowKw"
+                  name="Battery Flow (kW)"
+                  stroke={COLOR_BATTERY}
+                  strokeWidth={2.5}
+                  fill="url(#soloBatteryGrad)"
+                  dot={false}
+                  activeDot={{ r: 5, stroke: COLOR_BATTERY, strokeWidth: 2, fill: '#fff' }}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}

@@ -67,6 +67,7 @@ export function TrigonometricHistoryGraph({
             pvYDomain={graph.pvYDomain}
             consumptionYDomain={graph.consumptionYDomain}
             gridYDomain={graph.gridYDomain}
+            batteryYDomain={graph.batteryYDomain}
             onSubViewChange={graph.setPowerSubView}
             onRenderModeChange={graph.setChartRenderMode}
           />
