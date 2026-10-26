@@ -576,20 +576,26 @@ export default function EnergyFlowDashboard() {
         {/* Top Command Banner */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border/50 pb-5">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight uppercase font-headline">
-              {isFleetView
-                ? 'Fleet Energy Flow'
-                : selectedPlant
-                  ? `${selectedPlant.stationName} Energy Flow`
-                  : `${selectedAccount?.name || 'Selected Site'} Energy Flow`}
-            </h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {isFleetView
-                ? `Real-time power distribution across ${totalAccounts} configured accounts`
-                : selectedPlant
-                  ? `Real-time power balance for ${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp)`
-                  : `Real-time power balance across ${selectedAccount?.plants?.length || 1} plant(s)`}
-            </p>
+            <HoverInfo
+              title={isFleetView ? 'Fleet Energy Flow' : selectedPlant ? `${selectedPlant.stationName} Energy Flow` : `${selectedAccount?.name || 'Selected Site'} Energy Flow`}
+              content={
+                <div className="text-xs font-mono">
+                  {isFleetView
+                    ? `Real-time power distribution across ${totalAccounts} configured accounts`
+                    : selectedPlant
+                      ? `Real-time power balance for ${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp)`
+                      : `Real-time power balance across ${selectedAccount?.plants?.length || 1} plant(s)`}
+                </div>
+              }
+            >
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight uppercase font-headline cursor-help">
+                {isFleetView
+                  ? 'Fleet Energy Flow'
+                  : selectedPlant
+                    ? `${selectedPlant.stationName} Energy Flow`
+                    : `${selectedAccount?.name || 'Selected Site'} Energy Flow`}
+              </h1>
+            </HoverInfo>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
@@ -833,82 +839,87 @@ export default function EnergyFlowDashboard() {
                 </div>
 
                 {/* Right: 3 Output Sinks (Battery, Demand, Grid) */}
-                <div className="flex flex-col gap-3 w-full">
-                  {/* Battery ESS Node */}
-                  <HoverInfo
-                    title={isFleetView ? 'Combined Battery Fleet' : 'Storage Battery (ESS)'}
-                    content={
-                      <div className="text-[11px] font-mono">
-                        {batterySoc > 0
-                          ? `${batterySoc.toFixed(1)}% SOC Active · ${batteryKw >= 0 ? '+' : ''}${batteryKw.toFixed(1)} kW`
-                          : 'No Battery Connected'}
-                      </div>
-                    }
-                  >
-                    <div className="p-3 sm:p-3.5 bg-card rounded-2xl border border-cyan-500/40 flex items-center justify-between shadow-2xs cursor-help">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-500">
-                          <BatteryCharging size={20} />
+                <div className="flex flex-col items-center w-full">
+                  <div className="flex flex-col gap-3 w-full max-w-[280px]">
+                    {/* Battery ESS Node */}
+                    <HoverInfo
+                      title={isFleetView ? 'Combined Battery Fleet' : 'Storage Battery (ESS)'}
+                      content={
+                        <div className="text-[11px] font-mono">
+                          {batterySoc > 0
+                            ? `${batterySoc.toFixed(1)}% SOC Active · ${batteryKw >= 0 ? '+' : ''}${batteryKw.toFixed(1)} kW`
+                            : 'No Battery Connected'}
                         </div>
-                        <span className="text-xs font-semibold text-foreground">
-                          {isFleetView ? 'Combined Battery Fleet' : 'Storage Battery (ESS)'}
+                      }
+                      className="w-full flex flex-col items-stretch"
+                    >
+                      <div className="w-full p-3 sm:p-3.5 bg-card rounded-2xl border border-cyan-500/40 flex items-center justify-between shadow-2xs cursor-help">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-500 shrink-0">
+                            <BatteryCharging size={20} />
+                          </div>
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            {isFleetView ? 'Combined Battery Fleet' : 'Storage Battery (ESS)'}
+                          </span>
+                        </div>
+                        <span className="font-mono text-sm text-cyan-500 font-bold ml-3 shrink-0 text-right">
+                          {batterySoc > 0 || Math.abs(batteryKw) > 0.05
+                            ? `${batteryKw >= 0 ? `+${batteryKw.toFixed(1)}` : batteryKw.toFixed(1)} kW`
+                            : 'Standby'}
                         </span>
                       </div>
-                      <span className="font-mono text-sm text-cyan-500 font-bold ml-4">
-                        {batterySoc > 0 || Math.abs(batteryKw) > 0.05
-                          ? `${batteryKw >= 0 ? `+${batteryKw.toFixed(1)}` : batteryKw.toFixed(1)} kW`
-                          : 'Standby'}
-                      </span>
-                    </div>
-                  </HoverInfo>
+                    </HoverInfo>
 
-                  {/* Facility Demand Node */}
-                  <HoverInfo
-                    title={isFleetView ? 'Total Facility Demand' : 'Facility Consumption'}
-                    content={
-                      <div className="text-[11px] font-mono">
-                        Current site demand: <span className="font-bold text-foreground">{loadKw.toFixed(1)} kW</span>
-                      </div>
-                    }
-                  >
-                    <div className="p-3 sm:p-3.5 bg-card rounded-2xl border border-border/60 flex items-center justify-between shadow-2xs cursor-help">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
-                          <Building2 size={20} />
+                    {/* Facility Demand Node */}
+                    <HoverInfo
+                      title={isFleetView ? 'Total Facility Demand' : 'Facility Consumption'}
+                      content={
+                        <div className="text-[11px] font-mono">
+                          Current site demand: <span className="font-bold text-foreground">{loadKw.toFixed(1)} kW</span>
                         </div>
-                        <span className="text-xs font-semibold text-foreground">
-                          {isFleetView ? 'Total Facility Demand' : 'Facility Consumption'}
+                      }
+                      className="w-full flex flex-col items-stretch"
+                    >
+                      <div className="w-full p-3 sm:p-3.5 bg-card rounded-2xl border border-border/60 flex items-center justify-between shadow-2xs cursor-help">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0">
+                            <Building2 size={20} />
+                          </div>
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            {isFleetView ? 'Total Facility Demand' : 'Facility Consumption'}
+                          </span>
+                        </div>
+                        <span className="font-mono text-sm text-foreground font-bold ml-3 shrink-0 text-right">
+                          {loadKw.toFixed(1)} kW
                         </span>
                       </div>
-                      <span className="font-mono text-sm text-foreground font-bold ml-4">
-                        {loadKw.toFixed(1)} kW
-                      </span>
-                    </div>
-                  </HoverInfo>
+                    </HoverInfo>
 
-                  {/* Utility Grid Dispatch */}
-                  <HoverInfo
-                    title={isFleetView ? 'Net Utility Grid Feed-In' : 'Utility Grid Interconnect'}
-                    content={
-                      <div className="text-[11px] font-mono">
-                        {gridKw > 0.05 ? 'Clean Solar Export' : gridKw < -0.05 ? 'Grid Power Import' : 'Balanced Interconnect'}
-                      </div>
-                    }
-                  >
-                    <div className="p-3 sm:p-3.5 bg-card rounded-2xl border border-emerald-500/40 flex items-center justify-between shadow-2xs cursor-help">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                          <Zap size={20} />
+                    {/* Utility Grid Dispatch */}
+                    <HoverInfo
+                      title={isFleetView ? 'Net Utility Grid Feed-In' : 'Utility Grid Interconnect'}
+                      content={
+                        <div className="text-[11px] font-mono">
+                          {gridKw > 0.05 ? 'Clean Solar Export' : gridKw < -0.05 ? 'Grid Power Import' : 'Balanced Interconnect'}
                         </div>
-                        <span className="text-xs font-semibold text-foreground">
-                          {isFleetView ? 'Net Utility Grid Feed-In' : 'Utility Grid Interconnect'}
+                      }
+                      className="w-full flex flex-col items-stretch"
+                    >
+                      <div className="w-full p-3 sm:p-3.5 bg-card rounded-2xl border border-emerald-500/40 flex items-center justify-between shadow-2xs cursor-help">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 shrink-0">
+                            <Zap size={20} />
+                          </div>
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            {isFleetView ? 'Net Utility Grid Feed-In' : 'Utility Grid Interconnect'}
+                          </span>
+                        </div>
+                        <span className={`font-mono text-sm font-bold ml-3 shrink-0 text-right ${gridKw >= 0 ? 'text-emerald-500' : 'text-blue-400'}`}>
+                          {gridKw >= 0 ? `+${gridKw.toFixed(1)}` : gridKw.toFixed(1)} kW
                         </span>
                       </div>
-                      <span className={`font-mono text-sm font-bold ml-4 ${gridKw >= 0 ? 'text-emerald-500' : 'text-blue-400'}`}>
-                        {gridKw >= 0 ? `+${gridKw.toFixed(1)}` : gridKw.toFixed(1)} kW
-                      </span>
-                    </div>
-                  </HoverInfo>
+                    </HoverInfo>
+                  </div>
                 </div>
               </div>
             </Card>
