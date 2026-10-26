@@ -21,7 +21,6 @@ import {
   CheckCircle2,
   Sliders,
   Gauge,
-  Leaf,
   DollarSign,
   Maximize2,
   Clock,
@@ -814,11 +813,11 @@ export default function AnalyticsDashboardPage() {
       )}
 
       {/* Primary KPI Ribbon (Key Performance & Efficiency Metrics - Scaled to Plant / Inverter) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8 gap-3 sm:gap-3.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3">
         {/* KPI 1: Solar Generation */}
-        <Card className="border-amber-500/30 bg-gradient-to-b from-amber-500/[0.04] to-card shadow-sm hover:border-amber-500/50 transition-colors">
+        <Card className="border-amber-500/30 bg-gradient-to-b from-amber-500/[0.04] to-card shadow-xs hover:border-amber-500/50 transition-colors">
           <HoverInfo
-            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
+            className="flex flex-col justify-between gap-1.5 w-full h-full px-3 py-2 sm:px-3.5 sm:py-2.5 cursor-help"
             title={selectedInverter ? "Inverter Solar Yield" : "Total Solar Generation"}
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
@@ -838,16 +837,16 @@ export default function AnalyticsDashboardPage() {
               </div>
             }
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono truncate">
                 {selectedInverter ? 'Inverter Yield' : 'Total Yield'}
               </span>
-              <div className="p-1 sm:p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
-                <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <div className="p-1 rounded-md bg-amber-500/10 text-amber-500 shrink-0">
+                <Sun className="w-3.5 h-3.5" />
               </div>
             </div>
             <div>
-              <div className="text-xl sm:text-2xl font-bold font-mono text-amber-500 tracking-tight">
+              <div className="text-lg sm:text-xl font-bold font-mono text-amber-500 tracking-tight leading-none">
                 {timeRange === '12M'
                   ? `${(analyticsSummary.totalSolarYieldKwh / 1000).toFixed(2)} MWh`
                   : `${analyticsSummary.totalSolarYieldKwh} kWh`}
@@ -856,49 +855,10 @@ export default function AnalyticsDashboardPage() {
           </HoverInfo>
         </Card>
 
-        {/* KPI 2: Self Consumption Ratio */}
-        <Card className="border-emerald-500/30 bg-gradient-to-b from-emerald-500/[0.04] to-card shadow-sm hover:border-emerald-500/50 transition-colors">
+        {/* KPI 2: Battery Storage ESS */}
+        <Card className="border-cyan-500/30 bg-gradient-to-b from-cyan-500/[0.04] to-card shadow-xs hover:border-cyan-500/50 transition-colors">
           <HoverInfo
-            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
-            title="Self-Consumption Ratio"
-            content={
-              <div className="space-y-1.5 min-w-[200px] text-[11px]">
-                <p className="text-muted-foreground leading-snug">
-                  {TELEMETRY_DESCRIPTIONS.analytics.selfConsumption}
-                </p>
-                <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Local Usage:</span>
-                    <span className="font-semibold text-foreground">{analyticsSummary.totalSelfConsumedKwh} kWh</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Self-Sufficiency:</span>
-                    <span className="font-semibold text-emerald-400">{analyticsSummary.selfSufficiencyPct}% of load</span>
-                  </div>
-                </div>
-              </div>
-            }
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
-                Self-Consumption
-              </span>
-              <div className="p-1 sm:p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500">
-                <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              </div>
-            </div>
-            <div>
-              <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-500 tracking-tight">
-                {analyticsSummary.selfConsumptionPct}%
-              </div>
-            </div>
-          </HoverInfo>
-        </Card>
-
-        {/* KPI 3: Battery Storage ESS */}
-        <Card className="border-cyan-500/30 bg-gradient-to-b from-cyan-500/[0.04] to-card shadow-sm hover:border-cyan-500/50 transition-colors">
-          <HoverInfo
-            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
+            className="flex flex-col justify-between gap-1.5 w-full h-full px-3 py-2 sm:px-3.5 sm:py-2.5 cursor-help"
             title="Battery Storage ESS"
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
@@ -920,26 +880,26 @@ export default function AnalyticsDashboardPage() {
               </div>
             }
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono truncate">
                 Battery ESS
               </span>
-              <div className="p-1 sm:p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
-                <BatteryCharging className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <div className="p-1 rounded-md bg-cyan-500/10 text-cyan-400 shrink-0">
+                <BatteryCharging className="w-3.5 h-3.5" />
               </div>
             </div>
             <div>
-              <div className="text-xl sm:text-2xl font-bold font-mono text-cyan-400 tracking-tight">
-                {analyticsSummary.currentSocPct.toFixed(1)}% <span className="text-xs text-muted-foreground font-normal">SOC</span>
+              <div className="text-lg sm:text-xl font-bold font-mono text-cyan-400 tracking-tight leading-none">
+                {analyticsSummary.currentSocPct.toFixed(1)}% <span className="text-[10px] text-muted-foreground font-normal">SOC</span>
               </div>
             </div>
           </HoverInfo>
         </Card>
 
-        {/* KPI 4: Grid Balance & Feed-in */}
-        <Card className="border-purple-500/30 bg-gradient-to-b from-purple-500/[0.04] to-card shadow-sm hover:border-purple-500/50 transition-colors">
+        {/* KPI 3: Grid Balance & Feed-in */}
+        <Card className="border-purple-500/30 bg-gradient-to-b from-purple-500/[0.04] to-card shadow-xs hover:border-purple-500/50 transition-colors">
           <HoverInfo
-            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
+            className="flex flex-col justify-between gap-1.5 w-full h-full px-3 py-2 sm:px-3.5 sm:py-2.5 cursor-help"
             title="Grid Net Balance"
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
@@ -959,26 +919,26 @@ export default function AnalyticsDashboardPage() {
               </div>
             }
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono truncate">
                 Grid Exchange
               </span>
-              <div className="p-1 sm:p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
-                <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <div className="p-1 rounded-md bg-purple-500/10 text-purple-400 shrink-0">
+                <TrendingUp className="w-3.5 h-3.5" />
               </div>
             </div>
             <div>
-              <div className="text-xl sm:text-2xl font-bold font-mono text-purple-400 tracking-tight">
-                {analyticsSummary.netGridBalanceKwh >= 0 ? `+${analyticsSummary.netGridBalanceKwh}` : analyticsSummary.netGridBalanceKwh} kWh
+              <div className="text-lg sm:text-xl font-bold font-mono text-purple-400 tracking-tight leading-none">
+                {analyticsSummary.netGridBalanceKwh >= 0 ? `+${analyticsSummary.netGridBalanceKwh}` : analyticsSummary.netGridBalanceKwh} <span className="text-[10px] text-muted-foreground font-normal">kWh</span>
               </div>
             </div>
           </HoverInfo>
         </Card>
 
-        {/* KPI 5: Performance Ratio (PR) / Utilization */}
-        <Card className="border-blue-500/30 bg-gradient-to-b from-blue-500/[0.04] to-card shadow-sm hover:border-blue-500/50 transition-colors">
+        {/* KPI 4: Performance Ratio (PR) / Utilization */}
+        <Card className="border-blue-500/30 bg-gradient-to-b from-blue-500/[0.04] to-card shadow-xs hover:border-blue-500/50 transition-colors">
           <HoverInfo
-            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
+            className="flex flex-col justify-between gap-1.5 w-full h-full px-3 py-2 sm:px-3.5 sm:py-2.5 cursor-help"
             title="Performance Ratio (PR) / Utilization"
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
@@ -998,26 +958,26 @@ export default function AnalyticsDashboardPage() {
               </div>
             }
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono truncate">
                 PR / Utilization
               </span>
-              <div className="p-1 sm:p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
-                <Gauge className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <div className="p-1 rounded-md bg-blue-500/10 text-blue-400 shrink-0">
+                <Gauge className="w-3.5 h-3.5" />
               </div>
             </div>
             <div>
-              <div className="text-xl sm:text-2xl font-bold font-mono text-blue-400 tracking-tight">
+              <div className="text-lg sm:text-xl font-bold font-mono text-blue-400 tracking-tight leading-none">
                 {analyticsSummary.performanceRatioPct}%
               </div>
             </div>
           </HoverInfo>
         </Card>
 
-        {/* KPI 6: Inverter Efficiency */}
-        <Card className="border-emerald-500/30 bg-gradient-to-b from-emerald-500/[0.04] to-card shadow-sm hover:border-emerald-500/50 transition-colors">
+        {/* KPI 5: Inverter Efficiency */}
+        <Card className="border-emerald-500/30 bg-gradient-to-b from-emerald-500/[0.04] to-card shadow-xs hover:border-emerald-500/50 transition-colors">
           <HoverInfo
-            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
+            className="flex flex-col justify-between gap-1.5 w-full h-full px-3 py-2 sm:px-3.5 sm:py-2.5 cursor-help"
             title="Inverter Efficiency"
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
@@ -1037,26 +997,26 @@ export default function AnalyticsDashboardPage() {
               </div>
             }
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono truncate">
                 Inverter Efficiency
               </span>
-              <div className="p-1 sm:p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
-                <Cpu className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <div className="p-1 rounded-md bg-emerald-500/10 text-emerald-400 shrink-0">
+                <Cpu className="w-3.5 h-3.5" />
               </div>
             </div>
             <div>
-              <div className="text-xl sm:text-2xl font-bold font-mono text-emerald-400 tracking-tight">
+              <div className="text-lg sm:text-xl font-bold font-mono text-emerald-400 tracking-tight leading-none">
                 {analyticsSummary.inverterEfficiencyPct}%
               </div>
             </div>
           </HoverInfo>
         </Card>
 
-        {/* KPI 7: PV Module Efficiency */}
-        <Card className="border-amber-500/30 bg-gradient-to-b from-amber-500/[0.04] to-card shadow-sm hover:border-amber-500/50 transition-colors">
+        {/* KPI 6: PV Module Efficiency */}
+        <Card className="border-amber-500/30 bg-gradient-to-b from-amber-500/[0.04] to-card shadow-xs hover:border-amber-500/50 transition-colors">
           <HoverInfo
-            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
+            className="flex flex-col justify-between gap-1.5 w-full h-full px-3 py-2 sm:px-3.5 sm:py-2.5 cursor-help"
             title="PV Module Efficiency"
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
@@ -1076,56 +1036,17 @@ export default function AnalyticsDashboardPage() {
               </div>
             }
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono truncate">
                 PV Module Efficiency
               </span>
-              <div className="p-1 sm:p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
-                <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <div className="p-1 rounded-md bg-amber-500/10 text-amber-500 shrink-0">
+                <Layers className="w-3.5 h-3.5" />
               </div>
             </div>
             <div>
-              <div className="text-xl sm:text-2xl font-bold font-mono text-amber-500 tracking-tight">
+              <div className="text-lg sm:text-xl font-bold font-mono text-amber-500 tracking-tight leading-none">
                 {analyticsSummary.pvModuleEfficiencyPct}%
-              </div>
-            </div>
-          </HoverInfo>
-        </Card>
-
-        {/* KPI 8: ESG & Avoided CO2 */}
-        <Card className="border-teal-600/30 bg-gradient-to-b from-teal-600/[0.04] to-card shadow-sm hover:border-teal-600/50 transition-colors">
-          <HoverInfo
-            className="block w-full h-full p-3 sm:p-4 space-y-1.5 sm:space-y-2 cursor-help"
-            title="Carbon Offset (ESG)"
-            content={
-              <div className="space-y-1.5 min-w-[200px] text-[11px]">
-                <p className="text-muted-foreground leading-snug">
-                  {TELEMETRY_DESCRIPTIONS.analytics.co2Avoided}
-                </p>
-                <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Equivalent:</span>
-                    <span className="font-semibold text-foreground">{analyticsSummary.treesEquivalent} Mature Trees</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Tariff Savings:</span>
-                    <span className="font-semibold text-teal-400">${analyticsSummary.totalSavingsUsd}</span>
-                  </div>
-                </div>
-              </div>
-            }
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground uppercase font-mono">
-                Carbon Offset
-              </span>
-              <div className="p-1 sm:p-1.5 rounded-lg bg-teal-600/10 text-teal-400">
-                <Leaf className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              </div>
-            </div>
-            <div>
-              <div className="text-xl sm:text-2xl font-bold font-mono text-teal-400 tracking-tight">
-                {analyticsSummary.co2AvoidedKg} kg
               </div>
             </div>
           </HoverInfo>
