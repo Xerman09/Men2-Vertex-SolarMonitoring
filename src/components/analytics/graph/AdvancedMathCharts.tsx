@@ -52,6 +52,7 @@ interface AdvancedMathChartsProps {
   acVoltage: number;
   acCurrent: number;
   powerFactor: number;
+  verticalNav?: React.ReactNode;
   onAcVoltageChange: (val: number) => void;
   onAcCurrentChange: (val: number) => void;
   onPowerFactorChange: (val: number) => void;
@@ -72,6 +73,7 @@ export function AdvancedMathCharts({
   acVoltage,
   acCurrent,
   powerFactor,
+  verticalNav,
   onAcVoltageChange,
   onAcCurrentChange,
   onPowerFactorChange,
@@ -169,64 +171,67 @@ export function AdvancedMathCharts({
           </HoverInfo>
         </div>
 
-        <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={fitResults.theoreticalPoints} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
-              <defs>
-                <linearGradient id="solarActualYellowGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLOR_PV} stopOpacity={0.35} />
-                  <stop offset="95%" stopColor={COLOR_PV} stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-              <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
-              <YAxis domain={sinusoidalYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'rgba(23, 31, 51, 0.95)',
-                  borderRadius: '0.5rem',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  fontSize: '11px',
-                }}
-              />
-              <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
-              <ReferenceLine
-                isFront
-                x={nowSlotStr}
-                stroke="#64748b"
-                strokeDasharray="3 3"
-                label={renderNowReferenceLabel('● Now', '#94a3b8') as any}
-              />
-              <Area
-                type="monotone"
-                dataKey="actualSolarKw"
-                name="Actual Measured PV"
-                stroke={COLOR_PV}
-                strokeWidth={2}
-                fill="url(#solarActualYellowGrad)"
-                dot={false}
-                connectNulls={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="sinusoidalClearSkyKw"
-                name="Theoretical Clear-Sky Model"
-                stroke="#06b6d4"
-                strokeWidth={2}
-                strokeDasharray="4 4"
-                dot={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="residualKw"
-                name="Model Deviation Residual"
-                stroke={COLOR_GRID}
-                strokeWidth={1.5}
-                dot={false}
-                connectNulls={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+        <div className={`flex items-stretch gap-2.5 sm:gap-3 ${compact ? 'h-[260px]' : 'h-[340px]'}`}>
+          {verticalNav}
+          <div className="flex-1 min-w-0 h-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={fitResults.theoreticalPoints} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="solarActualYellowGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={COLOR_PV} stopOpacity={0.35} />
+                    <stop offset="95%" stopColor={COLOR_PV} stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
+                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
+                <YAxis domain={sinusoidalYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'rgba(23, 31, 51, 0.95)',
+                    borderRadius: '0.5rem',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    fontSize: '11px',
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
+                <ReferenceLine
+                  isFront
+                  x={nowSlotStr}
+                  stroke="#64748b"
+                  strokeDasharray="3 3"
+                  label={renderNowReferenceLabel('● Now', '#94a3b8') as any}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="actualSolarKw"
+                  name="Actual Measured PV"
+                  stroke={COLOR_PV}
+                  strokeWidth={2}
+                  fill="url(#solarActualYellowGrad)"
+                  dot={false}
+                  connectNulls={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="sinusoidalClearSkyKw"
+                  name="Theoretical Clear-Sky Model"
+                  stroke="#06b6d4"
+                  strokeWidth={2}
+                  strokeDasharray="4 4"
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="residualKw"
+                  name="Model Deviation Residual"
+                  stroke={COLOR_GRID}
+                  strokeWidth={1.5}
+                  dot={false}
+                  connectNulls={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     );
@@ -258,65 +263,68 @@ export function AdvancedMathCharts({
           </HoverInfo>
         </div>
 
-        <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={fourierData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-              <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
-              <YAxis domain={fourierYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'rgba(23, 31, 51, 0.95)',
-                  borderRadius: '0.5rem',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  fontSize: '11px',
-                }}
-              />
-              <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
-              <ReferenceLine
-                isFront
-                x={nowSlotStr}
-                stroke="#64748b"
-                strokeDasharray="3 3"
-                label={renderNowReferenceLabel('● Now', '#94a3b8') as any}
-              />
-              <Line
-                type="monotone"
-                dataKey="actualSolarKw"
-                name="Actual Harvest"
-                stroke={COLOR_PV}
-                strokeWidth={2}
-                dot={false}
-                connectNulls={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="fundamentalHarmonicKw"
-                name="k=1 Fundamental Diurnal Wave (kW)"
-                stroke="#06b6d4"
-                strokeWidth={2}
-                dot={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="secondHarmonicKw"
-                name="k=2 12-Hour Asymmetry Wave (kW)"
-                stroke={COLOR_GRID}
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-                dot={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="fourierReconstructedKw"
-                name="Fourier Reconstructed Series (kW)"
-                stroke={COLOR_LOAD}
-                strokeWidth={2}
-                strokeDasharray="2 2"
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className={`flex items-stretch gap-2.5 sm:gap-3 ${compact ? 'h-[260px]' : 'h-[340px]'}`}>
+          {verticalNav}
+          <div className="flex-1 min-w-0 h-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={fourierData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
+                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
+                <YAxis domain={fourierYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'rgba(23, 31, 51, 0.95)',
+                    borderRadius: '0.5rem',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    fontSize: '11px',
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
+                <ReferenceLine
+                  isFront
+                  x={nowSlotStr}
+                  stroke="#64748b"
+                  strokeDasharray="3 3"
+                  label={renderNowReferenceLabel('● Now', '#94a3b8') as any}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="actualSolarKw"
+                  name="Actual Harvest"
+                  stroke={COLOR_PV}
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="fundamentalHarmonicKw"
+                  name="k=1 Fundamental Diurnal Wave (kW)"
+                  stroke="#06b6d4"
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="secondHarmonicKw"
+                  name="k=2 12-Hour Asymmetry Wave (kW)"
+                  stroke={COLOR_GRID}
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="fourierReconstructedKw"
+                  name="Fourier Reconstructed Series (kW)"
+                  stroke={COLOR_LOAD}
+                  strokeWidth={2}
+                  strokeDasharray="2 2"
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     );
@@ -342,44 +350,47 @@ export function AdvancedMathCharts({
           </Badge>
         </div>
 
-        <div className={compact ? 'h-[280px] w-full' : 'h-[360px] w-full'}>
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart cx="50%" cy="50%" outerRadius="80%" data={polarData.filter((_, idx) => idx % (timeResolution === 5 ? 12 : 1) === 0)}>
-              <PolarGrid stroke="currentColor" className="opacity-20" />
-              <PolarAngleAxis dataKey="hourLabel" stroke="currentColor" className="text-[9px] font-mono opacity-75" />
-              <PolarRadiusAxis angle={30} domain={[0, 140]} stroke="currentColor" className="text-[8.5px] font-mono opacity-60" />
-              <Radar
-                name="Solar Generation"
-                dataKey="solarHarvestRadius"
-                stroke={COLOR_PV}
-                fill={COLOR_PV}
-                fillOpacity={0.35}
-              />
-              <Radar
-                name="Industrial Load Demand"
-                dataKey="loadDemandRadius"
-                stroke={COLOR_LOAD}
-                fill={COLOR_LOAD}
-                fillOpacity={0.25}
-              />
-              <Radar
-                name="Battery Energy Flow"
-                dataKey="batteryRadius"
-                stroke="#06b6d4"
-                fill="#06b6d4"
-                fillOpacity={0.25}
-              />
-              <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'rgba(23, 31, 51, 0.95)',
-                  borderRadius: '0.5rem',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  fontSize: '11px',
-                }}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
+        <div className={`flex items-stretch gap-2.5 sm:gap-3 ${compact ? 'h-[280px]' : 'h-[360px]'}`}>
+          {verticalNav}
+          <div className="flex-1 min-w-0 h-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={polarData.filter((_, idx) => idx % (timeResolution === 5 ? 12 : 1) === 0)}>
+                <PolarGrid stroke="currentColor" className="opacity-20" />
+                <PolarAngleAxis dataKey="hourLabel" stroke="currentColor" className="text-[9px] font-mono opacity-75" />
+                <PolarRadiusAxis angle={30} domain={[0, 140]} stroke="currentColor" className="text-[8.5px] font-mono opacity-60" />
+                <Radar
+                  name="Solar Generation"
+                  dataKey="solarHarvestRadius"
+                  stroke={COLOR_PV}
+                  fill={COLOR_PV}
+                  fillOpacity={0.35}
+                />
+                <Radar
+                  name="Industrial Load Demand"
+                  dataKey="loadDemandRadius"
+                  stroke={COLOR_LOAD}
+                  fill={COLOR_LOAD}
+                  fillOpacity={0.25}
+                />
+                <Radar
+                  name="Battery Energy Flow"
+                  dataKey="batteryRadius"
+                  stroke="#06b6d4"
+                  fill="#06b6d4"
+                  fillOpacity={0.25}
+                />
+                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'rgba(23, 31, 51, 0.95)',
+                    borderRadius: '0.5rem',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    fontSize: '11px',
+                  }}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     );
@@ -455,57 +466,60 @@ export function AdvancedMathCharts({
         </div>
       </div>
 
-      <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={acResults.waveform} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-            <XAxis dataKey="timeMs" stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="ms" />
-            <YAxis stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="V" />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'rgba(23, 31, 51, 0.95)',
-                borderRadius: '0.5rem',
-                border: '1px solid rgba(255,255,255,0.1)',
-                fontSize: '11px',
-              }}
-            />
-            <ReferenceLine y={0} stroke="currentColor" className="opacity-30" />
-            <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
-            <Line
-              type="monotone"
-              dataKey="voltagePhaseA"
-              name="Phase A: Vm·sin(ωt) [0°]"
-              stroke="#ef4444"
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="voltagePhaseB"
-              name="Phase B: Vm·sin(ωt - 120°)"
-              stroke="#3b82f6"
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="voltagePhaseC"
-              name="Phase C: Vm·sin(ωt + 120°)"
-              stroke="#10b981"
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="currentA"
-              name="Phase A Current: Im·sin(ωt - φ)"
-              stroke="#f59e0b"
-              strokeWidth={1.5}
-              strokeDasharray="4 4"
-              dot={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+      <div className={`flex items-stretch gap-2.5 sm:gap-3 ${compact ? 'h-[260px]' : 'h-[340px]'}`}>
+        {verticalNav}
+        <div className="flex-1 min-w-0 h-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={acResults.waveform} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
+              <XAxis dataKey="timeMs" stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="ms" />
+              <YAxis stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="V" />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgba(23, 31, 51, 0.95)',
+                  borderRadius: '0.5rem',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  fontSize: '11px',
+                }}
+              />
+              <ReferenceLine y={0} stroke="currentColor" className="opacity-30" />
+              <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
+              <Line
+                type="monotone"
+                dataKey="voltagePhaseA"
+                name="Phase A: Vm·sin(ωt) [0°]"
+                stroke="#ef4444"
+                strokeWidth={2}
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="voltagePhaseB"
+                name="Phase B: Vm·sin(ωt - 120°)"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="voltagePhaseC"
+                name="Phase C: Vm·sin(ωt + 120°)"
+                stroke="#10b981"
+                strokeWidth={2}
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="currentA"
+                name="Phase A Current: Im·sin(ωt - φ)"
+                stroke="#f59e0b"
+                strokeWidth={1.5}
+                strokeDasharray="4 4"
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">

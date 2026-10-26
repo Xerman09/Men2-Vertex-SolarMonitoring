@@ -31,6 +31,16 @@ export function TrigonometricHistoryGraph({
 
   const [isNavCollapsed, setIsNavCollapsed] = useState<boolean>(compact);
 
+  const verticalNav = (
+    <GraphVerticalNav
+      activeTab={graph.activeTab}
+      onTabChange={graph.setActiveTab}
+      isCollapsed={isNavCollapsed}
+      onToggleCollapse={() => setIsNavCollapsed((prev) => !prev)}
+      compact={compact}
+    />
+  );
+
   return (
     <Card className={compact ? 'w-full border-border/40 bg-card/60 shadow-none' : 'w-full border-border/60 bg-card/80 shadow-xs'}>
       <GraphHeaderControls
@@ -44,82 +54,75 @@ export function TrigonometricHistoryGraph({
         onTabChange={graph.setActiveTab}
       />
 
-      <div className="flex flex-row items-stretch divide-x divide-border/50">
-        <GraphVerticalNav
-          activeTab={graph.activeTab}
-          onTabChange={graph.setActiveTab}
-          isCollapsed={isNavCollapsed}
-          onToggleCollapse={() => setIsNavCollapsed((prev) => !prev)}
-          compact={compact}
-        />
-
-        <CardContent className={compact ? 'flex-1 min-w-0 p-3 pt-2.5 space-y-3 relative overflow-hidden' : 'flex-1 min-w-0 p-4 pt-3.5 space-y-4 relative overflow-hidden'}>
-          {loading && (
-            <div className="absolute inset-0 z-20 bg-background/60 backdrop-blur-xs flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card border border-primary/20 shadow-md">
-                <RefreshCw size={13} className="animate-spin text-primary" />
-                <span className="text-xs font-mono font-bold text-foreground">Syncing Harmonic Telemetry Curve...</span>
-              </div>
+      <CardContent className={compact ? 'p-3 pt-2.5 space-y-3 relative overflow-hidden' : 'p-4 pt-3.5 space-y-4 relative overflow-hidden'}>
+        {loading && (
+          <div className="absolute inset-0 z-20 bg-background/60 backdrop-blur-xs flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card border border-primary/20 shadow-md">
+              <RefreshCw size={13} className="animate-spin text-primary" />
+              <span className="text-xs font-mono font-bold text-foreground">Syncing Harmonic Telemetry Curve...</span>
             </div>
-          )}
-          {graph.activeTab === 'power' && (
-            <PowerFlowChart
-              compact={compact}
-              powerSeriesData={graph.powerSeriesData}
-              currentLivePoint={graph.currentLivePoint}
-              peakPv={graph.peakPv}
-              peakLoad={graph.peakLoad}
-              powerSubView={graph.powerSubView}
-              chartRenderMode={graph.chartRenderMode}
-              timeResolution={graph.timeResolution}
-              nowSlotStr={graph.nowSlotStr}
-              nowExactTimeStr={graph.nowExactTimeStr}
-              majorXTicks={graph.majorXTicks}
-              combinedYDomain={graph.combinedYDomain}
-              pvYDomain={graph.pvYDomain}
-              consumptionYDomain={graph.consumptionYDomain}
-              gridYDomain={graph.gridYDomain}
-              batteryYDomain={graph.batteryYDomain}
-              onSubViewChange={graph.setPowerSubView}
-              onRenderModeChange={graph.setChartRenderMode}
-            />
-          )}
+          </div>
+        )}
+        {graph.activeTab === 'power' && (
+          <PowerFlowChart
+            compact={compact}
+            verticalNav={verticalNav}
+            powerSeriesData={graph.powerSeriesData}
+            currentLivePoint={graph.currentLivePoint}
+            peakPv={graph.peakPv}
+            peakLoad={graph.peakLoad}
+            powerSubView={graph.powerSubView}
+            chartRenderMode={graph.chartRenderMode}
+            timeResolution={graph.timeResolution}
+            nowSlotStr={graph.nowSlotStr}
+            nowExactTimeStr={graph.nowExactTimeStr}
+            majorXTicks={graph.majorXTicks}
+            combinedYDomain={graph.combinedYDomain}
+            pvYDomain={graph.pvYDomain}
+            consumptionYDomain={graph.consumptionYDomain}
+            gridYDomain={graph.gridYDomain}
+            batteryYDomain={graph.batteryYDomain}
+            onSubViewChange={graph.setPowerSubView}
+            onRenderModeChange={graph.setChartRenderMode}
+          />
+        )}
 
-          {graph.activeTab === 'selfconsumption' && (
-            <SelfConsumptionChart
-              compact={compact}
-              selfConsumptionMetrics={graph.selfConsumptionMetrics}
-              majorXTicks={graph.majorXTicks}
-              nowSlotStr={graph.nowSlotStr}
-            />
-          )}
+        {graph.activeTab === 'selfconsumption' && (
+          <SelfConsumptionChart
+            compact={compact}
+            verticalNav={verticalNav}
+            selfConsumptionMetrics={graph.selfConsumptionMetrics}
+            majorXTicks={graph.majorXTicks}
+            nowSlotStr={graph.nowSlotStr}
+          />
+        )}
 
-          {(graph.activeTab === 'sinusoidal' ||
-            graph.activeTab === 'fourier' ||
-            graph.activeTab === 'polar' ||
-            graph.activeTab === 'waveform') && (
-            <AdvancedMathCharts
-              compact={compact}
-              activeTab={graph.activeTab}
-              timeResolution={graph.timeResolution}
-              nowSlotStr={graph.nowSlotStr}
-              majorXTicks={graph.majorXTicks}
-              fitResults={graph.fitResults}
-              fourierData={graph.fourierData}
-              polarData={graph.polarData}
-              acResults={graph.acResults}
-              sinusoidalYDomain={graph.sinusoidalYDomain}
-              fourierYDomain={graph.fourierYDomain}
-              acVoltage={graph.acVoltage}
-              acCurrent={graph.acCurrent}
-              powerFactor={graph.powerFactor}
-              onAcVoltageChange={graph.setAcVoltage}
-              onAcCurrentChange={graph.setAcCurrent}
-              onPowerFactorChange={graph.setPowerFactor}
-            />
-          )}
-        </CardContent>
-      </div>
+        {(graph.activeTab === 'sinusoidal' ||
+          graph.activeTab === 'fourier' ||
+          graph.activeTab === 'polar' ||
+          graph.activeTab === 'waveform') && (
+          <AdvancedMathCharts
+            compact={compact}
+            verticalNav={verticalNav}
+            activeTab={graph.activeTab}
+            timeResolution={graph.timeResolution}
+            nowSlotStr={graph.nowSlotStr}
+            majorXTicks={graph.majorXTicks}
+            fitResults={graph.fitResults}
+            fourierData={graph.fourierData}
+            polarData={graph.polarData}
+            acResults={graph.acResults}
+            sinusoidalYDomain={graph.sinusoidalYDomain}
+            fourierYDomain={graph.fourierYDomain}
+            acVoltage={graph.acVoltage}
+            acCurrent={graph.acCurrent}
+            powerFactor={graph.powerFactor}
+            onAcVoltageChange={graph.setAcVoltage}
+            onAcCurrentChange={graph.setAcCurrent}
+            onPowerFactorChange={graph.setPowerFactor}
+          />
+        )}
+      </CardContent>
     </Card>
   );
 }

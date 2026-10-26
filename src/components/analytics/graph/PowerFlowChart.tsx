@@ -45,6 +45,7 @@ interface PowerFlowChartProps {
   consumptionYDomain: [number, number];
   gridYDomain: [number, number];
   batteryYDomain?: [number, number];
+  verticalNav?: React.ReactNode;
   onSubViewChange: (view: PowerSubView) => void;
   onRenderModeChange?: (mode: ChartRenderMode) => void;
 }
@@ -66,6 +67,7 @@ export function PowerFlowChart({
   consumptionYDomain,
   gridYDomain,
   batteryYDomain = [-10, 10],
+  verticalNav,
   onSubViewChange,
   onRenderModeChange,
 }: PowerFlowChartProps) {
@@ -336,10 +338,12 @@ export function PowerFlowChart({
         </div>
       </div>
 
-      {/* Combined View */}
-      {powerSubView === 'combined' && (
-        <div className="space-y-3">
-          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
+      {/* Chart Row: Vertical Navigation Rail beside the Graph in the SAME ROW */}
+      <div className={`flex items-stretch gap-2.5 sm:gap-3 ${compact ? 'h-[260px]' : 'h-[340px]'}`}>
+        {verticalNav}
+        <div className="flex-1 min-w-0 h-full">
+          {/* Combined View */}
+          {powerSubView === 'combined' && (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
@@ -378,7 +382,7 @@ export function PowerFlowChart({
                 <ReferenceLine
                   isFront
                   x={nowSlotStr}
-                  stroke="#94a3b8"
+                  stroke="#64748b"
                   strokeDasharray="4 4"
                   strokeWidth={1.5}
                   label={renderNowReferenceLabel(`● Now (${nowExactTimeStr})`, '#94a3b8') as any}
@@ -433,14 +437,10 @@ export function PowerFlowChart({
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Individual PV Power */}
-      {powerSubView === 'pv' && (
-        <div className="space-y-3">
-          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
+          {/* Individual PV Power */}
+          {powerSubView === 'pv' && (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
@@ -475,14 +475,10 @@ export function PowerFlowChart({
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Individual Consumption */}
-      {powerSubView === 'consumption' && (
-        <div className="space-y-2.5">
-          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
+          {/* Individual Consumption */}
+          {powerSubView === 'consumption' && (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
@@ -517,14 +513,10 @@ export function PowerFlowChart({
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Individual Grid Power */}
-      {powerSubView === 'grid' && (
-        <div className="space-y-2.5">
-          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
+          {/* Individual Grid Power */}
+          {powerSubView === 'grid' && (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
@@ -560,14 +552,10 @@ export function PowerFlowChart({
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Individual Battery ESS Power */}
-      {powerSubView === 'battery' && (
-        <div className="space-y-2.5">
-          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
+          {/* Individual Battery ESS Power */}
+          {powerSubView === 'battery' && (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
@@ -603,9 +591,9 @@ export function PowerFlowChart({
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

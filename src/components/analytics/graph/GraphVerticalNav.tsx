@@ -97,16 +97,16 @@ export function GraphVerticalNav({
 }: GraphVerticalNavProps) {
   return (
     <aside
-      className={`transition-all duration-200 shrink-0 bg-muted/20 flex flex-col select-none ${
+      className={`transition-all duration-200 shrink-0 bg-card/90 border border-border/70 rounded-xl flex flex-col select-none overflow-hidden h-full shadow-xs ${
         isCollapsed ? 'w-11 sm:w-12' : 'w-44 sm:w-48'
       }`}
       aria-label="Telemetry & Analytics Navigation"
     >
       {/* Collapse/Expand Toggle Header */}
-      <div className={`border-b border-border/40 ${isCollapsed ? 'p-2 flex justify-center' : 'px-3 py-2 flex items-center justify-between'}`}>
+      <div className={`border-b border-border/50 bg-muted/40 shrink-0 ${isCollapsed ? 'p-1.5 flex justify-center' : 'px-2.5 py-1.5 flex items-center justify-between'}`}>
         {!isCollapsed && (
           <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
-            Telemetry Views
+            Views
           </span>
         )}
         <HoverInfo
@@ -120,7 +120,7 @@ export function GraphVerticalNav({
           <button
             type="button"
             onClick={onToggleCollapse}
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
             aria-label={isCollapsed ? 'Expand navigation menu' : 'Collapse navigation to icons'}
           >
             {isCollapsed ? (
@@ -134,7 +134,7 @@ export function GraphVerticalNav({
 
       {/* Navigation Options List */}
       <nav
-        className={`flex flex-col gap-1 p-1.5 sm:p-2 flex-1 ${isCollapsed ? 'items-center' : ''}`}
+        className={`flex flex-col justify-between gap-1 p-1 sm:p-1.5 flex-1 min-h-0 ${isCollapsed ? 'items-center' : ''}`}
         role="tablist"
         aria-orientation="vertical"
       >

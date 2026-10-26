@@ -23,6 +23,7 @@ interface SelfConsumptionChartProps {
   selfConsumptionMetrics: SelfConsumptionMetrics;
   majorXTicks: string[];
   nowSlotStr: string;
+  verticalNav?: React.ReactNode;
 }
 
 export function SelfConsumptionChart({
@@ -30,6 +31,7 @@ export function SelfConsumptionChart({
   selfConsumptionMetrics,
   majorXTicks,
   nowSlotStr,
+  verticalNav,
 }: SelfConsumptionChartProps) {
   return (
     <div className={compact ? 'space-y-3' : 'space-y-4'}>
@@ -186,51 +188,54 @@ export function SelfConsumptionChart({
       {/* Continuous ratios chart */}
       <div className="space-y-1">
         <span className="text-[11px] font-semibold text-foreground uppercase tracking-wider">5-Minute Continuous Ratios (%)</span>
-        <div className={compact ? 'h-[270px] w-full' : 'h-[360px] w-full'}>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={selfConsumptionMetrics.hourlyRatios} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
-              <defs>
-                <linearGradient id="utilGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLOR_PV} stopOpacity={0.35} />
-                  <stop offset="95%" stopColor={COLOR_PV} stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="prodGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLOR_LOAD} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={COLOR_LOAD} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-              <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
-              <YAxis domain={[0, 100]} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="%" />
-              <Tooltip contentStyle={{ backgroundColor: 'rgba(23,31,51,0.95)', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.1)', fontSize: '11px' }} />
-              <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
-              <ReferenceLine
-                isFront
-                x={nowSlotStr}
-                stroke="#64748b"
-                strokeDasharray="3 3"
-                label={renderNowReferenceLabel('● Now', '#94a3b8') as any}
-              />
-              <Area
-                type="monotone"
-                dataKey="utilizationPct"
-                name="Utilization % (PV→Load)"
-                stroke={COLOR_PV}
-                strokeWidth={2}
-                fill="url(#utilGrad)"
-                connectNulls={false}
-              />
-              <Area
-                type="monotone"
-                dataKey="productionPct"
-                name="Self-Consumption % (Local PV)"
-                stroke={COLOR_LOAD}
-                strokeWidth={2}
-                fill="url(#prodGrad)"
-                connectNulls={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+        <div className={`flex items-stretch gap-2.5 sm:gap-3 ${compact ? 'h-[270px]' : 'h-[360px]'}`}>
+          {verticalNav}
+          <div className="flex-1 min-w-0 h-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={selfConsumptionMetrics.hourlyRatios} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="utilGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={COLOR_PV} stopOpacity={0.35} />
+                    <stop offset="95%" stopColor={COLOR_PV} stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="prodGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={COLOR_LOAD} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={COLOR_LOAD} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
+                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
+                <YAxis domain={[0, 100]} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="%" />
+                <Tooltip contentStyle={{ backgroundColor: 'rgba(23,31,51,0.95)', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.1)', fontSize: '11px' }} />
+                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
+                <ReferenceLine
+                  isFront
+                  x={nowSlotStr}
+                  stroke="#64748b"
+                  strokeDasharray="3 3"
+                  label={renderNowReferenceLabel('● Now', '#94a3b8') as any}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="utilizationPct"
+                  name="Utilization % (PV→Load)"
+                  stroke={COLOR_PV}
+                  strokeWidth={2}
+                  fill="url(#utilGrad)"
+                  connectNulls={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="productionPct"
+                  name="Self-Consumption % (Local PV)"
+                  stroke={COLOR_LOAD}
+                  strokeWidth={2}
+                  fill="url(#prodGrad)"
+                  connectNulls={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </div>
