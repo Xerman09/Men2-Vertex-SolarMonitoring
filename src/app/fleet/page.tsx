@@ -70,11 +70,6 @@ export default function FleetMonitoringPage() {
     return true;
   });
   const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(() => {
-    return typeof window !== 'undefined' && telemetryCache.get<AggregatedFleetSummary>(FLEET_CACHE_KEY, 60000, true)
-      ? new Date()
-      : null;
-  });
   const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(30); // 0 = paused
 
   // Search & Filter controls
@@ -145,7 +140,6 @@ export default function FleetMonitoringPage() {
         const json: AggregatedFleetSummary = await res.json();
         telemetryCache.set(FLEET_CACHE_KEY, json);
         setFleetData(json);
-        setLastRefreshedAt(new Date());
       }
     } catch (err) {
       log.error('Failed to fetch fleet aggregate', { error: err });
@@ -1303,30 +1297,6 @@ export default function FleetMonitoringPage() {
           })}
         </div>
       )}
-
-      {/* Footer Status Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border/50 gap-2">
-        <div className="flex items-center gap-2">
-          <span>Fleet telemetry updated from {totalAccountsCount} accounts</span>
-          {lastRefreshedAt && (
-            <>
-              <span>•</span>
-              <span>Last polled {lastRefreshedAt.toLocaleTimeString()}</span>
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-3 font-mono text-[11px]">
-          <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-emerald-500" /> Online
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-amber-500" /> Standby
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-destructive" /> Fault
-          </span>
-        </div>
-      </div>
     </div>
   );
 }
