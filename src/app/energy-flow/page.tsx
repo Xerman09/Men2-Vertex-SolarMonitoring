@@ -688,246 +688,6 @@ export default function EnergyFlowDashboard() {
 
         {/* Subsystem Overview: 5 Vertical KPI Cards beside Multi-Site Power Flow */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch w-full">
-          {/* 5 Primary Telemetry Summary Cards (Vertical Column on Desktop) */}
-          <div className="lg:col-span-4 xl:col-span-3 grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-col gap-3 h-full">
-            {/* PV Live Yield */}
-            <HoverInfo
-              title={isFleetView ? 'Total PV Generation' : 'PV Generation'}
-              content={
-                <div className="space-y-1 text-[11px] font-mono">
-                  <div className="flex justify-between gap-3">
-                    <span className="text-muted-foreground">Daily Harvest:</span>
-                    <span className="font-bold text-amber-500">{dailyYield.toFixed(1)} kWh</span>
-                  </div>
-                  {totalCapacity > 0 && (
-                    <div className="flex justify-between gap-3">
-                      <span className="text-muted-foreground">Array Capacity:</span>
-                      <span className="font-semibold text-foreground">{totalCapacity.toFixed(0)} kWp</span>
-                    </div>
-                  )}
-                </div>
-              }
-              className="h-full flex-1"
-            >
-              <Card className="border-border/60 bg-card/80 shadow-xs hover:border-amber-500/40 transition-all p-3.5 sm:p-4 cursor-help h-full flex flex-col justify-between">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono truncate">
-                    {isFleetView ? 'Total PV Generation' : 'PV Generation'}
-                  </span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {isDataPlacementLoading && (
-                      <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-amber-500 animate-pulse bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                        <RefreshCw size={8} className="animate-spin" />
-                        Syncing
-                      </span>
-                    )}
-                    <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                      <Sun className="h-3.5 w-3.5" />
-                    </div>
-                  </div>
-                </div>
-                {isDataPlacementLoading ? (
-                  <div className="py-1">
-                    <Skeleton className="h-7 w-24 bg-amber-500/20" />
-                  </div>
-                ) : (
-                  <div className="text-xl sm:text-2xl font-black tracking-tight text-amber-500 font-mono mt-1">
-                    {solarKw.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">kW</span>
-                  </div>
-                )}
-              </Card>
-            </HoverInfo>
-
-            {/* Battery Storage */}
-            <HoverInfo
-              title={isFleetView ? 'Fleet Battery ESS' : 'Battery Storage'}
-              content={
-                <div className="space-y-1 text-[11px] font-mono">
-                  <div className="flex justify-between gap-3">
-                    <span className="text-muted-foreground">Power Flow:</span>
-                    <span className="font-semibold text-cyan-400">
-                      {batterySoc > 0 || Math.abs(batteryKw) > 0.05
-                        ? `${batteryKw >= 0 ? '+' : ''}${batteryKw.toFixed(1)} kW`
-                        : 'Standby (0.0 kW)'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-muted-foreground">Status:</span>
-                    <span className="font-semibold text-foreground">
-                      {batterySoc > 0 ? `${batterySoc.toFixed(1)}% SOC Active` : 'No Battery Connected'}
-                    </span>
-                  </div>
-                </div>
-              }
-              className="h-full flex-1"
-            >
-              <Card className="border-border/60 bg-card/80 shadow-xs hover:border-cyan-500/40 transition-all p-3.5 sm:p-4 cursor-help h-full flex flex-col justify-between">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono truncate">
-                    {isFleetView ? 'Fleet Battery ESS' : 'Battery Storage'}
-                  </span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {isDataPlacementLoading && (
-                      <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-cyan-500 animate-pulse bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20">
-                        <RefreshCw size={8} className="animate-spin" />
-                        Syncing
-                      </span>
-                    )}
-                    <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
-                      <BatteryCharging className="h-3.5 w-3.5" />
-                    </div>
-                  </div>
-                </div>
-                {isDataPlacementLoading ? (
-                  <div className="py-1">
-                    <Skeleton className="h-7 w-24 bg-cyan-500/20" />
-                  </div>
-                ) : (
-                  <div className="text-xl sm:text-2xl font-black tracking-tight text-cyan-500 font-mono mt-1">
-                    {batterySoc > 0 ? (
-                      <>
-                        {batterySoc.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">% SOC</span>
-                      </>
-                    ) : (
-                      <span className="text-base sm:text-lg text-muted-foreground font-medium">No Battery</span>
-                    )}
-                  </div>
-                )}
-              </Card>
-            </HoverInfo>
-
-            {/* Facility Load */}
-            <HoverInfo
-              title={isFleetView ? 'Total Facility Load' : 'Facility Consumption'}
-              content={
-                <div className="text-[11px] font-mono text-muted-foreground">
-                  Current site demand: <span className="text-foreground font-bold">{loadKw.toFixed(1)} kW</span>
-                </div>
-              }
-              className="h-full flex-1"
-            >
-              <Card className="border-border/60 bg-card/80 shadow-xs hover:border-indigo-500/40 transition-all p-3.5 sm:p-4 cursor-help h-full flex flex-col justify-between">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono truncate">
-                    {isFleetView ? 'Total Facility Load' : 'Facility Consumption'}
-                  </span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {isDataPlacementLoading && (
-                      <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-indigo-500 animate-pulse bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">
-                        <RefreshCw size={8} className="animate-spin" />
-                        Syncing
-                      </span>
-                    )}
-                    <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
-                      <Building2 className="h-3.5 w-3.5" />
-                    </div>
-                  </div>
-                </div>
-                {isDataPlacementLoading ? (
-                  <div className="py-1">
-                    <Skeleton className="h-7 w-24 bg-indigo-500/20" />
-                  </div>
-                ) : (
-                  <div className="text-xl sm:text-2xl font-black tracking-tight text-foreground font-mono mt-1">
-                    {loadKw.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">kW</span>
-                  </div>
-                )}
-              </Card>
-            </HoverInfo>
-
-            {/* Grid Interconnection */}
-            <HoverInfo
-              title={isFleetView ? 'Net Grid Dispatch' : 'Grid Interconnect'}
-              content={
-                <div className="space-y-1 text-[11px] font-mono">
-                  <div className="flex justify-between gap-3">
-                    <span className="text-muted-foreground">Status:</span>
-                    <span className="font-semibold text-foreground">
-                      {gridKw > 0.05 ? 'Exporting to Grid' : gridKw < -0.05 ? 'Importing from Grid' : 'Standby / Balanced'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-muted-foreground">Net Flow:</span>
-                    <span className={`font-bold ${gridKw >= 0 ? 'text-emerald-500' : 'text-blue-400'}`}>
-                      {gridKw >= 0 ? `+${gridKw.toFixed(1)}` : gridKw.toFixed(1)} kW
-                    </span>
-                  </div>
-                </div>
-              }
-              className="h-full flex-1"
-            >
-              <Card className="border-border/60 bg-card/80 shadow-xs hover:border-emerald-500/40 transition-all p-3.5 sm:p-4 cursor-help h-full flex flex-col justify-between">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono truncate">
-                    {isFleetView ? 'Net Grid Dispatch' : 'Grid Interconnect'}
-                  </span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {isDataPlacementLoading && (
-                      <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-emerald-500 animate-pulse bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                        <RefreshCw size={8} className="animate-spin" />
-                        Syncing
-                      </span>
-                    )}
-                    <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                      <Zap className="h-4 w-4" />
-                    </div>
-                  </div>
-                </div>
-                {isDataPlacementLoading ? (
-                  <div className="py-1">
-                    <Skeleton className="h-7 w-24 bg-emerald-500/20" />
-                  </div>
-                ) : (
-                  <div className={`text-xl sm:text-2xl font-black tracking-tight font-mono mt-1 ${gridKw >= 0 ? 'text-emerald-500' : 'text-blue-400'}`}>
-                    {gridKw >= 0 ? `+${gridKw.toFixed(1)}` : gridKw.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">kW</span>
-                  </div>
-                )}
-              </Card>
-            </HoverInfo>
-
-            {/* Fleet Hardware Health */}
-            <HoverInfo
-              title={isFleetView ? 'Fleet Inverters' : 'Inverter Status'}
-              content={
-                <div className="text-[11px] font-mono text-muted-foreground">
-                  {isFleetView
-                    ? `${totalAccounts} Accounts Configured · ${nodes.length} Inverters`
-                    : `${plantGroups.length} Plant Group(s) · ${nodes.length} Inverters`}
-                </div>
-              }
-              className="col-span-2 sm:col-span-1 lg:col-span-1 h-full flex-1"
-            >
-              <Card className="border-border/60 bg-card/80 shadow-xs hover:border-primary/40 transition-all p-3.5 sm:p-4 cursor-help h-full flex flex-col justify-between">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono truncate">
-                    {isFleetView ? 'Fleet Inverters' : 'Inverter Status'}
-                  </span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {isDataPlacementLoading && (
-                      <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-primary animate-pulse bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
-                        <RefreshCw size={8} className="animate-spin" />
-                        Syncing
-                      </span>
-                    )}
-                    <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-primary/10 text-primary border border-primary/20">
-                      <Cpu className="h-4 w-4" />
-                    </div>
-                  </div>
-                </div>
-                {isDataPlacementLoading ? (
-                  <div className="py-1">
-                    <Skeleton className="h-7 w-20 bg-primary/20" />
-                  </div>
-                ) : (
-                  <div className="text-xl sm:text-2xl font-black tracking-tight text-primary font-mono mt-1">
-                    {nodes.filter((n) => n.status === 'ONLINE' || n.isLive).length}
-                    <span className="text-xs text-muted-foreground font-normal"> / {nodes.length} Online</span>
-                  </div>
-                )}
-              </Card>
-            </HoverInfo>
-          </div>
-
           {/* Real-time Synoptic Power Flow (Main Column on Desktop) */}
           <div className="lg:col-span-8 xl:col-span-9 h-full">
             <Card className="border-border/60 bg-card/80 p-5 sm:p-6 lg:p-7 shadow-sm relative overflow-hidden h-full flex flex-col justify-between">
@@ -1152,6 +912,246 @@ export default function EnergyFlowDashboard() {
                 </div>
               </div>
             </Card>
+          </div>
+
+          {/* 5 Primary Telemetry Summary Cards (Vertical Column on Right, Uniform Width) */}
+          <div className="lg:col-span-4 xl:col-span-3 flex flex-col gap-3 h-full w-full">
+            {/* PV Live Yield */}
+            <HoverInfo
+              title={isFleetView ? 'Total PV Generation' : 'PV Generation'}
+              content={
+                <div className="space-y-1 text-[11px] font-mono">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Daily Harvest:</span>
+                    <span className="font-bold text-amber-500">{dailyYield.toFixed(1)} kWh</span>
+                  </div>
+                  {totalCapacity > 0 && (
+                    <div className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">Array Capacity:</span>
+                      <span className="font-semibold text-foreground">{totalCapacity.toFixed(0)} kWp</span>
+                    </div>
+                  )}
+                </div>
+              }
+              className="w-full h-full flex-1 flex flex-col items-stretch"
+            >
+              <Card className="w-full border-border/60 bg-card/80 shadow-xs hover:border-amber-500/40 transition-all p-3.5 sm:p-4 cursor-help h-full flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono truncate">
+                    {isFleetView ? 'Total PV Generation' : 'PV Generation'}
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isDataPlacementLoading && (
+                      <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-amber-500 animate-pulse bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                        <RefreshCw size={8} className="animate-spin" />
+                        Syncing
+                      </span>
+                    )}
+                    <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                      <Sun className="h-3.5 w-3.5" />
+                    </div>
+                  </div>
+                </div>
+                {isDataPlacementLoading ? (
+                  <div className="py-1">
+                    <Skeleton className="h-7 w-24 bg-amber-500/20" />
+                  </div>
+                ) : (
+                  <div className="text-xl sm:text-2xl font-black tracking-tight text-amber-500 font-mono mt-1">
+                    {solarKw.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">kW</span>
+                  </div>
+                )}
+              </Card>
+            </HoverInfo>
+
+            {/* Battery Storage */}
+            <HoverInfo
+              title={isFleetView ? 'Fleet Battery ESS' : 'Battery Storage'}
+              content={
+                <div className="space-y-1 text-[11px] font-mono">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Power Flow:</span>
+                    <span className="font-semibold text-cyan-400">
+                      {batterySoc > 0 || Math.abs(batteryKw) > 0.05
+                        ? `${batteryKw >= 0 ? '+' : ''}${batteryKw.toFixed(1)} kW`
+                        : 'Standby (0.0 kW)'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Status:</span>
+                    <span className="font-semibold text-foreground">
+                      {batterySoc > 0 ? `${batterySoc.toFixed(1)}% SOC Active` : 'No Battery Connected'}
+                    </span>
+                  </div>
+                </div>
+              }
+              className="w-full h-full flex-1 flex flex-col items-stretch"
+            >
+              <Card className="w-full border-border/60 bg-card/80 shadow-xs hover:border-cyan-500/40 transition-all p-3.5 sm:p-4 cursor-help h-full flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono truncate">
+                    {isFleetView ? 'Fleet Battery ESS' : 'Battery Storage'}
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isDataPlacementLoading && (
+                      <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-cyan-500 animate-pulse bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20">
+                        <RefreshCw size={8} className="animate-spin" />
+                        Syncing
+                      </span>
+                    )}
+                    <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
+                      <BatteryCharging className="h-3.5 w-3.5" />
+                    </div>
+                  </div>
+                </div>
+                {isDataPlacementLoading ? (
+                  <div className="py-1">
+                    <Skeleton className="h-7 w-24 bg-cyan-500/20" />
+                  </div>
+                ) : (
+                  <div className="text-xl sm:text-2xl font-black tracking-tight text-cyan-500 font-mono mt-1">
+                    {batterySoc > 0 ? (
+                      <>
+                        {batterySoc.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">% SOC</span>
+                      </>
+                    ) : (
+                      <span className="text-base sm:text-lg text-muted-foreground font-medium">No Battery</span>
+                    )}
+                  </div>
+                )}
+              </Card>
+            </HoverInfo>
+
+            {/* Facility Load */}
+            <HoverInfo
+              title={isFleetView ? 'Total Facility Load' : 'Facility Consumption'}
+              content={
+                <div className="text-[11px] font-mono text-muted-foreground">
+                  Current site demand: <span className="text-foreground font-bold">{loadKw.toFixed(1)} kW</span>
+                </div>
+              }
+              className="w-full h-full flex-1 flex flex-col items-stretch"
+            >
+              <Card className="w-full border-border/60 bg-card/80 shadow-xs hover:border-indigo-500/40 transition-all p-3.5 sm:p-4 cursor-help h-full flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono truncate">
+                    {isFleetView ? 'Total Facility Load' : 'Facility Consumption'}
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isDataPlacementLoading && (
+                      <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-indigo-500 animate-pulse bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">
+                        <RefreshCw size={8} className="animate-spin" />
+                        Syncing
+                      </span>
+                    )}
+                    <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+                      <Building2 className="h-3.5 w-3.5" />
+                    </div>
+                  </div>
+                </div>
+                {isDataPlacementLoading ? (
+                  <div className="py-1">
+                    <Skeleton className="h-7 w-24 bg-indigo-500/20" />
+                  </div>
+                ) : (
+                  <div className="text-xl sm:text-2xl font-black tracking-tight text-foreground font-mono mt-1">
+                    {loadKw.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">kW</span>
+                  </div>
+                )}
+              </Card>
+            </HoverInfo>
+
+            {/* Grid Interconnection */}
+            <HoverInfo
+              title={isFleetView ? 'Net Grid Dispatch' : 'Grid Interconnect'}
+              content={
+                <div className="space-y-1 text-[11px] font-mono">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Status:</span>
+                    <span className="font-semibold text-foreground">
+                      {gridKw > 0.05 ? 'Exporting to Grid' : gridKw < -0.05 ? 'Importing from Grid' : 'Standby / Balanced'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Net Flow:</span>
+                    <span className={`font-bold ${gridKw >= 0 ? 'text-emerald-500' : 'text-blue-400'}`}>
+                      {gridKw >= 0 ? `+${gridKw.toFixed(1)}` : gridKw.toFixed(1)} kW
+                    </span>
+                  </div>
+                </div>
+              }
+              className="w-full h-full flex-1 flex flex-col items-stretch"
+            >
+              <Card className="w-full border-border/60 bg-card/80 shadow-xs hover:border-emerald-500/40 transition-all p-3.5 sm:p-4 cursor-help h-full flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono truncate">
+                    {isFleetView ? 'Net Grid Dispatch' : 'Grid Interconnect'}
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isDataPlacementLoading && (
+                      <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-emerald-500 animate-pulse bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                        <RefreshCw size={8} className="animate-spin" />
+                        Syncing
+                      </span>
+                    )}
+                    <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                      <Zap className="h-4 w-4" />
+                    </div>
+                  </div>
+                </div>
+                {isDataPlacementLoading ? (
+                  <div className="py-1">
+                    <Skeleton className="h-7 w-24 bg-emerald-500/20" />
+                  </div>
+                ) : (
+                  <div className={`text-xl sm:text-2xl font-black tracking-tight font-mono mt-1 ${gridKw >= 0 ? 'text-emerald-500' : 'text-blue-400'}`}>
+                    {gridKw >= 0 ? `+${gridKw.toFixed(1)}` : gridKw.toFixed(1)} <span className="text-xs text-muted-foreground font-normal">kW</span>
+                  </div>
+                )}
+              </Card>
+            </HoverInfo>
+
+            {/* Fleet Hardware Health */}
+            <HoverInfo
+              title={isFleetView ? 'Fleet Inverters' : 'Inverter Status'}
+              content={
+                <div className="text-[11px] font-mono text-muted-foreground">
+                  {isFleetView
+                    ? `${totalAccounts} Accounts Configured · ${nodes.length} Inverters`
+                    : `${plantGroups.length} Plant Group(s) · ${nodes.length} Inverters`}
+                </div>
+              }
+              className="w-full h-full flex-1 flex flex-col items-stretch"
+            >
+              <Card className="w-full border-border/60 bg-card/80 shadow-xs hover:border-primary/40 transition-all p-3.5 sm:p-4 cursor-help h-full flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono truncate">
+                    {isFleetView ? 'Fleet Inverters' : 'Inverter Status'}
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isDataPlacementLoading && (
+                      <span className="flex items-center gap-1 text-[9px] font-mono font-bold text-primary animate-pulse bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
+                        <RefreshCw size={8} className="animate-spin" />
+                        Syncing
+                      </span>
+                    )}
+                    <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-primary/10 text-primary border border-primary/20">
+                      <Cpu className="h-4 w-4" />
+                    </div>
+                  </div>
+                </div>
+                {isDataPlacementLoading ? (
+                  <div className="py-1">
+                    <Skeleton className="h-7 w-20 bg-primary/20" />
+                  </div>
+                ) : (
+                  <div className="text-xl sm:text-2xl font-black tracking-tight text-primary font-mono mt-1">
+                    {nodes.filter((n) => n.status === 'ONLINE' || n.isLive).length}
+                    <span className="text-xs text-muted-foreground font-normal"> / {nodes.length} Online</span>
+                  </div>
+                )}
+              </Card>
+            </HoverInfo>
           </div>
         </div>
 
