@@ -202,144 +202,12 @@ export function PowerFlowChart({
         </HoverInfo>
       </div>
 
-      {/* Unified Interactive Legend & View Filter Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 p-1 bg-muted/40 rounded-xl border border-border/60 w-fit flex-wrap">
-          <HoverInfo title="Combined Overlay" content="Simultaneous overlay of PV generation, facility load demand, net utility grid exchange, and battery ESS flow.">
-            <button
-              type="button"
-              onClick={() => onSubViewChange('combined')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                powerSubView === 'combined'
-                  ? 'bg-background text-foreground shadow-xs border border-border/70'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-              }`}
-            >
-              <Layers size={13} className={powerSubView === 'combined' ? 'text-primary' : 'text-muted-foreground'} />
-              <span>Combined</span>
-            </button>
-          </HoverInfo>
-
-          <HoverInfo
-            title="Solar PV Generation"
-            content={
-              <div className="space-y-1 text-[11px] min-w-[200px]">
-                <p className="text-muted-foreground">{TELEMETRY_DESCRIPTIONS.trigonometricGraph.pvPowerSolo}</p>
-                <div className="pt-1 border-t border-border/50 text-yellow-500 font-mono text-[10.5px]">
-                  Peak Recorded: {peakPv.toFixed(1)} kW
-                </div>
-              </div>
-            }
-          >
-            <button
-              type="button"
-              onClick={() => onSubViewChange(powerSubView === 'pv' ? 'combined' : 'pv')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                powerSubView === 'pv'
-                  ? 'bg-yellow-500/15 text-yellow-500 border border-yellow-500/40 shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-yellow-500/5'
-              }`}
-            >
-              <span className={`size-2 rounded-full bg-yellow-500 ${powerSubView === 'pv' ? 'ring-2 ring-yellow-500/40' : ''}`} />
-              <span>Solar Yield (kW)</span>
-            </button>
-          </HoverInfo>
-
-          <HoverInfo
-            title="Facility Load Demand"
-            content={
-              <div className="space-y-1 text-[11px] min-w-[200px]">
-                <p className="text-muted-foreground">{TELEMETRY_DESCRIPTIONS.trigonometricGraph.consumptionSolo}</p>
-                <div className="pt-1 border-t border-border/50 text-purple-400 font-mono text-[10.5px]">
-                  Peak Demand: {peakLoad.toFixed(1)} kW
-                </div>
-              </div>
-            }
-          >
-            <button
-              type="button"
-              onClick={() => onSubViewChange(powerSubView === 'consumption' ? 'combined' : 'consumption')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                powerSubView === 'consumption'
-                  ? 'bg-purple-500/15 text-purple-400 border border-purple-500/40 shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-purple-500/5'
-              }`}
-            >
-              <span className={`size-2 rounded-full bg-purple-500 ${powerSubView === 'consumption' ? 'ring-2 ring-purple-500/40' : ''}`} />
-              <span>Facility Load (kW)</span>
-            </button>
-          </HoverInfo>
-
-          <HoverInfo
-            title="Net Utility Grid Flow"
-            content={
-              <div className="space-y-1.5 text-[11px] min-w-[220px]">
-                <p className="text-muted-foreground">
-                  Isolate utility grid exchange balance. Click to view grid solo or return to combined view.
-                </p>
-                <div className="pt-1.5 border-t border-border/50 text-[10.5px] space-y-1 font-mono">
-                  <div className="flex items-center gap-1.5 text-emerald-400">
-                    <span className="font-bold">Positive (+)</span>: Clean Solar Export
-                  </div>
-                  <div className="flex items-center gap-1.5 text-rose-400">
-                    <span className="font-bold">Negative (−)</span>: Utility Grid Import
-                  </div>
-                </div>
-              </div>
-            }
-          >
-            <button
-              type="button"
-              onClick={() => onSubViewChange(powerSubView === 'grid' ? 'combined' : 'grid')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                powerSubView === 'grid'
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/40 shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-emerald-500/5'
-              }`}
-            >
-              <span className={`size-2 rounded-full bg-emerald-500 ${powerSubView === 'grid' ? 'ring-2 ring-emerald-500/40' : ''}`} />
-              <span>Net Grid Flow (kW)</span>
-            </button>
-          </HoverInfo>
-
-          <HoverInfo
-            title="Battery ESS Flow"
-            content={
-              <div className="space-y-1.5 text-[11px] min-w-[220px]">
-                <p className="text-muted-foreground">
-                  Isolate active battery charge and discharge telemetry. Click to view battery solo or return to combined view.
-                </p>
-                <div className="pt-1.5 border-t border-border/50 text-[10.5px] space-y-1 font-mono">
-                  <div className="flex items-center gap-1.5 text-cyan-400">
-                    <span className="font-bold">Positive (+)</span>: Charging ESS
-                  </div>
-                  <div className="flex items-center gap-1.5 text-amber-400">
-                    <span className="font-bold">Negative (−)</span>: Discharging to Load
-                  </div>
-                </div>
-              </div>
-            }
-          >
-            <button
-              type="button"
-              onClick={() => onSubViewChange(powerSubView === 'battery' ? 'combined' : 'battery')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                powerSubView === 'battery'
-                  ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/40 shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-cyan-500/5'
-              }`}
-            >
-              <span className={`size-2 rounded-full bg-cyan-500 ${powerSubView === 'battery' ? 'ring-2 ring-cyan-500/40' : ''}`} />
-              <span>Battery Flow (kW)</span>
-            </button>
-          </HoverInfo>
-        </div>
-      </div>
-
-      {/* Combined View */}
-      {powerSubView === 'combined' && (
-        <div className="space-y-3">
-          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
+      {/* Chart Canvas with Vertical Options Beside the Graph */}
+      <div className="flex flex-col md:flex-row items-stretch gap-3">
+        {/* Main Chart Canvas */}
+        <div className={compact ? 'h-[260px] flex-1 min-w-0' : 'h-[340px] flex-1 min-w-0'}>
+          {/* Combined View */}
+          {powerSubView === 'combined' && (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
@@ -433,14 +301,10 @@ export function PowerFlowChart({
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Individual PV Power */}
-      {powerSubView === 'pv' && (
-        <div className="space-y-3">
-          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
+          {/* Individual PV Power */}
+          {powerSubView === 'pv' && (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
@@ -475,14 +339,10 @@ export function PowerFlowChart({
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Individual Consumption */}
-      {powerSubView === 'consumption' && (
-        <div className="space-y-2.5">
-          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
+          {/* Individual Consumption */}
+          {powerSubView === 'consumption' && (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
@@ -517,14 +377,10 @@ export function PowerFlowChart({
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Individual Grid Power */}
-      {powerSubView === 'grid' && (
-        <div className="space-y-2.5">
-          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
+          {/* Individual Grid Power */}
+          {powerSubView === 'grid' && (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
@@ -560,14 +416,10 @@ export function PowerFlowChart({
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Individual Battery ESS Power */}
-      {powerSubView === 'battery' && (
-        <div className="space-y-2.5">
-          <div className={compact ? 'h-[260px] w-full' : 'h-[340px] w-full'}>
+          {/* Individual Battery ESS Power */}
+          {powerSubView === 'battery' && (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
@@ -603,9 +455,155 @@ export function PowerFlowChart({
                 />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
+          )}
         </div>
-      )}
+
+        {/* Vertical Options Rail Beside the Graph */}
+        <div className="flex flex-row md:flex-col items-stretch justify-center gap-1.5 p-1.5 bg-muted/40 rounded-xl border border-border/60 shrink-0 md:w-44 overflow-x-auto md:overflow-x-visible">
+          <HoverInfo title="Combined Overlay" content="Simultaneous overlay of PV generation, facility load demand, net utility grid exchange, and battery ESS flow.">
+            <button
+              type="button"
+              onClick={() => onSubViewChange('combined')}
+              className={`w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                powerSubView === 'combined'
+                  ? 'bg-background text-foreground shadow-xs border border-border/70'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50 border border-transparent'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Layers size={14} className={powerSubView === 'combined' ? 'text-primary' : 'text-muted-foreground'} />
+                <span>Combined</span>
+              </div>
+            </button>
+          </HoverInfo>
+
+          <HoverInfo
+            title="Solar PV Generation"
+            content={
+              <div className="space-y-1 text-[11px] min-w-[200px]">
+                <p className="text-muted-foreground">{TELEMETRY_DESCRIPTIONS.trigonometricGraph.pvPowerSolo}</p>
+                <div className="pt-1 border-t border-border/50 text-yellow-500 font-mono text-[10.5px]">
+                  Peak Recorded: {peakPv.toFixed(1)} kW
+                </div>
+              </div>
+            }
+          >
+            <button
+              type="button"
+              onClick={() => onSubViewChange(powerSubView === 'pv' ? 'combined' : 'pv')}
+              className={`w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                powerSubView === 'pv'
+                  ? 'bg-yellow-500/15 text-yellow-500 border border-yellow-500/40 shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-yellow-500/5 border border-transparent'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className={`size-2 rounded-full bg-yellow-500 ${powerSubView === 'pv' ? 'ring-2 ring-yellow-500/40' : ''}`} />
+                <span>Solar Yield</span>
+              </div>
+              <span className="text-[10px] font-mono text-muted-foreground">kW</span>
+            </button>
+          </HoverInfo>
+
+          <HoverInfo
+            title="Facility Load Demand"
+            content={
+              <div className="space-y-1 text-[11px] min-w-[200px]">
+                <p className="text-muted-foreground">{TELEMETRY_DESCRIPTIONS.trigonometricGraph.consumptionSolo}</p>
+                <div className="pt-1 border-t border-border/50 text-purple-400 font-mono text-[10.5px]">
+                  Peak Demand: {peakLoad.toFixed(1)} kW
+                </div>
+              </div>
+            }
+          >
+            <button
+              type="button"
+              onClick={() => onSubViewChange(powerSubView === 'consumption' ? 'combined' : 'consumption')}
+              className={`w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                powerSubView === 'consumption'
+                  ? 'bg-purple-500/15 text-purple-400 border border-purple-500/40 shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-purple-500/5 border border-transparent'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className={`size-2 rounded-full bg-purple-500 ${powerSubView === 'consumption' ? 'ring-2 ring-purple-500/40' : ''}`} />
+                <span>Facility Load</span>
+              </div>
+              <span className="text-[10px] font-mono text-muted-foreground">kW</span>
+            </button>
+          </HoverInfo>
+
+          <HoverInfo
+            title="Net Utility Grid Flow"
+            content={
+              <div className="space-y-1.5 text-[11px] min-w-[220px]">
+                <p className="text-muted-foreground">
+                  Isolate utility grid exchange balance. Click to view grid solo or return to combined view.
+                </p>
+                <div className="pt-1.5 border-t border-border/50 text-[10.5px] space-y-1 font-mono">
+                  <div className="flex items-center gap-1.5 text-emerald-400">
+                    <span className="font-bold">Positive (+)</span>: Clean Solar Export
+                  </div>
+                  <div className="flex items-center gap-1.5 text-rose-400">
+                    <span className="font-bold">Negative (−)</span>: Utility Grid Import
+                  </div>
+                </div>
+              </div>
+            }
+          >
+            <button
+              type="button"
+              onClick={() => onSubViewChange(powerSubView === 'grid' ? 'combined' : 'grid')}
+              className={`w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                powerSubView === 'grid'
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/40 shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-emerald-500/5 border border-transparent'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className={`size-2 rounded-full bg-emerald-500 ${powerSubView === 'grid' ? 'ring-2 ring-emerald-500/40' : ''}`} />
+                <span>Net Grid Flow</span>
+              </div>
+              <span className="text-[10px] font-mono text-muted-foreground">kW</span>
+            </button>
+          </HoverInfo>
+
+          <HoverInfo
+            title="Battery ESS Flow"
+            content={
+              <div className="space-y-1.5 text-[11px] min-w-[220px]">
+                <p className="text-muted-foreground">
+                  Isolate active battery charge and discharge telemetry. Click to view battery solo or return to combined view.
+                </p>
+                <div className="pt-1.5 border-t border-border/50 text-[10.5px] space-y-1 font-mono">
+                  <div className="flex items-center gap-1.5 text-cyan-400">
+                    <span className="font-bold">Positive (+)</span>: Charging ESS
+                  </div>
+                  <div className="flex items-center gap-1.5 text-amber-400">
+                    <span className="font-bold">Negative (−)</span>: Discharging to Load
+                  </div>
+                </div>
+              </div>
+            }
+          >
+            <button
+              type="button"
+              onClick={() => onSubViewChange(powerSubView === 'battery' ? 'combined' : 'battery')}
+              className={`w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                powerSubView === 'battery'
+                  ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/40 shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-cyan-500/5 border border-transparent'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className={`size-2 rounded-full bg-cyan-500 ${powerSubView === 'battery' ? 'ring-2 ring-cyan-500/40' : ''}`} />
+                <span>Battery Flow</span>
+              </div>
+              <span className="text-[10px] font-mono text-muted-foreground">kW</span>
+            </button>
+          </HoverInfo>
+        </div>
+      </div>
     </div>
   );
 }

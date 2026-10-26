@@ -116,19 +116,57 @@ export function GraphHeaderControls({
                 <span>Diurnal Fit</span>
               </TabsTrigger>
             </HoverInfo>
-            <HoverInfo title="Fourier Decomposition" content="Discrete Fourier decomposition of 24-hour diurnal cycle across fundamental and harmonic frequencies.">
+            <HoverInfo
+              title="Discrete Fourier Decomposition of 24-Hour Diurnal Cycle"
+              content={
+                <div className="space-y-1.5 text-[11px] min-w-[220px]">
+                  <p className="text-muted-foreground">{TELEMETRY_DESCRIPTIONS.trigonometricGraph.fourierDecomposition}</p>
+                  <div className="pt-1.5 border-t border-border/50 flex items-center justify-between font-mono text-[10.5px]">
+                    <span className="text-muted-foreground">Harmonics:</span>
+                    <span className="text-cyan-400 font-semibold">k = 1, 2, 3</span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground font-mono">
+                    {TELEMETRY_DESCRIPTIONS.trigonometricGraph.fourierHarmonicPhases}
+                  </div>
+                </div>
+              }
+            >
               <TabsTrigger value="fourier" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
                 <Waves className="h-3.5 w-3.5 text-cyan-500" />
                 <span>Fourier</span>
               </TabsTrigger>
             </HoverInfo>
-            <HoverInfo title="Polar Radar Phasor" content="360-degree circular phasor radar mapping 24-hour solar harvest lobes against industrial load demand.">
+            <HoverInfo
+              title="360-Degree Circular Phasor: Solar Lobe vs Load Profile"
+              content={
+                <div className="space-y-1.5 text-[11px] min-w-[220px]">
+                  <p className="text-muted-foreground">{TELEMETRY_DESCRIPTIONS.trigonometricGraph.polarPhasor}</p>
+                  <div className="pt-1.5 border-t border-border/50 flex items-center justify-between font-mono text-[10.5px]">
+                    <span className="text-muted-foreground">Coordinates:</span>
+                    <span className="text-indigo-400 font-semibold">Polar Coordinates (r, θ)</span>
+                  </div>
+                </div>
+              }
+            >
               <TabsTrigger value="polar" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
                 <Compass className="h-3.5 w-3.5 text-indigo-500" />
                 <span>Polar Radar</span>
               </TabsTrigger>
             </HoverInfo>
-            <HoverInfo title="3-Phase AC Waveforms" content="Real-time 60Hz instantaneous 3-phase AC voltage & current sinusoidal waveforms with power factor metrics.">
+            <HoverInfo
+              title="Three-Phase AC Instantaneous Waveforms & Harmonic Phasors"
+              content={
+                <div className="space-y-1.5 text-[11px] min-w-[220px]">
+                  <p className="text-muted-foreground">
+                    Real-time 60Hz instantaneous sinusoidal waveforms across Phase A (0°), Phase B (-120°), Phase C (+120°), and Phase A Current with power factor phase shift φ.
+                  </p>
+                  <div className="pt-1.5 border-t border-border/50 flex items-center justify-between font-mono text-[10.5px]">
+                    <span className="text-muted-foreground">Grid State:</span>
+                    <span className="text-emerald-400 font-semibold">60.00 Hz • Balanced</span>
+                  </div>
+                </div>
+              }
+            >
               <TabsTrigger value="waveform" className="text-xs gap-1 px-2.5 py-1 font-medium cursor-help">
                 <Activity className="h-3.5 w-3.5 text-emerald-500" />
                 <span>3-Phase AC</span>
