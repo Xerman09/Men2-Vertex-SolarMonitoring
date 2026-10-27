@@ -135,7 +135,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const accounts = useMemo(() => {
     let list = rawAccounts;
     if (!isAdmin) {
-      list = list.filter((acc) => !acc.isDemo && acc.id !== 'men2-facility-2' && acc.id !== 'men2-facility-3');
+      list = list.filter((acc) => !acc.isDemo);
     }
 
     if (isConsumer && user) {

@@ -79,7 +79,7 @@ export const GET = withGate(
       // Demo accounts are restricted exclusively to the admin account
       const authorizedAccounts = session.role === 'admin'
         ? accounts
-        : accounts.filter((a) => !a.isDemo && a.id !== 'men2-facility-2' && a.id !== 'men2-facility-3');
+        : accounts.filter((a) => !a.isDemo);
 
       return NextResponse.json({
         total: authorizedAccounts.length,

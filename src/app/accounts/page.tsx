@@ -284,7 +284,7 @@ export default function AccountsManagementPage() {
                           Auto-Discovered
                         </Badge>
                       )}
-                      {(account.isDemo || account.id === 'men2-facility-2' || account.id === 'men2-facility-3') && (
+                      {account.isDemo && (
                         <Badge variant="warning" className="text-[10px] font-mono">
                           DEMO ACCOUNT
                         </Badge>

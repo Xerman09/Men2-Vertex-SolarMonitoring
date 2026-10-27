@@ -128,6 +128,7 @@ export function getSnLiveOverlay(raw: Map<string, string>): SnLiveOverlay {
 export class DeyeCloudClient {
   public readonly accountId: string;
   public readonly accountName: string;
+  public readonly isDemo: boolean;
   private baseUrl: string;
   private appId: string;
   private appSecret: string;
@@ -147,6 +148,7 @@ export class DeyeCloudClient {
   constructor(config?: Partial<DeyeAccountConfig>) {
     this.accountId = config?.id || 'default-site';
     this.accountName = config?.name || 'Primary Facility';
+    this.isDemo = Boolean(config?.isDemo);
     this.directusId = config?.directusId !== undefined ? String(config.directusId) : undefined;
     this.accountEmail = config?.email;
     this.baseUrl = sanitizeDeyeBaseUrl(config?.baseUrl || env.DEYE_BASE_URL);
@@ -191,6 +193,7 @@ export class DeyeCloudClient {
    * Avoids attempting token acquisition for internal admin accounts or dummy '0' placeholders.
    */
   public hasCredentials(): boolean {
+    if (this.isDemo) return false;
     const hasValidAppId = Boolean(this.appId && this.appId !== '0' && this.appId.length > 3);
     const hasValidSecret = Boolean(this.appSecret && this.appSecret !== '0' && this.appSecret.length > 5);
     const hasValidEmail = Boolean(this.email && this.email !== '0');
@@ -469,7 +472,7 @@ export class DeyeCloudClient {
       lastUpdated: new Date().toISOString(),
     };
 
-    if (!id) {
+    if (!id || !this.hasCredentials()) {
       return { data: emptySummary, isLive: false, stationDetected: false };
     }
 

@@ -36,7 +36,7 @@ export class FleetAggregator {
     allRawAccounts: DeyeAccountConfig[],
     accountIds?: string[]
   ): Promise<AggregatedFleetSummary> {
-    let clients = allClients.filter((c) => c.hasCredentials());
+    let clients = allClients;
     if (accountIds && accountIds.length > 0) {
       const allowedSet = new Set(accountIds);
       clients = clients.filter((c) => allowedSet.has(c.accountId));
@@ -214,6 +214,7 @@ export class FleetAggregator {
           email: accConfig?.email,
           enabled: accConfig?.enabled,
           admin: accConfig?.admin,
+          isDemo: Boolean(accConfig?.isDemo),
           isLive: item.isLive,
           stationCount: plants.length,
           deviceCount: invCount + logCount,
@@ -239,6 +240,7 @@ export class FleetAggregator {
           email: accConfig?.email,
           enabled: accConfig?.enabled,
           admin: accConfig?.admin,
+          isDemo: Boolean(accConfig?.isDemo),
           isLive: false,
           stationCount: plants.length,
           deviceCount: 0,

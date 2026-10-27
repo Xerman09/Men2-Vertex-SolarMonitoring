@@ -901,7 +901,7 @@ class DeyeAccountManager {
         email: acc.email,
         enabled: acc.enabled !== false,
         admin: acc.admin,
-        isDemo: Boolean(acc.isDemo ?? (acc.id === 'men2-facility-2' || acc.id === 'men2-facility-3')),
+        isDemo: Boolean(acc.isDemo),
         isLive,
         stationCount: plants.length,
         deviceCount: inverterCount + loggerCount,
@@ -952,7 +952,7 @@ class DeyeAccountManager {
     // Demo accounts only accessible by admin account
     let effectiveRaw = rawAccounts;
     if (sessionRole && sessionRole !== 'admin') {
-      effectiveRaw = rawAccounts.filter((a) => !a.isDemo && a.id !== 'men2-facility-2' && a.id !== 'men2-facility-3');
+      effectiveRaw = rawAccounts.filter((a) => !a.isDemo);
     }
     const result = await this.fleetAggregator.aggregateFleet(clients, effectiveRaw, accountIds);
     this.cachedFleetSummary.set(cacheKey, { data: result, timestamp: Date.now() });

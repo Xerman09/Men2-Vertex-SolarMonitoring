@@ -196,9 +196,7 @@ export default function FleetMonitoringPage() {
   const authorizedAccounts = useMemo(() => {
     if (!fleetData?.accounts) return [];
     if (isAdmin) return fleetData.accounts;
-    return fleetData.accounts.filter(
-      (a) => !a.isDemo && a.id !== 'men2-facility-2' && a.id !== 'men2-facility-3'
-    );
+    return fleetData.accounts.filter((a) => !a.isDemo);
   }, [fleetData, isAdmin]);
 
   // Structure accounts with nested plants and individual inverters
@@ -206,7 +204,7 @@ export default function FleetMonitoringPage() {
     if (!fleetData) return [];
 
     return authorizedAccounts.map((acc) => {
-      const isAccDemo = Boolean(acc.isDemo || acc.id === 'men2-facility-2' || acc.id === 'men2-facility-3');
+      const isAccDemo = Boolean(acc.isDemo);
 
       const plants = (acc.plants || []).map((plant) => {
         const plantKey = `${acc.id}:${plant.stationId}`;
@@ -1099,7 +1097,7 @@ export default function FleetMonitoringPage() {
                             historyPoints={telemetryHistory ?? undefined}
                             height={135}
                             className="w-full"
-                            showLabels={false}
+                            showLabels={true}
                           />
                         </div>
                       </div>

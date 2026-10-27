@@ -13,29 +13,26 @@ describe('Fleet Monitoring & Multi-Account Aggregation Suite', () => {
     const data = JSON.parse(fs.readFileSync(accountsPath, 'utf8'));
     expect(data.accounts).toBeDefined();
     expect(Array.isArray(data.accounts)).toBe(true);
-    expect(data.accounts.length).toBeGreaterThanOrEqual(3);
+    expect(data.accounts.length).toBeGreaterThanOrEqual(1);
 
-    // Verify the copied accounts exist
+    // Verify only authentic accounts exist and no dummy/demo accounts are present
     const acc1 = data.accounts.find((a: DeyeAccountConfig) => a.id === 'men2-facility-1');
-    const acc2 = data.accounts.find((a: DeyeAccountConfig) => a.id === 'men2-facility-2');
-    const acc3 = data.accounts.find((a: DeyeAccountConfig) => a.id === 'men2-facility-3');
-
     expect(acc1).toBeDefined();
-    expect(acc2).toBeDefined();
-    expect(acc3).toBeDefined();
-
     expect(acc1.name).toContain('Hanvin Solar');
-    expect(acc2.name).toContain('Commercial Fleet');
-    expect(acc3.name).toContain('Regional Microgrid');
 
-    // Check total plants across all accounts
+    const demoAccounts = data.accounts.filter(
+      (a: DeyeAccountConfig) => a.isDemo || a.id === 'men2-facility-2' || a.id === 'men2-facility-3'
+    );
+    expect(demoAccounts.length).toBe(0);
+
+    // Check total plants across configured accounts
     const totalPlants = data.accounts.reduce(
       (sum: number, a: DeyeAccountConfig) => sum + (a.plants?.length || 0),
       0
     );
-    expect(totalPlants).toBeGreaterThanOrEqual(9);
+    expect(totalPlants).toBeGreaterThanOrEqual(3);
 
-    // Check inverters across all accounts
+    // Check inverters across configured accounts
     const totalInverters = data.accounts.reduce(
       (sum: number, a: DeyeAccountConfig) =>
         sum +
@@ -45,7 +42,7 @@ describe('Fleet Monitoring & Multi-Account Aggregation Suite', () => {
         ) || 0),
       0
     );
-    expect(totalInverters).toBeGreaterThanOrEqual(23);
+    expect(totalInverters).toBeGreaterThanOrEqual(5);
   });
 
   it('aggregates multi-account fleet data into unified matrix nodes', async () => {
@@ -210,12 +207,12 @@ describe('Fleet Monitoring & Multi-Account Aggregation Suite', () => {
     );
     expect(demoInViewer.length).toBe(0);
 
-    // As admin session role
+    // As admin session role: no demo accounts exist in authentic data
     const adminAccounts = await accountManager.getAccountsSummary(false, 'admin');
     const demoInAdmin = adminAccounts.filter(
       (a) => a.isDemo || a.id === 'men2-facility-2' || a.id === 'men2-facility-3'
     );
-    expect(demoInAdmin.length).toBeGreaterThanOrEqual(2);
+    expect(demoInAdmin.length).toBe(0);
   });
 
   describe('3-Column Plant & Inverter Row Realignment Algorithm', () => {

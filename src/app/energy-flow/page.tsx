@@ -830,7 +830,7 @@ export default function EnergyFlowDashboard() {
                             {isFleetView ? 'Active Sites' : 'Daily Yield'}
                           </span>
                           <span className="font-mono text-sm text-foreground font-bold">
-                            {isFleetView ? `${liveAccountsCount} / ${totalAccounts} Sites` : `${dailyYield.toFixed(1)} kWh`}
+                            {isFleetView ? `${liveAccountsCount} / ${totalAccounts}` : `${dailyYield.toFixed(1)} kWh`}
                           </span>
                         </div>
                       </div>

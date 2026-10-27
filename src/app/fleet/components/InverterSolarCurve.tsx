@@ -175,6 +175,58 @@ export function InverterSolarCurve({
 
   return (
     <div className={`relative w-full select-none ${className}`}>
+      {/* Telemetry Header Above Graph: Never covers the curve */}
+      <div className="flex items-center justify-between text-[7.5px] sm:text-[8px] font-mono text-muted-foreground mb-1 px-0.5 shrink-0 min-h-[16px] leading-tight">
+        {hoveredPoint ? (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="flex items-center gap-1 font-bold text-foreground bg-primary/10 text-primary px-1 py-0.2 rounded text-[7.5px]">
+              <Clock className="size-2 text-primary" />
+              {String(hoveredPoint.hour).padStart(2, '0')}:00
+            </span>
+            <div className="flex items-center gap-1">
+              <span className="size-1.5 rounded-full inline-block shrink-0 bg-[#f59e0b]" />
+              <span className="text-muted-foreground/80">PV:</span>
+              <span className="font-bold text-amber-500">{hoveredPoint.power.toFixed(2)} kW</span>
+            </div>
+            {dailyYieldKwh > 0 && (
+              <span className="text-muted-foreground/70">
+                (Yield: <strong className="text-foreground/90 font-semibold">{dailyYieldKwh.toFixed(1)} kWh</strong>)
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1">
+              <span className="size-1.5 rounded-full inline-block shrink-0 bg-amber-500 animate-pulse" />
+              <span className="text-muted-foreground/80">Live:</span>
+              <span className="font-bold text-amber-500">{liveSolarPowerKw.toFixed(1)} kW</span>
+              {dailyYieldKwh > 0 && (
+                <span className="text-amber-500/80 font-normal text-[7px]">
+                  ({dailyYieldKwh.toFixed(1)} kWh)
+                </span>
+              )}
+            </div>
+            {ratedKw > 0 && (
+              <div className="flex items-center gap-1 text-muted-foreground/70">
+                <span>Cap:</span>
+                <span className="font-semibold text-foreground/80">{ratedKw} kW</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {hoveredPoint ? (
+          <span className="text-[7px] px-1 py-0.2 rounded bg-emerald-500/15 text-emerald-500 font-semibold flex items-center gap-1 ml-auto">
+            <span className="size-1 rounded-full bg-emerald-500 inline-block motion-safe:animate-pulse" />
+            5-Min Telemetry
+          </span>
+        ) : (
+          <span className="text-[7px] text-muted-foreground/60 font-mono ml-auto">
+            Diurnal PV
+          </span>
+        )}
+      </div>
+
       <div
         className="relative w-full overflow-visible rounded-md bg-card/70 border border-border/40 p-1 flex items-stretch gap-1"
         style={{ height: `${height}px`, minHeight: `${height}px` }}
@@ -383,54 +435,7 @@ export function InverterSolarCurve({
           </div>
         </HoverInfo>
 
-        {/* Hover Tooltip Overlay: exact timestamp and power */}
-        {hoveredPoint && (
-          <div
-            className="absolute pointer-events-none z-50 rounded-xl border border-border/80 bg-background/95 p-2 text-xs shadow-xl backdrop-blur-md min-w-[190px] font-mono transition-all duration-75"
-            style={{
-              top: '2px',
-              left: hoveredPoint.x > width * 0.5 ? '4px' : undefined,
-              right: hoveredPoint.x <= width * 0.5 ? '4px' : undefined,
-            }}
-          >
-            <div className="flex items-center justify-between border-b border-border/50 pb-1 font-mono text-[10px]">
-              <div className="flex items-center gap-1.5">
-                <Clock className="h-3 w-3 text-muted-foreground" />
-                <span className="font-bold text-foreground">
-                  {String(hoveredPoint.hour).padStart(2, '0')}:00
-                </span>
-              </div>
-              <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 font-semibold flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block motion-safe:animate-pulse" />
-                5-Min Telemetry
-              </span>
-            </div>
-            <div className="pt-1.5 space-y-1 font-mono text-[10px]">
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <span className="h-2 w-2 rounded-full inline-block shrink-0 bg-[#f59e0b]" />
-                  Inverter PV Power:
-                </span>
-                <span className="font-bold text-foreground">
-                  {hoveredPoint.power.toFixed(2)}
-                  <span className="text-[9px] font-normal text-muted-foreground ml-1">kW</span>
-                </span>
-              </div>
-              {dailyYieldKwh > 0 && (
-                <div className="flex items-center justify-between gap-2 pt-0.5 border-t border-border/30 text-muted-foreground">
-                  <span>Daily Yield:</span>
-                  <span className="font-semibold text-foreground">{dailyYieldKwh.toFixed(1)} kWh</span>
-                </div>
-              )}
-              {ratedKw > 0 && (
-                <div className="flex items-center justify-between gap-2 text-muted-foreground">
-                  <span>Rated Cap:</span>
-                  <span className="font-semibold text-foreground">{ratedKw} kW</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+
       </div>
     </div>
   );

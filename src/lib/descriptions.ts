@@ -63,8 +63,6 @@ export const TELEMETRY_DESCRIPTIONS = {
       'Instantaneous active load consumption demanded by industrial machinery, cooling, and facility infrastructure.',
     gridNode:
       'Two-way utility grid interconnect. Exports surplus solar energy when generation exceeds load; imports power during shortfall.',
-    viewModeToggle:
-      'Switch between the Standard Horizontal Energy Flow layout and the Compact Vertical Flow view.',
     liveIndicator:
       'Real-time WebSocket / polling status indicator confirming sub-minute synchronization with DeyeCloud API.',
     fleetMatrix:
