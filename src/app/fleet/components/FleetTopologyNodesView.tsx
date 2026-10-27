@@ -746,27 +746,27 @@ export function FleetTopologyNodesView({
                         </div>
                         <h3 className="font-bold text-xs text-slate-100 truncate">{acc.account.name}</h3>
                       </div>
-                      <Badge variant="outline" className="text-[10px] font-mono py-0 text-slate-400 border-slate-700 shrink-0">
+                      <Badge variant="outline" className="text-xs font-mono py-0.5 px-2 text-slate-400 border-slate-700 shrink-0">
                         Account
                       </Badge>
                     </div>
 
                     {/* Node Body */}
                     <div className="p-3 space-y-2.5">
-                      <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                      <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                         <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800/60">
-                          <span className="text-[9px] uppercase text-slate-500 block">Live Power</span>
+                          <span className="text-[11px] uppercase tracking-wider text-slate-400 font-medium block">Live Power</span>
                           <strong className="text-amber-400 text-xs font-bold">{acc.livePowerKw.toFixed(1)} kW</strong>
                         </div>
                         <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800/60">
-                          <span className="text-[9px] uppercase text-slate-500 block">Capacity</span>
+                          <span className="text-[11px] uppercase tracking-wider text-slate-400 font-medium block">Capacity</span>
                           <strong className="text-slate-200 text-xs font-bold">{acc.capacityKw.toFixed(0)} kW</strong>
                         </div>
                       </div>
 
                       {/* Capacity Utilization Bar */}
                       <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                        <div className="flex items-center justify-between text-xs font-mono text-slate-400">
                           <span>Utilization</span>
                           <span className="text-emerald-400 font-bold">{accUtil.toFixed(1)}%</span>
                         </div>
@@ -780,7 +780,7 @@ export function FleetTopologyNodesView({
 
                       {/* Expand / Collapse Plants Child Branch */}
                       <div className="flex items-center justify-between pt-1">
-                        <span className="text-[10px] text-slate-500 font-mono">
+                        <span className="text-xs text-slate-400 font-mono">
                           {acc.plants.length} Connected Plants
                         </span>
                         <Button
@@ -788,7 +788,7 @@ export function FleetTopologyNodesView({
                           size="xs"
                           onMouseDown={(e) => e.stopPropagation()}
                           onClick={(e) => toggleAccount(acc.account.id, e)}
-                          className="text-[10px] h-6 px-2 gap-1 cursor-pointer"
+                          className="text-xs h-7 px-2.5 gap-1 cursor-pointer"
                         >
                           {isAccExp ? <ChevronUp size={12} /> : <ChevronRight size={12} />}
                           <span>{isAccExp ? 'Hide Plants' : 'Show Plants'}</span>
@@ -851,7 +851,7 @@ export function FleetTopologyNodesView({
                               </div>
                               <Badge
                                 variant={isFault ? 'destructive' : isStandby ? 'warning' : 'success'}
-                                className="text-[9px] font-mono py-0 gap-1 capitalize shrink-0"
+                                className="text-[11px] font-mono py-0.5 px-2 gap-1 capitalize shrink-0"
                               >
                                 <span
                                   className={`size-1.5 rounded-full ${
@@ -868,20 +868,20 @@ export function FleetTopologyNodesView({
 
                             {/* Plant Body */}
                             <div className="p-3 space-y-2">
-                              <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                              <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                                 <div className="bg-slate-950/60 p-1.5 rounded-xl border border-slate-800/60">
-                                  <span className="text-[9px] uppercase text-slate-500 block">Live Output</span>
+                                  <span className="text-[11px] uppercase tracking-wider text-slate-400 font-medium block">Live Output</span>
                                   <strong className="text-amber-400 text-xs font-bold">{p.livePowerKw.toFixed(1)} kW</strong>
                                 </div>
                                 <div className="bg-slate-950/60 p-1.5 rounded-xl border border-slate-800/60">
-                                  <span className="text-[9px] uppercase text-slate-500 block">Today's Yield</span>
+                                  <span className="text-[11px] uppercase tracking-wider text-slate-400 font-medium block">Today's Yield</span>
                                   <strong className="text-slate-200 text-xs font-bold">{p.dailyYieldKwh.toFixed(1)} kWh</strong>
                                 </div>
                               </div>
 
                               {/* Capacity Bar */}
                               <div className="space-y-1">
-                                <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                                <div className="flex items-center justify-between text-xs font-mono text-slate-400">
                                   <span>Plant Load ({plantUtil.toFixed(0)}%)</span>
                                   <span className="text-slate-300 font-bold">{p.capacityKw.toFixed(0)} kW max</span>
                                 </div>
@@ -895,7 +895,7 @@ export function FleetTopologyNodesView({
 
                               {/* Expand / Collapse Inverters */}
                               <div className="flex items-center justify-between pt-1">
-                                <span className="text-[10px] text-slate-500 font-mono">
+                                <span className="text-xs text-slate-400 font-mono">
                                   {p.inverters.length} Inverters
                                 </span>
                                 <Button
@@ -904,7 +904,7 @@ export function FleetTopologyNodesView({
                                   onMouseDown={(e) => e.stopPropagation()}
                                   onClick={(e) => togglePlant(p.plantKey, e)}
                                   disabled={p.inverters.length === 0}
-                                  className="text-[10px] h-6 px-2 gap-1 cursor-pointer"
+                                  className="text-xs h-7 px-2.5 gap-1 cursor-pointer"
                                 >
                                   {isPlantExp ? <ChevronUp size={12} /> : <ChevronRight size={12} />}
                                   <span>{isPlantExp ? 'Hide Inverters' : 'Show Inverters'}</span>
@@ -982,14 +982,14 @@ export function FleetTopologyNodesView({
                                   </div>
 
                                   {/* Inverter Body */}
-                                  <div className="p-2.5 space-y-2 text-[11px] font-mono">
+                                  <div className="p-2.5 space-y-2 text-xs font-mono">
                                     <div className="flex items-center justify-between">
-                                      <span className="text-slate-400 text-[10px]">
+                                      <span className="text-slate-400 text-xs">
                                         {inv.model || 'Inverter'} ({inv.ratedKw} kW)
                                       </span>
                                       <Badge
                                         variant={isInvFault ? 'destructive' : isInvStandby ? 'warning' : 'success'}
-                                        className="text-[9px] font-mono py-0 gap-1 capitalize shrink-0"
+                                        className="text-[11px] font-mono py-0.5 px-2 gap-1 capitalize shrink-0"
                                       >
                                         <span
                                           className={`size-1.5 rounded-full ${
@@ -1006,7 +1006,7 @@ export function FleetTopologyNodesView({
 
                                     {/* Output Progress */}
                                     <div className="space-y-1">
-                                      <div className="flex items-center justify-between text-[10px]">
+                                      <div className="flex items-center justify-between text-xs">
                                         <span className="text-slate-400">Live Yield</span>
                                         <span className="text-amber-400 font-bold">
                                           {inv.liveSolarPowerKw.toFixed(1)} kW ({invUtil.toFixed(0)}%)
@@ -1020,11 +1020,11 @@ export function FleetTopologyNodesView({
                                       </div>
                                     </div>
 
-                                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5 border-t border-slate-800/60">
+                                    <div className="flex items-center justify-between text-xs text-slate-400 pt-0.5 border-t border-slate-800/60">
                                       <span>Day: <strong className="text-slate-200">{inv.dailyYieldKwh.toFixed(1)} kWh</strong></span>
                                       {inv.loggerSn && (
-                                        <span className="flex items-center gap-1 text-[9px] text-slate-500 truncate max-w-[100px]" title={`Logger: ${inv.loggerSn}`}>
-                                          <Radio size={9} /> {inv.loggerSn}
+                                        <span className="flex items-center gap-1 text-[11px] text-slate-400 truncate max-w-[120px]" title={`Logger: ${inv.loggerSn}`}>
+                                          <Radio size={10} /> {inv.loggerSn}
                                         </span>
                                       )}
                                     </div>
@@ -1140,7 +1140,7 @@ export function FleetTopologyNodesView({
       {/* MINIMAP RADAR */}
       {showMinimap && minimapData && (
         <div className="absolute bottom-4 right-4 z-30 w-44 h-32 bg-slate-900/90 border border-slate-800 rounded-2xl p-2 shadow-2xl backdrop-blur-md hidden sm:flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[9px] font-mono text-slate-400 border-b border-slate-800/70 pb-1">
+          <div className="flex items-center justify-between text-xs font-mono text-slate-400 border-b border-slate-800/70 pb-1">
             <span className="flex items-center gap-1">
               <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" /> Radar
             </span>
@@ -1178,7 +1178,7 @@ export function FleetTopologyNodesView({
             })}
           </div>
 
-          <div className="flex items-center justify-between text-[8.5px] font-mono text-slate-500 pt-0.5">
+          <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-0.5">
             <span className="text-blue-400">● Acc</span>
             <span className="text-emerald-400">● Plant</span>
             <span className="text-amber-400">● Inv</span>
@@ -1249,19 +1249,19 @@ export function FleetTopologyNodesView({
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-2 text-center font-mono">
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                    <div className="text-[9px] uppercase text-slate-500">Live Power</div>
+                    <div className="text-xs uppercase font-medium text-slate-400">Live Power</div>
                     <div className="text-sm font-bold text-amber-400 mt-0.5">
                       {selectedNode.data.livePowerKw.toFixed(1)} kW
                     </div>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                    <div className="text-[9px] uppercase text-slate-500">Harvest</div>
+                    <div className="text-xs uppercase font-medium text-slate-400">Harvest</div>
                     <div className="text-sm font-bold text-slate-100 mt-0.5">
                       {selectedNode.data.dailyYieldKwh.toFixed(1)} kWh
                     </div>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                    <div className="text-[9px] uppercase text-slate-500">Capacity</div>
+                    <div className="text-xs uppercase font-medium text-slate-400">Capacity</div>
                     <div className="text-sm font-bold text-slate-400 mt-0.5">
                       {selectedNode.data.capacityKw.toFixed(0)} kW
                     </div>
@@ -1284,7 +1284,7 @@ export function FleetTopologyNodesView({
                 </div>
 
                 <div className="text-xs font-mono text-slate-400 space-y-1 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                  <div>Account ID: <strong className="text-slate-200">{selectedNode.data.account.id}</strong></div>
+                  <div>Account: <strong className="text-slate-200">{selectedNode.data.account.name}</strong></div>
                   <div>Registered Stations: <strong className="text-slate-200">{selectedNode.data.plants.length} Plants</strong></div>
                   <div>Hardware Matrix: <strong className="text-slate-200">{selectedNode.data.invertersCount} Inverter Nodes</strong></div>
                 </div>
@@ -1295,19 +1295,19 @@ export function FleetTopologyNodesView({
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-2 text-center font-mono">
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                    <div className="text-[9px] uppercase text-slate-500">Live Power</div>
+                    <div className="text-xs uppercase font-medium text-slate-400">Live Power</div>
                     <div className="text-sm font-bold text-amber-400 mt-0.5">
                       {selectedNode.data.livePowerKw.toFixed(1)} kW
                     </div>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                    <div className="text-[9px] uppercase text-slate-500">Harvest</div>
+                    <div className="text-xs uppercase font-medium text-slate-400">Harvest</div>
                     <div className="text-sm font-bold text-slate-100 mt-0.5">
                       {selectedNode.data.dailyYieldKwh.toFixed(1)} kWh
                     </div>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                    <div className="text-[9px] uppercase text-slate-500">Capacity</div>
+                    <div className="text-xs uppercase font-medium text-slate-400">Capacity</div>
                     <div className="text-sm font-bold text-slate-400 mt-0.5">
                       {selectedNode.data.capacityKw.toFixed(0)} kW
                     </div>
@@ -1330,7 +1330,7 @@ export function FleetTopologyNodesView({
                 </div>
 
                 <div className="text-xs font-mono text-slate-400 space-y-1 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                  <div>Station ID: <strong className="text-slate-200">{selectedNode.data.plant.stationId}</strong></div>
+                  <div>Station: <strong className="text-slate-200">{selectedNode.data.plant.stationName}</strong></div>
                   <div>Parent Account: <strong className="text-slate-200">{selectedNode.accountName}</strong></div>
                   <div>Hardware Devices: <strong className="text-slate-200">{selectedNode.data.inverters.length} Inverters</strong></div>
                 </div>
@@ -1341,13 +1341,13 @@ export function FleetTopologyNodesView({
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-2 text-center font-mono">
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                    <div className="text-[9px] uppercase text-slate-500">Live Solar Output</div>
+                    <div className="text-xs uppercase font-medium text-slate-400">Live Solar Output</div>
                     <div className="text-sm font-bold text-amber-400 mt-0.5">
                       {selectedNode.data.liveSolarPowerKw.toFixed(1)} kW
                     </div>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                    <div className="text-[9px] uppercase text-slate-500">Today's Harvest</div>
+                    <div className="text-xs uppercase font-medium text-slate-400">Today's Harvest</div>
                     <div className="text-sm font-bold text-slate-100 mt-0.5">
                       {selectedNode.data.dailyYieldKwh.toFixed(1)} kWh
                     </div>
@@ -1369,15 +1369,17 @@ export function FleetTopologyNodesView({
                   <div>Serial Number: <strong className="text-slate-100">{selectedNode.data.deviceSn}</strong></div>
                   <div>Model: <strong className="text-slate-300">{selectedNode.data.model || 'Deye Hybrid Inverter'}</strong></div>
                   <div>Rated Capacity: <strong className="text-slate-300">{selectedNode.data.ratedKw} kW</strong></div>
-                  <div>
-                    Status:{' '}
-                    <Badge
-                      variant={selectedNode.data.status === 'FAULT' ? 'destructive' : 'success'}
-                      className="text-[9px] font-mono py-0 ml-1"
-                    >
-                      {selectedNode.data.status}
-                    </Badge>
-                  </div>
+                  {selectedNode.data.status !== 'ONLINE' && (
+                    <div>
+                      Status:{' '}
+                      <Badge
+                        variant={selectedNode.data.status === 'FAULT' ? 'destructive' : 'warning'}
+                        className="text-xs font-mono py-0.5 px-2 ml-1"
+                      >
+                        {selectedNode.data.status}
+                      </Badge>
+                    </div>
+                  )}
                   {selectedNode.data.loggerSn && (
                     <div>Paired Logger: <strong className="text-slate-300">{selectedNode.data.loggerSn}</strong></div>
                   )}

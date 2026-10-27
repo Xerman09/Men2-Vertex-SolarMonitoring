@@ -112,14 +112,25 @@ export function InverterSolarCurve({
   const plotWidth = width - paddingX * 2;
   const plotHeight = svgHeight - paddingY * 2;
 
+  // Set kW (ratedKw) is the minimum baseline ceiling, but dynamically expands if actual telemetry exceeds it
   const maxPower = useMemo(() => {
-    return Math.max(ratedKw || 50, liveSolarPowerKw || 0);
-  }, [ratedKw, liveSolarPowerKw]);
+    const setKw = Math.max(ratedKw || 10, 10);
+    let peakValue = Math.max(liveSolarPowerKw || 0, 0);
+
+    for (const p of points) {
+      if (p.power > peakValue) peakValue = p.power;
+    }
+
+    const ceiling = Math.max(setKw, peakValue);
+    // 10% headroom so curves comfortably fit inside without touching the top border
+    return Math.max(10, Math.ceil(ceiling * 1.10));
+  }, [ratedKw, liveSolarPowerKw, points]);
 
   const coords = useMemo(() => {
     return points.map((p, idx) => {
-      const x = paddingX + (idx / (points.length - 1)) * plotWidth;
-      const y = paddingY + plotHeight - (p.power / maxPower) * plotHeight;
+      const x = paddingX + (idx / Math.max(1, points.length - 1)) * plotWidth;
+      const rawY = paddingY + plotHeight - (p.power / maxPower) * plotHeight;
+      const y = Math.max(paddingY, Math.min(paddingY + plotHeight, rawY));
       return { ...p, x, y };
     });
   }, [points, maxPower, plotWidth, plotHeight, paddingX, paddingY]);
@@ -128,7 +139,8 @@ export function InverterSolarCurve({
   const elapsedCoords = useMemo(() => {
     const elapsed = coords.filter((c) => c.hour <= Math.floor(nowHour));
     const nowX = paddingX + (Math.min(23, nowHour) / 23) * plotWidth;
-    const nowY = paddingY + plotHeight - (Math.min(maxPower, liveSolarPowerKw) / maxPower) * plotHeight;
+    const rawNowY = paddingY + plotHeight - (liveSolarPowerKw / maxPower) * plotHeight;
+    const nowY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawNowY));
 
     const list = [...elapsed];
     if (list.length === 0 || Math.abs(list[list.length - 1].x - nowX) > 2) {
@@ -176,70 +188,53 @@ export function InverterSolarCurve({
   return (
     <div className={`relative w-full select-none ${className}`}>
       {/* Telemetry Header Above Graph: Never covers the curve */}
-      <div className="flex items-center justify-between text-[7.5px] sm:text-[8px] font-mono text-muted-foreground mb-1 px-0.5 shrink-0 min-h-[16px] leading-tight">
+      <div className="flex items-center justify-between text-xs sm:text-[12.5px] font-mono text-muted-foreground mb-1.5 px-0.5 shrink-0 min-h-[20px] leading-tight">
         {hoveredPoint ? (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="flex items-center gap-1 font-bold text-foreground bg-primary/10 text-primary px-1 py-0.2 rounded text-[7.5px]">
-              <Clock className="size-2 text-primary" />
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="flex items-center gap-1 font-bold text-foreground bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs">
+              <Clock className="size-3 text-primary" />
               {String(hoveredPoint.hour).padStart(2, '0')}:00
             </span>
-            <div className="flex items-center gap-1">
-              <span className="size-1.5 rounded-full inline-block shrink-0 bg-[#f59e0b]" />
+            <div className="flex items-center gap-1 text-xs">
+              <span className="size-2 rounded-full inline-block shrink-0 bg-[#f59e0b]" />
               <span className="text-muted-foreground/80">PV:</span>
               <span className="font-bold text-amber-500">{hoveredPoint.power.toFixed(2)} kW</span>
             </div>
             {dailyYieldKwh > 0 && (
-              <span className="text-muted-foreground/70">
+              <span className="text-muted-foreground/75 text-[11px] sm:text-xs">
                 (Yield: <strong className="text-foreground/90 font-semibold">{dailyYieldKwh.toFixed(1)} kWh</strong>)
               </span>
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap text-xs">
             <div className="flex items-center gap-1">
-              <span className="size-1.5 rounded-full inline-block shrink-0 bg-amber-500 animate-pulse" />
+              <span className="size-2 rounded-full inline-block shrink-0 bg-amber-500 animate-pulse" />
               <span className="text-muted-foreground/80">Live:</span>
               <span className="font-bold text-amber-500">{liveSolarPowerKw.toFixed(1)} kW</span>
               {dailyYieldKwh > 0 && (
-                <span className="text-amber-500/80 font-normal text-[7px]">
+                <span className="text-amber-500/80 font-normal text-[11px] sm:text-xs">
                   ({dailyYieldKwh.toFixed(1)} kWh)
                 </span>
               )}
             </div>
-            {ratedKw > 0 && (
-              <div className="flex items-center gap-1 text-muted-foreground/70">
-                <span>Cap:</span>
-                <span className="font-semibold text-foreground/80">{ratedKw} kW</span>
-              </div>
-            )}
           </div>
-        )}
-
-        {hoveredPoint ? (
-          <span className="text-[7px] px-1 py-0.2 rounded bg-emerald-500/15 text-emerald-500 font-semibold flex items-center gap-1 ml-auto">
-            <span className="size-1 rounded-full bg-emerald-500 inline-block motion-safe:animate-pulse" />
-            5-Min Telemetry
-          </span>
-        ) : (
-          <span className="text-[7px] text-muted-foreground/60 font-mono ml-auto">
-            Diurnal PV
-          </span>
         )}
       </div>
 
       <div
-        className="relative w-full overflow-visible rounded-md bg-card/70 border border-border/40 p-1 flex items-stretch gap-1"
+        className="relative w-full overflow-hidden rounded-md bg-card/70 border border-border/40 p-1.5 flex items-stretch gap-1.5"
         style={{ height: `${height}px`, minHeight: `${height}px` }}
       >
         {/* Inverter Mini Y-Axis Column */}
-        <div className="flex flex-col justify-between items-end pr-1 text-[7px] font-mono text-muted-foreground/80 shrink-0 select-none pb-3 pt-0.5 w-7 sm:w-8 border-r border-border/30">
+        <div className="flex flex-col justify-between items-end pr-1.5 text-[11px] sm:text-xs font-mono font-medium text-muted-foreground shrink-0 select-none pb-3 pt-0.5 w-11 sm:w-12 border-r border-border/30">
           <div className="flex items-center justify-end w-full leading-none">
-            <span className="font-semibold text-foreground/90">{formatYAxisLabel(maxPower)}</span>
+            <span className="font-bold text-foreground">{formatYAxisLabel(maxPower)}</span>
           </div>
-          <div className="flex items-center justify-end w-full leading-none text-muted-foreground/70">
+          <div className="flex items-center justify-end w-full leading-none text-muted-foreground">
             <span>{formatYAxisLabel(maxPower * 0.5)}</span>
           </div>
-          <div className="flex items-center justify-end w-full leading-none text-muted-foreground/70">
+          <div className="flex items-center justify-end w-full leading-none text-muted-foreground/80">
             <span>0</span>
           </div>
         </div>
@@ -258,6 +253,11 @@ export function InverterSolarCurve({
                 <stop offset="5%" stopColor={COLOR_SOLAR} stopOpacity={0.8} />
                 <stop offset="95%" stopColor={COLOR_SOLAR} stopOpacity={0.0} />
               </linearGradient>
+
+              {/* Plot boundary clip path to guarantee paths never leak outside */}
+              <clipPath id={`${gradId}-inv-clip`}>
+                <rect x={paddingX} y={paddingY} width={plotWidth} height={plotHeight} rx={1} />
+              </clipPath>
             </defs>
 
             {/* Top limit grid line */}
@@ -295,21 +295,24 @@ export function InverterSolarCurve({
               vectorEffect="non-scaling-stroke"
             />
 
-            {/* Area Fill */}
-            <path
-              d={svgPaths.areaPath}
-              fill={`url(#${gradId})`}
-            />
+            {/* Clipped Curve Layers */}
+            <g clipPath={`url(#${gradId}-inv-clip)`}>
+              {/* Area Fill */}
+              <path
+                d={svgPaths.areaPath}
+                fill={`url(#${gradId})`}
+              />
 
-            {/* Power Curve Line */}
-            <path
-              d={svgPaths.linePath}
-              fill="none"
-              stroke={COLOR_SOLAR}
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-            />
+              {/* Power Curve Line */}
+              <path
+                d={svgPaths.linePath}
+                fill="none"
+                stroke={COLOR_SOLAR}
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </g>
 
             {/* Vertical 'Now' Reference Line */}
             <line
@@ -364,7 +367,7 @@ export function InverterSolarCurve({
           </svg>
 
           {/* Mini time hints */}
-          <div className="flex items-center justify-between text-[6.5px] font-mono text-muted-foreground/50 px-0.5 pt-0.5 border-t border-border/20 leading-none">
+          <div className="flex items-center justify-between text-[10.5px] sm:text-[11px] font-mono text-muted-foreground/80 px-1 pt-1 border-t border-border/20 leading-none">
             <span>06:00</span>
             <span>12:00</span>
             <span>18:00</span>
@@ -375,7 +378,7 @@ export function InverterSolarCurve({
         <HoverInfo
           title="Inverter Operating Status"
           content={
-            <div className="text-[11px] space-y-1 min-w-[150px]">
+            <div className="text-xs space-y-1.5 min-w-[160px]">
               <p className="text-muted-foreground">Inverter load utilization relative to rated capacity.</p>
               <div className="pt-1 border-t border-border/50 flex justify-between font-mono">
                 <span className="text-muted-foreground">Live Power:</span>
@@ -406,8 +409,8 @@ export function InverterSolarCurve({
             </div>
           }
         >
-          <div className="flex flex-col items-center justify-between shrink-0 select-none border-l border-border/30 pl-1 sm:pl-1.5 w-7 sm:w-8 h-full py-0.5 cursor-help">
-            <span className="text-[7px] uppercase tracking-wider font-mono text-muted-foreground font-semibold leading-none">
+          <div className="flex flex-col items-center justify-between shrink-0 select-none border-l border-border/30 pl-1.5 sm:pl-2 w-9 sm:w-11 h-full py-0.5 cursor-help">
+            <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-mono text-muted-foreground font-bold leading-none">
               Util
             </span>
 
@@ -426,7 +429,7 @@ export function InverterSolarCurve({
             </div>
 
             <span
-              className={`text-[7.5px] sm:text-[8px] font-mono font-bold leading-none ${
+              className={`text-[11px] sm:text-xs font-mono font-bold leading-none ${
                 isFault ? 'text-destructive' : isStandby ? 'text-amber-500' : 'text-emerald-500'
               }`}
             >

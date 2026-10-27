@@ -110,6 +110,23 @@ export function PlantSolarCurve({
     return Math.max(livePowerKw * 1.15, capacityKw * 0.78, 10);
   }, [livePowerKw, capacityKw]);
 
+  // Check if history points appear to be fleet-aggregate (peak history vastly exceeds capacityKw)
+  const historyScaleRatio = useMemo(() => {
+    if (!historyPoints || historyPoints.length === 0 || !capacityKw || capacityKw <= 0) return 1;
+    let maxHistorySolar = 0;
+    for (const pt of historyPoints) {
+      if (pt.solarYieldKw && pt.solarYieldKw > maxHistorySolar) {
+        maxHistorySolar = pt.solarYieldKw;
+      }
+    }
+    // If max history solar is more than 1.25x capacityKw, the history was passed from fleet total
+    // and needs to be scaled down to this station's capacity
+    if (maxHistorySolar > capacityKw * 1.25) {
+      return (capacityKw * 0.9) / maxHistorySolar;
+    }
+    return 1;
+  }, [historyPoints, capacityKw]);
+
   // Generate diurnal points or map actual 5-minute continuous telemetry points from history
   const points = useMemo(() => {
     if (historyPoints && historyPoints.length > 0) {
@@ -119,9 +136,9 @@ export function PlantSolarCurve({
         const m = parseInt(parts[1], 10) || 0;
         const hourFloat = h + m / 60;
         const isFuture = hourFloat > nowHour;
-        const rawSolar = pt.solarYieldKw !== null && pt.solarYieldKw !== undefined ? pt.solarYieldKw : 0;
-        const rawLoad = pt.loadDemandKw !== null && pt.loadDemandKw !== undefined ? pt.loadDemandKw : baselineLoad;
-        const rawGrid = pt.gridFlowKw !== null && pt.gridFlowKw !== undefined ? pt.gridFlowKw : (rawSolar - rawLoad);
+        const rawSolar = (pt.solarYieldKw !== null && pt.solarYieldKw !== undefined ? pt.solarYieldKw : 0) * historyScaleRatio;
+        const rawLoad = (pt.loadDemandKw !== null && pt.loadDemandKw !== undefined ? pt.loadDemandKw : baselineLoad) * historyScaleRatio;
+        const rawGrid = pt.gridFlowKw !== null && pt.gridFlowKw !== undefined ? pt.gridFlowKw * historyScaleRatio : (rawSolar - rawLoad);
 
         return {
           hour: hourFloat,
@@ -186,7 +203,7 @@ export function PlantSolarCurve({
     }
 
     return data;
-  }, [historyPoints, nowHour, baselineLoad, peakEstimate, livePowerKw, currentDemand]);
+  }, [historyPoints, historyScaleRatio, nowHour, baselineLoad, peakEstimate, livePowerKw, currentDemand]);
 
   // SVG dimensions: bigger graph drawing area
   const width = 280;
@@ -196,15 +213,28 @@ export function PlantSolarCurve({
   const svgHeight = 60;
   const plotHeight = svgHeight - paddingY * 2;
 
+  // Set kWp (capacityKw) is the minimum baseline ceiling, but dynamically expands if actual telemetry exceeds it
   const maxPower = useMemo(() => {
-    return Math.max(capacityKw || 10, livePowerKw || 0, currentDemand || 0);
-  }, [capacityKw, livePowerKw, currentDemand]);
+    const setKwp = Math.max(capacityKw || 10, 10);
+    let peakData = Math.max(livePowerKw || 0, currentDemand || 0);
+
+    for (const p of points) {
+      if (p.solar > peakData) peakData = p.solar;
+      if (p.load > peakData) peakData = p.load;
+    }
+
+    const ceiling = Math.max(setKwp, peakData);
+    // 10% headroom so curves comfortably fit inside without touching the top border
+    return Math.max(10, Math.ceil(ceiling * 1.10));
+  }, [capacityKw, livePowerKw, currentDemand, points]);
 
   const coords = useMemo(() => {
     return points.map((p, idx) => {
-      const x = paddingX + (idx / (points.length - 1)) * plotWidth;
-      const solarY = paddingY + plotHeight - (p.solar / maxPower) * plotHeight;
-      const loadY = paddingY + plotHeight - (p.load / maxPower) * plotHeight;
+      const x = paddingX + (idx / Math.max(1, points.length - 1)) * plotWidth;
+      const rawSolarY = paddingY + plotHeight - (p.solar / maxPower) * plotHeight;
+      const rawLoadY = paddingY + plotHeight - (p.load / maxPower) * plotHeight;
+      const solarY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawSolarY));
+      const loadY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawLoadY));
       return { ...p, x, solarY, loadY };
     });
   }, [points, maxPower, plotWidth, plotHeight, paddingX, paddingY]);
@@ -213,8 +243,10 @@ export function PlantSolarCurve({
   const elapsedCoords = useMemo(() => {
     const elapsed = coords.filter((c) => c.hour <= Math.floor(nowHour));
     const nowX = paddingX + (Math.min(23, nowHour) / 23) * plotWidth;
-    const nowSolarY = paddingY + plotHeight - (Math.min(maxPower, livePowerKw) / maxPower) * plotHeight;
-    const nowLoadY = paddingY + plotHeight - (Math.min(maxPower, currentDemand) / maxPower) * plotHeight;
+    const rawNowSolarY = paddingY + plotHeight - (livePowerKw / maxPower) * plotHeight;
+    const rawNowLoadY = paddingY + plotHeight - (currentDemand / maxPower) * plotHeight;
+    const nowSolarY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawNowSolarY));
+    const nowLoadY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawNowLoadY));
 
     const list = [...elapsed];
     // Ensure final coordinate anchors precisely at the current moment
@@ -349,29 +381,29 @@ export function PlantSolarCurve({
   return (
     <div className={`relative w-full select-none flex flex-col flex-1 h-full ${className}`}>
       {/* Telemetry Header Above Graph: Never covers the curve */}
-      <div className="flex items-center justify-between text-[8px] sm:text-[8.5px] text-muted-foreground mb-1.5 px-0.5 shrink-0 gap-1.5 flex-wrap min-h-[22px]">
+      <div className="flex items-center justify-between text-xs sm:text-[13px] text-muted-foreground mb-2 px-1 shrink-0 gap-2 flex-wrap min-h-[26px]">
         {hoveredPoint ? (
-          <div className="flex items-center gap-2 sm:gap-3 font-mono flex-wrap">
-            <span className="flex items-center gap-1 font-bold text-foreground bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[8px] sm:text-[8.5px]">
-              <Clock className="size-2.5 sm:size-3 text-primary" />
+          <div className="flex items-center gap-2.5 sm:gap-3.5 font-mono flex-wrap">
+            <span className="flex items-center gap-1.5 font-bold text-foreground bg-primary/10 text-primary px-2 py-0.5 rounded text-xs">
+              <Clock className="size-3 sm:size-3.5 text-primary" />
               {hoveredPoint.timeStr}
             </span>
-            <div className="flex items-center gap-1">
-              <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_SOLAR }} />
+            <div className="flex items-center gap-1.5 text-xs sm:text-[12.5px]">
+              <span className="size-2 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_SOLAR }} />
               <span className="text-muted-foreground/80">PV:</span>
               <span className="font-bold text-amber-500 whitespace-nowrap">
                 {hoveredPoint.solar.toFixed(2)} kW
               </span>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_LOAD }} />
+            <div className="flex items-center gap-1.5 text-xs sm:text-[12.5px]">
+              <span className="size-2 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_LOAD }} />
               <span className="text-muted-foreground/80">Demand:</span>
               <span className="font-bold text-indigo-400 whitespace-nowrap">
                 {hoveredPoint.load.toFixed(2)} kW
               </span>
             </div>
-            <div className="flex items-center gap-1">
-              <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_GRID }} />
+            <div className="flex items-center gap-1.5 text-xs sm:text-[12.5px]">
+              <span className="size-2 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_GRID }} />
               <span className="text-muted-foreground/80">Grid:</span>
               <span className={`font-bold whitespace-nowrap ${hoveredPoint.gridNet >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
                 {hoveredPoint.gridNet >= 0 ? `+${hoveredPoint.gridNet.toFixed(2)}` : hoveredPoint.gridNet.toFixed(2)} kW
@@ -379,20 +411,20 @@ export function PlantSolarCurve({
             </div>
           </div>
         ) : showLabels ? (
-          <div className="flex items-center gap-2 sm:gap-3 font-mono flex-wrap">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 font-mono flex-wrap text-xs sm:text-[12.5px]">
             {/* Live Solar Harvest (Amber #f59e0b) - NOT GREEN */}
             <HoverInfo
               title="Solar Generation & Harvest"
               content="Real-time photovoltaic solar generation output across active inverters and daily cumulative energy yield."
             >
-              <div className="flex items-center gap-1 cursor-help">
-                <span className="size-1.5 rounded-full bg-amber-500 inline-block animate-pulse shrink-0" />
+              <div className="flex items-center gap-1.5 cursor-help">
+                <span className="size-2 rounded-full bg-amber-500 inline-block animate-pulse shrink-0" />
                 <span className="text-muted-foreground/80">Solar:</span>
                 <span className="font-bold text-amber-500 whitespace-nowrap">
                   {livePowerKw.toFixed(1)} kW
                 </span>
                 {dailyYieldKwh > 0 && (
-                  <span className="text-amber-500/80 font-normal text-[7.5px] sm:text-[8px] whitespace-nowrap">
+                  <span className="text-amber-500/80 font-normal text-[11px] sm:text-xs whitespace-nowrap">
                     ({dailyYieldKwh.toFixed(1)} kWh)
                   </span>
                 )}
@@ -404,8 +436,8 @@ export function PlantSolarCurve({
               title="Facility Demand (Load)"
               content="Current facility electrical power demand required by connected equipment and industrial circuits."
             >
-              <div className="flex items-center gap-1 cursor-help">
-                <span className="size-1.5 rounded-full bg-indigo-500 inline-block shrink-0" />
+              <div className="flex items-center gap-1.5 cursor-help">
+                <span className="size-2 rounded-full bg-indigo-500 inline-block shrink-0" />
                 <span className="text-muted-foreground/80">Demand:</span>
                 <span className="font-bold text-indigo-400 whitespace-nowrap">
                   {currentDemand.toFixed(1)} kW
@@ -418,8 +450,8 @@ export function PlantSolarCurve({
               title="Grid Net Exchange"
               content="Net exchange with utility grid (+ Export to grid / − Import from grid)."
             >
-              <div className="flex items-center gap-1 cursor-help">
-                <span className="size-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
+              <div className="flex items-center gap-1.5 cursor-help">
+                <span className="size-2 rounded-full bg-emerald-500 inline-block shrink-0" />
                 <span className="text-muted-foreground/80">Grid Net:</span>
                 <span className="font-bold text-emerald-500 whitespace-nowrap">
                   {currentGridNet >= 0 ? `+${currentGridNet.toFixed(1)}` : currentGridNet.toFixed(1)} kW
@@ -428,44 +460,31 @@ export function PlantSolarCurve({
             </HoverInfo>
           </div>
         ) : (
-          <div className="flex items-center gap-2 font-mono text-[7.5px] sm:text-[8px] text-muted-foreground/70">
-            <span className="size-1.5 rounded-full bg-amber-500/70 inline-block shrink-0" />
-            <span>Solar: <strong className="text-amber-500">{livePowerKw.toFixed(1)} kW</strong></span>
+          <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground/80">
+            <span className="size-2 rounded-full bg-amber-500/70 inline-block shrink-0" />
+            <span>Solar: <strong className="text-amber-500 font-semibold">{livePowerKw.toFixed(1)} kW</strong></span>
             {dailyYieldKwh > 0 && <span>({dailyYieldKwh.toFixed(1)} kWh)</span>}
           </div>
         )}
-
-        {hoveredPoint ? (
-          <span className="text-[7.5px] sm:text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500 font-semibold flex items-center gap-1 ml-auto">
-            <span className="size-1.5 rounded-full bg-emerald-500 inline-block motion-safe:animate-pulse" />
-            5-Min Telemetry
-          </span>
-        ) : (
-          capacityKw > 0 && (
-            <span className="text-[7.5px] sm:text-[8px] text-muted-foreground/70 font-mono ml-auto">
-              Cap: <strong className="text-foreground/90">{capacityKw.toFixed(0)} kWp</strong>
-            </span>
-          )
-        )}
       </div>
 
-      {/* Full-height graph container covering the whole card (overflow-visible for tooltips) */}
+      {/* Full-height graph container covering the whole card */}
       <div
-        className="relative w-full overflow-visible rounded-lg bg-card/70 border border-border/50 p-1.5 flex-1 flex flex-col justify-between min-h-0"
+        className="relative w-full overflow-hidden rounded-lg bg-card/70 border border-border/50 p-2 flex-1 flex flex-col justify-between min-h-0"
         style={heightStyle ? heightStyle : { minHeight: '100px' }}
       >
         {/* Main Plot Area: Y-Axis Column on Left + Chart Canvas in Center + Vertical Utilization on Right */}
-        <div className="flex flex-1 min-h-0 w-full gap-1 items-stretch">
+        <div className="flex flex-1 min-h-0 w-full gap-1.5 items-stretch">
           {/* Y-Axis Column */}
-          <div className="flex flex-col justify-between items-end pr-1 text-[7.5px] sm:text-[8px] font-mono text-muted-foreground/80 shrink-0 select-none pb-4 pt-0.5 w-9 sm:w-10 border-r border-border/40">
+          <div className="flex flex-col justify-between items-end pr-1.5 text-xs sm:text-[12.5px] font-mono font-medium text-muted-foreground shrink-0 select-none pb-4 pt-0.5 w-12 sm:w-14 border-r border-border/40">
             <div className="flex items-center gap-0.5 justify-end w-full leading-none">
-              <span className="font-semibold text-foreground/90">{formatYAxisLabel(maxPower)}</span>
-              <span className="text-[6.5px] text-muted-foreground">kW</span>
+              <span className="font-bold text-foreground">{formatYAxisLabel(maxPower)}</span>
+              <span className="text-[11px] text-muted-foreground font-mono font-normal">kW</span>
             </div>
-            <div className="flex items-center justify-end w-full leading-none text-muted-foreground/75">
+            <div className="flex items-center justify-end w-full leading-none text-muted-foreground">
               <span>{formatYAxisLabel(maxPower * 0.5)}</span>
             </div>
-            <div className="flex items-center justify-end w-full leading-none text-muted-foreground/75">
+            <div className="flex items-center justify-end w-full leading-none text-muted-foreground/80">
               <span>0</span>
             </div>
           </div>
@@ -491,6 +510,11 @@ export function PlantSolarCurve({
                   <stop offset="5%" stopColor={COLOR_LOAD} stopOpacity={0.35} />
                   <stop offset="95%" stopColor={COLOR_LOAD} stopOpacity={0.0} />
                 </linearGradient>
+
+                {/* Plot boundary clip path to guarantee paths never leak outside */}
+                <clipPath id={`${gradId}-plot-clip`}>
+                  <rect x={paddingX} y={paddingY} width={plotWidth} height={plotHeight} rx={1} />
+                </clipPath>
               </defs>
 
               {/* Background Grid Lines matching CartesianGrid in Analytics */}
@@ -524,28 +548,31 @@ export function PlantSolarCurve({
                 vectorEffect="non-scaling-stroke"
               />
 
-              {/* Facility Demand Area & Line (Analytics colorLoad #6366f1) */}
-              <path d={svgPaths.loadArea} fill={`url(#${gradId}-load)`} />
-              <path
-                d={svgPaths.loadLine}
-                fill="none"
-                stroke={COLOR_LOAD}
-                strokeWidth="1.25"
-                strokeDasharray="2 2"
-                strokeLinecap="round"
-                vectorEffect="non-scaling-stroke"
-              />
+              {/* Clipped Curve Layers */}
+              <g clipPath={`url(#${gradId}-plot-clip)`}>
+                {/* Facility Demand Area & Line (Analytics colorLoad #6366f1) */}
+                <path d={svgPaths.loadArea} fill={`url(#${gradId}-load)`} />
+                <path
+                  d={svgPaths.loadLine}
+                  fill="none"
+                  stroke={COLOR_LOAD}
+                  strokeWidth="1.25"
+                  strokeDasharray="2 2"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                />
 
-              {/* Solar Generation Area & Line (Analytics colorSolar #f59e0b) */}
-              <path d={svgPaths.solarArea} fill={`url(#${gradId}-solar)`} />
-              <path
-                d={svgPaths.solarLine}
-                fill="none"
-                stroke={COLOR_SOLAR}
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                vectorEffect="non-scaling-stroke"
-              />
+                {/* Solar Generation Area & Line (Analytics colorSolar #f59e0b) */}
+                <path d={svgPaths.solarArea} fill={`url(#${gradId}-solar)`} />
+                <path
+                  d={svgPaths.solarLine}
+                  fill="none"
+                  stroke={COLOR_SOLAR}
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </g>
 
               {/* Vertical 'Now' Reference Line matching Analytics Dashboard */}
               <line
@@ -602,7 +629,7 @@ export function PlantSolarCurve({
             </svg>
 
             {/* Time Axis Labels: accurately spaced across diurnal cycle */}
-            <div className="flex items-center justify-between text-[7.5px] font-mono text-muted-foreground/60 px-1 pt-1 border-t border-border/30">
+            <div className="flex items-center justify-between text-xs sm:text-[12.5px] font-mono text-muted-foreground/85 px-1 pt-1.5 border-t border-border/30">
               <span>00:00</span>
               <span>06:00</span>
               <span>12:00</span>
@@ -615,7 +642,7 @@ export function PlantSolarCurve({
           <HoverInfo
             title="Capacity Utilization Rate"
             content={
-              <div className="text-[11px] space-y-1 min-w-[150px]">
+              <div className="text-xs space-y-1.5 min-w-[160px]">
                 <p className="text-muted-foreground">Operating utilization relative to installed rated capacity.</p>
                 <div className="pt-1 border-t border-border/50 flex justify-between font-mono">
                   <span className="text-muted-foreground">Solar Output:</span>
@@ -640,20 +667,20 @@ export function PlantSolarCurve({
               </div>
             }
           >
-            <div className="flex flex-col items-center justify-between shrink-0 select-none border-l border-border/40 pl-1 sm:pl-1.5 w-8 sm:w-9 h-full py-0.5 cursor-help">
-              <span className="text-[7.5px] sm:text-[8px] uppercase tracking-wider font-mono text-muted-foreground font-semibold leading-none">
+            <div className="flex flex-col items-center justify-between shrink-0 select-none border-l border-border/40 pl-1.5 sm:pl-2 w-10 sm:w-12 h-full py-0.5 cursor-help">
+              <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-mono text-muted-foreground font-bold leading-none">
                 Util
               </span>
 
               {/* Vertical Progress Gauge Track (Amber matching live solar harvest) */}
-              <div className="w-1.5 sm:w-2 flex-1 my-1 bg-muted/60 rounded-full overflow-hidden relative border border-border/30 flex flex-col justify-end">
+              <div className="w-2 sm:w-2.5 flex-1 my-1 bg-muted/60 rounded-full overflow-hidden relative border border-border/30 flex flex-col justify-end">
                 <div
                   className="w-full bg-gradient-to-t from-amber-600 via-amber-500 to-amber-400 rounded-full transition-all duration-500"
                   style={{ height: `${Math.min(100, Math.max(0, currentUtil))}%` }}
                 />
               </div>
 
-              <span className="text-[8px] sm:text-[9px] font-bold font-mono text-amber-500 leading-none">
+              <span className="text-xs sm:text-[13px] font-bold font-mono text-amber-500 leading-none">
                 {currentUtil.toFixed(0)}%
               </span>
             </div>

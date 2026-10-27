@@ -150,12 +150,12 @@ export function Sidebar() {
                   </span>
                   <Badge
                     variant="outline"
-                    className="text-[9px] px-1 py-0 h-4 border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono font-bold"
+                    className="text-xs px-1.5 py-0.5 border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono font-bold"
                   >
                     VOS
                   </Badge>
                 </div>
-                <span className="text-[10px] text-muted-foreground font-mono">
+                <span className="text-xs text-muted-foreground font-mono">
                   Multi-Account Fleet
                 </span>
               </Link>
@@ -227,7 +227,7 @@ export function Sidebar() {
                     <span className="truncate">{item.label}</span>
                     {item.badge && (
                       <span
-                        className={`text-[9.5px] px-1.5 py-0.2 rounded font-mono shrink-0 ml-1.5 ${
+                        className={`text-[11px] px-1.5 py-0.5 rounded font-mono shrink-0 ml-1.5 ${
                           isActive
                             ? 'bg-white/20 text-white font-bold'
                             : 'bg-muted text-muted-foreground'
@@ -243,7 +243,7 @@ export function Sidebar() {
                     <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-popover text-popover-foreground text-xs font-semibold rounded-xl shadow-xl border border-border pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap z-50 flex items-center gap-2">
                       <span>{item.label}</span>
                       {item.badge && (
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-primary/15 text-primary font-mono font-bold">
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-mono font-bold">
                           {item.badge}
                         </span>
                       )}

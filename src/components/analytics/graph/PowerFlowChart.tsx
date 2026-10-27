@@ -90,7 +90,7 @@ export function PowerFlowChart({
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/30">
             <div className="flex items-center justify-between">
-              <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground font-mono font-medium">
                 PV Power ({currentLivePoint.hour})
               </span>
               <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 motion-safe:animate-ping" />
@@ -99,7 +99,7 @@ export function PowerFlowChart({
               <span className="text-sm sm:text-base font-bold font-mono text-yellow-500">
                 {currentLivePoint.solarYieldKw !== null ? currentLivePoint.solarYieldKw.toFixed(2) : '0.00'}
               </span>
-              <span className="text-[9px] text-muted-foreground font-mono">kW</span>
+              <span className="text-xs text-muted-foreground font-mono">kW</span>
             </div>
           </div>
         </HoverInfo>
@@ -119,7 +119,7 @@ export function PowerFlowChart({
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/30">
             <div className="flex items-center justify-between">
-              <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground font-mono font-medium">
                 Load ({currentLivePoint.hour})
               </span>
               <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
@@ -128,7 +128,7 @@ export function PowerFlowChart({
               <span className="text-sm sm:text-base font-bold font-mono text-purple-400">
                 {currentLivePoint.loadDemandKw !== null ? currentLivePoint.loadDemandKw.toFixed(2) : '0.00'}
               </span>
-              <span className="text-[9px] text-muted-foreground font-mono">kW</span>
+              <span className="text-xs text-muted-foreground font-mono">kW</span>
             </div>
           </div>
         </HoverInfo>
@@ -152,7 +152,7 @@ export function PowerFlowChart({
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
             <div className="flex items-center justify-between">
-              <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground font-mono font-medium">
                 Grid Flow ({currentLivePoint.hour})
               </span>
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -163,7 +163,7 @@ export function PowerFlowChart({
                   ? `${currentLivePoint.gridExportKw > 0 ? '+' : ''}${currentLivePoint.gridExportKw.toFixed(2)}`
                   : '0.00'}
               </span>
-              <span className="text-[9px] text-muted-foreground font-mono">kW</span>
+              <span className="text-xs text-muted-foreground font-mono">kW</span>
             </div>
           </div>
         </HoverInfo>
@@ -187,7 +187,7 @@ export function PowerFlowChart({
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-cyan-500/30">
             <div className="flex items-center justify-between">
-              <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground font-mono font-medium">
                 Battery ({currentLivePoint.hour})
               </span>
               <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
@@ -198,7 +198,7 @@ export function PowerFlowChart({
                   ? `${currentLivePoint.batteryFlowKw > 0 ? '+' : ''}${currentLivePoint.batteryFlowKw.toFixed(2)}`
                   : '0.00'}
               </span>
-              <span className="text-[9px] text-muted-foreground font-mono">kW</span>
+              <span className="text-xs text-muted-foreground font-mono">kW</span>
             </div>
           </div>
         </HoverInfo>
@@ -369,12 +369,12 @@ export function PowerFlowChart({
                   dataKey="hour"
                   ticks={majorXTicks}
                   stroke="currentColor"
-                  className="text-[9px] font-mono opacity-75"
+                  className="text-xs font-mono opacity-80"
                 />
                 <YAxis
                   domain={combinedYDomain}
                   stroke="currentColor"
-                  className="text-[9px] font-mono opacity-75"
+                  className="text-xs font-mono opacity-80"
                   unit="kW"
                 />
                 <Tooltip content={<CustomExactTooltip />} />
@@ -450,8 +450,8 @@ export function PowerFlowChart({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
-                <YAxis domain={pvYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
+                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-xs font-mono opacity-80" />
+                <YAxis domain={pvYDomain} stroke="currentColor" className="text-xs font-mono opacity-80" unit="kW" />
                 <Tooltip content={<CustomExactTooltip />} />
                 <ReferenceLine
                   isFront
@@ -488,8 +488,8 @@ export function PowerFlowChart({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
-                <YAxis domain={consumptionYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
+                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-xs font-mono opacity-80" />
+                <YAxis domain={consumptionYDomain} stroke="currentColor" className="text-xs font-mono opacity-80" unit="kW" />
                 <Tooltip content={<CustomExactTooltip />} />
                 <ReferenceLine
                   isFront
@@ -526,8 +526,8 @@ export function PowerFlowChart({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
-                <YAxis domain={gridYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
+                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-xs font-mono opacity-80" />
+                <YAxis domain={gridYDomain} stroke="currentColor" className="text-xs font-mono opacity-80" unit="kW" />
                 <Tooltip content={<CustomExactTooltip />} />
                 <ReferenceLine y={0} stroke="currentColor" className="opacity-40" />
                 <ReferenceLine
@@ -565,8 +565,8 @@ export function PowerFlowChart({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
-                <YAxis domain={batteryYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
+                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-xs font-mono opacity-80" />
+                <YAxis domain={batteryYDomain} stroke="currentColor" className="text-xs font-mono opacity-80" unit="kW" />
                 <Tooltip content={<CustomExactTooltip />} />
                 <ReferenceLine y={0} stroke="currentColor" className="opacity-40" />
                 <ReferenceLine

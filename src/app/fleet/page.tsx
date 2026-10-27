@@ -469,22 +469,22 @@ export default function FleetMonitoringPage() {
                 content={
                   <div className="space-y-2 pt-0.5">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <Badge variant="outline" className="text-[10px] font-mono gap-1.5 py-0.5">
+                      <Badge variant="outline" className="text-xs font-mono gap-1.5 py-0.5">
                         <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         Live Sync
                       </Badge>
                       {isAdmin ? (
-                        <Badge variant="warning" className="text-[10px] font-mono gap-1">
-                          <ShieldCheck size={11} />
+                        <Badge variant="warning" className="text-xs font-mono gap-1">
+                          <ShieldCheck size={12} />
                           Admin View ({authorizedAccounts.length} Accounts)
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="text-[10px] font-mono">
+                        <Badge variant="secondary" className="text-xs font-mono">
                           Production Fleet
                         </Badge>
                       )}
                     </div>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       {isAdmin
                         ? 'Defaulting to separate account totals in a grid: expand an account to inspect plant curves, then expand plants to inspect individual inverter graphs.'
                         : 'Defaulting to individual plant curves & operational metrics: expand plants to inspect individual inverter graphs.'}
@@ -512,7 +512,7 @@ export default function FleetMonitoringPage() {
             <button
               type="button"
               onClick={collapseToAccountGrid}
-              className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
                 expandedAccountIds.size === 0
                   ? 'bg-background text-foreground shadow-xs font-bold'
                   : 'text-muted-foreground hover:text-foreground'
@@ -528,7 +528,7 @@ export default function FleetMonitoringPage() {
                 expandAllAccounts();
                 setExpandedPlantKeys(new Set());
               }}
-              className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
                 expandedAccountIds.size > 0 && expandedPlantKeys.size === 0
                   ? 'bg-background text-foreground shadow-xs font-bold'
                   : 'text-muted-foreground hover:text-foreground'
@@ -541,7 +541,7 @@ export default function FleetMonitoringPage() {
             <button
               type="button"
               onClick={expandAllEverywhere}
-              className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
                 expandedPlantKeys.size > 0
                   ? 'bg-background text-foreground shadow-xs font-bold'
                   : 'text-muted-foreground hover:text-foreground'
@@ -558,7 +558,7 @@ export default function FleetMonitoringPage() {
             <select
               value={autoRefreshInterval}
               onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
-              className="bg-transparent text-[11px] font-semibold focus:outline-hidden cursor-pointer"
+              className="bg-transparent text-xs font-semibold focus:outline-hidden cursor-pointer"
               aria-label="Auto-refresh interval"
             >
               <option value={15}>15s</option>
@@ -636,7 +636,7 @@ export default function FleetMonitoringPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                className="bg-transparent text-[11px] font-medium focus:outline-hidden cursor-pointer"
+                className="bg-transparent text-xs font-medium focus:outline-hidden cursor-pointer"
                 aria-label="Filter by Status"
               >
                 <option value="ALL">All Status</option>
@@ -739,20 +739,20 @@ export default function FleetMonitoringPage() {
                       {/* Row 2: Status badge and plant/inverter count */}
                       <div className="flex items-center gap-2 flex-wrap">
                         {accGroup.isDemo && (
-                          <Badge variant="warning" className="text-[9px] font-mono py-0">
+                          <Badge variant="warning" className="text-[11px] font-mono py-0.5 px-2">
                             DEMO ACCOUNT
                           </Badge>
                         )}
                         {accGroup.account.status === 'OFFLINE' ? (
-                          <Badge variant="destructive" className="text-[9px] font-mono py-0">
+                          <Badge variant="destructive" className="text-[11px] font-mono py-0.5 px-2">
                             DISABLED
                           </Badge>
                         ) : (
-                          <Badge variant="success" className="text-[9px] font-mono py-0">
+                          <Badge variant="success" className="text-[11px] font-mono py-0.5 px-2">
                             ACTIVE
                           </Badge>
                         )}
-                        <span className="text-[10px] text-muted-foreground font-mono">
+                        <span className="text-xs text-muted-foreground font-mono">
                           {accGroup.invertersCount} Inverters Total
                         </span>
                       </div>
@@ -804,7 +804,7 @@ export default function FleetMonitoringPage() {
                         Account Totals
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground group-hover:text-primary transition-colors">
+                    <div className="flex items-center gap-1 text-xs font-mono text-muted-foreground group-hover:text-primary transition-colors">
                       <span>Collapse</span>
                       <ChevronUp size={13} className="transition-transform group-hover:-translate-y-0.5" />
                     </div>
@@ -826,8 +826,8 @@ export default function FleetMonitoringPage() {
                   </div>
                 </div>
 
-                <div className="text-[10px] font-mono text-muted-foreground border-t border-border/40 pt-2 flex items-center justify-between">
-                  <span>Account ID: {accGroup.account.id}</span>
+                <div className="text-xs font-mono text-muted-foreground border-t border-border/40 pt-2 flex items-center justify-between">
+                  <span>{accGroup.account.name}</span>
                   <span>{accGroup.plants.length} Plant Stations</span>
                 </div>
               </div>
@@ -854,21 +854,21 @@ export default function FleetMonitoringPage() {
                           {accGroup.account.name}
                         </h2>
                         {accGroup.isDemo && (
-                          <Badge variant="warning" className="text-[9px] font-mono py-0">
+                          <Badge variant="warning" className="text-[11px] font-mono py-0.5 px-2">
                             DEMO
                           </Badge>
                         )}
                         {accGroup.account.status === 'OFFLINE' ? (
-                          <Badge variant="destructive" className="text-[9px] font-mono py-0">
+                          <Badge variant="destructive" className="text-[11px] font-mono py-0.5 px-2">
                             DISABLED
                           </Badge>
                         ) : (
-                          <Badge variant="success" className="text-[9px] font-mono py-0">
+                          <Badge variant="success" className="text-[11px] font-mono py-0.5 px-2">
                             ACTIVE
                           </Badge>
                         )}
                       </div>
-                      <div className="text-[11px] text-muted-foreground font-mono">
+                      <div className="text-xs sm:text-[13px] text-muted-foreground font-mono mt-0.5">
                         {accGroup.plants.length} Plants • {accGroup.invertersCount} Inverters • {accGroup.capacityKw.toFixed(0)} kW Installed
                       </div>
                     </div>
@@ -883,7 +883,7 @@ export default function FleetMonitoringPage() {
                           e.stopPropagation();
                           handleToggleAccount(accGroup.account);
                         }}
-                        className={`text-[10px] font-mono h-7 px-2 gap-1 cursor-pointer ${
+                        className={`text-xs font-mono h-7 px-2.5 gap-1 cursor-pointer ${
                           accGroup.account.status === 'OFFLINE'
                             ? 'border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10'
                             : 'border-destructive/40 text-destructive hover:bg-destructive/10'
@@ -906,19 +906,19 @@ export default function FleetMonitoringPage() {
                   {!activePlant ? (
                     <>
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-foreground font-mono uppercase tracking-wider text-[11px]">
+                        <div className="flex items-center gap-1.5 text-foreground font-mono uppercase tracking-wider text-xs">
                           <Building2 size={13} className="text-primary" />
                           <span>1. Account Overview</span>
                         </div>
-                        <span className="text-[10px] font-mono text-muted-foreground">Click card to collapse</span>
+                        <span className="text-xs font-mono text-muted-foreground">Click card to collapse</span>
                       </div>
 
                       <div className="col-span-2 flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-foreground font-mono uppercase tracking-wider text-[11px]">
+                        <div className="flex items-center gap-1.5 text-foreground font-mono uppercase tracking-wider text-xs">
                           <Layers size={13} className="text-primary" />
                           <span>2 & 3. Plants ({accGroup.plants.length})</span>
                         </div>
-                        <span className="text-[10px] font-mono text-muted-foreground">
+                        <span className="text-xs font-mono text-muted-foreground">
                           Click any plant to expand inverters
                         </span>
                       </div>
@@ -926,19 +926,19 @@ export default function FleetMonitoringPage() {
                   ) : (
                     <>
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-foreground font-mono uppercase tracking-wider text-[11px]">
+                        <div className="flex items-center gap-1.5 text-foreground font-mono uppercase tracking-wider text-xs">
                           <Layers size={13} className="text-primary" />
                           <span>1. Active Plant</span>
                         </div>
-                        <span className="text-[10px] font-mono text-muted-foreground">Click plant to collapse back</span>
+                        <span className="text-xs font-mono text-muted-foreground">Click plant to collapse back</span>
                       </div>
 
                       <div className="col-span-2 flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-foreground font-mono uppercase tracking-wider text-[11px]">
+                        <div className="flex items-center gap-1.5 text-foreground font-mono uppercase tracking-wider text-xs">
                           <Cpu size={13} className="text-primary" />
                           <span>2 & 3. Inverters ({activePlant.inverters.length})</span>
                         </div>
-                        <span className="text-[10px] font-mono text-muted-foreground">
+                        <span className="text-xs font-mono text-muted-foreground">
                           {activePlant.plant.stationName}
                         </span>
                       </div>
@@ -976,39 +976,28 @@ export default function FleetMonitoringPage() {
                               {/* Plant Header */}
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-[10px] font-mono text-muted-foreground">
-                                      ID: {pGroup.plant.stationId}
-                                    </span>
-                                    <Badge
-                                      variant={
-                                        pGroup.status === 'FAULT'
-                                          ? 'destructive'
-                                          : pGroup.status === 'STANDBY'
-                                          ? 'warning'
-                                          : 'success'
-                                      }
-                                      className="text-[9px] font-mono py-0 gap-1 capitalize"
-                                    >
-                                      <span
-                                        className={`size-1.5 rounded-full ${
-                                          pGroup.status === 'FAULT'
-                                            ? 'bg-destructive'
-                                            : pGroup.status === 'STANDBY'
-                                            ? 'bg-amber-500'
-                                            : 'bg-emerald-500 animate-pulse'
-                                        }`}
-                                      />
-                                      {pGroup.status.toLowerCase()}
-                                    </Badge>
-                                  </div>
-                                  <h4 className="text-sm font-bold text-foreground truncate mt-0.5 group-hover:text-primary transition-colors" title={pGroup.plant.stationName}>
+                                  {pGroup.status !== 'ONLINE' && (
+                                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                      <Badge
+                                        variant={pGroup.status === 'FAULT' ? 'destructive' : 'warning'}
+                                        className="text-[11px] font-mono py-0.5 px-2 gap-1 capitalize"
+                                      >
+                                        <span
+                                          className={`size-1.5 rounded-full ${
+                                            pGroup.status === 'FAULT' ? 'bg-destructive' : 'bg-amber-500'
+                                          }`}
+                                        />
+                                        {pGroup.status.toLowerCase()}
+                                      </Badge>
+                                    </div>
+                                  )}
+                                  <h4 className="text-sm font-bold text-foreground truncate group-hover:text-primary transition-colors" title={pGroup.plant.stationName}>
                                     {pGroup.plant.stationName}
                                   </h4>
                                 </div>
 
                                 <div className="flex items-center gap-1 shrink-0">
-                                  <div className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground group-hover:text-primary transition-colors">
+                                  <div className="flex items-center gap-1 text-xs font-mono text-muted-foreground group-hover:text-primary transition-colors">
                                     <ChevronDown size={14} className="transition-transform duration-200 group-hover:translate-y-0.5" />
                                   </div>
                                 </div>
@@ -1048,38 +1037,27 @@ export default function FleetMonitoringPage() {
                       >
                         <div className="flex items-start justify-between gap-2 border-b border-border/40 pb-2.5">
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[10px] font-mono text-muted-foreground">
-                                ID: {activePlant.plant.stationId}
-                              </span>
-                              <Badge
-                                variant={
-                                  activePlant.status === 'FAULT'
-                                    ? 'destructive'
-                                    : activePlant.status === 'STANDBY'
-                                    ? 'warning'
-                                    : 'success'
-                                }
-                                className="text-[9px] font-mono py-0 gap-1 capitalize"
-                              >
-                                <span
-                                  className={`size-1.5 rounded-full ${
-                                    activePlant.status === 'FAULT'
-                                      ? 'bg-destructive'
-                                      : activePlant.status === 'STANDBY'
-                                      ? 'bg-amber-500'
-                                      : 'bg-emerald-500 animate-pulse'
-                                  }`}
-                                />
-                                {activePlant.status.toLowerCase()}
-                              </Badge>
-                            </div>
-                            <h3 className="text-base font-bold text-foreground truncate mt-0.5 group-hover:text-primary transition-colors" title={activePlant.plant.stationName}>
+                            {activePlant.status !== 'ONLINE' && (
+                              <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                <Badge
+                                  variant={activePlant.status === 'FAULT' ? 'destructive' : 'warning'}
+                                  className="text-[11px] font-mono py-0.5 px-2 gap-1 capitalize"
+                                >
+                                  <span
+                                    className={`size-1.5 rounded-full ${
+                                      activePlant.status === 'FAULT' ? 'bg-destructive' : 'bg-amber-500'
+                                    }`}
+                                  />
+                                  {activePlant.status.toLowerCase()}
+                                </Badge>
+                              </div>
+                            )}
+                            <h3 className="text-base font-bold text-foreground truncate group-hover:text-primary transition-colors" title={activePlant.plant.stationName}>
                               {activePlant.plant.stationName}
                             </h3>
                           </div>
 
-                          <div className="flex items-center gap-1 text-[10px] font-mono text-primary font-semibold shrink-0">
+                          <div className="flex items-center gap-1 text-xs font-mono text-primary font-semibold shrink-0">
                             <span>Collapse</span>
                             <ChevronUp size={14} className="transition-transform group-hover:-translate-y-0.5" />
                           </div>
@@ -1109,26 +1087,26 @@ export default function FleetMonitoringPage() {
                         title="Click to collapse whole account back to accounts grid"
                       >
                         <div className="min-w-0">
-                          <div className="text-[10px] font-mono text-muted-foreground uppercase flex items-center gap-1">
-                            <Building2 size={11} className="text-primary" />
+                          <div className="text-xs font-mono text-muted-foreground uppercase flex items-center gap-1">
+                            <Building2 size={12} className="text-primary" />
                             <span>Account: {accGroup.account.name}</span>
                           </div>
-                          <div className="text-xs font-mono font-semibold text-foreground truncate mt-0.5">
+                          <div className="text-xs sm:text-sm font-mono font-semibold text-foreground truncate mt-0.5">
                             {accGroup.livePowerKw.toFixed(1)} kW total • {accGroup.plants.length} Plants
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground group-hover:text-primary transition-colors shrink-0">
+                        <div className="flex items-center gap-1 text-xs font-mono text-muted-foreground group-hover:text-primary transition-colors shrink-0">
                           <span>Exit Account</span>
-                          <ChevronUp size={12} />
+                          <ChevronUp size={13} />
                         </div>
                       </div>
 
                       {/* Other Plants Switcher (if account has more than 1 plant) */}
                       {otherPlants.length > 0 && (
                         <div className="space-y-2 pt-1">
-                          <div className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground flex items-center justify-between">
+                          <div className="text-xs uppercase font-mono tracking-wider text-muted-foreground flex items-center justify-between">
                             <span>Other Plants ({otherPlants.length})</span>
-                            <span className="text-[9px]">Click to switch</span>
+                            <span className="text-[11px] font-medium">Click to switch</span>
                           </div>
                           <div className="flex flex-col gap-2">
                             {otherPlants.map((op) => {
@@ -1152,16 +1130,17 @@ export default function FleetMonitoringPage() {
                                 >
                                   <div className="flex items-start justify-between gap-1.5">
                                     <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-1.5 flex-wrap">
-                                        <span className="text-[10px] font-mono text-muted-foreground">ID: {op.plant.stationId}</span>
-                                        <Badge
-                                          variant={op.status === 'FAULT' ? 'destructive' : op.status === 'STANDBY' ? 'warning' : 'success'}
-                                          className="text-[9px] font-mono py-0 shrink-0 capitalize"
-                                        >
-                                          {op.status.toLowerCase()}
-                                        </Badge>
-                                      </div>
-                                      <h4 className="text-xs font-bold text-foreground truncate mt-0.5 group-hover:text-primary transition-colors">
+                                      {op.status !== 'ONLINE' && (
+                                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                          <Badge
+                                            variant={op.status === 'FAULT' ? 'destructive' : 'warning'}
+                                            className="text-[11px] font-mono py-0.5 px-2 shrink-0 capitalize"
+                                          >
+                                            {op.status.toLowerCase()}
+                                          </Badge>
+                                        </div>
+                                      )}
+                                      <h4 className="text-xs font-bold text-foreground truncate group-hover:text-primary transition-colors">
                                         {op.plant.stationName}
                                       </h4>
                                     </div>
@@ -1196,7 +1175,6 @@ export default function FleetMonitoringPage() {
                         <div className="p-12 text-center text-xs text-muted-foreground border border-dashed border-border/60 rounded-2xl flex flex-col items-center justify-center gap-2">
                           <Cpu size={24} className="text-muted-foreground/50" />
                           <span className="font-semibold text-foreground">No inverters configured for this plant</span>
-                          <span className="text-[11px] font-mono">Station ID: {activePlant.plant.stationId}</span>
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
@@ -1231,26 +1209,26 @@ export default function FleetMonitoringPage() {
                                         )}
                                       </button>
                                     </div>
-                                    <div className="text-[10px] text-muted-foreground truncate mt-0.5">
+                                    <div className="text-xs text-muted-foreground truncate mt-0.5">
                                       {inv.model} • <span className="font-mono text-foreground/80">#{invIndex + 1} of {activePlant.plant.stationName}</span>
                                     </div>
                                   </div>
 
-                                  <Badge
-                                    variant={isFault ? 'destructive' : isStandby ? 'warning' : 'success'}
-                                    className="text-[9px] font-mono py-0 gap-1 capitalize shrink-0"
-                                  >
-                                    <span
-                                      className={`size-1.5 rounded-full ${
-                                        isFault
-                                          ? 'bg-destructive animate-ping'
-                                          : isStandby
-                                          ? 'bg-amber-500'
-                                          : 'bg-emerald-500 animate-pulse'
-                                      }`}
-                                    />
-                                    {inv.status.toLowerCase()}
-                                  </Badge>
+                                  {inv.status !== 'ONLINE' && (
+                                    <Badge
+                                      variant={isFault ? 'destructive' : 'warning'}
+                                      className="text-[11px] font-mono py-0.5 px-2 gap-1 capitalize shrink-0"
+                                    >
+                                      <span
+                                        className={`size-1.5 rounded-full ${
+                                          isFault
+                                            ? 'bg-destructive animate-ping'
+                                            : 'bg-amber-500'
+                                        }`}
+                                      />
+                                      {inv.status.toLowerCase()}
+                                    </Badge>
+                                  )}
                                 </div>
 
                                 {/* Inverter Solar Curve Graph with Vertical Utilization Gauge Beside It */}
@@ -1269,7 +1247,7 @@ export default function FleetMonitoringPage() {
 
                                 {/* Battery SoC or Logger info */}
                                 {(inv.batterySoc > 0 || inv.loggerSn) && (
-                                  <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground pt-1 border-t border-border/40">
+                                  <div className="flex items-center justify-between text-xs font-mono text-muted-foreground pt-1.5 border-t border-border/40">
                                     <span>
                                       {inv.batterySoc > 0 && (
                                         <span className="text-emerald-500 font-semibold">⚡ Battery {inv.batterySoc}%</span>
