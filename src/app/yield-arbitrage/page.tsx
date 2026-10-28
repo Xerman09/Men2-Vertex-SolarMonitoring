@@ -222,6 +222,15 @@ export default function YieldArbitragePage() {
     ];
   }, [hourlyData, totals, selectedScopeTitle, targetCapacityKw]);
 
+  // Exact label for the monitored Solar PV series
+  const monitoredSolarLabel = React.useMemo(() => {
+    if (selectedInverter) return `Solar PV (${selectedInverter.deviceSn}) · Monitored`;
+    if (selectedPlant) return `Solar PV (${selectedPlant.stationName}) · Monitored`;
+    if (selectedAccount) return `Solar PV (${selectedAccount.name}) · Monitored`;
+    if (isFleetView) return 'Solar PV (Fleet Total) · Monitored';
+    return 'Solar PV Harvest · Monitored';
+  }, [selectedInverter, selectedPlant, selectedAccount, isFleetView]);
+
   return (
     <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-12">
       {/* Top Header with VOS Design Standards */}
@@ -440,35 +449,35 @@ export default function YieldArbitragePage() {
               }
               showIcon
             >
-              <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-help flex-wrap">
-                {selectedInverter ? (
-                  <Cpu className="w-5 h-5 text-cyan-400 shrink-0" />
-                ) : isFleetView ? (
-                  <Globe className="w-5 h-5 text-primary shrink-0" />
-                ) : selectedPlant ? (
-                  <Building2 className="w-5 h-5 text-amber-500 shrink-0" />
-                ) : (
-                  <Sun className="w-5 h-5 text-amber-500 shrink-0" />
-                )}
-                <span>{selectedScopeTitle}</span>
-                {selectedPlant && selectedAccount && selectedAccount.plants && selectedAccount.plants.length > 1 && (
-                  <span className="text-xs font-normal text-muted-foreground font-mono">
-                    ({selectedAccount.name})
-                  </span>
-                )}
-              </CardTitle>
+              <div className="space-y-1">
+                <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-help flex-wrap">
+                  {selectedInverter ? (
+                    <Cpu className="w-5 h-5 text-cyan-400 shrink-0" />
+                  ) : isFleetView ? (
+                    <Globe className="w-5 h-5 text-primary shrink-0" />
+                  ) : selectedPlant ? (
+                    <Building2 className="w-5 h-5 text-amber-500 shrink-0" />
+                  ) : (
+                    <Sun className="w-5 h-5 text-amber-500 shrink-0" />
+                  )}
+                  <span>{selectedScopeTitle}</span>
+                  {selectedPlant && selectedAccount && selectedAccount.plants && selectedAccount.plants.length > 1 && (
+                    <span className="text-xs font-normal text-muted-foreground font-mono">
+                      ({selectedAccount.name})
+                    </span>
+                  )}
+                </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">
+                  Diurnal Generation vs Facility Load & Battery ESS Profile
+                </CardDescription>
+              </div>
             </HoverInfo>
           </div>
-          <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> PV Harvest
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-yellow-500" /> Facility Load
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" /> Battery ESS
-            </span>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs font-mono border-amber-500/30 text-amber-500 bg-amber-500/10">
+              <span className="w-2 h-2 rounded-full bg-amber-500 mr-1.5 animate-pulse" />
+              Monitored: Solar PV Generation
+            </Badge>
           </div>
         </CardHeader>
         <CardContent className="p-5 pt-4">
@@ -496,12 +505,16 @@ export default function YieldArbitragePage() {
                       border: '1px solid rgba(255,255,255,0.1)',
                       fontSize: '12px',
                     }}
+                    formatter={(value: any, name: any) => [
+                      `${typeof value === 'number' ? value.toFixed(1) : value} kW`,
+                      name,
+                    ]}
                   />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                   <Area
                     type="monotone"
                     dataKey="solarYieldKw"
-                    name="Solar PV Harvest (kW)"
+                    name={monitoredSolarLabel}
                     stroke="#f59e0b"
                     strokeWidth={2}
                     fill="url(#solarGrad)"
@@ -509,7 +522,7 @@ export default function YieldArbitragePage() {
                   <Area
                     type="monotone"
                     dataKey="loadDemandKw"
-                    name="Industrial Load Demand (kW)"
+                    name="Facility Demand (kW)"
                     stroke="#6366f1"
                     strokeWidth={2}
                     fill="url(#loadGrad)"
