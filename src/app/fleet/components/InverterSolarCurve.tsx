@@ -188,32 +188,32 @@ export function InverterSolarCurve({
   return (
     <div className={`relative w-full select-none ${className}`}>
       {/* Telemetry Header Above Graph: Never covers the curve */}
-      <div className="flex items-center justify-between text-xs sm:text-[12.5px] font-mono text-muted-foreground mb-1.5 px-0.5 shrink-0 min-h-[20px] leading-tight">
+      <div className="flex items-center justify-between text-[7.5px] sm:text-[8px] font-mono text-muted-foreground mb-1 px-0.5 shrink-0 min-h-[16px] leading-tight">
         {hoveredPoint ? (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="flex items-center gap-1 font-bold text-foreground bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs">
-              <Clock className="size-3 text-primary" />
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="flex items-center gap-1 font-bold text-foreground bg-primary/10 text-primary px-1 py-0.2 rounded text-[7.5px]">
+              <Clock className="size-2 text-primary" />
               {String(hoveredPoint.hour).padStart(2, '0')}:00
             </span>
-            <div className="flex items-center gap-1 text-xs">
-              <span className="size-2 rounded-full inline-block shrink-0 bg-[#f59e0b]" />
+            <div className="flex items-center gap-1">
+              <span className="size-1.5 rounded-full inline-block shrink-0 bg-[#f59e0b]" />
               <span className="text-muted-foreground/80">PV:</span>
               <span className="font-bold text-amber-500">{hoveredPoint.power.toFixed(2)} kW</span>
             </div>
             {dailyYieldKwh > 0 && (
-              <span className="text-muted-foreground/75 text-[11px] sm:text-xs">
+              <span className="text-muted-foreground/70">
                 (Yield: <strong className="text-foreground/90 font-semibold">{dailyYieldKwh.toFixed(1)} kWh</strong>)
               </span>
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-2 flex-wrap text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1">
-              <span className="size-2 rounded-full inline-block shrink-0 bg-amber-500 animate-pulse" />
+              <span className="size-1.5 rounded-full inline-block shrink-0 bg-amber-500 animate-pulse" />
               <span className="text-muted-foreground/80">Live:</span>
               <span className="font-bold text-amber-500">{liveSolarPowerKw.toFixed(1)} kW</span>
               {dailyYieldKwh > 0 && (
-                <span className="text-amber-500/80 font-normal text-[11px] sm:text-xs">
+                <span className="text-amber-500/80 font-normal text-[7px]">
                   ({dailyYieldKwh.toFixed(1)} kWh)
                 </span>
               )}
@@ -223,18 +223,18 @@ export function InverterSolarCurve({
       </div>
 
       <div
-        className="relative w-full overflow-hidden rounded-md bg-card/70 border border-border/40 p-1.5 flex items-stretch gap-1.5"
+        className="relative w-full overflow-hidden rounded-md bg-card/70 border border-border/40 p-1 flex items-stretch gap-1"
         style={{ height: `${height}px`, minHeight: `${height}px` }}
       >
         {/* Inverter Mini Y-Axis Column */}
-        <div className="flex flex-col justify-between items-end pr-1.5 text-[11px] sm:text-xs font-mono font-medium text-muted-foreground shrink-0 select-none pb-3 pt-0.5 w-11 sm:w-12 border-r border-border/30">
+        <div className="flex flex-col justify-between items-end pr-1 text-[7px] font-mono text-muted-foreground/80 shrink-0 select-none pb-3 pt-0.5 w-7 sm:w-8 border-r border-border/30">
           <div className="flex items-center justify-end w-full leading-none">
-            <span className="font-bold text-foreground">{formatYAxisLabel(maxPower)}</span>
+            <span className="font-semibold text-foreground/90">{formatYAxisLabel(maxPower)}</span>
           </div>
-          <div className="flex items-center justify-end w-full leading-none text-muted-foreground">
+          <div className="flex items-center justify-end w-full leading-none text-muted-foreground/70">
             <span>{formatYAxisLabel(maxPower * 0.5)}</span>
           </div>
-          <div className="flex items-center justify-end w-full leading-none text-muted-foreground/80">
+          <div className="flex items-center justify-end w-full leading-none text-muted-foreground/70">
             <span>0</span>
           </div>
         </div>
@@ -367,7 +367,7 @@ export function InverterSolarCurve({
           </svg>
 
           {/* Mini time hints */}
-          <div className="flex items-center justify-between text-[10.5px] sm:text-[11px] font-mono text-muted-foreground/80 px-1 pt-1 border-t border-border/20 leading-none">
+          <div className="flex items-center justify-between text-[6.5px] font-mono text-muted-foreground/50 px-0.5 pt-0.5 border-t border-border/20 leading-none">
             <span>06:00</span>
             <span>12:00</span>
             <span>18:00</span>
@@ -378,7 +378,7 @@ export function InverterSolarCurve({
         <HoverInfo
           title="Inverter Operating Status"
           content={
-            <div className="text-xs space-y-1.5 min-w-[160px]">
+            <div className="text-[11px] space-y-1 min-w-[150px]">
               <p className="text-muted-foreground">Inverter load utilization relative to rated capacity.</p>
               <div className="pt-1 border-t border-border/50 flex justify-between font-mono">
                 <span className="text-muted-foreground">Live Power:</span>
@@ -409,8 +409,8 @@ export function InverterSolarCurve({
             </div>
           }
         >
-          <div className="flex flex-col items-center justify-between shrink-0 select-none border-l border-border/30 pl-1.5 sm:pl-2 w-9 sm:w-11 h-full py-0.5 cursor-help">
-            <span className="text-[10px] sm:text-[11px] uppercase tracking-wider font-mono text-muted-foreground font-bold leading-none">
+          <div className="flex flex-col items-center justify-between shrink-0 select-none border-l border-border/30 pl-1 sm:pl-1.5 w-7 sm:w-8 h-full py-0.5 cursor-help">
+            <span className="text-[7px] uppercase tracking-wider font-mono text-muted-foreground font-semibold leading-none">
               Util
             </span>
 
@@ -429,7 +429,7 @@ export function InverterSolarCurve({
             </div>
 
             <span
-              className={`text-[11px] sm:text-xs font-mono font-bold leading-none ${
+              className={`text-[7.5px] sm:text-[8px] font-mono font-bold leading-none ${
                 isFault ? 'text-destructive' : isStandby ? 'text-amber-500' : 'text-emerald-500'
               }`}
             >

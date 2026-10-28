@@ -50,7 +50,7 @@ export function SelfConsumptionChart({
           }
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30 flex flex-col items-center justify-center text-center h-full min-h-[58px] gap-0.5">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground font-mono font-medium block">Utilization Rate</span>
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono font-medium block">Utilization Rate</span>
             <span className="text-sm sm:text-base font-bold font-mono text-emerald-500">{selfConsumptionMetrics.utilizationPct}%</span>
           </div>
         </HoverInfo>
@@ -68,7 +68,7 @@ export function SelfConsumptionChart({
           }
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/30 flex flex-col items-center justify-center text-center h-full min-h-[58px] gap-0.5">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground font-mono font-medium block">Self-Consumption</span>
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono font-medium block">Self-Consumption</span>
             <span className="text-sm sm:text-base font-bold font-mono text-yellow-500">{selfConsumptionMetrics.productionPct}%</span>
           </div>
         </HoverInfo>
@@ -86,7 +86,7 @@ export function SelfConsumptionChart({
           }
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30 flex flex-col items-center justify-center text-center h-full min-h-[58px] gap-0.5">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground font-mono font-medium block">Self-Consumed kWh</span>
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono font-medium block">Self-Consumed kWh</span>
             <span className="text-sm sm:text-base font-bold font-mono text-emerald-400">{selfConsumptionMetrics.selfConsumedKwh}</span>
           </div>
         </HoverInfo>
@@ -104,7 +104,7 @@ export function SelfConsumptionChart({
           }
         >
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/30 flex flex-col items-center justify-center text-center h-full min-h-[58px] gap-0.5">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground font-mono font-medium block">Grid Import</span>
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono font-medium block">Grid Import</span>
             <span className="text-sm sm:text-base font-bold font-mono text-purple-400">{selfConsumptionMetrics.totalImportKwh}</span>
           </div>
         </HoverInfo>
@@ -204,10 +204,10 @@ export function SelfConsumptionChart({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-xs font-mono opacity-80" />
-                <YAxis domain={[0, 100]} stroke="currentColor" className="text-xs font-mono opacity-80" unit="%" />
-                <Tooltip contentStyle={{ backgroundColor: 'rgba(23,31,51,0.95)', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.1)', fontSize: '12px' }} />
-                <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '4px' }} />
+                <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
+                <YAxis domain={[0, 100]} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="%" />
+                <Tooltip contentStyle={{ backgroundColor: 'rgba(23,31,51,0.95)', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.1)', fontSize: '11px' }} />
+                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
                 <ReferenceLine
                   isFront
                   x={nowSlotStr}

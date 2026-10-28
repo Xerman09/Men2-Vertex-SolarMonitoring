@@ -265,12 +265,12 @@ export function Header({
             {/* Dropdown Menu - Fully responsive to compressed width and height */}
             {showAccountDropdown && (
               <div className="fixed sm:absolute top-16 sm:top-full left-3 right-3 sm:left-0 sm:right-auto mt-1.5 sm:w-88 max-h-[calc(100dvh-5rem)] flex flex-col overflow-hidden bg-popover/95 border border-border/70 rounded-2xl shadow-2xl p-2.5 z-50 backdrop-blur-md animate-in fade-in-80">
-                <div className="px-2 py-1 text-xs font-mono uppercase tracking-wider text-muted-foreground border-b border-border/60 mb-2 flex items-center justify-between shrink-0">
+                <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground border-b border-border/60 mb-2 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2">
                     <span>{isConsumer ? 'Your Solar Plants' : 'Monitor Accounts & Plants'}</span>
                     {(isFetchingDeye || syncing || isPlantSwitching) && (
-                      <span className="flex items-center gap-1 text-xs text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/30 font-bold lowercase tracking-normal motion-safe:animate-pulse">
-                        <RefreshCw size={11} className="animate-spin text-cyan-400" />
+                      <span className="flex items-center gap-1 text-[9px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/30 font-bold lowercase tracking-normal motion-safe:animate-pulse">
+                        <RefreshCw size={9} className="animate-spin text-cyan-400" />
                         syncing...
                       </span>
                     )}
@@ -279,7 +279,7 @@ export function Header({
                     {accounts.some((a) => (a.plants?.length || 0) > 0) && (
                       <button
                         onClick={toggleExpandAll}
-                        className="text-primary hover:underline cursor-pointer lowercase text-xs"
+                        className="text-primary hover:underline cursor-pointer lowercase text-[10px]"
                       >
                         {accounts.every((a) => isAccountExpanded(a.id)) ? 'collapse all' : 'expand all'}
                       </button>
@@ -516,16 +516,16 @@ export function Header({
                                   {/* Sub-node: Individual Inverters (Informational hardware list, non-clickable) */}
                                   {hasInverters && isInvertersExpanded && (
                                     <div className="pl-4 pr-1 py-1 space-y-1 bg-muted/20 rounded-lg border border-border/40 ml-2 animate-in fade-in-50">
-                                      <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground px-1.5 py-0.5 flex items-center justify-between">
+                                      <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground px-1.5 py-0.5 flex items-center justify-between">
                                         <span className="flex items-center gap-1">
-                                          <Cpu size={12} className="text-cyan-400" />
+                                          <Cpu size={10} className="text-cyan-400" />
                                           Inverters ({effectiveInverters.length})
                                         </span>
                                       </div>
                                       {effectiveInverters.map((inv) => (
                                         <div
                                           key={inv.deviceSn}
-                                          className="flex items-center justify-between px-2 py-1 rounded-md text-xs font-mono select-none bg-muted/15 border border-border/30 text-muted-foreground"
+                                          className="flex items-center justify-between px-2 py-1 rounded-md text-[10.5px] font-mono select-none bg-muted/15 border border-border/30 text-muted-foreground"
                                         >
                                           <div className="flex items-center gap-1.5 truncate">
                                             <span
@@ -542,7 +542,7 @@ export function Header({
                                             </span>
                                           </div>
                                           <div className="flex items-center gap-1.5 shrink-0">
-                                            <span className="text-xs text-muted-foreground/80 font-mono">
+                                            <span className="text-[9.5px] text-muted-foreground/80 font-mono">
                                               {inv.ratedKw ? `${inv.ratedKw} kW` : inv.deviceSn}
                                             </span>
                                           </div>
