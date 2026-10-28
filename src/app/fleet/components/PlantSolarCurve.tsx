@@ -71,6 +71,8 @@ interface HoverData {
   x: number;
   solarY: number;
   loadY: number;
+  svgXPercent: number;
+  svgYPercent: number;
   isRightHalf: boolean;
 }
 
@@ -245,8 +247,9 @@ export function PlantSolarCurve({
   }, [capacityKw, livePowerKw, currentDemand, points]);
 
   const coords = useMemo(() => {
-    return points.map((p, idx) => {
-      const x = paddingX + (idx / Math.max(1, points.length - 1)) * plotWidth;
+    return points.map((p) => {
+      // Linear mapping of 0..24 hours across [paddingX, paddingX + plotWidth]
+      const x = paddingX + (Math.min(24, Math.max(0, p.hour)) / 24) * plotWidth;
       const rawSolarY = paddingY + plotHeight - (p.solar / maxPower) * plotHeight;
       const rawLoadY = paddingY + plotHeight - (p.load / maxPower) * plotHeight;
       const solarY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawSolarY));
@@ -258,7 +261,7 @@ export function PlantSolarCurve({
   // Elapsed curve coordinates only up to current time (no future values!)
   const elapsedCoords = useMemo(() => {
     const elapsed = coords.filter((c) => c.hour <= nowHour);
-    const nowX = paddingX + (Math.min(24, nowHour) / 24) * plotWidth;
+    const nowX = paddingX + (Math.min(24, Math.max(0, nowHour)) / 24) * plotWidth;
     const rawNowSolarY = paddingY + plotHeight - (livePowerKw / maxPower) * plotHeight;
     const rawNowLoadY = paddingY + plotHeight - (currentDemand / maxPower) * plotHeight;
     const nowSolarY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawNowSolarY));
@@ -266,7 +269,7 @@ export function PlantSolarCurve({
 
     const list = [...elapsed];
     // Ensure final coordinate anchors precisely at the current moment
-    if (list.length === 0 || Math.abs(list[list.length - 1].x - nowX) > 2) {
+    if (list.length === 0 || Math.abs(list[list.length - 1].x - nowX) > 1) {
       list.push({
         hour: nowHour,
         label: `${String(Math.floor(nowHour)).padStart(2, '0')}:${String(Math.floor((nowHour % 1) * 60)).padStart(2, '0')}`,
@@ -322,72 +325,37 @@ export function PlantSolarCurve({
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
-      if (!rect.width) return;
+      if (!rect.width || elapsedCoords.length === 0) return;
       const clientX = e.clientX - rect.left;
-      const clampedX = Math.max(paddingX, Math.min(width - paddingX, (clientX / rect.width) * width));
-      const ratio = (clampedX - paddingX) / plotWidth;
+      const svgX = (clientX / rect.width) * width;
+      const clampedSvgX = Math.max(paddingX, Math.min(width - paddingX, svgX));
 
-      // Snapped hour up to current time (no future prediction)
-      const rawHour = Math.max(0, Math.min(nowHour, ratio * 23));
-      const totalMinutes = Math.round(rawHour * 12) * 5;
-      const clampedMinutes = Math.min(Math.floor(nowHour * 60), totalMinutes);
-      const snapHour = Math.floor(clampedMinutes / 60);
-      const snapMinute = clampedMinutes % 60;
-      const snapHourFloat = snapHour + snapMinute / 60;
-      const timeStr = `${String(snapHour).padStart(2, '0')}:${String(snapMinute).padStart(2, '0')}`;
+      // Find the closest point in elapsedCoords to the cursor position
+      let closest = elapsedCoords[0];
+      let minDiff = Math.abs(elapsedCoords[0].x - clampedSvgX);
 
-      let solar = 0;
-      let load = 0;
-      let gridNet = 0;
-
-      if (historyPoints && historyPoints.length > 0 && points.length > 0) {
-        // Nearest index in 5-min intervals
-        const idx = Math.min(
-          points.length - 1,
-          Math.max(0, Math.round((snapHourFloat / 24) * (points.length - 1)))
-        );
-        const pt = points[idx];
-        solar = pt.solar;
-        load = pt.load;
-        gridNet = pt.gridNet;
-      } else {
-        if (snapHourFloat >= 5.5 && snapHourFloat <= 18.5) {
-          const norm = (snapHourFloat - 5.5) / 13;
-          const rad = norm * Math.PI;
-          const curveFactor = Math.pow(Math.sin(rad), 1.25);
-          solar = peakEstimate * curveFactor;
-
-          if (Math.abs(snapHourFloat - nowHour) <= 1.5 && livePowerKw > 0) {
-            const weight = 1 - Math.abs(snapHourFloat - nowHour) / 1.5;
-            solar = solar * (1 - weight) + livePowerKw * weight;
-          }
+      for (let i = 1; i < elapsedCoords.length; i++) {
+        const diff = Math.abs(elapsedCoords[i].x - clampedSvgX);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closest = elapsedCoords[i];
         }
-
-        const df = snapHourFloat >= 8 && snapHourFloat <= 17 ? 1.25 : 0.85;
-        load = baselineLoad * df;
-        if (Math.abs(snapHourFloat - nowHour) <= 1.5 && currentDemand > 0) {
-          const weight = 1 - Math.abs(snapHourFloat - nowHour) / 1.5;
-          load = load * (1 - weight) + currentDemand * weight;
-        }
-        gridNet = parseFloat((solar - load).toFixed(2));
       }
 
-      const plotX = paddingX + (snapHourFloat / 23) * plotWidth;
-      const solarY = paddingY + plotHeight - (Math.min(maxPower, solar) / maxPower) * plotHeight;
-      const loadY = paddingY + plotHeight - (Math.min(maxPower, load) / maxPower) * plotHeight;
-
       setHoveredPoint({
-        timeStr,
-        solar: parseFloat(Math.max(0, solar).toFixed(2)),
-        load: parseFloat(Math.max(0, load).toFixed(2)),
-        gridNet,
-        x: plotX,
-        solarY,
-        loadY,
-        isRightHalf: plotX > width * 0.55,
+        timeStr: closest.label,
+        solar: closest.solar,
+        load: closest.load,
+        gridNet: closest.gridNet,
+        x: closest.x,
+        solarY: closest.solarY,
+        loadY: closest.loadY,
+        svgXPercent: (closest.x / width) * 100,
+        svgYPercent: (closest.solarY / svgHeight) * 100,
+        isRightHalf: closest.x > width * 0.55,
       });
     },
-    [paddingX, width, plotWidth, nowHour, historyPoints, points, peakEstimate, livePowerKw, baselineLoad, currentDemand, paddingY, plotHeight, maxPower]
+    [elapsedCoords, paddingX, width, svgHeight]
   );
 
   const heightStyle = height !== undefined
@@ -644,13 +612,61 @@ export function PlantSolarCurve({
               )}
             </svg>
 
+            {/* Floating Glassmorphic Tooltip matching Analytics Recharts Tooltip */}
+            {hoveredPoint && (
+              <div
+                className="pointer-events-none absolute z-30 transition-all duration-75"
+                style={{
+                  left: hoveredPoint.isRightHalf ? undefined : `calc(${hoveredPoint.svgXPercent}% + 8px)`,
+                  right: hoveredPoint.isRightHalf ? `calc(${100 - hoveredPoint.svgXPercent}% + 8px)` : undefined,
+                  top: '4px',
+                }}
+              >
+                <div className="rounded-lg border border-border/80 bg-popover/95 px-2.5 py-1.5 text-[9px] shadow-xl backdrop-blur-md min-w-[135px] sm:min-w-[150px]">
+                  <div className="font-semibold text-foreground border-b border-border/60 pb-0.5 mb-1 flex items-center justify-between font-mono">
+                    <span>Interval: {hoveredPoint.timeStr}</span>
+                    <span className="text-[8px] text-amber-500 font-bold">5-min</span>
+                  </div>
+                  <div className="space-y-0.5 font-mono">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1 text-muted-foreground text-[8.5px]">
+                        <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_SOLAR }} />
+                        Solar:
+                      </span>
+                      <span className="font-bold text-amber-500">
+                        {hoveredPoint.solar.toFixed(2)} kW
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1 text-muted-foreground text-[8.5px]">
+                        <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_LOAD }} />
+                        Demand:
+                      </span>
+                      <span className="font-bold text-indigo-400">
+                        {hoveredPoint.load.toFixed(2)} kW
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1 text-muted-foreground text-[8.5px]">
+                        <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_GRID }} />
+                        Grid Net:
+                      </span>
+                      <span className={`font-bold ${hoveredPoint.gridNet >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
+                        {hoveredPoint.gridNet >= 0 ? `+${hoveredPoint.gridNet.toFixed(2)}` : hoveredPoint.gridNet.toFixed(2)} kW
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Time Axis Labels: accurately spaced across diurnal cycle */}
             <div className="flex items-center justify-between text-[7.5px] font-mono text-muted-foreground/60 px-1 pt-1 border-t border-border/30">
               <span>00:00</span>
               <span>06:00</span>
               <span>12:00</span>
               <span>18:00</span>
-              <span>23:00</span>
+              <span>24:00</span>
             </div>
           </div>
 

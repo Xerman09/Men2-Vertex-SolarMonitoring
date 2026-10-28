@@ -380,7 +380,15 @@ export default function AnalyticsDashboardPage() {
       });
       return cap > 0 ? cap : 120;
     }
-    return selectedPlant?.installedCapacityKw || selectedAccount?.capacityKw || 120;
+    if (selectedPlant) {
+      return selectedPlant.installedCapacityKw || 120;
+    }
+    if (selectedAccount) {
+      const plantSum = selectedAccount.plants?.reduce((sum, p) => sum + (p.installedCapacityKw || 0), 0);
+      if (plantSum && plantSum > 0) return plantSum;
+      return selectedAccount.capacityKw > 0 ? selectedAccount.capacityKw : 120;
+    }
+    return 120;
   }, [isFleetView, accounts, selectedPlant, selectedAccount]);
 
   // Effective capacity when isolated to a single inverter or plant
@@ -588,6 +596,45 @@ export default function AnalyticsDashboardPage() {
     return false;
   }, [selectedPlant, isFleetView, accounts]);
 
+  // Live telemetry aggregators for the current scope (Plant, Inverter, or Account summing its stations)
+  const effectiveLiveSolar = useMemo(() => {
+    if (selectedInverter) return selectedInverter.liveSolarPowerKw;
+    if (selectedPlant) return selectedPlant.liveSolarPowerKw;
+    if (selectedAccount) {
+      if (selectedAccount.plants && selectedAccount.plants.length > 0) {
+        const sum = selectedAccount.plants.reduce((acc, p) => acc + (p.liveSolarPowerKw || 0), 0);
+        if (sum > 0) return sum;
+      }
+      return selectedAccount.liveSolarPowerKw;
+    }
+    return undefined;
+  }, [selectedInverter, selectedPlant, selectedAccount]);
+
+  const effectiveLiveDemand = useMemo(() => {
+    if (selectedPlant) return selectedPlant.consumptionPowerKw;
+    if (selectedAccount) {
+      if (selectedAccount.plants && selectedAccount.plants.length > 0) {
+        const sum = selectedAccount.plants.reduce((acc, p) => acc + (p.consumptionPowerKw || 0), 0);
+        if (sum > 0) return sum;
+      }
+      return selectedAccount.consumptionPowerKw;
+    }
+    return undefined;
+  }, [selectedPlant, selectedAccount]);
+
+  const effectiveDailyYield = useMemo(() => {
+    if (selectedInverter) return selectedInverter.dailyYieldKwh;
+    if (selectedPlant) return selectedPlant.dailyYieldKwh;
+    if (selectedAccount) {
+      if (selectedAccount.plants && selectedAccount.plants.length > 0) {
+        const sum = selectedAccount.plants.reduce((acc, p) => acc + (p.dailyYieldKwh || 0), 0);
+        if (sum > 0) return sum;
+      }
+      return selectedAccount.dailyYieldKwh;
+    }
+    return undefined;
+  }, [selectedInverter, selectedPlant, selectedAccount]);
+
   // Calculate high-level KPIs and multi-period datasets
   const analyticsSummary = useMemo<AnalyticsSummary>(() => {
     const liveSoc = selectedPlant?.batterySoc ?? selectedAccount?.batterySoc;
@@ -595,10 +642,10 @@ export default function AnalyticsDashboardPage() {
     return computeAnalyticsSummary(isolatedHourlyData, effectiveCapacityKw, hasBattery, {
       batterySoc: liveSoc,
       inverterEfficiencyPct: invEff,
-      liveSolarPowerKw: selectedPlant?.liveSolarPowerKw ?? selectedAccount?.liveSolarPowerKw,
-      dailyYieldKwh: selectedPlant?.dailyYieldKwh ?? selectedAccount?.dailyYieldKwh,
+      liveSolarPowerKw: effectiveLiveSolar,
+      dailyYieldKwh: effectiveDailyYield,
     });
-  }, [isolatedHourlyData, effectiveCapacityKw, hasBattery, selectedPlant, selectedAccount, selectedInverter]);
+  }, [isolatedHourlyData, effectiveCapacityKw, hasBattery, selectedPlant, selectedAccount, selectedInverter, effectiveLiveSolar, effectiveDailyYield]);
 
   const dailyPoints7D = useMemo<DailyAnalyticsPoint[]>(() => {
     return generateDailyAnalytics(
@@ -630,8 +677,8 @@ export default function AnalyticsDashboardPage() {
   const diurnalChartData = useMemo(() => {
     const raw = isolatedHourlyData.length > 0 ? isolatedHourlyData : [];
     const nowHour = new Date().getHours() + new Date().getMinutes() / 60;
-    const liveSolar = selectedPlant?.liveSolarPowerKw ?? selectedAccount?.liveSolarPowerKw ?? selectedInverter?.liveSolarPowerKw;
-    const liveDemand = selectedPlant?.consumptionPowerKw ?? selectedAccount?.consumptionPowerKw;
+    const liveSolar = effectiveLiveSolar;
+    const liveDemand = effectiveLiveDemand;
 
     return raw.map((pt) => {
       const parts = pt.hour.split(':');

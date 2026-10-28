@@ -105,9 +105,10 @@ export function getMockHourlyEnergyPoints(
       ? currentHour * 60 + now.getMinutes()
       : now.getHours() * 60 + now.getMinutes();
 
-  // Deterministic variance factor based on date string (if specified)
+  // Deterministic variance factor based on date string (for historical dates).
+  // For Today, keep dateVariance = 1.0 so Today's baseline is always reference clear-sky calibrated across all views.
   let dateVariance = 1.0;
-  if (date) {
+  if (date && !isToday) {
     let hash = 0;
     for (let c = 0; c < date.length; c++) {
       hash = (hash * 31 + date.charCodeAt(c)) & 0xffffffff;
