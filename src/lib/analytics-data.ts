@@ -258,13 +258,23 @@ export function generateBatteryHourlyTelemetry(
   return result;
 }
 
+export interface AnalyticsSummaryOptions {
+  batterySoc?: number;
+  inverterEfficiencyPct?: number;
+  pvModuleEfficiencyPct?: number;
+  ambientTempC?: number;
+  liveSolarPowerKw?: number;
+  dailyYieldKwh?: number;
+}
+
 /**
  * Compute aggregate KPIs from hourly telemetry points and plant metadata
  */
 export function computeAnalyticsSummary(
   hourly: HourlyEnergyPoint[],
   capacityKw: number = 120,
-  hasBattery?: boolean
+  hasBattery?: boolean,
+  options?: AnalyticsSummaryOptions
 ): AnalyticsSummary {
   const elapsed = hourly.filter((pt) => pt.isElapsed !== false && pt.solarYieldKw !== null);
   const data = elapsed.length > 0 ? elapsed : hourly;
@@ -314,14 +324,30 @@ export function computeAnalyticsSummary(
 
   // Fallbacks if data empty or zero
   if (totalSolarYield === 0) {
-    totalSolarYield = 512.4;
-    peakSolar = 119.5;
+    const scale = capacityKw > 0 ? capacityKw / 120 : 1;
+    totalSolarYield = Number((512.4 * scale).toFixed(1));
+    peakSolar = Number((119.5 * scale).toFixed(1));
     peakHour = '12:15';
-    totalLoad = 478.2;
-    totalExport = 94.6;
-    totalImport = 60.4;
-    totalBatCharge = hasExplicitBattery ? 48.2 : 0;
-    totalBatDischarge = hasExplicitBattery ? 45.1 : 0;
+    totalLoad = Number((478.2 * scale).toFixed(1));
+    totalExport = Number((94.6 * scale).toFixed(1));
+    totalImport = Number((60.4 * scale).toFixed(1));
+    totalBatCharge = hasExplicitBattery ? Number((48.2 * scale).toFixed(1)) : 0;
+    totalBatDischarge = hasExplicitBattery ? Number((45.1 * scale).toFixed(1)) : 0;
+  }
+
+  // If reported daily yield from live hardware/telemetry is available, honor it exactly
+  if (options?.dailyYieldKwh !== undefined && options.dailyYieldKwh > 0) {
+    const rawSum = totalSolarYield;
+    totalSolarYield = options.dailyYieldKwh;
+    if (rawSum > 0) {
+      const ratio = options.dailyYieldKwh / rawSum;
+      totalExport = Number((totalExport * ratio).toFixed(1));
+    }
+  }
+  if (options?.liveSolarPowerKw !== undefined && options.liveSolarPowerKw > 0) {
+    if (options.liveSolarPowerKw > peakSolar) {
+      peakSolar = options.liveSolarPowerKw;
+    }
   }
 
   const directSelfCons = Math.max(0, totalSolarYield - totalExport - (hasExplicitBattery ? totalBatCharge : 0));
@@ -329,8 +355,70 @@ export function computeAnalyticsSummary(
   const selfConsPct = Number(Math.min(100, (totalSelfConsumed / (totalSolarYield || 1)) * 100).toFixed(1));
   const selfSufficiencyPct = Number(Math.min(100, (totalSelfConsumed / (totalLoad || 1)) * 100).toFixed(1));
   const netBalance = Number((totalExport - totalImport).toFixed(1));
-  const pr = Number(Math.min(92, Math.max(76, (totalSolarYield / ((capacityKw * 4.8) || 1)) * 100)).toFixed(1));
+
+  // Dynamic PR calculation: Actual Generation / Reference Clear-Sky Generation for elapsed daytime hours
+  let clearSkyElapsedKwh = 0;
+  data.forEach((pt) => {
+    const parts = pt.hour.split(':');
+    const h = parseInt(parts[0], 10) || 0;
+    const m = parseInt(parts[1], 10) || 0;
+    const hDec = h + m / 60;
+    if (hDec >= 5.75 && hDec <= 18.25) {
+      const prog = (hDec - 5.75) / (18.25 - 5.75);
+      const clearSkyKw = Math.sin(prog * Math.PI) * (capacityKw * 0.95);
+      clearSkyElapsedKwh += clearSkyKw * hoursPerStep;
+    }
+  });
+
+  let pr = 82.5;
+  if (clearSkyElapsedKwh > 0 && totalSolarYield > 0) {
+    const rawPr = (totalSolarYield / clearSkyElapsedKwh) * 100;
+    pr = Number(Math.min(92.0, Math.max(72.0, rawPr)).toFixed(1));
+  } else {
+    const pshEquiv = (capacityKw * 4.8) || 1;
+    pr = Number(Math.min(92.0, Math.max(76.0, (totalSolarYield / pshEquiv) * 100)).toFixed(1));
+  }
+
   const specYield = Number((totalSolarYield / (capacityKw || 1)).toFixed(2));
+
+  // Dynamic Inverter Efficiency based on loading ratio (P_ac / P_rated)
+  let inverterEfficiency = 98.4;
+  if (options?.inverterEfficiencyPct !== undefined && options.inverterEfficiencyPct > 0) {
+    inverterEfficiency = Number(options.inverterEfficiencyPct.toFixed(1));
+  } else {
+    const loadRatio = capacityKw > 0 ? Math.min(1.0, peakSolar / capacityKw) : 0.7;
+    if (loadRatio < 0.15) {
+      inverterEfficiency = Number((94.5 + loadRatio * 20).toFixed(1));
+    } else if (loadRatio < 0.40) {
+      inverterEfficiency = Number((97.2 + (loadRatio - 0.15) * 4.8).toFixed(1));
+    } else {
+      const thermalDerate = Math.max(0, (loadRatio - 0.85) * 0.4);
+      inverterEfficiency = Number((98.5 - thermalDerate).toFixed(1));
+    }
+  }
+
+  // Dynamic PV Module Efficiency based on cell temperature derating
+  let pvModuleEfficiency = 21.8;
+  if (options?.pvModuleEfficiencyPct !== undefined && options.pvModuleEfficiencyPct > 0) {
+    pvModuleEfficiency = Number(options.pvModuleEfficiencyPct.toFixed(1));
+  } else {
+    const ambTemp = options?.ambientTempC ?? 30.0;
+    const irradianceRatio = capacityKw > 0 ? Math.min(1.0, peakSolar / capacityKw) : 0.75;
+    const cellTemp = ambTemp + irradianceRatio * 24.0;
+    const tempDelta = Math.max(0, cellTemp - 25.0);
+    const tempDeratingFactor = 1 - (tempDelta * 0.0035);
+    pvModuleEfficiency = Number((21.8 * tempDeratingFactor).toFixed(1));
+  }
+
+  // Dynamic Battery SOC
+  let currentSoc = 0;
+  if (hasExplicitBattery) {
+    if (options?.batterySoc !== undefined && options.batterySoc >= 0) {
+      currentSoc = options.batterySoc;
+    } else {
+      currentSoc = 68.0;
+    }
+  }
 
   // Economic & Ecological impact
   const savings = Number((totalSelfConsumed * 0.34 + totalExport * 0.12).toFixed(2));
@@ -352,12 +440,12 @@ export function computeAnalyticsSummary(
     hasBattery: hasExplicitBattery,
     batteryCycles: hasExplicitBattery ? 1.8 : 0,
     batteryRoundTripEfficiencyPct: hasExplicitBattery ? 94.2 : 0,
-    currentSocPct: hasExplicitBattery ? 68 : 0,
+    currentSocPct: Number(currentSoc.toFixed(1)),
     totalBatCharge: Number(totalBatCharge.toFixed(1)),
     totalBatDischarge: Number(totalBatDischarge.toFixed(1)),
     performanceRatioPct: pr,
-    inverterEfficiencyPct: 98.4,
-    pvModuleEfficiencyPct: 21.8,
+    inverterEfficiencyPct: inverterEfficiency,
+    pvModuleEfficiencyPct: pvModuleEfficiency,
     specificYieldKwhKwp: specYield,
     totalSavingsUsd: savings,
     co2AvoidedKg: co2,

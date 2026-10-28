@@ -119,6 +119,8 @@ export interface PlantInfo {
   dailyYieldKwh?: number;
   gridPowerKw?: number;
   consumptionPowerKw?: number;
+  batterySoc?: number;
+  batteryPowerKw?: number;
   devices: DeviceInfo[];
 }
 
@@ -170,6 +172,8 @@ export interface AccountSummary {
   dailyYieldKwh: number;
   gridPowerKw?: number;
   consumptionPowerKw?: number;
+  batterySoc?: number;
+  batteryPowerKw?: number;
   capacityKw: number;
   status: 'ONLINE' | 'OFFLINE' | 'ALARM' | 'SIMULATED';
   lastPingMs: number;

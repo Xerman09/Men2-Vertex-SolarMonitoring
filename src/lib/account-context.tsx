@@ -76,6 +76,16 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isPlantSwitching]);
 
+  useEffect(() => {
+    if (isFetchingDeye) {
+      const timer = setTimeout(() => {
+        setIsFetchingDeye(false);
+        setFetchingStage(null);
+      }, 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [isFetchingDeye]);
+
   const setFetchingDeye = useCallback((fetching: boolean, stage: string | null = null) => {
     setIsFetchingDeye(fetching);
     setFetchingStage(stage);
@@ -212,12 +222,11 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     if (!hasCachedData) {
       setIsPlantSwitchingState(true);
       setSwitchingPlantName(plantName);
-      setFetchingDeye(true, `Synchronizing ${plantName} Telemetry...`);
     }
 
     setSelectedStationId(String(id));
     setSelectedInverterSn('ALL');
-  }, [selectedStationId, selectedAccount, selectedAccountId, setFetchingDeye]);
+  }, [selectedStationId, selectedAccount, selectedAccountId]);
 
   const handleSetSelectedAccountId = useCallback((id: string) => {
     if (isConsumer) {
@@ -238,13 +247,12 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       if (!hasCachedData) {
         setIsPlantSwitchingState(true);
         setSwitchingPlantName(accName);
-        setFetchingDeye(true, `Switching to ${accName}...`);
       }
     }
     setSelectedAccountId(normalized);
     setSelectedStationId('ALL');
     setSelectedInverterSn('ALL');
-  }, [isConsumer, accounts, selectedAccountId, setFetchingDeye]);
+  }, [isConsumer, accounts, selectedAccountId]);
 
   const selectAccountAndPlant = useCallback((accountId: string, stationId: string = 'ALL') => {
     const cleanStationId = String(stationId);
@@ -262,7 +270,6 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     if (!hasCachedData) {
       setIsPlantSwitchingState(true);
       setSwitchingPlantName(plantName);
-      setFetchingDeye(true, `Synchronizing ${plantName} Telemetry...`);
     }
 
     if (isConsumer && accounts.length > 0) {
@@ -275,7 +282,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     setSelectedAccountId(normalized);
     setSelectedStationId(cleanStationId);
     setSelectedInverterSn('ALL');
-  }, [isConsumer, accounts, setFetchingDeye]);
+  }, [isConsumer, accounts]);
 
   const selectInverter = useCallback((accountId: string, stationId: string, inverterSn: string) => {
     const cleanStationId = String(stationId);
@@ -299,7 +306,6 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     if (!hasCachedData) {
       setIsPlantSwitchingState(true);
       setSwitchingPlantName(plantName);
-      setFetchingDeye(true, `Syncing ${plantName} · Inverter ${cleanInverterSn}...`);
     }
 
     if (isConsumer && accounts.length > 0) {
@@ -312,7 +318,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     setSelectedAccountId(effectiveAccId);
     setSelectedStationId(cleanStationId);
     setSelectedInverterSn(cleanInverterSn);
-  }, [isConsumer, accounts, setFetchingDeye]);
+  }, [isConsumer, accounts]);
 
   // Fleet view is NEVER active for consumer accounts
   const isFleetView = !isConsumer && (selectedAccountId === 'ALL' || selectedAccountId === 'ALL_FLEET');

@@ -110,7 +110,8 @@ export function PlantSolarCurve({
     return Math.max(livePowerKw * 1.15, capacityKw * 0.78, 10);
   }, [livePowerKw, capacityKw]);
 
-  // Check if history points appear to be fleet-aggregate (peak history vastly exceeds capacityKw)
+  // Baseline synthetic history in /api/deye/history is calibrated to a 120 kWp reference system.
+  // Standardize scaling ratio to capacityKw / 120, exactly matching Analytics Dashboard scopeScaleFactor.
   const historyScaleRatio = useMemo(() => {
     if (!historyPoints || historyPoints.length === 0 || !capacityKw || capacityKw <= 0) return 1;
     let maxHistorySolar = 0;
@@ -119,12 +120,11 @@ export function PlantSolarCurve({
         maxHistorySolar = pt.solarYieldKw;
       }
     }
-    // If max history solar is more than 1.25x capacityKw, the history was passed from fleet total
-    // and needs to be scaled down to this station's capacity
-    if (maxHistorySolar > capacityKw * 1.25) {
-      return (capacityKw * 0.9) / maxHistorySolar;
+    // If points are already isolated/scaled to this station capacity (within 2%), do not re-scale
+    if (maxHistorySolar > 0 && Math.abs(maxHistorySolar - capacityKw * (119.5 / 120)) < 1.0) {
+      return 1;
     }
-    return 1;
+    return capacityKw / 120;
   }, [historyPoints, capacityKw]);
 
   // Generate diurnal points or map actual 5-minute continuous telemetry points from history
@@ -138,13 +138,29 @@ export function PlantSolarCurve({
         const isFuture = hourFloat > nowHour;
         const rawSolar = (pt.solarYieldKw !== null && pt.solarYieldKw !== undefined ? pt.solarYieldKw : 0) * historyScaleRatio;
         const rawLoad = (pt.loadDemandKw !== null && pt.loadDemandKw !== undefined ? pt.loadDemandKw : baselineLoad) * historyScaleRatio;
-        const rawGrid = pt.gridFlowKw !== null && pt.gridFlowKw !== undefined ? pt.gridFlowKw * historyScaleRatio : (rawSolar - rawLoad);
+
+        // Smoothly blend latest elapsed telemetry towards live readings near current moment (within 30m)
+        let solar = rawSolar;
+        if (!isFuture && livePowerKw > 0 && Math.abs(hourFloat - nowHour) <= 0.5) {
+          const weight = 1 - Math.abs(hourFloat - nowHour) / 0.5;
+          solar = rawSolar * (1 - weight) + livePowerKw * weight;
+        }
+
+        let load = rawLoad;
+        if (!isFuture && demandKw !== undefined && demandKw > 0 && Math.abs(hourFloat - nowHour) <= 0.5) {
+          const weight = 1 - Math.abs(hourFloat - nowHour) / 0.5;
+          load = rawLoad * (1 - weight) + demandKw * weight;
+        }
+
+        const rawGrid = pt.gridFlowKw !== null && pt.gridFlowKw !== undefined && livePowerKw === 0
+          ? pt.gridFlowKw * historyScaleRatio
+          : (solar - load);
 
         return {
           hour: hourFloat,
           label: pt.hour || `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
-          solar: parseFloat(Math.max(0, rawSolar).toFixed(2)),
-          load: parseFloat(Math.max(0, rawLoad).toFixed(2)),
+          solar: parseFloat(Math.max(0, solar).toFixed(2)),
+          load: parseFloat(Math.max(0, load).toFixed(2)),
           gridNet: parseFloat(rawGrid.toFixed(2)),
           isNow: Math.abs(hourFloat - nowHour) <= 0.05,
           isFuture,
@@ -241,8 +257,8 @@ export function PlantSolarCurve({
 
   // Elapsed curve coordinates only up to current time (no future values!)
   const elapsedCoords = useMemo(() => {
-    const elapsed = coords.filter((c) => c.hour <= Math.floor(nowHour));
-    const nowX = paddingX + (Math.min(23, nowHour) / 23) * plotWidth;
+    const elapsed = coords.filter((c) => c.hour <= nowHour);
+    const nowX = paddingX + (Math.min(24, nowHour) / 24) * plotWidth;
     const rawNowSolarY = paddingY + plotHeight - (livePowerKw / maxPower) * plotHeight;
     const rawNowLoadY = paddingY + plotHeight - (currentDemand / maxPower) * plotHeight;
     const nowSolarY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawNowSolarY));

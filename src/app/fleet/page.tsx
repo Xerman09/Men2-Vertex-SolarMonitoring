@@ -53,7 +53,18 @@ type StatusFilter = 'ALL' | 'ONLINE' | 'STANDBY' | 'FAULT';
 
 export default function FleetMonitoringPage() {
   const router = useRouter();
-  const { selectInverter, refreshAccounts, isFetchingDeye, syncing } = useAccount();
+  const {
+    selectInverter,
+    refreshAccounts,
+    isFetchingDeye,
+    syncing,
+    selectedAccountId,
+    selectedStationId,
+    isFleetView,
+    selectAccountAndPlant,
+    setSelectedAccountId,
+    setSelectedStationId,
+  } = useAccount();
   const { isAdmin, isConsumer, user, isInitialized } = useRole();
 
   // Fleet aggregate data - restored from client cache immediately (0ms instant render)
@@ -394,27 +405,72 @@ export default function FleetMonitoringPage() {
     }
   }, [accountTree, isInitialized, isAdmin, lastDefaultRole]);
 
+  // Synchronize expanded state with top panel fleet dropdown selection
+  useEffect(() => {
+    if (isFleetView || !selectedAccountId) return;
+    setExpandedAccountIds((prev) => {
+      const next = new Set(prev);
+      next.add(selectedAccountId);
+      return next;
+    });
+
+    if (selectedStationId && selectedStationId !== 'ALL') {
+      const pKey = `${selectedAccountId}:${selectedStationId}`;
+      setExpandedPlantKeys(new Set([pKey]));
+    } else {
+      setExpandedPlantKeys((prev) => {
+        const next = new Set(prev);
+        for (const k of next) {
+          if (k.startsWith(`${selectedAccountId}:`)) {
+            next.delete(k);
+          }
+        }
+        return next;
+      });
+    }
+  }, [selectedAccountId, selectedStationId, isFleetView]);
+
   // Toggle Account Expansion
   const toggleAccountExpand = useCallback((accId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setExpandedAccountIds((prev) => {
       const next = new Set(prev);
-      if (next.has(accId)) next.delete(accId);
-      else next.add(accId);
+      if (next.has(accId)) {
+        next.delete(accId);
+        if (selectedAccountId === accId && !isFleetView) {
+          selectAccountAndPlant('ALL_FLEET', 'ALL');
+        }
+      } else {
+        next.add(accId);
+        if (selectedAccountId !== accId) {
+          selectAccountAndPlant(accId, 'ALL');
+        }
+      }
       return next;
     });
-  }, []);
+  }, [selectedAccountId, isFleetView, selectAccountAndPlant]);
 
   // Toggle Plant Expansion (reveals inverter graphs)
   const togglePlantExpand = useCallback((plantKey: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    const [accId, stationId] = plantKey.split(':');
     setExpandedPlantKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(plantKey)) next.delete(plantKey);
-      else next.add(plantKey);
+      if (next.has(plantKey)) {
+        next.delete(plantKey);
+        if (selectedStationId === stationId) {
+          setSelectedStationId('ALL');
+        }
+      } else {
+        next.clear();
+        next.add(plantKey);
+        if (accId && stationId) {
+          selectAccountAndPlant(accId, stationId);
+        }
+      }
       return next;
     });
-  }, []);
+  }, [selectedStationId, selectAccountAndPlant, setSelectedStationId]);
 
   // Global Expand / Collapse Controls
   const expandAllAccounts = useCallback(() => {

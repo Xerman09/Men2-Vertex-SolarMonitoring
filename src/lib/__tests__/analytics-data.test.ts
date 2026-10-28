@@ -88,4 +88,26 @@ describe('Analytics Data & Model Calculations', () => {
     expect(summary.selfConsumptionPct).toBeLessThanOrEqual(100);
     expect(summary.co2AvoidedKg).toBeGreaterThan(0);
   });
+
+  it('honors reported daily yield and live solar power from live hardware telemetry', () => {
+    const mockHourly: HourlyEnergyPoint[] = [
+      {
+        hour: '12:00',
+        solarYieldKw: 50,
+        loadDemandKw: 30,
+        batteryFlowKw: 0,
+        gridFlowKw: 20,
+        tariffRateUsd: 0.14,
+        isElapsed: true,
+      },
+    ];
+
+    const summary = computeAnalyticsSummary(mockHourly, 100, false, {
+      dailyYieldKwh: 324.2,
+      liveSolarPowerKw: 85.0,
+    });
+
+    expect(summary.totalSolarYieldKwh).toBe(324.2);
+    expect(summary.peakSolarKw).toBe(85.0);
+  });
 });

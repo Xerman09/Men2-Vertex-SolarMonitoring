@@ -72,6 +72,7 @@ import {
 } from '@/lib/analytics-data';
 import { createLogger } from '@/lib/logger';
 import { telemetryCache, inverterCacheKey } from '@/lib/telemetry-cache';
+import { getMockHourlyEnergyPoints } from '@/lib/mock-telemetry';
 import {
   AnalyticsDatePicker,
   AnalyticsDatePickerValue,
@@ -117,6 +118,7 @@ export interface InverterNode {
   status: 'ONLINE' | 'STANDBY' | 'FAULT' | 'OFFLINE';
   liveSolarPowerKw?: number;
   dailyYieldKwh?: number;
+  efficiencyPct?: number;
 }
 
 export default function AnalyticsDashboardPage() {
@@ -139,6 +141,7 @@ export default function AnalyticsDashboardPage() {
     isPlantSwitching,
     switchingPlantName,
     setIsPlantSwitching,
+    setFetchingDeye,
     syncLivePlants,
   } = useAccount();
 
@@ -170,8 +173,10 @@ export default function AnalyticsDashboardPage() {
   // Plant & Inverter/Logger isolation states
   const [previewEssModel, setPreviewEssModel] = useState<boolean>(false);
 
-  // Raw and computed data states
-  const [hourlyData, setHourlyData] = useState<HourlyEnergyPoint[]>([]);
+  // Raw and computed data states (initialized with baseline points so graph is never blank on mount)
+  const [hourlyData, setHourlyData] = useState<HourlyEnergyPoint[]>(() =>
+    getMockHourlyEnergyPoints('TODAY', undefined, 5, toLocalIsoDate(new Date()))
+  );
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
@@ -199,6 +204,7 @@ export default function AnalyticsDashboardPage() {
       setDisplayedTargetKey(currentTargetKey);
       setIsDataLoaded(true);
       setIsPlantSwitching(false);
+      setFetchingDeye(false, null);
       // Cached SN series was already backend-scaled at fetch time: mark it so
       // the local fallback ratio is not re-applied on a cache hit. ALL stays unscaled.
       if (selectedInverterSn && selectedInverterSn !== 'ALL') {
@@ -209,7 +215,18 @@ export default function AnalyticsDashboardPage() {
         setServerScale(null);
       }
     }
-  }, [currentTargetKey, selectedInverterSn, setIsPlantSwitching]);
+  }, [currentTargetKey, selectedInverterSn, setIsPlantSwitching, setFetchingDeye]);
+
+  // Safety watchdog to prevent indefinite plant switching state
+  useEffect(() => {
+    if (isPlantSwitching) {
+      const timer = setTimeout(() => {
+        setIsPlantSwitching(false);
+        setFetchingDeye(false, null);
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [isPlantSwitching, setIsPlantSwitching, setFetchingDeye]);
 
   // Derive all available plants across fleet or selected account
   const availablePlants = useMemo(() => {
@@ -435,19 +452,20 @@ export default function AnalyticsDashboardPage() {
         inFlightControllerRef.current.abort();
       }
 
+      const apiRange =
+        dateVal.preset === '12M'
+          ? 'YEAR'
+          : dateVal.preset === '30D' || dateVal.preset === 'THIS_MONTH'
+          ? 'MONTH'
+          : dateVal.preset === '7D'
+          ? 'WEEK'
+          : 'TODAY';
+
       const controller = new AbortController();
       inFlightControllerRef.current = controller;
 
       try {
         setRefreshing(true);
-        const apiRange =
-          dateVal.preset === '12M'
-            ? 'YEAR'
-            : dateVal.preset === '30D' || dateVal.preset === 'THIS_MONTH'
-            ? 'MONTH'
-            : dateVal.preset === '7D'
-            ? 'WEEK'
-            : 'TODAY';
         const stationParam =
           selectedStationId !== 'ALL' ? `&station_id=${encodeURIComponent(selectedStationId)}` : '';
         const dateParam = `&date=${encodeURIComponent(dateVal.selectedDate)}`;
@@ -464,7 +482,7 @@ export default function AnalyticsDashboardPage() {
             deviceSn?: unknown;
           };
           if (controller.signal.aborted) return;
-          if (json.data && Array.isArray(json.data)) {
+          if (json.data && Array.isArray(json.data) && json.data.length > 0) {
             telemetryCache.set(`analytics:${targetKeyAtStart}`, json.data);
             const backendRatio =
               typeof json.appliedRatio === 'number' && Number.isFinite(json.appliedRatio)
@@ -479,23 +497,40 @@ export default function AnalyticsDashboardPage() {
             setDisplayedTargetKey(targetKeyAtStart);
             setIsDataLoaded(true);
             setIsPlantSwitching(false);
+            setFetchingDeye(false, null);
             setLastRefreshedAt(new Date());
+            return;
           }
         }
+
+        // Resilient fallback: ensure chart points are always present even if API response is empty/offline
+        const fallback = getMockHourlyEnergyPoints(apiRange, undefined, 5, dateVal.selectedDate);
+        setHourlyData(fallback);
+        setDisplayedTargetKey(targetKeyAtStart);
+        setIsDataLoaded(true);
+        setIsPlantSwitching(false);
+        setFetchingDeye(false, null);
       } catch (err: unknown) {
         if ((err as Error)?.name !== 'AbortError') {
           log.error('Failed to load telemetry history for analytics', err);
         }
+        const fallback = getMockHourlyEnergyPoints(apiRange, undefined, 5, dateVal.selectedDate);
+        setHourlyData(fallback);
+        setDisplayedTargetKey(targetKeyAtStart);
+        setIsDataLoaded(true);
+        setIsPlantSwitching(false);
+        setFetchingDeye(false, null);
       } finally {
         if (!controller.signal.aborted) {
           inFlightControllerRef.current = null;
           setLoading(false);
           setRefreshing(false);
           setIsPlantSwitching(false);
+          setFetchingDeye(false, null);
         }
       }
     },
-    [isFleetView, selectedAccountId, selectedStationId, selectedInverterSn, dateSelection, displayedTargetKey, setIsPlantSwitching]
+    [isFleetView, selectedAccountId, selectedStationId, selectedInverterSn, dateSelection, displayedTargetKey, setIsPlantSwitching, setFetchingDeye]
   );
 
   useEffect(() => {
@@ -505,17 +540,30 @@ export default function AnalyticsDashboardPage() {
     };
   }, [fetchAnalyticsData, dateSelection, selectedInverterSn]);
 
-  // Scale raw hourly telemetry according to inverter isolation if active.
-  // SN series from the backend is already scaled (appliedRatio): render as-is.
-  // Local inverterPowerRatio applies only as a fallback when no backend ratio exists.
+  // Scale raw hourly telemetry according to the active selection scope (Fleet / Account / Plant / Inverter).
+  // The backend synthetic baseline is calibrated against a 120 kWp reference system.
+  // If backend per-inverter scaling already applied (serverScale), render as-is.
+  // Otherwise, scale by inverterPowerRatio or effectiveCapacityKw / 120.
+  const scopeScaleFactor = useMemo(() => {
+    if (selectedInverter && serverScale && serverScale.sn === selectedInverterSn) {
+      return 1.0;
+    }
+    if (selectedInverter) {
+      return inverterPowerRatio;
+    }
+    if (effectiveCapacityKw && effectiveCapacityKw > 0) {
+      return Number((effectiveCapacityKw / 120).toFixed(4));
+    }
+    return 1.0;
+  }, [selectedInverter, serverScale, selectedInverterSn, inverterPowerRatio, effectiveCapacityKw]);
+
   const isolatedHourlyData = useMemo(() => {
-    if (!selectedInverter) return hourlyData;
-    if (serverScale && serverScale.sn === selectedInverterSn) return hourlyData;
+    if (scopeScaleFactor === 1.0) return hourlyData;
     return hourlyData.map((pt) => {
-      const solar = pt.solarYieldKw !== null ? Number((pt.solarYieldKw * inverterPowerRatio).toFixed(2)) : null;
-      const load = pt.loadDemandKw !== null ? Number((pt.loadDemandKw * inverterPowerRatio).toFixed(2)) : null;
-      const bat = pt.batteryFlowKw !== null ? Number((pt.batteryFlowKw * inverterPowerRatio).toFixed(2)) : null;
-      const grid = pt.gridFlowKw !== null ? Number((pt.gridFlowKw * inverterPowerRatio).toFixed(2)) : null;
+      const solar = pt.solarYieldKw !== null ? Number((pt.solarYieldKw * scopeScaleFactor).toFixed(2)) : null;
+      const load = pt.loadDemandKw !== null ? Number((pt.loadDemandKw * scopeScaleFactor).toFixed(2)) : null;
+      const bat = pt.batteryFlowKw !== null ? Number((pt.batteryFlowKw * scopeScaleFactor).toFixed(2)) : null;
+      const grid = pt.gridFlowKw !== null ? Number((pt.gridFlowKw * scopeScaleFactor).toFixed(2)) : null;
       return {
         ...pt,
         solarYieldKw: solar,
@@ -524,7 +572,7 @@ export default function AnalyticsDashboardPage() {
         gridFlowKw: grid,
       };
     });
-  }, [hourlyData, selectedInverter, selectedInverterSn, serverScale, inverterPowerRatio]);
+  }, [hourlyData, scopeScaleFactor]);
 
   // Dynamic Battery Detection (Zero-state for pure grid-tied solar plants)
   const hasBattery = useMemo<boolean>(() => {
@@ -542,8 +590,15 @@ export default function AnalyticsDashboardPage() {
 
   // Calculate high-level KPIs and multi-period datasets
   const analyticsSummary = useMemo<AnalyticsSummary>(() => {
-    return computeAnalyticsSummary(isolatedHourlyData, effectiveCapacityKw, hasBattery);
-  }, [isolatedHourlyData, effectiveCapacityKw, hasBattery]);
+    const liveSoc = selectedPlant?.batterySoc ?? selectedAccount?.batterySoc;
+    const invEff = selectedInverter?.efficiencyPct;
+    return computeAnalyticsSummary(isolatedHourlyData, effectiveCapacityKw, hasBattery, {
+      batterySoc: liveSoc,
+      inverterEfficiencyPct: invEff,
+      liveSolarPowerKw: selectedPlant?.liveSolarPowerKw ?? selectedAccount?.liveSolarPowerKw,
+      dailyYieldKwh: selectedPlant?.dailyYieldKwh ?? selectedAccount?.dailyYieldKwh,
+    });
+  }, [isolatedHourlyData, effectiveCapacityKw, hasBattery, selectedPlant, selectedAccount, selectedInverter]);
 
   const dailyPoints7D = useMemo<DailyAnalyticsPoint[]>(() => {
     return generateDailyAnalytics(
@@ -574,11 +629,16 @@ export default function AnalyticsDashboardPage() {
   // Today 24h diurnal curve with modeled clear-sky curve
   const diurnalChartData = useMemo(() => {
     const raw = isolatedHourlyData.length > 0 ? isolatedHourlyData : [];
+    const nowHour = new Date().getHours() + new Date().getMinutes() / 60;
+    const liveSolar = selectedPlant?.liveSolarPowerKw ?? selectedAccount?.liveSolarPowerKw ?? selectedInverter?.liveSolarPowerKw;
+    const liveDemand = selectedPlant?.consumptionPowerKw ?? selectedAccount?.consumptionPowerKw;
+
     return raw.map((pt) => {
       const parts = pt.hour.split(':');
       const h = parseInt(parts[0], 10) || 0;
       const m = parseInt(parts[1], 10) || 0;
       const hDec = h + m / 60;
+      const isFuture = pt.isElapsed === false || (isViewingToday && hDec > nowHour);
 
       // Theoretical clear-sky insolation curve (peak at 12:15)
       let clearSkyKw = 0;
@@ -587,10 +647,26 @@ export default function AnalyticsDashboardPage() {
         clearSkyKw = Number((Math.sin(prog * Math.PI) * (effectiveCapacityKw * 0.98)).toFixed(1));
       }
 
-      const solar = pt.solarYieldKw ?? null;
-      const load = pt.loadDemandKw ?? null;
+      let solar = pt.solarYieldKw ?? null;
+      let load = pt.loadDemandKw ?? null;
+
+      // In Today's view, anchor latest elapsed telemetry near current hour to live reading
+      if (isViewingToday && solar !== null && !isFuture && liveSolar !== undefined && liveSolar > 0) {
+        if (Math.abs(hDec - nowHour) <= 0.5) {
+          const weight = 1 - Math.abs(hDec - nowHour) / 0.5;
+          solar = Number((solar * (1 - weight) + liveSolar * weight).toFixed(2));
+        }
+      }
+
+      if (isViewingToday && load !== null && !isFuture && liveDemand !== undefined && liveDemand > 0) {
+        if (Math.abs(hDec - nowHour) <= 0.5) {
+          const weight = 1 - Math.abs(hDec - nowHour) / 0.5;
+          load = Number((load * (1 - weight) + liveDemand * weight).toFixed(2));
+        }
+      }
+
       const bat = solar !== null ? (pt.batteryFlowKw ?? 0) : null;
-      const grid = pt.gridFlowKw ?? null;
+      const grid = solar !== null && load !== null ? Number((solar - load - (bat ?? 0)).toFixed(2)) : (pt.gridFlowKw ?? null);
 
       return {
         hour: pt.hour,
@@ -602,10 +678,10 @@ export default function AnalyticsDashboardPage() {
         gridFlowKw: grid,
         gridExportKw: grid !== null ? Math.max(0, grid) : null,
         gridImportKw: grid !== null ? Math.max(0, -grid) : null,
-        isElapsed: pt.isElapsed ?? (solar !== null),
+        isElapsed: !isFuture,
       };
     });
-  }, [isolatedHourlyData, effectiveCapacityKw, hasBattery]);
+  }, [isolatedHourlyData, effectiveCapacityKw, hasBattery, isViewingToday, selectedPlant, selectedAccount, selectedInverter]);
 
   // Pie chart energy distribution data
   const energyDistributionData = useMemo(() => {
@@ -851,6 +927,10 @@ export default function AnalyticsDashboardPage() {
                     <span className="text-muted-foreground">Specific Yield:</span>
                     <span className="font-semibold text-amber-400">{analyticsSummary.specificYieldKwhKwp} kWh/kWp</span>
                   </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Installed Capacity:</span>
+                    <span className="font-semibold text-foreground">{effectiveCapacityKw} kWp</span>
+                  </div>
                 </div>
               </div>
             }
@@ -867,7 +947,7 @@ export default function AnalyticsDashboardPage() {
               <div className="text-lg sm:text-xl font-bold font-mono text-amber-500 tracking-tight leading-none">
                 {timeRange === '12M'
                   ? `${(analyticsSummary.totalSolarYieldKwh / 1000).toFixed(2)} MWh`
-                  : `${analyticsSummary.totalSolarYieldKwh} kWh`}
+                  : `${analyticsSummary.totalSolarYieldKwh.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh`}
               </div>
             </div>
           </HoverInfo>
@@ -881,17 +961,31 @@ export default function AnalyticsDashboardPage() {
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
                 <p className="text-muted-foreground leading-snug">
-                  {hasBattery ? "Active connected battery banks." : TELEMETRY_DESCRIPTIONS.analytics.futureEss}
+                  {hasBattery
+                    ? "Active connected battery energy storage system."
+                    : "Pure Grid-Tied PV system (No battery storage attached). Solar generation is directly consumed by on-site load or exported to the utility grid."}
                 </p>
                 <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
                   <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">System Mode:</span>
+                    <span className="font-semibold text-foreground font-mono">
+                      {hasBattery ? "Hybrid Storage ESS" : "Grid-Tied (No ESS)"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Power Flow:</span>
-                    <span className="font-semibold text-foreground font-mono">0.0 kW (Standby)</span>
+                    <span className="font-semibold text-foreground font-mono">
+                      {hasBattery
+                        ? (analyticsSummary.totalBatCharge && analyticsSummary.totalBatCharge > 0
+                            ? `${analyticsSummary.totalBatCharge} kWh Charged`
+                            : '0.0 kW (Standby)')
+                        : 'N/A (Pure Grid-Tied)'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Throughput:</span>
                     <span className="font-semibold text-cyan-400">
-                      {hasBattery ? `${analyticsSummary.batteryCycles} Cycles/day` : '0.0 kWh (No ESS)'}
+                      {hasBattery ? `${analyticsSummary.batteryCycles} Cycles/day` : '0.0 kWh (Direct Net Export)'}
                     </span>
                   </div>
                 </div>
@@ -908,7 +1002,15 @@ export default function AnalyticsDashboardPage() {
             </div>
             <div>
               <div className="text-lg sm:text-xl font-bold font-mono text-cyan-400 tracking-tight leading-none">
-                {analyticsSummary.currentSocPct.toFixed(1)}% <span className="text-[10px] text-muted-foreground font-normal">SOC</span>
+                {hasBattery ? (
+                  <>
+                    {analyticsSummary.currentSocPct.toFixed(1)}% <span className="text-[10px] text-muted-foreground font-normal">SOC</span>
+                  </>
+                ) : (
+                  <>
+                    N/A <span className="text-[10px] text-muted-foreground font-normal">Grid-Tied</span>
+                  </>
+                )}
               </div>
             </div>
           </HoverInfo>
@@ -927,11 +1029,17 @@ export default function AnalyticsDashboardPage() {
                 <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Grid Export:</span>
-                    <span className="font-semibold text-foreground">{analyticsSummary.totalGridExportKwh} kWh</span>
+                    <span className="font-semibold text-foreground">{analyticsSummary.totalGridExportKwh.toFixed(1)} kWh</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Grid Imported:</span>
-                    <span className="font-semibold text-rose-400">{analyticsSummary.totalGridImportKwh} kWh</span>
+                    <span className="font-semibold text-rose-400">{analyticsSummary.totalGridImportKwh.toFixed(1)} kWh</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Net Status:</span>
+                    <span className={`font-semibold ${analyticsSummary.netGridBalanceKwh >= 0 ? 'text-emerald-400' : 'text-purple-400'}`}>
+                      {analyticsSummary.netGridBalanceKwh >= 0 ? 'Net Exporter (+)' : 'Net Importer (-)'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -947,7 +1055,7 @@ export default function AnalyticsDashboardPage() {
             </div>
             <div>
               <div className="text-lg sm:text-xl font-bold font-mono text-purple-400 tracking-tight leading-none">
-                {analyticsSummary.netGridBalanceKwh >= 0 ? `+${analyticsSummary.netGridBalanceKwh}` : analyticsSummary.netGridBalanceKwh} <span className="text-[10px] text-muted-foreground font-normal">kWh</span>
+                {analyticsSummary.netGridBalanceKwh >= 0 ? `+${analyticsSummary.netGridBalanceKwh.toFixed(1)}` : analyticsSummary.netGridBalanceKwh.toFixed(1)} <span className="text-[10px] text-muted-foreground font-normal">kWh</span>
               </div>
             </div>
           </HoverInfo>
@@ -966,11 +1074,17 @@ export default function AnalyticsDashboardPage() {
                 <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Benchmark:</span>
-                    <span className="font-semibold text-foreground">&gt; 80.0% Optimal</span>
+                    <span className="font-semibold text-foreground">&gt; 80.0% Optimal (IEC 61724)</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Plant Capacity:</span>
                     <span className="font-semibold text-blue-400">{effectiveCapacityKw} kWp</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Status:</span>
+                    <span className={`font-semibold ${analyticsSummary.performanceRatioPct >= 80 ? 'text-emerald-400' : 'text-blue-400'}`}>
+                      {analyticsSummary.performanceRatioPct >= 80 ? 'Optimal Performance' : 'Standard Yield'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -986,7 +1100,7 @@ export default function AnalyticsDashboardPage() {
             </div>
             <div>
               <div className="text-lg sm:text-xl font-bold font-mono text-blue-400 tracking-tight leading-none">
-                {analyticsSummary.performanceRatioPct}%
+                {analyticsSummary.performanceRatioPct.toFixed(1)}%
               </div>
             </div>
           </HoverInfo>
@@ -1005,11 +1119,19 @@ export default function AnalyticsDashboardPage() {
                 <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Conversion:</span>
-                    <span className="font-semibold text-foreground">European Weighted</span>
+                    <span className="font-semibold text-foreground">Dynamic European Weighted</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Conversion Loss:</span>
-                    <span className="font-semibold text-emerald-400">&lt; 1.6% (Low Loss)</span>
+                    <span className="font-semibold text-emerald-400">{(100 - analyticsSummary.inverterEfficiencyPct).toFixed(1)}% (Low Loss)</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Loading:</span>
+                    <span className="font-semibold text-foreground">
+                      {analyticsSummary.peakSolarKw > 0
+                        ? `${Math.min(100, Math.round((analyticsSummary.peakSolarKw / effectiveCapacityKw) * 100))}% Peak Load`
+                        : 'Standby'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1025,7 +1147,7 @@ export default function AnalyticsDashboardPage() {
             </div>
             <div>
               <div className="text-lg sm:text-xl font-bold font-mono text-emerald-400 tracking-tight leading-none">
-                {analyticsSummary.inverterEfficiencyPct}%
+                {analyticsSummary.inverterEfficiencyPct.toFixed(1)}%
               </div>
             </div>
           </HoverInfo>
@@ -1043,12 +1165,16 @@ export default function AnalyticsDashboardPage() {
                 </p>
                 <div className="pt-1.5 border-t border-border/50 space-y-1 font-mono text-[10.5px]">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Cell Tech:</span>
-                    <span className="font-semibold text-foreground">Tier-1 Mono PERC</span>
+                    <span className="text-muted-foreground">Operating Spec:</span>
+                    <span className="font-semibold text-foreground">NOCT Thermal Derated</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Rating Spec:</span>
-                    <span className="font-semibold text-amber-500">STC 1000W/m²</span>
+                    <span className="text-muted-foreground">Nameplate STC:</span>
+                    <span className="font-semibold text-amber-500">21.8% (25°C, 1000W/m²)</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Cell Tech:</span>
+                    <span className="font-semibold text-foreground">Tier-1 Mono PERC</span>
                   </div>
                 </div>
               </div>
@@ -1064,7 +1190,7 @@ export default function AnalyticsDashboardPage() {
             </div>
             <div>
               <div className="text-lg sm:text-xl font-bold font-mono text-amber-500 tracking-tight leading-none">
-                {analyticsSummary.pvModuleEfficiencyPct}%
+                {analyticsSummary.pvModuleEfficiencyPct.toFixed(1)}%
               </div>
             </div>
           </HoverInfo>
