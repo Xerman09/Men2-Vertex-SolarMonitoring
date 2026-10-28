@@ -49,6 +49,11 @@ const nextConfig: NextConfig = {
         destination: '/analytics',
         permanent: false,
       },
+      {
+        source: '/trigonometric-analytics',
+        destination: '/analytics',
+        permanent: false,
+      },
     ];
   },
 };

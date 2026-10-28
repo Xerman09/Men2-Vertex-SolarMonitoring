@@ -76,11 +76,6 @@ export function Sidebar() {
       icon: TrendingUp,
     },
     {
-      label: 'Trigonometric Analytics',
-      href: '/trigonometric-analytics',
-      icon: Activity,
-    },
-    {
       label: 'API & Diagnostics',
       href: '/api-diagnostics',
       icon: ShieldCheck,
