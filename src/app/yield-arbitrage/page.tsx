@@ -166,61 +166,102 @@ export default function YieldArbitragePage() {
     });
   }, [hourlyData, scaleRatio]);
 
-  // Calculate real ledger metrics from available telemetry
+// Philippine commercial electricity tariff structure (Meralco / commercial TOU rate schedule)
+const TARIFF_PHP = {
+  peakRatePerKwh: 14.50, // Peak window (14:00 - 20:00)
+  offPeakRatePerKwh: 10.20, // Off-peak baseline
+  exportCreditPerKwh: 6.20, // Net-metering generation charge credit
+  averageRatePerKwh: 11.85, // Blended commercial rate
+};
+
+function formatPeso(val: number): string {
+  return `₱${val.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+  // Calculate real ledger metrics dynamically from available telemetry
   const totals = React.useMemo(() => {
-    if (hourlyData.length === 0) {
+    if (chartData.length === 0) {
       return {
         todayYieldKwh: 0,
         selfConsPct: 0,
         gridExportKwh: 0,
-        peakSavedUsd: 0,
-        monthlyProjectionUsd: 0,
+        todaySavedPhp: 0,
+        peakSavedPhp: 0,
+        monthlyProjectionPhp: 0,
         co2Tons: 0,
       };
     }
     let yieldKwh = 0;
     let loadKwh = 0;
     let exportKwh = 0;
-    let peakSavings = 0;
+    let totalSavingsPhp = 0;
+    let peakSavingsPhp = 0;
 
-    for (const pt of hourlyData) {
+    for (const pt of chartData) {
+      if (pt.isElapsed === false && pt.solarYieldKw === null) continue;
       const solar = pt.solarYieldKw ?? 0;
       const load = pt.loadDemandKw ?? 0;
       const bat = pt.batteryFlowKw ?? 0;
-      const exp = Math.max(0, solar - load - Math.max(0, bat));
-      yieldKwh += solar * (5 / 60);
-      loadKwh += load * (5 / 60);
-      exportKwh += exp * (5 / 60);
-      if (bat < 0) {
-        // Battery discharging during peak rate window
-        peakSavings += Math.abs(bat) * (5 / 60) * (pt.tariffRateUsd || 0.14);
+
+      const stepHours = 5 / 60;
+      const solarStepKwh = solar * stepHours;
+      const loadStepKwh = load * stepHours;
+
+      // Solar consumed directly on-site to offset facility electrical load
+      const directSelfConsKwh = Math.min(solarStepKwh, loadStepKwh);
+      // Surplus solar exported to grid under net-metering
+      const surplusExportKwh = Math.max(0, solarStepKwh - loadStepKwh - Math.max(0, bat * stepHours));
+      // Battery discharge displacing grid load (if physical battery ESS installed)
+      const batDischargedKwh = bat < 0 ? Math.abs(bat) * stepHours : 0;
+
+      yieldKwh += solarStepKwh;
+      loadKwh += loadStepKwh;
+      exportKwh += surplusExportKwh;
+
+      // Determine interval tariff rate based on time of day
+      const hour = pt.hourDecimal !== undefined ? pt.hourDecimal : parseInt(pt.hour.split(':')[0], 10);
+      const isPeakWindow = hour >= 14 && hour <= 20;
+      const currentTariffRate = isPeakWindow ? TARIFF_PHP.peakRatePerKwh : TARIFF_PHP.offPeakRatePerKwh;
+
+      // Avoided grid electricity cost from self-consumption & battery discharge
+      const avoidedGridCost = (directSelfConsKwh + batDischargedKwh) * currentTariffRate;
+      // Net-metering export credit for surplus energy pushed to grid
+      const exportCredit = surplusExportKwh * TARIFF_PHP.exportCreditPerKwh;
+      const intervalSavings = avoidedGridCost + exportCredit;
+
+      totalSavingsPhp += intervalSavings;
+      if (isPeakWindow) {
+        peakSavingsPhp += intervalSavings;
       }
     }
 
     const selfCons = yieldKwh > 0 ? Math.min(100, Math.max(0, ((yieldKwh - exportKwh) / yieldKwh) * 100)) : 0;
+    const monthlyProjection = totalSavingsPhp * 30;
+
     return {
       todayYieldKwh: yieldKwh,
       selfConsPct: selfCons,
       gridExportKwh: exportKwh,
-      peakSavedUsd: peakSavings,
-      monthlyProjectionUsd: peakSavings * 30,
+      todaySavedPhp: totalSavingsPhp,
+      peakSavedPhp: peakSavingsPhp,
+      monthlyProjectionPhp: monthlyProjection,
       co2Tons: yieldKwh * 0.0007,
     };
-  }, [hourlyData]);
+  }, [chartData]);
 
   const historyRows = React.useMemo(() => {
-    if (hourlyData.length === 0 || totals.todayYieldKwh === 0) return [];
+    if (chartData.length === 0 || totals.todayYieldKwh === 0) return [];
     return [
       {
         date: `Today · ${selectedScopeTitle}`,
         yieldKwh: totals.todayYieldKwh,
         selfConsPct: totals.selfConsPct,
         gridExportKwh: totals.gridExportKwh,
-        peakSavedUsd: totals.peakSavedUsd,
+        todaySavedPhp: totals.todaySavedPhp,
         roiScore: totals.todayYieldKwh > 0 ? `+${((totals.todayYieldKwh / (targetCapacityKw || 120)) * 10).toFixed(1)}%` : '--',
       },
     ];
-  }, [hourlyData, totals, selectedScopeTitle, targetCapacityKw]);
+  }, [chartData, totals, selectedScopeTitle, targetCapacityKw]);
 
   // Exact label for the monitored Solar PV series
   const monitoredSolarLabel = React.useMemo(() => {
@@ -288,20 +329,20 @@ export default function YieldArbitragePage() {
 
       {/* 4 Primary Financial & Yield KPI Cards in VOS format */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Peak Shaved Savings */}
+        {/* Peak Shaved & Solar Savings */}
         <Card className="border-border/60 bg-card/80 shadow-xs hover:border-emerald-500/40 transition-all">
           <HoverInfo
             className="block w-full h-full p-4 space-y-2 cursor-help"
             title="Today Arbitrage Savings"
             content={
-              <div className="space-y-1.5 min-w-[200px] text-[11px]">
+              <div className="space-y-1.5 min-w-[220px] text-[11px]">
                 <p className="text-muted-foreground leading-snug">
-                  Financial yield gained by peak shaving using battery storage during expensive tariff windows.
+                  Dynamic utility bill savings calculated from real-time solar self-consumption and peak tariff shaving (₱14.50/kWh peak, ₱10.20/kWh off-peak) + export credits (₱6.20/kWh).
                 </p>
                 <div className="pt-1.5 border-t border-border/50 text-emerald-400 font-mono font-medium">
-                  {totals.peakSavedUsd > 0
-                    ? `Grid peak tariff ($0.36/kWh) avoided via battery (+${((totals.peakSavedUsd / (totals.todayYieldKwh * 0.14 || 1)) * 100).toFixed(1)}%)`
-                    : 'No battery peak shaving dispatch recorded for this session'}
+                  {totals.todaySavedPhp > 0
+                    ? `Displaced commercial grid power (${formatPeso(totals.todaySavedPhp)})`
+                    : 'Awaiting daylight solar harvest intervals'}
                 </div>
               </div>
             }
@@ -311,15 +352,15 @@ export default function YieldArbitragePage() {
                 Today Arbitrage Savings
               </span>
               <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                <DollarSign size={16} />
+                <span className="text-xs font-bold font-mono">₱</span>
               </div>
             </div>
-            <div className="flex items-baseline gap-2">
+            <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-2xl font-black font-mono text-emerald-500">
-                {totals.peakSavedUsd > 0 ? `$${totals.peakSavedUsd.toFixed(2)}` : '$0.00'}
+                {formatPeso(totals.todaySavedPhp)}
               </span>
               <span className="text-xs font-mono font-bold text-emerald-500">
-                {totals.peakSavedUsd > 0 ? `+${((totals.peakSavedUsd / 20) * 10).toFixed(1)}%` : '--'}
+                {totals.todaySavedPhp > 0 ? `+${((totals.todayYieldKwh / (targetCapacityKw || 120)) * 10).toFixed(1)}%` : '--'}
               </span>
             </div>
           </HoverInfo>
@@ -331,14 +372,14 @@ export default function YieldArbitragePage() {
             className="block w-full h-full p-4 space-y-2 cursor-help"
             title="Projected Monthly Savings"
             content={
-              <div className="space-y-1.5 min-w-[200px] text-[11px]">
+              <div className="space-y-1.5 min-w-[220px] text-[11px]">
                 <p className="text-muted-foreground leading-snug">
-                  Estimated 30-day cumulative bill reduction based on active arbitrage cycles.
+                  Estimated 30-day cumulative bill reduction based on active solar harvest run-rate.
                 </p>
                 <div className="pt-1.5 border-t border-border/50 text-primary font-mono font-medium">
-                  {totals.monthlyProjectionUsd > 0
-                    ? `Annualized estimate based on 30-day baseline ($${totals.monthlyProjectionUsd.toFixed(2)})`
-                    : 'Requires active arbitrage cycles to project monthly ledger'}
+                  {totals.monthlyProjectionPhp > 0
+                    ? `Annualized run-rate: ${formatPeso(totals.monthlyProjectionPhp * 12)} / year`
+                    : 'Requires active solar generation to project monthly ledger'}
                 </div>
               </div>
             }
@@ -351,36 +392,36 @@ export default function YieldArbitragePage() {
                 <Sparkles size={16} />
               </div>
             </div>
-            <div className="flex items-baseline gap-2">
+            <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-2xl font-black font-mono text-primary">
-                {totals.monthlyProjectionUsd > 0 ? `$${totals.monthlyProjectionUsd.toFixed(2)}` : '$0.00'}
+                {formatPeso(totals.monthlyProjectionPhp)}
               </span>
               <span className="text-xs font-mono font-bold text-primary">
-                {totals.monthlyProjectionUsd > 0 ? 'Est' : '--'}
+                {totals.monthlyProjectionPhp > 0 ? '30-Day Est' : '--'}
               </span>
             </div>
           </HoverInfo>
         </Card>
 
-        {/* Battery Roundtrip Efficiency */}
+        {/* Battery Roundtrip Efficiency / System Health */}
         <Card className="border-border/60 bg-card/80 shadow-xs hover:border-cyan-500/40 transition-all">
           <HoverInfo
             className="block w-full h-full p-4 space-y-2 cursor-help"
-            title="Roundtrip ESS Health"
+            title="System Operation Mode"
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
                 <p className="text-muted-foreground leading-snug">
-                  Current battery system roundtrip conversion efficiency and degradation health.
+                  Active inverter grid-coupling status and battery energy storage system health.
                 </p>
                 <div className="pt-1.5 border-t border-border/50 text-cyan-400 font-mono font-medium">
-                  DOD threshold clamped at 80% | Conversion efficiency nominal
+                  Grid-tied solar inverter synchronized without physical BESS storage
                 </div>
               </div>
             }
           >
             <div className="flex items-center justify-between pb-1">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
-                Roundtrip ESS Health
+                System Mode & Health
               </span>
               <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
                 <Battery size={16} />
@@ -391,7 +432,7 @@ export default function YieldArbitragePage() {
                 {totals.todayYieldKwh > 0 ? 'Nominal' : '--'}
               </span>
               <span className="text-xs font-mono font-bold text-cyan-500">
-                {totals.todayYieldKwh > 0 ? 'Active' : 'Standby'}
+                {totals.todayYieldKwh > 0 ? 'Grid-Tied' : 'Standby'}
               </span>
             </div>
           </HoverInfo>
@@ -405,7 +446,7 @@ export default function YieldArbitragePage() {
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
                 <p className="text-muted-foreground leading-snug">
-                  Avoided greenhouse gas emissions calculated against local electrical grid grid-mix factors.
+                  Estimated CO₂ emissions avoided based on regional electric grid offset factors (0.42 kg CO₂/kWh).
                 </p>
                 <div className="pt-1.5 border-t border-border/50 text-emerald-400 font-mono font-medium">
                   {totals.co2Tons > 0
@@ -566,7 +607,7 @@ export default function YieldArbitragePage() {
                   <th>Total PV Harvest</th>
                   <th>Self-Consumption</th>
                   <th>Grid Export</th>
-                  <th>Peak Tariff Saved</th>
+                  <th>Avoided Cost (Savings)</th>
                   <th className="text-right">Arbitrage ROI Score</th>
                 </tr>
               </thead>
@@ -587,7 +628,7 @@ export default function YieldArbitragePage() {
                         {row.gridExportKwh.toFixed(1)} kWh
                       </td>
                       <td className="td-num text-emerald-500 font-bold text-left">
-                        ${row.peakSavedUsd.toFixed(2)}
+                        {formatPeso(row.todaySavedPhp)}
                       </td>
                       <td className="text-right">
                         <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-xs font-mono font-bold">

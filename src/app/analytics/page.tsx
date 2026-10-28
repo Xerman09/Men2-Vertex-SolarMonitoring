@@ -1994,7 +1994,7 @@ export default function AnalyticsDashboardPage() {
                           </HoverInfo>
                         </th>
                         <th className="px-4 py-2.5">
-                          <HoverInfo title="Tariff Structure" content="Time-of-Use electricity tariff tier (Peak $0.36/kWh vs Off-Peak $0.14/kWh).">
+                          <HoverInfo title="Tariff Structure" content="Time-of-Use electricity tariff tier (Peak ₱14.50/kWh vs Off-Peak ₱10.20/kWh).">
                             <span className="cursor-help">Tariff Rate</span>
                           </HoverInfo>
                         </th>
@@ -2041,9 +2041,9 @@ export default function AnalyticsDashboardPage() {
                               </td>
                               <td className="px-4 py-2 text-muted-foreground">
                                 {row.hourDecimal >= 17 && row.hourDecimal <= 21 ? (
-                                  <span className="text-purple-400 font-semibold">$0.36/kWh (Peak)</span>
+                                  <span className="text-purple-400 font-semibold">₱14.50/kWh (Peak)</span>
                                 ) : (
-                                  <span>$0.14/kWh (Off-Peak)</span>
+                                  <span>₱10.20/kWh (Off-Peak)</span>
                                 )}
                               </td>
                               <td className="px-4 py-2">
