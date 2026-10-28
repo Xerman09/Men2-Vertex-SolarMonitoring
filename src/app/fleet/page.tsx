@@ -28,7 +28,6 @@ import {
   Minimize2,
   Power,
   Globe,
-  Info,
 } from 'lucide-react';
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
@@ -492,14 +491,9 @@ export default function FleetMonitoringPage() {
                   </div>
                 }
               >
-                <span className="inline-flex items-center gap-2 group cursor-help">
-                  <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
-                    Fleet Monitoring Hub
-                  </h1>
-                  <span className="p-1 rounded-full text-muted-foreground group-hover:text-foreground group-hover:bg-muted/80 transition-colors inline-flex items-center justify-center">
-                    <Info size={16} />
-                  </span>
-                </span>
+                <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground cursor-help">
+                  Fleet Monitoring Hub
+                </h1>
               </HoverInfo>
             </div>
           </div>

@@ -17,7 +17,6 @@ import {
   Zap,
   Activity,
   Gauge,
-  Info,
   X,
   Maximize2,
   Minimize2,

@@ -24,7 +24,6 @@ import {
   DollarSign,
   Maximize2,
   Clock,
-  Info,
   Cpu,
   Radio,
   Search,
@@ -389,6 +388,25 @@ export default function AnalyticsDashboardPage() {
     }
     return selectedAccount?.name || 'Commercial Solar Array';
   }, [selectedInverter, isFleetView, accounts, baseCapacityKw, selectedPlant, selectedAccount]);
+
+  // Selected Target Title matching the top panel fleet dropdown selection
+  const selectedScopeTitle = useMemo(() => {
+    if (selectedInverter) {
+      return `Inverter ${selectedInverter.model || selectedInverter.deviceSn} (${selectedInverter.deviceSn})`;
+    }
+    if (selectedPlant) {
+      return selectedPlant.stationName;
+    }
+    if (selectedAccount) {
+      return selectedAccount.plants && selectedAccount.plants.length > 1
+        ? `${selectedAccount.name} (${selectedAccount.plants.length} Plants)`
+        : selectedAccount.name;
+    }
+    if (isFleetView) {
+      return `Global Fleet Aggregate (${totalAccounts} Accounts)`;
+    }
+    return 'Commercial Solar Array';
+  }, [selectedInverter, selectedPlant, selectedAccount, isFleetView, totalAccounts]);
 
   // Inverter scaling ratio for solar yield curves
   const inverterPowerRatio = useMemo(() => {
@@ -1061,7 +1079,7 @@ export default function AnalyticsDashboardPage() {
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
               <div>
                 <HoverInfo
-                  title="Diurnal Profile Sampling"
+                  title={`${selectedScopeTitle} · Diurnal Sampling`}
                   content={
                     <div className="space-y-1.5 text-[11px]">
                       <p>High-frequency 5-minute sampling of solar production, facility consumption, and storage flows.</p>
@@ -1084,9 +1102,22 @@ export default function AnalyticsDashboardPage() {
                   }
                   showIcon
                 >
-                  <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-help">
-                    <Sun className="w-5 h-5 text-amber-500" />
-                    {selectedInverter ? `Inverter Generation Profile (${selectedInverter.model})` : 'Diurnal Generation & Industrial Load Profile'}
+                  <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-help flex-wrap">
+                    {selectedInverter ? (
+                      <Cpu className="w-5 h-5 text-cyan-400 shrink-0" />
+                    ) : isFleetView ? (
+                      <Globe className="w-5 h-5 text-primary shrink-0" />
+                    ) : selectedPlant ? (
+                      <Building2 className="w-5 h-5 text-amber-500 shrink-0" />
+                    ) : (
+                      <Sun className="w-5 h-5 text-amber-500 shrink-0" />
+                    )}
+                    <span>{selectedScopeTitle}</span>
+                    {selectedPlant && selectedAccount && selectedAccount.plants && selectedAccount.plants.length > 1 && (
+                      <span className="text-xs font-normal text-muted-foreground font-mono">
+                        ({selectedAccount.name})
+                      </span>
+                    )}
                   </CardTitle>
                 </HoverInfo>
               </div>
