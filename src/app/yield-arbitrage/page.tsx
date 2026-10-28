@@ -34,8 +34,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { HoverInfo } from '@/components/ui/tooltip';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { TrigonometricHistoryGraph } from '@/components/analytics/TrigonometricHistoryGraph';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('YieldArbitrage');
@@ -44,7 +42,6 @@ export default function YieldArbitragePage() {
   const { isAdmin } = useRole();
   const [timeRange, setTimeRange] = useState<'DAY' | 'WEEK' | 'MONTH' | 'YEAR'>('DAY');
   const [hourlyData, setHourlyData] = useState<HourlyEnergyPoint[]>([]);
-  const [viewMode, setViewMode] = useState<'arbitrage' | 'trigonometric'>('arbitrage');
 
   useEffect(() => {
     fetch('/api/deye/history')
@@ -173,29 +170,6 @@ export default function YieldArbitragePage() {
                 {range}
               </button>
             ))}
-          </div>
-
-          <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-xl border border-border/50">
-            <button
-              onClick={() => setViewMode('arbitrage')}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                viewMode === 'arbitrage'
-                  ? 'bg-background text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Arbitrage Curve
-            </button>
-            <button
-              onClick={() => setViewMode('trigonometric')}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                viewMode === 'trigonometric'
-                  ? 'bg-background text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Trigonometric Fit
-            </button>
           </div>
         </div>
       </div>
@@ -347,99 +321,95 @@ export default function YieldArbitragePage() {
         </Card>
       </div>
 
-      {/* Dynamic View: Diurnal Area Chart OR Trigonometric Analysis */}
-      {viewMode === 'arbitrage' ? (
-        <Card className="border-border/60 bg-card/80 shadow-sm">
-          <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-border/50 p-5">
-            <div>
-              <HoverInfo
-                title="Diurnal Energy Curve"
-                content={TELEMETRY_DESCRIPTIONS.yieldArbitrage.diurnalCurveLegend}
-                showIcon
-              >
-                <CardTitle className="text-base font-bold flex items-center gap-2 cursor-help">
-                  <Zap size={18} className="text-amber-500" />
-                  <span>Diurnal Curve: Solar Generation vs Industrial Load Profile</span>
-                </CardTitle>
-              </HoverInfo>
-            </div>
-            <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> PV Harvest
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-yellow-500" /> Facility Load
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" /> Battery ESS
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent className="p-5 pt-4">
-            <div className="h-[320px] w-full">
-              {chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="solarGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
-                      </linearGradient>
-                      <linearGradient id="loadGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-                    <XAxis dataKey="hour" stroke="currentColor" className="text-[10px] opacity-60" />
-                    <YAxis stroke="currentColor" className="text-[10px] opacity-60" unit="kW" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'rgba(23, 31, 51, 0.95)',
-                        borderRadius: '0.75rem',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        fontSize: '12px',
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                    <Area
-                      type="monotone"
-                      dataKey="solarYieldKw"
-                      name="Solar PV Harvest (kW)"
-                      stroke="#f59e0b"
-                      strokeWidth={2}
-                      fill="url(#solarGrad)"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="loadDemandKw"
-                      name="Industrial Load Demand (kW)"
-                      stroke="#6366f1"
-                      strokeWidth={2}
-                      fill="url(#loadGrad)"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="batteryFlowKw"
-                      name="Battery ESS Arbitrage (kW)"
-                      stroke="#06b6d4"
-                      strokeWidth={2}
-                      strokeDasharray="3 3"
-                      dot={false}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground font-mono text-xs">
-                  No diurnal energy curve recorded for this period.
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <TrigonometricHistoryGraph data={chartData} installedCapacityKw={120} />
-      )}
+      {/* Diurnal Time-of-Use Arbitrage Curve */}
+      <Card className="border-border/60 bg-card/80 shadow-sm">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-border/50 p-5">
+          <div>
+            <HoverInfo
+              title="Diurnal Energy Curve"
+              content={TELEMETRY_DESCRIPTIONS.yieldArbitrage.diurnalCurveLegend}
+              showIcon
+            >
+              <CardTitle className="text-base font-bold flex items-center gap-2 cursor-help">
+                <Zap size={18} className="text-amber-500" />
+                <span>Diurnal Curve: Solar Generation vs Industrial Load Profile</span>
+              </CardTitle>
+            </HoverInfo>
+          </div>
+          <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> PV Harvest
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-yellow-500" /> Facility Load
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" /> Battery ESS
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent className="p-5 pt-4">
+          <div className="h-[320px] w-full">
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="solarGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
+                    </linearGradient>
+                    <linearGradient id="loadGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
+                  <XAxis dataKey="hour" stroke="currentColor" className="text-[10px] opacity-60" />
+                  <YAxis stroke="currentColor" className="text-[10px] opacity-60" unit="kW" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(23, 31, 51, 0.95)',
+                      borderRadius: '0.75rem',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                  <Area
+                    type="monotone"
+                    dataKey="solarYieldKw"
+                    name="Solar PV Harvest (kW)"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    fill="url(#solarGrad)"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="loadDemandKw"
+                    name="Industrial Load Demand (kW)"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    fill="url(#loadGrad)"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="batteryFlowKw"
+                    name="Battery ESS Arbitrage (kW)"
+                    stroke="#06b6d4"
+                    strokeWidth={2}
+                    strokeDasharray="3 3"
+                    dot={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground font-mono text-xs">
+                No diurnal energy curve recorded for this period.
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Historical Yield & Arbitrage Table in VOS Data-Grid format */}
       <Card className="border-border/60 bg-card/80 shadow-xs">
