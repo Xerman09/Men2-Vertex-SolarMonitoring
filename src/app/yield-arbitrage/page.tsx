@@ -14,6 +14,10 @@ import {
   RefreshCw,
   Clock,
   Download,
+  Cpu,
+  Globe,
+  Building2,
+  Sun,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -28,6 +32,7 @@ import {
   Legend,
 } from 'recharts';
 import { HourlyEnergyPoint } from '@/lib/types';
+import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -40,28 +45,126 @@ const log = createLogger('YieldArbitrage');
 
 export default function YieldArbitragePage() {
   const { isAdmin } = useRole();
+  const {
+    accounts,
+    selectedAccountId,
+    selectedAccount,
+    selectedStationId,
+    selectedPlant,
+    selectedInverterSn,
+    isFleetView,
+    totalAccounts,
+  } = useAccount();
+
   const [timeRange, setTimeRange] = useState<'DAY' | 'WEEK' | 'MONTH' | 'YEAR'>('DAY');
   const [hourlyData, setHourlyData] = useState<HourlyEnergyPoint[]>([]);
 
-  useEffect(() => {
-    fetch('/api/deye/history')
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.data) setHourlyData(json.data);
-      })
-      .catch((err) => log.error('Failed to load history', err));
-  }, []);
+  // Resolve isolated inverter metadata if selected
+  const selectedInverter = React.useMemo(() => {
+    if (!selectedInverterSn || selectedInverterSn === 'ALL') return null;
+    for (const acc of accounts) {
+      for (const plant of acc.plants || []) {
+        const inv = plant.devices?.find(
+          (d) => String(d.deviceSn).trim() === String(selectedInverterSn).trim()
+        );
+        if (inv) {
+          return {
+            deviceSn: inv.deviceSn,
+            model: inv.model || 'SUN-Hybrid-Inverter',
+            ratedKw: inv.ratedKw || 10,
+          };
+        }
+      }
+    }
+    return null;
+  }, [selectedInverterSn, accounts]);
 
-  const chartData = (hourlyData.length > 0 ? hourlyData : []).map((pt) => {
-    const solar = pt.solarYieldKw ?? 0;
-    const load = pt.loadDemandKw ?? 0;
-    const bat = pt.batteryFlowKw ?? 0;
-    return {
-      ...pt,
-      hourDecimal: parseInt(pt.hour.split(':')[0], 10),
-      gridExportKw: Math.max(0, solar - load - Math.max(0, bat)),
+  // Selected Target Title matching the top panel fleet dropdown selection
+  const selectedScopeTitle = React.useMemo(() => {
+    if (selectedInverter) {
+      return `Inverter ${selectedInverter.model || selectedInverter.deviceSn} (${selectedInverter.deviceSn})`;
+    }
+    if (selectedPlant) {
+      return selectedPlant.stationName;
+    }
+    if (selectedAccount) {
+      return selectedAccount.plants && selectedAccount.plants.length > 1
+        ? `${selectedAccount.name} (${selectedAccount.plants.length} Plants)`
+        : selectedAccount.name;
+    }
+    if (isFleetView) {
+      return `Global Fleet Aggregate (${totalAccounts} Accounts)`;
+    }
+    return 'Commercial Solar Array';
+  }, [selectedInverter, selectedPlant, selectedAccount, isFleetView, totalAccounts]);
+
+  const targetCapacityKw = React.useMemo(() => {
+    if (selectedInverter) return selectedInverter.ratedKw;
+    if (selectedPlant) return selectedPlant.installedCapacityKw || 120;
+    if (selectedAccount) {
+      const plantSum = selectedAccount.plants?.reduce((sum, p) => sum + (p.installedCapacityKw || 0), 0);
+      if (plantSum && plantSum > 0) return plantSum;
+      return selectedAccount.capacityKw > 0 ? selectedAccount.capacityKw : 120;
+    }
+    if (isFleetView) {
+      let cap = 0;
+      accounts.forEach((acc) => {
+        acc.plants?.forEach((p) => {
+          cap += p.installedCapacityKw || 0;
+        });
+      });
+      return cap > 0 ? cap : 120;
+    }
+    return 120;
+  }, [selectedInverter, selectedPlant, selectedAccount, isFleetView, accounts]);
+
+  const scaleRatio = React.useMemo(() => {
+    if (selectedInverterSn && selectedInverterSn !== 'ALL') return 1.0;
+    return targetCapacityKw > 0 ? targetCapacityKw / 120 : 1.0;
+  }, [selectedInverterSn, targetCapacityKw]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadHistory() {
+      try {
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const stationParam = selectedStationId && selectedStationId !== 'ALL' ? `&station_id=${encodeURIComponent(selectedStationId)}` : '';
+        const snParam = selectedInverterSn && selectedInverterSn !== 'ALL' ? `&device_sn=${encodeURIComponent(selectedInverterSn)}` : '';
+        const accountParam = !isFleetView && selectedAccountId && selectedAccountId !== 'ALL' ? `&accountId=${encodeURIComponent(selectedAccountId)}` : '';
+
+        const res = await fetch(`/api/deye/history?range=TODAY&step=5&date=${todayStr}${accountParam}${stationParam}${snParam}`);
+        if (res.ok && active) {
+          const json = await res.json();
+          if (json.data && Array.isArray(json.data)) {
+            setHourlyData(json.data);
+          }
+        }
+      } catch (err) {
+        log.error('Failed to load history', err);
+      }
+    }
+    loadHistory();
+    return () => {
+      active = false;
     };
-  });
+  }, [selectedAccountId, selectedStationId, selectedInverterSn, isFleetView]);
+
+  const chartData = React.useMemo(() => {
+    return (hourlyData.length > 0 ? hourlyData : []).map((pt) => {
+      const rawSolar = (pt.solarYieldKw ?? 0) * scaleRatio;
+      const rawLoad = (pt.loadDemandKw ?? 0) * scaleRatio;
+      const bat = (pt.batteryFlowKw ?? 0) * scaleRatio;
+      return {
+        ...pt,
+        solarYieldKw: parseFloat(rawSolar.toFixed(2)),
+        loadDemandKw: parseFloat(rawLoad.toFixed(2)),
+        batteryFlowKw: parseFloat(bat.toFixed(2)),
+        hourDecimal: parseInt(pt.hour.split(':')[0], 10),
+        gridExportKw: parseFloat(Math.max(0, rawSolar - rawLoad - Math.max(0, bat)).toFixed(2)),
+      };
+    });
+  }, [hourlyData, scaleRatio]);
 
   // Calculate real ledger metrics from available telemetry
   const totals = React.useMemo(() => {
@@ -109,15 +212,15 @@ export default function YieldArbitragePage() {
     if (hourlyData.length === 0 || totals.todayYieldKwh === 0) return [];
     return [
       {
-        date: 'Today',
+        date: `Today · ${selectedScopeTitle}`,
         yieldKwh: totals.todayYieldKwh,
         selfConsPct: totals.selfConsPct,
         gridExportKwh: totals.gridExportKwh,
         peakSavedUsd: totals.peakSavedUsd,
-        roiScore: totals.todayYieldKwh > 0 ? `+${((totals.todayYieldKwh / 120) * 10).toFixed(1)}%` : '--',
+        roiScore: totals.todayYieldKwh > 0 ? `+${((totals.todayYieldKwh / (targetCapacityKw || 120)) * 10).toFixed(1)}%` : '--',
       },
     ];
-  }, [hourlyData, totals]);
+  }, [hourlyData, totals, selectedScopeTitle, targetCapacityKw]);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto pb-12">
@@ -326,13 +429,33 @@ export default function YieldArbitragePage() {
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-border/50 p-5">
           <div>
             <HoverInfo
-              title="Diurnal Energy Curve"
-              content={TELEMETRY_DESCRIPTIONS.yieldArbitrage.diurnalCurveLegend}
+              title={`${selectedScopeTitle} · Time-of-Use Arbitrage`}
+              content={
+                <div className="space-y-1.5 text-[11px]">
+                  <p>{TELEMETRY_DESCRIPTIONS.yieldArbitrage.diurnalCurveLegend}</p>
+                  <div className="pt-1 border-t border-border/50 text-amber-400 font-mono font-medium">
+                    {selectedScopeTitle} · Real-time 5-minute sampling
+                  </div>
+                </div>
+              }
               showIcon
             >
-              <CardTitle className="text-base font-bold flex items-center gap-2 cursor-help">
-                <Zap size={18} className="text-amber-500" />
-                <span>Diurnal Curve: Solar Generation vs Industrial Load Profile</span>
+              <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-help flex-wrap">
+                {selectedInverter ? (
+                  <Cpu className="w-5 h-5 text-cyan-400 shrink-0" />
+                ) : isFleetView ? (
+                  <Globe className="w-5 h-5 text-primary shrink-0" />
+                ) : selectedPlant ? (
+                  <Building2 className="w-5 h-5 text-amber-500 shrink-0" />
+                ) : (
+                  <Sun className="w-5 h-5 text-amber-500 shrink-0" />
+                )}
+                <span>{selectedScopeTitle}</span>
+                {selectedPlant && selectedAccount && selectedAccount.plants && selectedAccount.plants.length > 1 && (
+                  <span className="text-xs font-normal text-muted-foreground font-mono">
+                    ({selectedAccount.name})
+                  </span>
+                )}
               </CardTitle>
             </HoverInfo>
           </div>
