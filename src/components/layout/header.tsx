@@ -167,8 +167,10 @@ export function Header({
     return () => clearTimeout(timer);
   }, [lastSyncedAt]);
 
+  const safeTotalAccounts = Math.max(1, totalAccounts || 0, accounts.length);
+
   const displayTitle = isFleetView
-    ? `Global Fleet Aggregate (${totalAccounts} Accounts)`
+    ? `Global Fleet Aggregate (${safeTotalAccounts} Accounts)`
     : selectedPlant
     ? `${selectedPlant.stationName}`
     : selectedAccount?.plants && selectedAccount.plants.length > 1
@@ -287,7 +289,7 @@ export function Header({
                     <span className="font-bold text-foreground">
                       {isConsumer
                         ? `${accounts[0]?.plants?.length || 0} Plant${(accounts[0]?.plants?.length || 0) !== 1 ? 's' : ''}`
-                        : `${accounts.length} Site${accounts.length !== 1 ? 's' : ''}`}
+                        : `${safeTotalAccounts} Site${safeTotalAccounts !== 1 ? 's' : ''}`}
                     </span>
                   </div>
                 </div>
@@ -345,7 +347,7 @@ export function Header({
                               isFleetView ? 'text-primary-foreground/80' : 'text-muted-foreground'
                             }`}
                           >
-                            All {totalAccounts} accounts combined ({liveAccountsCount} live)
+                            All {safeTotalAccounts} accounts combined ({liveAccountsCount} live)
                           </div>
                         </div>
                       </div>

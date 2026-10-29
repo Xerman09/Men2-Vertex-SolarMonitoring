@@ -9,6 +9,7 @@ const log = createLogger('StationsRoute');
 
 export const GET = withGate(
   {
+    allowUnauthenticated: true,
     rateLimit: {
       keyPrefix: 'read_stations',
       maxRequests: RATE_LIMIT_CONFIGS.READ_STATIONS.maxRequests,
@@ -20,7 +21,7 @@ export const GET = withGate(
     const accountId = searchParams.get('accountId') || undefined;
 
     // Consumer role is strictly restricted to their assigned account
-    if (session.role === 'consumer') {
+    if (session?.role === 'consumer') {
       if (!session.accountId) {
         return NextResponse.json(
           { error: 'Forbidden: Consumer account is not assigned to any solar station' },

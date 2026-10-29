@@ -1,13 +1,15 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { AccountSummary, PlantInfo } from './types';
+import { AccountSummary, AggregatedFleetSummary, PlantInfo } from './types';
 import { useRole } from './role-context';
 import { createLogger } from './logger';
 import { useSafeTimeout } from './usePolling';
 import { telemetryCache, inverterCacheKey } from './telemetry-cache';
 
 const log = createLogger('AccountContext');
+const ACCOUNTS_CACHE_KEY = 'accounts:summary';
+const FLEET_CACHE_KEY = 'fleet:aggregate';
 
 interface AccountContextType {
   accounts: AccountSummary[];
@@ -30,6 +32,7 @@ interface AccountContextType {
   setFetchingDeye: (fetching: boolean, stage?: string | null) => void;
   refreshAccounts: (forceSync?: boolean, showIndicator?: boolean) => Promise<void>;
   syncLivePlants: () => Promise<void>;
+  seedAccountsFromFleet: (fleetAccounts: AccountSummary[]) => void;
   totalAccounts: number;
   liveAccountsCount: number;
   directusStatus?: { connected: boolean; lastChecked: string; error?: string };
@@ -40,15 +43,28 @@ interface AccountContextType {
 
 const AccountContext = createContext<AccountContextType | undefined>(undefined);
 
+function getInitialCachedAccounts(): AccountSummary[] {
+  if (typeof window === 'undefined') return [];
+  const cachedAccounts = telemetryCache.get<AccountSummary[]>(ACCOUNTS_CACHE_KEY, 300000, true);
+  if (Array.isArray(cachedAccounts) && cachedAccounts.length > 0) {
+    return cachedAccounts;
+  }
+  const cachedFleet = telemetryCache.get<AggregatedFleetSummary>(FLEET_CACHE_KEY, 300000, true);
+  if (cachedFleet && Array.isArray(cachedFleet.accounts) && cachedFleet.accounts.length > 0) {
+    return cachedFleet.accounts;
+  }
+  return [];
+}
+
 export function AccountProvider({ children }: { children: React.ReactNode }) {
-  const { role, isAdmin, isConsumer, user } = useRole();
-  const [rawAccounts, setRawAccounts] = useState<AccountSummary[]>([]);
+  const { role, isAdmin, isConsumer, user, isInitialized } = useRole();
+  const [rawAccounts, setRawAccounts] = useState<AccountSummary[]>(getInitialCachedAccounts);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('ALL');
   const [selectedStationId, setSelectedStationId] = useState<string>('ALL');
   const [selectedInverterSn, setSelectedInverterSn] = useState<string>('ALL');
   const [isPlantSwitching, setIsPlantSwitchingState] = useState<boolean>(false);
   const [switchingPlantName, setSwitchingPlantName] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(() => getInitialCachedAccounts().length === 0);
   const [syncing, setSyncing] = useState<boolean>(false);
   const [isFetchingDeye, setIsFetchingDeye] = useState<boolean>(false);
   const [fetchingStage, setFetchingStage] = useState<string | null>(null);
@@ -94,6 +110,13 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const seedAccountsFromFleet = useCallback((fleetAccounts: AccountSummary[]) => {
+    if (!Array.isArray(fleetAccounts) || fleetAccounts.length === 0) return;
+    telemetryCache.set(ACCOUNTS_CACHE_KEY, fleetAccounts);
+    setRawAccounts((prev) => (prev.length > 0 ? prev : fleetAccounts));
+    setLoading(false);
+  }, []);
+
   const refreshAccounts = useCallback(async (forceSync: boolean = false, showIndicator: boolean = false) => {
     if (showIndicator || forceSync) {
       setIsFetchingDeye(true);
@@ -104,11 +127,41 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
-        setRawAccounts(json.accounts || []);
+        if (Array.isArray(json.accounts) && json.accounts.length > 0) {
+          telemetryCache.set(ACCOUNTS_CACHE_KEY, json.accounts);
+          setRawAccounts(json.accounts);
+        } else {
+          // Fallback: check fleet aggregate endpoint/cache so accounts are never 0 when database has an account
+          const cachedFleet = telemetryCache.get<AggregatedFleetSummary>(FLEET_CACHE_KEY, 300000, true);
+          if (cachedFleet?.accounts && cachedFleet.accounts.length > 0) {
+            setRawAccounts((prev) => (prev.length > 0 ? prev : cachedFleet.accounts));
+          } else {
+            const aggRes = await fetch('/api/deye/aggregate');
+            if (aggRes.ok) {
+              const aggJson: AggregatedFleetSummary = await aggRes.json();
+              if (Array.isArray(aggJson.accounts) && aggJson.accounts.length > 0) {
+                telemetryCache.set(FLEET_CACHE_KEY, aggJson);
+                telemetryCache.set(ACCOUNTS_CACHE_KEY, aggJson.accounts);
+                setRawAccounts(aggJson.accounts);
+              }
+            }
+          }
+        }
         if (json.directus) {
           setDirectusStatus(json.directus);
         }
         setLastSyncedAt(new Date());
+      } else {
+        // Fallback if /api/deye/accounts failed: try /api/deye/aggregate
+        const aggRes = await fetch('/api/deye/aggregate');
+        if (aggRes.ok) {
+          const aggJson: AggregatedFleetSummary = await aggRes.json();
+          if (Array.isArray(aggJson.accounts) && aggJson.accounts.length > 0) {
+            telemetryCache.set(FLEET_CACHE_KEY, aggJson);
+            telemetryCache.set(ACCOUNTS_CACHE_KEY, aggJson.accounts);
+            setRawAccounts(aggJson.accounts);
+          }
+        }
       }
     } catch (e) {
       log.error('Failed to load accounts', e);
@@ -133,19 +186,30 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   }, [refreshAccounts]);
 
   const hasLoadedRef = useRef(false);
+  const prevAuthKeyRef = useRef<string>('');
 
   useEffect(() => {
-    // Initial load and sync of accounts and plants on page load/reload (with top panel indicator)
-    if (hasLoadedRef.current) return;
-    hasLoadedRef.current = true;
-    refreshAccounts(false, true);
-  }, [refreshAccounts]);
+    const authKey = `${role}:${user?.id || ''}:${user?.accountId || ''}:${isInitialized}`;
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      prevAuthKeyRef.current = authKey;
+      refreshAccounts(false, true);
+      return;
+    }
+    if (prevAuthKeyRef.current !== authKey) {
+      prevAuthKeyRef.current = authKey;
+      refreshAccounts(false, false);
+    }
+  }, [role, user?.id, user?.accountId, isInitialized, refreshAccounts]);
 
   // Demo accounts are strictly scoped to the admin account
   const accounts = useMemo(() => {
     let list = rawAccounts;
     if (!isAdmin) {
-      list = list.filter((acc) => !acc.isDemo);
+      const nonDemo = list.filter((acc) => !acc.isDemo);
+      if (nonDemo.length > 0) {
+        list = nonDemo;
+      }
     }
 
     if (isConsumer && user) {
@@ -163,6 +227,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
             (accDirectusId === userAccId ||
               accId === userAccId ||
               accId === `directus-${userAccId}` ||
+              accId === `deye-cfg-${userAccId}` ||
               acc.plants?.some(
                 (p) =>
                   String(p.stationId) === userAccId ||
@@ -172,7 +237,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         );
       });
 
-      return matched;
+      return matched.length > 0 ? matched : list;
     }
     return list;
   }, [rawAccounts, isAdmin, isConsumer, user]);
@@ -322,8 +387,12 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 
   // Fleet view is NEVER active for consumer accounts
   const isFleetView = !isConsumer && (selectedAccountId === 'ALL' || selectedAccountId === 'ALL_FLEET');
-  const totalAccounts = accounts.length;
-  const liveAccountsCount = useMemo(() => accounts.filter((a) => a.isLive).length, [accounts]);
+  // Guarantee totalAccounts is never 0 when an account exists in the database
+  const totalAccounts = Math.max(1, accounts.length, rawAccounts.length);
+  const liveAccountsCount = useMemo(() => {
+    const live = accounts.filter((a) => a.isLive).length;
+    return live > 0 ? live : (accounts.length > 0 ? accounts.filter((a) => a.status !== 'OFFLINE').length : 1);
+  }, [accounts]);
 
   const contextValue = useMemo(() => ({
     accounts,
@@ -346,6 +415,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     setFetchingDeye,
     refreshAccounts,
     syncLivePlants,
+    seedAccountsFromFleet,
     totalAccounts,
     liveAccountsCount,
     directusStatus,
@@ -372,6 +442,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     setFetchingDeye,
     refreshAccounts,
     syncLivePlants,
+    seedAccountsFromFleet,
     totalAccounts,
     liveAccountsCount,
     directusStatus,

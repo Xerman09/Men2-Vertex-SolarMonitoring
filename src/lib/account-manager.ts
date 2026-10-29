@@ -60,6 +60,14 @@ class DeyeAccountManager {
     return FileAccountCache.getConfigPath();
   }
 
+  private getEnabledOrAllAccounts(accounts: DeyeAccountConfig[]): DeyeAccountConfig[] {
+    const enabled = accounts.filter((a) => a.enabled !== false);
+    if (enabled.length > 0) {
+      return enabled;
+    }
+    return accounts;
+  }
+
   public getDirectusHealth() {
     return this.directusTransport.getHealth();
   }
@@ -122,7 +130,7 @@ class DeyeAccountManager {
       this.cachedFleetSummary.clear();
     }
     const now = Date.now();
-    if (!force && this.accountsCache && now - this.lastDirectusSyncAt < 10000) {
+    if (!force && this.accountsCache && this.accountsCache.length > 0 && now - this.lastDirectusSyncAt < 10000) {
       return this.accountsCache;
     }
 
@@ -147,7 +155,7 @@ class DeyeAccountManager {
 
           // Find stations associated with this config
           const configStations = Array.isArray(stations)
-            ? stations.filter((s) => s.deye_config_id === cfg.id || (!s.deye_config_id && stations.length === 1))
+            ? stations.filter((s) => s.deye_config_id === cfg.id || (!s.deye_config_id && (stations.length === 1 || configs.length === 1)))
             : [];
 
           const plants: PlantInfo[] = configStations.map((st) => {
@@ -221,7 +229,7 @@ class DeyeAccountManager {
         if (mergedAccounts.length > 0) {
           this.saveAccountsToFile(mergedAccounts);
           this.lastDirectusSyncAt = now;
-          this.accountsCache = mergedAccounts.filter((a) => a.enabled !== false);
+          this.accountsCache = this.getEnabledOrAllAccounts(mergedAccounts);
           this.syncClients();
           return this.accountsCache;
         }
@@ -300,16 +308,17 @@ class DeyeAccountManager {
 
       this.saveAccountsToFile(mergedAccounts);
       this.lastDirectusSyncAt = now;
-      this.accountsCache = mergedAccounts.filter((a) => a.enabled !== false);
+      this.accountsCache = this.getEnabledOrAllAccounts(mergedAccounts);
       this.syncClients();
       return this.accountsCache;
     }
 
     // 3. Directus unreachable or empty: fallback to disk cache
     if (diskAccounts.length > 0) {
-      this.accountsCache = diskAccounts
-        .filter((a) => a.enabled !== false)
-        .map((a) => ({ ...a, source: 'cache' as const }));
+      this.accountsCache = this.getEnabledOrAllAccounts(diskAccounts).map((a) => ({
+        ...a,
+        source: a.source || ('cache' as const),
+      }));
       this.syncClients();
       this.lastLoadedAt = now;
       return this.accountsCache;
@@ -332,7 +341,7 @@ class DeyeAccountManager {
     this.cachedFleetSummary.clear();
     const success = FileAccountCache.saveAccountsToFile(accounts);
     if (success) {
-      this.accountsCache = accounts.filter((acc) => acc.enabled !== false);
+      this.accountsCache = this.getEnabledOrAllAccounts(accounts);
       this.lastLoadedAt = Date.now();
       this.syncClients();
     }
@@ -344,13 +353,13 @@ class DeyeAccountManager {
    */
   public loadAccounts(forceReload = false): DeyeAccountConfig[] {
     const now = Date.now();
-    if (!forceReload && this.accountsCache && now - this.lastLoadedAt < 5000) {
+    if (!forceReload && this.accountsCache && this.accountsCache.length > 0 && now - this.lastLoadedAt < 5000) {
       return this.accountsCache;
     }
 
     const all = this.getAllRawAccounts(forceReload);
     if (all.length > 0) {
-      this.accountsCache = all.filter((acc) => acc.enabled !== false);
+      this.accountsCache = this.getEnabledOrAllAccounts(all);
       this.syncClients();
       this.lastLoadedAt = now;
       return this.accountsCache;
@@ -835,96 +844,103 @@ class DeyeAccountManager {
     // Synchronize with Directus (or fallback to cache if offline)
     await this.syncWithDirectus(forceSync);
 
-    const rawAccounts = this.getAllRawAccounts(true);
-    const summaries: AccountSummary[] = [];
-
-    for (const acc of rawAccounts) {
-      const client = new DeyeCloudClient(acc);
-      let isLive = false;
-      let pingMs = 25;
-      let liveKw = 0;
-      let dailyYield = 0;
-
-      if (acc.enabled && client.hasCredentials()) {
-        try {
-          const health = await client.getHealth();
-          isLive = health.isLive;
-          pingMs = health.pingMs;
-
-          if (isLive) {
-            // Dynamic auto-sync: refresh plant names & devices every 30s or on forceSync
-            const lastSyncTime = acc.lastSyncedAt ? new Date(acc.lastSyncedAt).getTime() : 0;
-            const needsSync = forceSync || !acc.lastSyncedAt || (Date.now() - lastSyncTime > 30_000);
-            if (needsSync) {
-              await this.syncDynamicPlantMetadata(acc, client);
-            }
-
-            const activePlants = acc.plants || [];
-            const activeInvSns = activePlants
-              .flatMap((p) => p.devices)
-              .filter((d) => d.deviceType === 'INVERTER')
-              .map((d) => d.deviceSn);
-
-            const [stSummary, batchDev] = await Promise.all([
-              client.getStationSummary(),
-              activeInvSns.length > 0 ? client.getBatchDeviceLatest(activeInvSns) : Promise.resolve(new Map()),
-            ]);
-            liveKw = stSummary.data.liveSolarPowerKw;
-            // Sum daily yield from real inverter telemetry
-            for (const [, devData] of batchDev) {
-              dailyYield += parseFloat(devData.get('DailyActiveProduction') || '0');
-            }
-          }
-        } catch {
-          isLive = false;
-        }
-      }
-
-      const plants = acc.plants || [];
-      let inverterCount = 0;
-      let loggerCount = 0;
-      let capacity = 0;
-
-      for (const p of plants) {
-        capacity += p.installedCapacityKw || 0;
-        for (const d of p.devices) {
-          if (d.deviceType === 'INVERTER') inverterCount++;
-          if (d.deviceType === 'LOGGER') loggerCount++;
-        }
-      }
-
-      summaries.push({
-        id: acc.id,
-        directusId: acc.directusId,
-        userId: acc.userId,
-        name: acc.name,
-        email: acc.email,
-        enabled: acc.enabled !== false,
-        admin: acc.admin,
-        isDemo: Boolean(acc.isDemo),
-        isLive,
-        stationCount: plants.length,
-        deviceCount: inverterCount + loggerCount,
-        inverterCount,
-        loggerCount,
-        liveSolarPowerKw: parseFloat(liveKw.toFixed(2)),
-        dailyYieldKwh: parseFloat(dailyYield.toFixed(2)),
-        capacityKw: parseFloat(capacity.toFixed(1)),
-        status: !acc.enabled
-          ? 'OFFLINE'
-          : isLive
-          ? 'ONLINE'
-          : 'OFFLINE',
-        lastPingMs: pingMs,
-        plants,
-        autoDiscovered: acc.autoDiscovered,
-        lastSyncedAt: acc.lastSyncedAt,
-        source: acc.source || (acc.directusId ? 'directus' : 'cache'),
-      });
+    let rawAccounts = this.getAllRawAccounts(true);
+    if (rawAccounts.length === 0) {
+      rawAccounts = this.loadAccounts(false);
     }
 
+    const summaries: AccountSummary[] = await Promise.all(
+      rawAccounts.map(async (acc) => {
+        const client = this.getClient(acc.id) || new DeyeCloudClient(acc);
+        let isLive = false;
+        let pingMs = 25;
+        let liveKw = 0;
+        let dailyYield = 0;
+
+        if (acc.enabled !== false && client.hasCredentials()) {
+          try {
+            const health = await client.getHealth();
+            isLive = health.isLive;
+            pingMs = health.pingMs;
+
+            if (isLive) {
+              // Dynamic auto-sync: refresh plant names & devices every 30s or on forceSync
+              const lastSyncTime = acc.lastSyncedAt ? new Date(acc.lastSyncedAt).getTime() : 0;
+              const needsSync = forceSync || !acc.lastSyncedAt || (Date.now() - lastSyncTime > 30_000);
+              if (needsSync) {
+                await this.syncDynamicPlantMetadata(acc, client);
+              }
+
+              const activePlants = acc.plants || [];
+              const activeInvSns = activePlants
+                .flatMap((p) => p.devices)
+                .filter((d) => d.deviceType === 'INVERTER')
+                .map((d) => d.deviceSn);
+
+              const [stSummary, batchDev] = await Promise.all([
+                client.getStationSummary(),
+                activeInvSns.length > 0 ? client.getBatchDeviceLatest(activeInvSns) : Promise.resolve(new Map()),
+              ]);
+              liveKw = stSummary.data.liveSolarPowerKw;
+              // Sum daily yield from real inverter telemetry
+              for (const [, devData] of batchDev) {
+                dailyYield += parseFloat(devData.get('DailyActiveProduction') || '0');
+              }
+            }
+          } catch {
+            isLive = false;
+          }
+        }
+
+        const plants = acc.plants || [];
+        let inverterCount = 0;
+        let loggerCount = 0;
+        let capacity = 0;
+
+        for (const p of plants) {
+          capacity += p.installedCapacityKw || 0;
+          for (const d of p.devices) {
+            if (d.deviceType === 'INVERTER') inverterCount++;
+            if (d.deviceType === 'LOGGER') loggerCount++;
+          }
+        }
+
+        return {
+          id: acc.id,
+          directusId: acc.directusId,
+          userId: acc.userId,
+          name: acc.name,
+          email: acc.email,
+          enabled: acc.enabled !== false,
+          admin: acc.admin,
+          isDemo: Boolean(acc.isDemo),
+          isLive,
+          stationCount: plants.length,
+          deviceCount: inverterCount + loggerCount,
+          inverterCount,
+          loggerCount,
+          liveSolarPowerKw: parseFloat(liveKw.toFixed(2)),
+          dailyYieldKwh: parseFloat(dailyYield.toFixed(2)),
+          capacityKw: parseFloat(capacity.toFixed(1)),
+          status: acc.enabled === false
+            ? 'OFFLINE'
+            : isLive
+            ? 'ONLINE'
+            : 'OFFLINE',
+          lastPingMs: pingMs,
+          plants,
+          autoDiscovered: acc.autoDiscovered,
+          lastSyncedAt: acc.lastSyncedAt,
+          source: acc.source || (acc.directusId ? 'directus' : 'cache'),
+        };
+      })
+    );
+
     if (sessionRole && sessionRole !== 'admin') {
-      return summaries.filter((s) => !s.isDemo);
+      const nonDemo = summaries.filter((s) => !s.isDemo);
+      if (nonDemo.length > 0 || summaries.every((s) => s.isDemo)) {
+        return nonDemo;
+      }
     }
 
     return summaries;
@@ -942,20 +958,32 @@ class DeyeAccountManager {
     const TTL_MS = 20000; // 20-second cache window
 
     const cached = this.cachedFleetSummary.get(cacheKey);
-    if (cached && now - cached.timestamp < TTL_MS) {
+    if (cached && cached.data.totalAccounts > 0 && cached.data.accounts.length > 0 && now - cached.timestamp < TTL_MS) {
       return cached.data;
     }
 
+    if (!this.accountsCache || this.accountsCache.length === 0 || now - this.lastDirectusSyncAt > 10000) {
+      await this.syncWithDirectus(false);
+    }
+
+    let rawAccounts = this.loadAccounts(false);
+    if (rawAccounts.length === 0) {
+      rawAccounts = this.getAllRawAccounts(true);
+    }
     const clients = this.getAllClients();
-    const rawAccounts = this.loadAccounts(false);
     
     // Demo accounts only accessible by admin account
     let effectiveRaw = rawAccounts;
     if (sessionRole && sessionRole !== 'admin') {
-      effectiveRaw = rawAccounts.filter((a) => !a.isDemo);
+      const nonDemo = rawAccounts.filter((a) => !a.isDemo);
+      if (nonDemo.length > 0) {
+        effectiveRaw = nonDemo;
+      }
     }
     const result = await this.fleetAggregator.aggregateFleet(clients, effectiveRaw, accountIds);
-    this.cachedFleetSummary.set(cacheKey, { data: result, timestamp: Date.now() });
+    if (result.totalAccounts > 0) {
+      this.cachedFleetSummary.set(cacheKey, { data: result, timestamp: Date.now() });
+    }
     return result;
   }
 

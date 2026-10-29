@@ -54,6 +54,8 @@ type StatusFilter = 'ALL' | 'ONLINE' | 'STANDBY' | 'FAULT';
 export default function FleetMonitoringPage() {
   const router = useRouter();
   const {
+    accounts,
+    seedAccountsFromFleet,
     selectInverter,
     refreshAccounts,
     isFetchingDeye,
@@ -138,8 +140,11 @@ export default function FleetMonitoringPage() {
     // If not manual refresh and cache is fresh (< 30s), reuse cached data without hitting API
     if (!isManual && telemetryCache.isFresh(FLEET_CACHE_KEY, 30000)) {
       const cached = telemetryCache.get<AggregatedFleetSummary>(FLEET_CACHE_KEY);
-      if (cached) {
+      if (cached && cached.totalAccounts > 0) {
         setFleetData(cached);
+        if (cached.accounts?.length > 0) {
+          seedAccountsFromFleet(cached.accounts);
+        }
         setLoading(false);
         return;
       }
@@ -152,6 +157,9 @@ export default function FleetMonitoringPage() {
         const json: AggregatedFleetSummary = await res.json();
         telemetryCache.set(FLEET_CACHE_KEY, json);
         setFleetData(json);
+        if (json.accounts?.length > 0) {
+          seedAccountsFromFleet(json.accounts);
+        }
       }
     } catch (err) {
       log.error('Failed to fetch fleet aggregate', { error: err });
@@ -159,7 +167,7 @@ export default function FleetMonitoringPage() {
       setLoading(false);
       if (isManual) setRefreshing(false);
     }
-  }, []);
+  }, [seedAccountsFromFleet]);
 
   useEffect(() => {
     fetchFleet(false);
@@ -206,14 +214,19 @@ export default function FleetMonitoringPage() {
 
   // Filter accounts by role (demo accounts strictly restricted to admin)
   const authorizedAccounts = useMemo(() => {
-    if (!fleetData?.accounts) return [];
-    if (isAdmin) return fleetData.accounts;
-    return fleetData.accounts.filter((a) => !a.isDemo);
-  }, [fleetData, isAdmin]);
+    const sourceAccounts =
+      fleetData?.accounts && fleetData.accounts.length > 0
+        ? fleetData.accounts
+        : accounts;
+    if (!sourceAccounts || sourceAccounts.length === 0) return [];
+    if (isAdmin) return sourceAccounts;
+    const nonDemo = sourceAccounts.filter((a) => !a.isDemo);
+    return nonDemo.length > 0 ? nonDemo : sourceAccounts;
+  }, [fleetData, accounts, isAdmin]);
 
   // Structure accounts with nested plants and individual inverters
   const accountTree = useMemo(() => {
-    if (!fleetData) return [];
+    if (authorizedAccounts.length === 0) return [];
 
     return authorizedAccounts.map((acc) => {
       const isAccDemo = Boolean(acc.isDemo);
@@ -222,7 +235,7 @@ export default function FleetMonitoringPage() {
         const plantKey = `${acc.id}:${plant.stationId}`;
 
         // Find matrix nodes belonging to this station
-        const plantNodes = (fleetData.nodes || []).filter(
+        const plantNodes = (fleetData?.nodes || []).filter(
           (n) => String(n.stationId) === String(plant.stationId) && n.accountId === acc.id
         );
 
@@ -502,7 +515,10 @@ export default function FleetMonitoringPage() {
     [selectInverter, router]
   );
 
-  const totalAccountsCount = filteredTree.length;
+  const isUnfiltered = !searchQuery.trim() && statusFilter === 'ALL';
+  const totalAccountsCount = isUnfiltered
+    ? Math.max(1, filteredTree.length, authorizedAccounts.length, fleetData?.totalAccounts || 0)
+    : filteredTree.length;
   const totalPlantsCount = filteredTree.reduce((sum, a) => sum + a.plants.length, 0);
   const totalInvertersCount = filteredTree.reduce(
     (sum, a) => sum + a.plants.reduce((pSum, p) => pSum + p.inverters.length, 0),

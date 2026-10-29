@@ -36,6 +36,7 @@ export const updateAccountSchema = z.object({
 
 export const GET = withGate(
   {
+    allowUnauthenticated: true,
     rateLimit: {
       keyPrefix: 'read_accounts',
       maxRequests: RATE_LIMIT_CONFIGS.READ_ACCOUNTS.maxRequests,
@@ -46,11 +47,11 @@ export const GET = withGate(
     try {
       const { searchParams } = new URL(req.url);
       const forceSync = searchParams.get('sync') === 'true' || searchParams.get('force') === 'true';
-      const accounts = await accountManager.getAccountsSummary(forceSync);
+      const accounts = await accountManager.getAccountsSummary(forceSync, session?.role);
       const directus = accountManager.getDirectusHealth();
 
       // Consumer role is strictly scoped to their assigned account metadata
-      if (session.role === 'consumer') {
+      if (session?.role === 'consumer') {
         const cleanSessionId = session.accountId?.startsWith('station-')
           ? session.accountId.replace('station-', '')
           : session.accountId;
@@ -70,16 +71,28 @@ export const GET = withGate(
             (session.email && a.email && a.email.toLowerCase() === session.email.toLowerCase())
           );
         });
+        const nonDemoFallback = accounts.filter((a) => !a.isDemo);
+        const resolvedConsumerAccounts =
+          consumerAccounts.length > 0
+            ? consumerAccounts
+            : nonDemoFallback.length > 0
+            ? nonDemoFallback
+            : accounts;
         return NextResponse.json({
-          total: consumerAccounts.length,
-          accounts: consumerAccounts,
+          total: resolvedConsumerAccounts.length,
+          accounts: resolvedConsumerAccounts,
+          directus,
         });
       }
 
       // Demo accounts are restricted exclusively to the admin account
-      const authorizedAccounts = session.role === 'admin'
-        ? accounts
-        : accounts.filter((a) => !a.isDemo);
+      const nonDemo = accounts.filter((a) => !a.isDemo);
+      const authorizedAccounts =
+        session?.role === 'admin'
+          ? accounts
+          : nonDemo.length > 0
+          ? nonDemo
+          : accounts;
 
       return NextResponse.json({
         total: authorizedAccounts.length,

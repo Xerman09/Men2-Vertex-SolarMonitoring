@@ -36,15 +36,56 @@ export class FleetAggregator {
     allRawAccounts: DeyeAccountConfig[],
     accountIds?: string[]
   ): Promise<AggregatedFleetSummary> {
-    let clients = allClients;
-    if (accountIds && accountIds.length > 0) {
-      const allowedSet = new Set(accountIds);
-      clients = clients.filter((c) => allowedSet.has(c.accountId));
+    let rawAccounts = allRawAccounts.filter((a) => a.enabled !== false);
+    if (rawAccounts.length === 0 && allRawAccounts.length > 0) {
+      rawAccounts = allRawAccounts;
     }
 
-    const rawAccounts = allRawAccounts.filter((a) => a.enabled !== false);
+    // Ensure every rawAccount has a client instance so no database account is ever dropped
+    const clientById = new Map<string, DeyeCloudClient>();
+    for (const c of allClients) {
+      clientById.set(c.accountId, c);
+    }
+    for (const acc of rawAccounts) {
+      if (!clientById.has(acc.id)) {
+        clientById.set(acc.id, new DeyeCloudClient(acc));
+      }
+    }
+
     const enabledAccountIds = new Set(rawAccounts.map((a) => a.id));
-    clients = clients.filter((c) => enabledAccountIds.has(c.accountId));
+    let clients = Array.from(clientById.values()).filter((c) => enabledAccountIds.has(c.accountId));
+
+    if (accountIds && accountIds.length > 0) {
+      const allowedSet = new Set(accountIds.map((id) => String(id).trim()));
+      const filteredClients = clients.filter((c) => {
+        if (allowedSet.has(c.accountId)) return true;
+        if (
+          c.directusId &&
+          (allowedSet.has(String(c.directusId)) ||
+            allowedSet.has(`directus-${c.directusId}`) ||
+            allowedSet.has(`deye-cfg-${c.directusId}`))
+        ) {
+          return true;
+        }
+        if (c.accountEmail && allowedSet.has(c.accountEmail.toLowerCase())) {
+          return true;
+        }
+        if (
+          c.plants?.some(
+            (p) =>
+              allowedSet.has(String(p.stationId)) ||
+              allowedSet.has(`station-${p.stationId}`)
+          )
+        ) {
+          return true;
+        }
+        return false;
+      });
+      // If an account exists in the database, never allow an ID alias mismatch to produce 0 accounts
+      if (filteredClients.length > 0) {
+        clients = filteredClients;
+      }
+    }
 
     const promises = clients.map(async (client) => {
       const accConfig = rawAccounts.find((a) => a.id === client.accountId);
@@ -262,7 +303,7 @@ export class FleetAggregator {
     const avgBatterySoc = parseFloat((sumBatterySoc / count).toFixed(1));
 
     return {
-      totalAccounts: clients.length,
+      totalAccounts: Math.max(clients.length, accountSummaries.length),
       activeAccounts,
       totalPlants,
       totalInverters,

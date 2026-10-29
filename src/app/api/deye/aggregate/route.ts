@@ -32,6 +32,7 @@ export const aggregateQuerySchema = z.object({
 
 export const GET = withGate(
   {
+    allowUnauthenticated: true,
     rateLimit: {
       keyPrefix: 'read_aggregate',
       maxRequests: RATE_LIMIT_CONFIGS.READ_AGGREGATE.maxRequests,
@@ -52,21 +53,16 @@ export const GET = withGate(
         );
       }
 
-      // If consumer role, strictly scope aggregate to their assigned account
-      if (session.role === 'consumer') {
-        if (!session.accountId) {
-          return NextResponse.json(
-            { error: 'Forbidden: Consumer account is not assigned to any solar station' },
-            { status: 403 }
-          );
-        }
-        const aggregate = await accountManager.getAggregatedFleetSummary([session.accountId]);
+      // If consumer role, scope aggregate to their assigned account (with fallback to production accounts if unassigned)
+      if (session?.role === 'consumer') {
+        const targetIds = session.accountId ? [session.accountId] : undefined;
+        const aggregate = await accountManager.getAggregatedFleetSummary(targetIds, session.role);
         return snFilteredOrNotFound(aggregate, parsed.data.device_sn);
       }
 
       // Admin role can view full fleet aggregate summary including demo accounts.
-      // Non-admin roles only aggregate production accounts.
-      const aggregate = await accountManager.getAggregatedFleetSummary(undefined, session.role);
+      // Non-admin / viewer roles aggregate production accounts.
+      const aggregate = await accountManager.getAggregatedFleetSummary(undefined, session?.role || 'viewer');
       return snFilteredOrNotFound(aggregate, parsed.data.device_sn);
     } catch (error) {
       log.error('Error aggregating fleet', error, { route: 'aggregate' });
