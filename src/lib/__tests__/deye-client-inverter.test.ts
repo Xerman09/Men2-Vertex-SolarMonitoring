@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   DeyeCloudClient,
   getInverterShareInfo,
   getSingleInverterStationView,
+  isNetworkTimeoutError,
 } from '../deye-client';
 import type { PlantInfo, StationSummary } from '../types';
 
@@ -135,5 +136,105 @@ describe('DeyeCloudClient per-inverter scaling (TDD)', () => {
       'UNKNOWN-SN'
     );
     expect(missing).toBeNull();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('detects undici UND_ERR_CONNECT_TIMEOUT wrapped inside TypeError: fetch failed', () => {
+    const connectErr = Object.assign(new Error('Connect Timeout Error'), {
+      name: 'ConnectTimeoutError',
+      code: 'UND_ERR_CONNECT_TIMEOUT',
+    });
+    const fetchErr = new TypeError('fetch failed', { cause: connectErr });
+    expect(isNetworkTimeoutError(fetchErr)).toBe(true);
+    expect(isNetworkTimeoutError(connectErr)).toBe(true);
+    expect(isNetworkTimeoutError(new Error('Syntax error'))).toBe(false);
+  });
+
+  it('deduplicates concurrent getStationSummary requests and skips redundant /v1.0/station/detail calls when plant metadata is known', async () => {
+    const client = new DeyeCloudClient({
+      id: 'hanvin-1',
+      name: 'Hanvin Solar',
+      appId: 'valid-app-id',
+      appSecret: 'valid-secret-key',
+      email: 'ops@hanvin.local',
+      password: 'valid-password',
+      plants: makePlants(),
+    });
+    vi.spyOn(client, 'getAccessToken').mockResolvedValue('mock-token');
+
+    const endpointsCalled: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      endpointsCalled.push(url);
+      await new Promise((r) => setTimeout(r, 20));
+      return new Response(
+        JSON.stringify({
+          code: '1000000',
+          generationPower: 45000,
+          consumptionPower: 12000,
+          wirePower: 33000,
+          batteryPower: 0,
+          batterySOC: 85,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    const [res1, res2, res3] = await Promise.all([
+      client.getStationSummary(),
+      client.getStationSummary(),
+      client.getStationSummary(),
+    ]);
+
+    expect(res1.isLive).toBe(true);
+    expect(res2.data.liveSolarPowerKw).toBe(45);
+    expect(res3.data.liveSolarPowerKw).toBe(45);
+    // Only 1 request to /v1.0/station/latest for the single plant, and 0 to /v1.0/station/detail
+    expect(endpointsCalled.filter((u) => u.includes('/v1.0/station/latest')).length).toBe(1);
+    expect(endpointsCalled.filter((u) => u.includes('/v1.0/station/detail')).length).toBe(0);
+  });
+
+  it('retries once and recovers when /v1.0/station/latest encounters a transient UND_ERR_CONNECT_TIMEOUT', async () => {
+    const client = new DeyeCloudClient({
+      id: 'hanvin-1',
+      name: 'Hanvin Solar',
+      appId: 'valid-app-id',
+      appSecret: 'valid-secret-key',
+      email: 'ops@hanvin.local',
+      password: 'valid-password',
+      plants: makePlants(),
+    });
+    vi.spyOn(client, 'getAccessToken').mockResolvedValue('mock-token');
+
+    let attempts = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      attempts++;
+      if (attempts === 1) {
+        const cause = Object.assign(new Error('Connect Timeout Error'), {
+          name: 'ConnectTimeoutError',
+          code: 'UND_ERR_CONNECT_TIMEOUT',
+        });
+        throw new TypeError('fetch failed', { cause });
+      }
+      return new Response(
+        JSON.stringify({
+          code: '1000000',
+          generationPower: 62000,
+          consumptionPower: 10000,
+          wirePower: 52000,
+          batteryPower: 0,
+          batterySOC: 90,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    const res = await client.getStationSummary();
+    expect(attempts).toBe(2);
+    expect(res.isLive).toBe(true);
+    expect(res.data.liveSolarPowerKw).toBe(62);
   });
 });

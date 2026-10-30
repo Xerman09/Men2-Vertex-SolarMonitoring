@@ -125,6 +125,51 @@ export function getSnLiveOverlay(raw: Map<string, string>): SnLiveOverlay {
   };
 }
 
+const NETWORK_TIMEOUT_CODES = new Set<string | number>([
+  23,
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_BODY_TIMEOUT',
+  'UND_ERR_SOCKET',
+  'ETIMEDOUT',
+  'ECONNRESET',
+  'ECONNABORTED',
+]);
+
+const NETWORK_TIMEOUT_NAMES = new Set<string>([
+  'TimeoutError',
+  'ConnectTimeoutError',
+  'HeadersTimeoutError',
+  'BodyTimeoutError',
+  'SocketError',
+  'AbortError',
+]);
+
+/**
+ * Detects AbortSignal timeouts as well as Node/undici cause-wrapped connection timeouts
+ * (e.g. TypeError: fetch failed -> cause: ConnectTimeoutError [UND_ERR_CONNECT_TIMEOUT]).
+ */
+export function isNetworkTimeoutError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const candidates: Record<string, unknown>[] = [err as Record<string, unknown>];
+  const cause = (err as { cause?: unknown }).cause;
+  if (cause && typeof cause === 'object') {
+    candidates.push(cause as Record<string, unknown>);
+  }
+  for (const item of candidates) {
+    if (typeof item.name === 'string' && NETWORK_TIMEOUT_NAMES.has(item.name)) {
+      return true;
+    }
+    if ((typeof item.code === 'string' || typeof item.code === 'number') && NETWORK_TIMEOUT_CODES.has(item.code)) {
+      return true;
+    }
+    if (typeof item.message === 'string' && /timeout|timed out|UND_ERR_CONNECT_TIMEOUT/i.test(item.message)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export class DeyeCloudClient {
   public readonly accountId: string;
   public readonly accountName: string;
@@ -140,7 +185,10 @@ export class DeyeCloudClient {
   private cachedToken: DeyeTokenCache | null = null;
   private tokenFetchPromise: Promise<string | null> | null = null;
   private cachedStationSummary: Map<string, { result: { data: StationSummary; isLive: boolean; stationDetected: boolean }; timestamp: number }> = new Map();
+  private inFlightStationSummary: Map<string, Promise<{ data: StationSummary; isLive: boolean; stationDetected: boolean }>> = new Map();
+  private cachedStationDetails: Map<string, { name: string; installedCapacityKw: number; connectionStatus: string; timestamp: number }> = new Map();
   private cachedBatchDevices: { result: Map<string, Map<string, string>>; timestamp: number } | null = null;
+  private inFlightBatchDevices: Promise<Map<string, Map<string, string>>> | null = null;
 
   public directusId?: string;
   public accountEmail?: string;
@@ -234,12 +282,12 @@ export class DeyeCloudClient {
   }
 
   private async performTokenFetch(): Promise<string | null> {
-    try {
-      const url = `${this.baseUrl}/v1.0/account/token?appId=${encodeURIComponent(this.appId)}`;
-      const sha256Password = this.hashPassword(this.passwordRaw);
+    const url = `${this.baseUrl}/v1.0/account/token?appId=${encodeURIComponent(this.appId)}`;
+    const sha256Password = this.hashPassword(this.passwordRaw);
+    const timeoutMs = env.DEYE_API_TIMEOUT_MS ?? 15000;
 
-      const timeoutMs = env.DEYE_API_TIMEOUT_MS ?? 15000;
-      const res = await fetch(url, {
+    const doFetch = () =>
+      fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -253,6 +301,19 @@ export class DeyeCloudClient {
         redirect: 'error',
         signal: AbortSignal.timeout(timeoutMs),
       });
+
+    try {
+      let res: Response;
+      try {
+        res = await doFetch();
+      } catch (firstErr: unknown) {
+        if (isNetworkTimeoutError(firstErr)) {
+          await new Promise((r) => setTimeout(r, 250));
+          res = await doFetch();
+        } else {
+          throw firstErr;
+        }
+      }
 
       if (!res.ok) {
         log.warn('Auth failed with status', { accountName: this.accountName, status: res.status });
@@ -273,13 +334,10 @@ export class DeyeCloudClient {
       log.warn('Auth response did not return token', { accountName: this.accountName, data });
       return null;
     } catch (err: unknown) {
-      const isTimeout =
-        (err instanceof Error && err.name === 'TimeoutError') ||
-        (typeof err === 'object' && err !== null && (err as { code?: number }).code === 23);
-      if (isTimeout) {
+      if (isNetworkTimeoutError(err)) {
         log.warn('Auth token request timed out', {
           accountName: this.accountName,
-          timeoutMs: env.DEYE_API_TIMEOUT_MS ?? 15000,
+          timeoutMs,
         });
       } else {
         log.error('Network error during token acquisition', err, { accountName: this.accountName });
@@ -293,6 +351,7 @@ export class DeyeCloudClient {
    * - Injects Bearer token
    * - Enforces configurable timeout (default 15s)
    * - Blocks redirects
+   * - Retries once on transient connect/socket timeouts
    * - Automatically invalidates token and retries once on 401
    */
   private async fetchWithAuth(endpoint: string, init: RequestInit = {}): Promise<Response | null> {
@@ -316,7 +375,17 @@ export class DeyeCloudClient {
     };
 
     try {
-      let res = await makeReq(token);
+      let res: Response;
+      try {
+        res = await makeReq(token);
+      } catch (firstErr: unknown) {
+        if (isNetworkTimeoutError(firstErr)) {
+          await new Promise((r) => setTimeout(r, 250));
+          res = await makeReq(token);
+        } else {
+          throw firstErr;
+        }
+      }
 
       // Invalidate and retry once if token expired
       if (res.status === 401) {
@@ -329,11 +398,7 @@ export class DeyeCloudClient {
 
       return res;
     } catch (err: unknown) {
-      const isTimeout =
-        (err instanceof Error && err.name === 'TimeoutError') ||
-        (typeof err === 'object' && err !== null && (err as { code?: number }).code === 23);
-
-      if (isTimeout) {
+      if (isNetworkTimeoutError(err)) {
         log.warn('Request timed out (upstream cloud latency)', {
           accountName: this.accountName,
           endpoint,
@@ -455,10 +520,11 @@ export class DeyeCloudClient {
    */
   public async getSingleStationSummary(stationId?: string): Promise<{ data: StationSummary; isLive: boolean; stationDetected: boolean }> {
     const id = stationId || this.defaultStationId;
-    const matchingPlant = this.plants.find((p) => String(p.stationId) === String(id));
+    const idKey = String(id || '');
+    const matchingPlant = this.plants.find((p) => String(p.stationId) === idKey);
 
     const emptySummary: StationSummary = {
-      stationId: String(id || ''),
+      stationId: idKey,
       name: matchingPlant?.stationName || this.accountName,
       capacityKw: matchingPlant?.installedCapacityKw || 0,
       liveSolarPowerKw: 0,
@@ -476,22 +542,32 @@ export class DeyeCloudClient {
       return { data: emptySummary, isLive: false, stationDetected: false };
     }
 
+    const now = Date.now();
     try {
       const numStationId = parseInt(id, 10) || id;
+      const cachedDetail = this.cachedStationDetails.get(idKey);
+      const hasKnownPlantMetadata =
+        Boolean(matchingPlant?.stationName && (matchingPlant.installedCapacityKw ?? 0) > 0) ||
+        Boolean(cachedDetail && now - cachedDetail.timestamp < 600_000);
+
+      // Only query /v1.0/station/detail when static metadata (name/capacity) is not already known or cached,
+      // halving concurrent TCP/TLS handshakes per poll cycle.
       const [latestRes, detailRes] = await Promise.all([
         this.fetchWithAuth('/v1.0/station/latest', {
           method: 'POST',
           body: JSON.stringify({ stationId: numStationId }),
         }),
-        this.fetchWithAuth('/v1.0/station/detail', {
-          method: 'POST',
-          body: JSON.stringify({ stationId: numStationId }),
-        }),
+        hasKnownPlantMetadata
+          ? Promise.resolve(null)
+          : this.fetchWithAuth('/v1.0/station/detail', {
+              method: 'POST',
+              body: JSON.stringify({ stationId: numStationId }),
+            }),
       ]);
 
-      let stationName = matchingPlant?.stationName || `${this.accountName} Plant`;
-      let installedCapacityKw = matchingPlant?.installedCapacityKw || 0;
-      let connectionStatus = 'NORMAL';
+      let stationName = cachedDetail?.name || matchingPlant?.stationName || `${this.accountName} Plant`;
+      let installedCapacityKw = cachedDetail?.installedCapacityKw || matchingPlant?.installedCapacityKw || 0;
+      let connectionStatus = cachedDetail?.connectionStatus || 'NORMAL';
 
       if (detailRes && detailRes.ok) {
         const detailData = await detailRes.json();
@@ -503,7 +579,16 @@ export class DeyeCloudClient {
             }
           }
           installedCapacityKw = parseFloat(detailData.station.installedCapacity || String(installedCapacityKw));
+          if (installedCapacityKw > 0 && matchingPlant) {
+            matchingPlant.installedCapacityKw = installedCapacityKw;
+          }
           connectionStatus = detailData.station.connectionStatus || 'NORMAL';
+          this.cachedStationDetails.set(idKey, {
+            name: stationName,
+            installedCapacityKw,
+            connectionStatus,
+            timestamp: Date.now(),
+          });
         }
       }
 
@@ -517,7 +602,7 @@ export class DeyeCloudClient {
           const batSoc = latestData.batterySOC != null ? Number(latestData.batterySOC) : 0;
 
           const summary: StationSummary = {
-            stationId: String(id),
+            stationId: idKey,
             name: stationName,
             capacityKw: installedCapacityKw > 0 ? installedCapacityKw : (matchingPlant?.installedCapacityKw || 0),
             liveSolarPowerKw: parseFloat((genW / 1000).toFixed(2)),
@@ -531,18 +616,26 @@ export class DeyeCloudClient {
             lastUpdated: new Date().toISOString(),
           };
 
-          return { data: summary, isLive: true, stationDetected: true };
+          const liveResult = { data: summary, isLive: true, stationDetected: true };
+          this.cachedStationSummary.set(idKey, { result: liveResult, timestamp: Date.now() });
+          return liveResult;
         }
       }
     } catch (err) {
       log.warn('Station summary fetch failed', { accountName: this.accountName, stationId: id }, err);
     }
 
+    // Stale-while-revalidate fallback if this station had a recent live reading within the last 120 seconds
+    const staleSingle = this.cachedStationSummary.get(idKey);
+    if (staleSingle && now - staleSingle.timestamp < 120_000) {
+      return staleSingle.result;
+    }
+
     return { data: emptySummary, isLive: false, stationDetected: false };
   }
 
   /**
-   * Fetch Station Summary (Single or Multi-Plant Aggregation)
+   * Fetch Station Summary (Single or Multi-Plant Aggregation) with in-flight deduplication
    */
   public async getStationSummary(stationId?: string): Promise<{ data: StationSummary; isLive: boolean; stationDetected: boolean }> {
     const cacheKey = stationId || 'ALL';
@@ -552,6 +645,24 @@ export class DeyeCloudClient {
       return cached.result;
     }
 
+    const existingInFlight = this.inFlightStationSummary.get(cacheKey);
+    if (existingInFlight) {
+      return existingInFlight;
+    }
+
+    const fetchPromise = this.performStationSummaryFetch(stationId, cacheKey, now, cached).finally(() => {
+      this.inFlightStationSummary.delete(cacheKey);
+    });
+    this.inFlightStationSummary.set(cacheKey, fetchPromise);
+    return fetchPromise;
+  }
+
+  private async performStationSummaryFetch(
+    stationId: string | undefined,
+    cacheKey: string,
+    now: number,
+    cached: { result: { data: StationSummary; isLive: boolean; stationDetected: boolean }; timestamp: number } | undefined
+  ): Promise<{ data: StationSummary; isLive: boolean; stationDetected: boolean }> {
     if (stationId && stationId !== 'ALL') {
       const res = await this.getSingleStationSummary(stationId);
       if (res.isLive || !cached || now - cached.timestamp >= 60000) {
@@ -676,17 +787,39 @@ export class DeyeCloudClient {
 
   /**
    * Batch fetch raw device telemetry from DeyeCloud OpenAPI (/v1.0/device/latest)
-   * Uses Promise.allSettled to ensure that one failing device chunk does not discard good data
+   * Uses Promise.allSettled and in-flight deduplication to avoid duplicate concurrent calls
    */
   public async getBatchDeviceLatest(deviceSnList: string[]): Promise<Map<string, Map<string, string>>> {
-    const result = new Map<string, Map<string, string>>();
-    if (!deviceSnList || deviceSnList.length === 0) return result;
+    if (!deviceSnList || deviceSnList.length === 0) {
+      return new Map<string, Map<string, string>>();
+    }
 
     const now = Date.now();
     if (this.cachedBatchDevices && now - this.cachedBatchDevices.timestamp < 20000) {
-      return this.cachedBatchDevices.result;
+      const hasAllRequested = deviceSnList.every((sn) => this.cachedBatchDevices!.result.has(sn));
+      if (hasAllRequested || this.cachedBatchDevices.result.size > 0) {
+        return this.cachedBatchDevices.result;
+      }
     }
 
+    if (this.inFlightBatchDevices) {
+      const sharedResult = await this.inFlightBatchDevices;
+      if (sharedResult.size > 0) {
+        return sharedResult;
+      }
+    }
+
+    this.inFlightBatchDevices = this.performBatchDeviceFetch(deviceSnList, now).finally(() => {
+      this.inFlightBatchDevices = null;
+    });
+    return this.inFlightBatchDevices;
+  }
+
+  private async performBatchDeviceFetch(
+    deviceSnList: string[],
+    now: number
+  ): Promise<Map<string, Map<string, string>>> {
+    const result = new Map<string, Map<string, string>>();
     const chunkSize = 8;
     const chunks: string[][] = [];
     for (let i = 0; i < deviceSnList.length; i += chunkSize) {

@@ -262,8 +262,22 @@ export function PlantSolarCurve({
   const elapsedCoords = useMemo(() => {
     const elapsed = coords.filter((c) => c.hour <= nowHour);
     const nowX = paddingX + (Math.min(24, Math.max(0, nowHour)) / 24) * plotWidth;
-    const rawNowSolarY = paddingY + plotHeight - (livePowerKw / maxPower) * plotHeight;
-    const rawNowLoadY = paddingY + plotHeight - (currentDemand / maxPower) * plotHeight;
+    const lastElapsed = elapsed.length > 0 ? elapsed[elapsed.length - 1] : null;
+    const effectiveNowSolar =
+      livePowerKw > 0 || !historyPoints || historyPoints.length === 0
+        ? livePowerKw
+        : (lastElapsed?.solar ?? livePowerKw);
+    const effectiveNowLoad =
+      (demandKw !== undefined && demandKw > 0) || !historyPoints || historyPoints.length === 0
+        ? currentDemand
+        : (lastElapsed?.load ?? currentDemand);
+    const effectiveNowGrid =
+      gridPowerKw !== undefined && gridPowerKw !== 0
+        ? gridPowerKw
+        : parseFloat((effectiveNowSolar - effectiveNowLoad).toFixed(2));
+
+    const rawNowSolarY = paddingY + plotHeight - (effectiveNowSolar / maxPower) * plotHeight;
+    const rawNowLoadY = paddingY + plotHeight - (effectiveNowLoad / maxPower) * plotHeight;
     const nowSolarY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawNowSolarY));
     const nowLoadY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawNowLoadY));
 
@@ -273,9 +287,9 @@ export function PlantSolarCurve({
       list.push({
         hour: nowHour,
         label: `${String(Math.floor(nowHour)).padStart(2, '0')}:${String(Math.floor((nowHour % 1) * 60)).padStart(2, '0')}`,
-        solar: livePowerKw,
-        load: currentDemand,
-        gridNet: currentGridNet,
+        solar: effectiveNowSolar,
+        load: effectiveNowLoad,
+        gridNet: effectiveNowGrid,
         isNow: true,
         isFuture: false,
         x: nowX,
@@ -285,16 +299,16 @@ export function PlantSolarCurve({
     } else {
       list[list.length - 1] = {
         ...list[list.length - 1],
-        solar: livePowerKw,
-        load: currentDemand,
-        gridNet: currentGridNet,
+        solar: effectiveNowSolar,
+        load: effectiveNowLoad,
+        gridNet: effectiveNowGrid,
         x: nowX,
         solarY: nowSolarY,
         loadY: nowLoadY,
       };
     }
     return list;
-  }, [coords, nowHour, paddingX, plotWidth, paddingY, plotHeight, maxPower, livePowerKw, currentDemand, currentGridNet]);
+  }, [coords, nowHour, paddingX, plotWidth, paddingY, plotHeight, maxPower, livePowerKw, demandKw, gridPowerKw, historyPoints, currentDemand]);
 
   const nowCoord = elapsedCoords[elapsedCoords.length - 1];
 

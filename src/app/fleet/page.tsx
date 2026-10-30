@@ -239,36 +239,47 @@ export default function FleetMonitoringPage() {
           (n) => String(n.stationId) === String(plant.stationId) && n.accountId === acc.id
         );
 
-        const inverters = (plant.devices || [])
-          .filter((d) => d.deviceType === 'INVERTER')
-          .map((device) => {
-            const matchedNode = plantNodes.find((n) => n.deviceSn === device.deviceSn);
-            const liveKw = matchedNode
-              ? matchedNode.liveSolarPowerKw
-              : (plant.liveSolarPowerKw || 0) / (plant.devices.length || 1);
-            const dailyYield = matchedNode
-              ? matchedNode.dailyYieldKwh
-              : (plant.dailyYieldKwh || 0) / (plant.devices.length || 1);
-            const rated = device.ratedKw || matchedNode?.ratedKw || 50;
-            const status = matchedNode?.status || device.status || 'ONLINE';
-            const loggerSn = device.loggerSn || matchedNode?.loggerSn;
+        const plantInverterDevices = (plant.devices || []).filter(
+          (d) => d.deviceType === 'INVERTER'
+        );
+        const invCount = plantInverterDevices.length || 1;
 
-            return {
-              ...device,
-              ratedKw: rated,
-              liveSolarPowerKw: parseFloat((liveKw || 0).toFixed(2)),
-              dailyYieldKwh: parseFloat((dailyYield || 0).toFixed(2)),
-              status,
-              loggerSn,
-              batterySoc: matchedNode?.batterySoc || 0,
-              model: device.model || matchedNode?.model || 'SUN Hybrid Inverter',
-            };
-          });
+        const inverters = plantInverterDevices.map((device) => {
+          const matchedNode = plantNodes.find((n) => n.deviceSn === device.deviceSn);
+          const liveKw = matchedNode
+            ? matchedNode.liveSolarPowerKw
+            : (plant.liveSolarPowerKw || 0) / invCount;
+          const dailyYield = matchedNode
+            ? matchedNode.dailyYieldKwh
+            : (plant.dailyYieldKwh || 0) / invCount;
+          const rated = device.ratedKw || matchedNode?.ratedKw || 50;
+          const status = matchedNode?.status || device.status || 'ONLINE';
+          const loggerSn = device.loggerSn || matchedNode?.loggerSn;
+
+          return {
+            ...device,
+            ratedKw: rated,
+            liveSolarPowerKw: parseFloat((liveKw || 0).toFixed(2)),
+            dailyYieldKwh: parseFloat((dailyYield || 0).toFixed(2)),
+            status,
+            loggerSn,
+            batterySoc: matchedNode?.batterySoc || 0,
+            model: device.model || matchedNode?.model || 'SUN Hybrid Inverter',
+          };
+        });
 
         const loggers = (plant.devices || []).filter((d) => d.deviceType === 'LOGGER');
 
-        const plantLivePowerKw = inverters.reduce((sum, inv) => sum + inv.liveSolarPowerKw, 0);
-        const plantDailyYieldKwh = inverters.reduce((sum, inv) => sum + inv.dailyYieldKwh, 0);
+        const sumInvLiveKw = inverters.reduce((sum, inv) => sum + inv.liveSolarPowerKw, 0);
+        const plantLivePowerKw =
+          inverters.length > 0 && sumInvLiveKw > 0
+            ? sumInvLiveKw
+            : (plant.liveSolarPowerKw ?? sumInvLiveKw);
+        const sumInvDailyKwh = inverters.reduce((sum, inv) => sum + inv.dailyYieldKwh, 0);
+        const plantDailyYieldKwh =
+          inverters.length > 0 && sumInvDailyKwh > 0
+            ? sumInvDailyKwh
+            : (plant.dailyYieldKwh ?? sumInvDailyKwh);
         const capacityKw = plant.installedCapacityKw || inverters.reduce((sum, inv) => sum + inv.ratedKw, 0);
 
         const plantDemandKw =
@@ -303,9 +314,12 @@ export default function FleetMonitoringPage() {
         };
       });
 
-      const accLivePowerKw = plants.reduce((sum, p) => sum + p.livePowerKw, 0);
-      const accDailyYieldKwh = plants.reduce((sum, p) => sum + p.dailyYieldKwh, 0);
-      const accCapacityKw = plants.reduce((sum, p) => sum + p.capacityKw, 0);
+      const sumPlantLiveKw = plants.reduce((sum, p) => sum + p.livePowerKw, 0);
+      const accLivePowerKw = sumPlantLiveKw > 0 ? sumPlantLiveKw : (acc.liveSolarPowerKw || 0);
+      const sumPlantDailyKwh = plants.reduce((sum, p) => sum + p.dailyYieldKwh, 0);
+      const accDailyYieldKwh = sumPlantDailyKwh > 0 ? sumPlantDailyKwh : (acc.dailyYieldKwh || 0);
+      const sumPlantCapKw = plants.reduce((sum, p) => sum + p.capacityKw, 0);
+      const accCapacityKw = sumPlantCapKw > 0 ? sumPlantCapKw : (acc.capacityKw || 120);
       const accDemandKw =
         typeof acc.consumptionPowerKw === 'number'
           ? acc.consumptionPowerKw
@@ -422,7 +436,14 @@ export default function FleetMonitoringPage() {
 
   // Synchronize expanded state with top panel fleet dropdown selection
   useEffect(() => {
-    if (isFleetView || !selectedAccountId) return;
+    if (isFleetView) {
+      if (isAdmin) {
+        setExpandedAccountIds(new Set());
+      }
+      setExpandedPlantKeys(new Set());
+      return;
+    }
+    if (!selectedAccountId) return;
     setExpandedAccountIds((prev) => {
       const next = new Set(prev);
       next.add(selectedAccountId);

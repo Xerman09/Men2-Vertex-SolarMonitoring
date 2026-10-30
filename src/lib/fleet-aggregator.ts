@@ -142,7 +142,9 @@ export class FleetAggregator {
 
       if (res.status === 'fulfilled') {
         const item = res.value;
-        totalCapacityKw += item.station.capacityKw;
+        const configuredPlantCapSum = plants.reduce((sum, p) => sum + (p.installedCapacityKw || 0), 0);
+        const accountCapacityKw = item.station.capacityKw > 0 ? item.station.capacityKw : configuredPlantCapSum;
+        totalCapacityKw += accountCapacityKw;
         totalBatteryPowerKw += item.station.batteryPowerKw;
         netGridPowerKw += item.station.gridPowerKw;
         totalLoadPowerKw += item.station.loadPowerKw;
@@ -159,6 +161,32 @@ export class FleetAggregator {
           const inverters = plant.devices.filter((d) => d.deviceType === 'INVERTER');
           const loggers = plant.devices.filter((d) => d.deviceType === 'LOGGER');
           logCount += loggers.length;
+
+          const plantSum = item.station.plantsSummary?.find(
+            (ps) => String(ps.stationId) === String(plant.stationId)
+          );
+
+          // Check whether any inverter in this plant reported live batch power/yield
+          // so standby (0 kW) inverters are not double-counted with plant average power.
+          const plantHasBatchSolar = inverters.some((inv) => {
+            const d = item.batchData?.get(inv.deviceSn);
+            return d ? parseFloat(d.get('TotalActiveACOutputPower') || '0') > 0 : false;
+          });
+          const plantHasBatchDaily = inverters.some((inv) => {
+            const d = item.batchData?.get(inv.deviceSn);
+            return d ? parseFloat(d.get('DailyActiveProduction') || '0') > 0 : false;
+          });
+
+          let plantSolarKw = 0;
+          let plantDailyKwh = 0;
+
+          if (inverters.length === 0 && plantSum) {
+            plantSolarKw = plantSum.liveSolarPowerKw || 0;
+            plantDailyKwh = plantSum.dailyYieldKwh || 0;
+            accSolarKw += plantSolarKw;
+            accDailyKwh += plantDailyKwh;
+            accLifetimeMwh += plantSum.totalYieldMwh || 0;
+          }
 
           for (let invIdx = 0; invIdx < inverters.length; invIdx++) {
             const device = inverters[invIdx];
@@ -189,18 +217,21 @@ export class FleetAggregator {
               ? parseFloat((parseFloat(devData.get('TotalConsumptionPower') || '0') / 1000).toFixed(2))
               : 0;
 
-            // Use per-plant telemetry from plantsSummary if individual inverter batchData is empty
-            const plantSum = item.station.plantsSummary?.find((ps) => String(ps.stationId) === String(plant.stationId));
-            const assignedLiveKw = liveKw > 0
+            // Use per-plant telemetry from plantsSummary only if this plant had no live inverter batch readings
+            const assignedLiveKw = plantHasBatchSolar
               ? liveKw
               : plantSum
               ? parseFloat(((plantSum.liveSolarPowerKw || 0) / (inverters.length || 1)).toFixed(2))
-              : parseFloat(((item.station.liveSolarPowerKw || 0) / (inverters.length || 1)).toFixed(2));
-            const assignedDailyKwh = dailyKwh > 0
+              : plants.length <= 1
+              ? parseFloat(((item.station.liveSolarPowerKw || 0) / (inverters.length || 1)).toFixed(2))
+              : 0;
+            const assignedDailyKwh = plantHasBatchDaily
               ? dailyKwh
               : plantSum
               ? parseFloat(((plantSum.dailyYieldKwh || 0) / (inverters.length || 1)).toFixed(2))
-              : parseFloat(((item.station.dailyYieldKwh || 0) / (inverters.length || 1)).toFixed(2));
+              : plants.length <= 1
+              ? parseFloat(((item.station.dailyYieldKwh || 0) / (inverters.length || 1)).toFixed(2))
+              : 0;
             const assignedGridKw = plantSum ? plantSum.gridPowerKw : item.station.gridPowerKw;
             const assignedConsKw = consKw > 0
               ? consKw
@@ -209,6 +240,8 @@ export class FleetAggregator {
               : 0;
             const assignedBatterySoc = plantSum?.batterySoc ?? (item.station.batterySoc || 0);
 
+            plantSolarKw += assignedLiveKw;
+            plantDailyKwh += assignedDailyKwh;
             accSolarKw += assignedLiveKw;
             accDailyKwh += assignedDailyKwh;
             accLifetimeMwh += lifetimeKwh > 0 ? lifetimeKwh / 1000 : (plantSum?.totalYieldMwh || item.station.totalYieldMwh || 0);
@@ -233,6 +266,22 @@ export class FleetAggregator {
               status: devData ? 'ONLINE' : (plantSum?.status === 'ONLINE' || device.status === 'ONLINE') ? 'ONLINE' : 'STANDBY',
               isLive: item.isLive,
             });
+          }
+
+          // Synchronize plant-level live metrics so Account & Fleet views share identical plant telemetry
+          plant.liveSolarPowerKw = parseFloat(
+            (plantSolarKw > 0 ? plantSolarKw : (plantSum?.liveSolarPowerKw ?? plant.liveSolarPowerKw ?? 0)).toFixed(2)
+          );
+          plant.dailyYieldKwh = parseFloat(
+            (plantDailyKwh > 0 ? plantDailyKwh : (plantSum?.dailyYieldKwh ?? plant.dailyYieldKwh ?? 0)).toFixed(2)
+          );
+          if (plantSum) {
+            plant.consumptionPowerKw = plantSum.loadPowerKw;
+            plant.gridPowerKw = plantSum.gridPowerKw;
+            plant.batterySoc = plantSum.batterySoc;
+            if (plantSum.capacityKw > 0) {
+              plant.installedCapacityKw = plantSum.capacityKw;
+            }
           }
         }
 
@@ -262,10 +311,11 @@ export class FleetAggregator {
           inverterCount: invCount,
           loggerCount: logCount,
           liveSolarPowerKw: parseFloat(finalSolarKw.toFixed(2)),
-          dailyYieldKwh: parseFloat(accDailyKwh.toFixed(2)),
+          dailyYieldKwh: parseFloat(finalDailyKwh.toFixed(2)),
           gridPowerKw: item.station.gridPowerKw,
           consumptionPowerKw: item.station.loadPowerKw,
-          capacityKw: item.station.capacityKw,
+          batterySoc: item.station.batterySoc,
+          capacityKw: parseFloat(accountCapacityKw.toFixed(1)),
           status: item.isLive ? 'ONLINE' : 'OFFLINE',
           lastPingMs: item.health.pingMs,
           plants,
@@ -273,6 +323,8 @@ export class FleetAggregator {
           lastSyncedAt: accConfig?.lastSyncedAt,
         });
       } else {
+        const fallbackCap = plants.reduce((sum, p) => sum + (p.installedCapacityKw || 0), 0);
+        totalCapacityKw += fallbackCap;
         accountSummaries.push({
           id: client.accountId,
           directusId: accConfig?.directusId,
@@ -289,7 +341,7 @@ export class FleetAggregator {
           loggerCount: 0,
           liveSolarPowerKw: 0,
           dailyYieldKwh: 0,
-          capacityKw: 0,
+          capacityKw: parseFloat(fallbackCap.toFixed(1)),
           status: 'OFFLINE',
           lastPingMs: 999,
           plants,

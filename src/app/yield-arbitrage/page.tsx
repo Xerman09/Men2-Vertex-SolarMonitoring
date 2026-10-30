@@ -102,16 +102,15 @@ export default function YieldArbitragePage() {
     if (selectedInverter) return selectedInverter.ratedKw;
     if (selectedPlant) return selectedPlant.installedCapacityKw || 120;
     if (selectedAccount) {
-      const plantSum = selectedAccount.plants?.reduce((sum, p) => sum + (p.installedCapacityKw || 0), 0);
-      if (plantSum && plantSum > 0) return plantSum;
+      const plantSum = selectedAccount.plants?.reduce((sum, p) => sum + (p.installedCapacityKw || 0), 0) || 0;
+      if (plantSum > 0) return plantSum;
       return selectedAccount.capacityKw > 0 ? selectedAccount.capacityKw : 120;
     }
     if (isFleetView) {
       let cap = 0;
       accounts.forEach((acc) => {
-        acc.plants?.forEach((p) => {
-          cap += p.installedCapacityKw || 0;
-        });
+        const plantSum = acc.plants?.reduce((sum, p) => sum + (p.installedCapacityKw || 0), 0) || 0;
+        cap += plantSum > 0 ? plantSum : (acc.capacityKw || 0);
       });
       return cap > 0 ? cap : 120;
     }

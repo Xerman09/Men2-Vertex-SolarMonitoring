@@ -374,9 +374,8 @@ export default function AnalyticsDashboardPage() {
     if (isFleetView) {
       let cap = 0;
       accounts.forEach((acc) => {
-        acc.plants?.forEach((p) => {
-          cap += p.installedCapacityKw || 0;
-        });
+        const plantSum = acc.plants?.reduce((sum, p) => sum + (p.installedCapacityKw || 0), 0) || 0;
+        cap += plantSum > 0 ? plantSum : (acc.capacityKw || 0);
       });
       return cap > 0 ? cap : 120;
     }
@@ -384,8 +383,8 @@ export default function AnalyticsDashboardPage() {
       return selectedPlant.installedCapacityKw || 120;
     }
     if (selectedAccount) {
-      const plantSum = selectedAccount.plants?.reduce((sum, p) => sum + (p.installedCapacityKw || 0), 0);
-      if (plantSum && plantSum > 0) return plantSum;
+      const plantSum = selectedAccount.plants?.reduce((sum, p) => sum + (p.installedCapacityKw || 0), 0) || 0;
+      if (plantSum > 0) return plantSum;
       return selectedAccount.capacityKw > 0 ? selectedAccount.capacityKw : 120;
     }
     return 120;
@@ -586,17 +585,23 @@ export default function AnalyticsDashboardPage() {
   const hasBattery = useMemo<boolean>(() => {
     // 1. Check if selected plant has any BATTERY device attached
     if (selectedPlant?.devices?.some((d) => d.deviceType === 'BATTERY')) return true;
-    // 2. Check if fleet view has any BATTERY devices across accounts
+    // 2. Check if selected account has any BATTERY devices across its plants
+    if (selectedAccount) {
+      return Boolean(
+        selectedAccount.plants?.some((p) => p.devices?.some((d) => d.deviceType === 'BATTERY'))
+      );
+    }
+    // 3. Check if fleet view has any BATTERY devices across accounts
     if (isFleetView) {
       return accounts.some((acc) =>
         acc.plants?.some((p) => p.devices?.some((d) => d.deviceType === 'BATTERY'))
       );
     }
-    // 3. Fallback: Plants without registered battery hardware are strictly Grid-Tied (hasBattery = false)
+    // 4. Fallback: Plants without registered battery hardware are strictly Grid-Tied (hasBattery = false)
     return false;
-  }, [selectedPlant, isFleetView, accounts]);
+  }, [selectedPlant, selectedAccount, isFleetView, accounts]);
 
-  // Live telemetry aggregators for the current scope (Plant, Inverter, or Account summing its stations)
+  // Live telemetry aggregators for the current scope (Plant, Inverter, Account, or Fleet summing all stations)
   const effectiveLiveSolar = useMemo(() => {
     if (selectedInverter) return selectedInverter.liveSolarPowerKw;
     if (selectedPlant) return selectedPlant.liveSolarPowerKw;
@@ -607,8 +612,16 @@ export default function AnalyticsDashboardPage() {
       }
       return selectedAccount.liveSolarPowerKw;
     }
+    if (isFleetView && accounts.length > 0) {
+      let total = 0;
+      for (const acc of accounts) {
+        const plantSum = acc.plants?.reduce((s, p) => s + (p.liveSolarPowerKw || 0), 0) || 0;
+        total += plantSum > 0 ? plantSum : (acc.liveSolarPowerKw || 0);
+      }
+      return total;
+    }
     return undefined;
-  }, [selectedInverter, selectedPlant, selectedAccount]);
+  }, [selectedInverter, selectedPlant, selectedAccount, isFleetView, accounts]);
 
   const effectiveLiveDemand = useMemo(() => {
     if (selectedPlant) return selectedPlant.consumptionPowerKw;
@@ -619,8 +632,23 @@ export default function AnalyticsDashboardPage() {
       }
       return selectedAccount.consumptionPowerKw;
     }
+    if (isFleetView && accounts.length > 0) {
+      let total = 0;
+      let anyDefined = false;
+      for (const acc of accounts) {
+        const plantSum = acc.plants?.reduce((s, p) => s + (p.consumptionPowerKw || 0), 0) || 0;
+        if (plantSum > 0) {
+          total += plantSum;
+          anyDefined = true;
+        } else if (typeof acc.consumptionPowerKw === 'number') {
+          total += acc.consumptionPowerKw;
+          anyDefined = true;
+        }
+      }
+      return anyDefined ? total : undefined;
+    }
     return undefined;
-  }, [selectedPlant, selectedAccount]);
+  }, [selectedPlant, selectedAccount, isFleetView, accounts]);
 
   const effectiveDailyYield = useMemo(() => {
     if (selectedInverter) return selectedInverter.dailyYieldKwh;
@@ -632,12 +660,24 @@ export default function AnalyticsDashboardPage() {
       }
       return selectedAccount.dailyYieldKwh;
     }
+    if (isFleetView && accounts.length > 0) {
+      let total = 0;
+      for (const acc of accounts) {
+        const plantSum = acc.plants?.reduce((s, p) => s + (p.dailyYieldKwh || 0), 0) || 0;
+        total += plantSum > 0 ? plantSum : (acc.dailyYieldKwh || 0);
+      }
+      return total;
+    }
     return undefined;
-  }, [selectedInverter, selectedPlant, selectedAccount]);
+  }, [selectedInverter, selectedPlant, selectedAccount, isFleetView, accounts]);
 
   // Calculate high-level KPIs and multi-period datasets
   const analyticsSummary = useMemo<AnalyticsSummary>(() => {
-    const liveSoc = selectedPlant?.batterySoc ?? selectedAccount?.batterySoc;
+    const fleetSoc =
+      isFleetView && accounts.length > 0
+        ? accounts.reduce((s, a) => s + (a.batterySoc || 0), 0) / accounts.length
+        : undefined;
+    const liveSoc = selectedPlant?.batterySoc ?? selectedAccount?.batterySoc ?? fleetSoc;
     const invEff = selectedInverter?.efficiencyPct;
     return computeAnalyticsSummary(isolatedHourlyData, effectiveCapacityKw, hasBattery, {
       batterySoc: liveSoc,
@@ -645,7 +685,7 @@ export default function AnalyticsDashboardPage() {
       liveSolarPowerKw: effectiveLiveSolar,
       dailyYieldKwh: effectiveDailyYield,
     });
-  }, [isolatedHourlyData, effectiveCapacityKw, hasBattery, selectedPlant, selectedAccount, selectedInverter, effectiveLiveSolar, effectiveDailyYield]);
+  }, [isolatedHourlyData, effectiveCapacityKw, hasBattery, isFleetView, accounts, selectedPlant, selectedAccount, selectedInverter, effectiveLiveSolar, effectiveDailyYield]);
 
   const dailyPoints7D = useMemo<DailyAnalyticsPoint[]>(() => {
     return generateDailyAnalytics(
@@ -728,7 +768,7 @@ export default function AnalyticsDashboardPage() {
         isElapsed: !isFuture,
       };
     });
-  }, [isolatedHourlyData, effectiveCapacityKw, hasBattery, isViewingToday, selectedPlant, selectedAccount, selectedInverter]);
+  }, [isolatedHourlyData, effectiveCapacityKw, hasBattery, isViewingToday, selectedPlant, selectedAccount, selectedInverter, effectiveLiveSolar, effectiveLiveDemand]);
 
   // Pie chart energy distribution data
   const energyDistributionData = useMemo(() => {
