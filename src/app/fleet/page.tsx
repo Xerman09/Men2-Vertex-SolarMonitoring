@@ -469,44 +469,54 @@ export default function FleetMonitoringPage() {
   // Toggle Account Expansion
   const toggleAccountExpand = useCallback((accId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    const isCurrentlyExpanded = expandedAccountIds.has(accId);
     setExpandedAccountIds((prev) => {
       const next = new Set(prev);
       if (next.has(accId)) {
         next.delete(accId);
-        if (selectedAccountId === accId && !isFleetView) {
-          selectAccountAndPlant('ALL_FLEET', 'ALL');
-        }
       } else {
         next.add(accId);
-        if (selectedAccountId !== accId) {
-          selectAccountAndPlant(accId, 'ALL');
-        }
       }
       return next;
     });
-  }, [selectedAccountId, isFleetView, selectAccountAndPlant]);
+
+    if (isCurrentlyExpanded) {
+      if (selectedAccountId === accId && !isFleetView) {
+        selectAccountAndPlant('ALL_FLEET', 'ALL');
+      }
+    } else {
+      if (selectedAccountId !== accId) {
+        selectAccountAndPlant(accId, 'ALL');
+      }
+    }
+  }, [expandedAccountIds, selectedAccountId, isFleetView, selectAccountAndPlant]);
 
   // Toggle Plant Expansion (reveals inverter graphs)
   const togglePlantExpand = useCallback((plantKey: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const [accId, stationId] = plantKey.split(':');
+    const isCurrentlyExpanded = expandedPlantKeys.has(plantKey);
     setExpandedPlantKeys((prev) => {
       const next = new Set(prev);
       if (next.has(plantKey)) {
         next.delete(plantKey);
-        if (selectedStationId === stationId) {
-          setSelectedStationId('ALL');
-        }
       } else {
         next.clear();
         next.add(plantKey);
-        if (accId && stationId) {
-          selectAccountAndPlant(accId, stationId);
-        }
       }
       return next;
     });
-  }, [selectedStationId, selectAccountAndPlant, setSelectedStationId]);
+
+    if (isCurrentlyExpanded) {
+      if (selectedStationId === stationId) {
+        setSelectedStationId('ALL');
+      }
+    } else {
+      if (accId && stationId) {
+        selectAccountAndPlant(accId, stationId);
+      }
+    }
+  }, [expandedPlantKeys, selectedStationId, selectAccountAndPlant, setSelectedStationId]);
 
   // Global Expand / Collapse Controls
   const expandAllAccounts = useCallback(() => {
