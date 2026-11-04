@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: 'VOSolar',
     description:
       'Enterprise VOSolar Inverter Telemetry, Multi-Account Fleet Synoptics, Arbitrage Management, and Harmonic Analytics',
-    start_url: '/fleet',
+    start_url: '/analytics',
     display: 'standalone',
     background_color: '#090a0f',
     theme_color: '#090a0f',

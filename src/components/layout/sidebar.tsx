@@ -45,15 +45,15 @@ export function Sidebar() {
     badge?: string;
   }> = [
     {
+      label: 'Analytics Dashboard',
+      href: '/analytics',
+      icon: BarChart3,
+    },
+    {
       label: 'Fleet Monitoring',
       href: '/fleet',
       icon: LayoutGrid,
       badge: totalAccounts > 1 ? `${totalAccounts} Acc` : undefined,
-    },
-    {
-      label: 'Analytics Dashboard',
-      href: '/analytics',
-      icon: BarChart3,
     },
     {
       label: 'Energy Flow & Fleet',
@@ -128,7 +128,7 @@ export function Sidebar() {
               </button>
 
               <Link
-                href="/fleet"
+                href="/analytics"
                 onClick={() => {
                   if (mobileOpen) closeMobile();
                 }}
@@ -181,8 +181,8 @@ export function Sidebar() {
           <nav className="flex flex-col gap-1.5 pt-2 px-3">
             {navItems.map((item) => {
               const isActive =
-                item.href === '/fleet'
-                  ? pathname === '/' || pathname.startsWith('/fleet')
+                item.href === '/analytics'
+                  ? pathname === '/' || pathname.startsWith('/analytics')
                   : pathname.startsWith(item.href);
               const Icon = item.icon;
               const isCollapsedMode = collapsed && !mobileOpen;

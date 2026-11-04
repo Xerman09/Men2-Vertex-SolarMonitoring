@@ -115,7 +115,12 @@ export async function middleware(req: NextRequest) {
   }
 
   // 4. Protected Page Routes
-  if (pathname.startsWith('/accounts') || pathname.startsWith('/api-diagnostics') || pathname.startsWith('/fleet')) {
+  if (
+    pathname.startsWith('/accounts') ||
+    pathname.startsWith('/api-diagnostics') ||
+    pathname.startsWith('/fleet') ||
+    pathname.startsWith('/analytics')
+  ) {
     const token = extractSessionToken(req.cookies);
     const session = await verifySessionToken(token);
 
@@ -136,5 +141,7 @@ export const config = {
     '/api-diagnostics/:path*',
     '/fleet/:path*',
     '/fleet',
+    '/analytics/:path*',
+    '/analytics',
   ],
 };

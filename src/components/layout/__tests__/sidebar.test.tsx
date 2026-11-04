@@ -34,7 +34,7 @@ describe('Sidebar Navigation & Role Visibility', () => {
     } as any);
   });
 
-  it('renders Fleet Monitoring at the top of the sidebar for admin', () => {
+  it('renders Analytics Dashboard at the top of the sidebar for admin', () => {
     vi.spyOn(roleContextModule, 'useRole').mockReturnValue({
       role: 'admin',
       isAdmin: true,
@@ -47,22 +47,22 @@ describe('Sidebar Navigation & Role Visibility', () => {
 
     const html = renderToStaticMarkup(<Sidebar />);
 
-    // Fleet Monitoring must be present
-    expect(html).toContain('Fleet Monitoring');
-    expect(html).toContain('href="/fleet"');
+    // Analytics Dashboard must be present
+    expect(html).toContain('Analytics Dashboard');
+    expect(html).toContain('href="/analytics"');
 
-    // Fleet Monitoring must appear BEFORE Analytics Dashboard in the DOM
+    // Analytics Dashboard must appear BEFORE Fleet Monitoring in the DOM
     const fleetIdx = html.indexOf('Fleet Monitoring');
     const analyticsIdx = html.indexOf('Analytics Dashboard');
     expect(fleetIdx).toBeGreaterThan(-1);
     expect(analyticsIdx).toBeGreaterThan(-1);
-    expect(fleetIdx).toBeLessThan(analyticsIdx);
+    expect(analyticsIdx).toBeLessThan(fleetIdx);
 
-    // Brand logo should link to /fleet as default for admin
-    expect(html).toContain('href="/fleet"');
+    // Brand logo should link to /analytics as default landing page
+    expect(html).toContain('href="/analytics"');
   });
 
-  it('renders Fleet Monitoring at the top of the sidebar for non-admin users as well', () => {
+  it('renders Analytics Dashboard at the top of the sidebar for non-admin users as well', () => {
     vi.spyOn(roleContextModule, 'useRole').mockReturnValue({
       role: 'consumer',
       isAdmin: false,
@@ -75,18 +75,18 @@ describe('Sidebar Navigation & Role Visibility', () => {
 
     const html = renderToStaticMarkup(<Sidebar />);
 
-    // Fleet Monitoring must be visible
-    expect(html).toContain('Fleet Monitoring');
-    expect(html).toContain('href="/fleet"');
+    // Analytics Dashboard must be visible
+    expect(html).toContain('Analytics Dashboard');
+    expect(html).toContain('href="/analytics"');
 
-    // Fleet Monitoring must appear BEFORE Analytics Dashboard in the DOM
+    // Analytics Dashboard must appear BEFORE Fleet Monitoring in the DOM
     const fleetIdx = html.indexOf('Fleet Monitoring');
     const analyticsIdx = html.indexOf('Analytics Dashboard');
     expect(fleetIdx).toBeGreaterThan(-1);
     expect(analyticsIdx).toBeGreaterThan(-1);
-    expect(fleetIdx).toBeLessThan(analyticsIdx);
+    expect(analyticsIdx).toBeLessThan(fleetIdx);
 
-    // Brand logo should link to /fleet
-    expect(html).toContain('href="/fleet"');
+    // Brand logo should link to /analytics
+    expect(html).toContain('href="/analytics"');
   });
 });
