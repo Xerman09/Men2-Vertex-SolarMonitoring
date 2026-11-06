@@ -33,6 +33,7 @@ import {
 } from 'recharts';
 import { HourlyEnergyPoint } from '@/lib/types';
 import { useAccount } from '@/lib/account-context';
+import { useTariff } from '@/lib/tariff-context';
 import { useRole } from '@/lib/role-context';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -45,6 +46,7 @@ const log = createLogger('YieldArbitrage');
 
 export default function YieldArbitragePage() {
   const { isAdmin } = useRole();
+  const { activeTariff, setIsConfigModalOpen } = useTariff();
   const {
     accounts,
     selectedAccountId,
@@ -219,13 +221,13 @@ function formatPeso(val: number): string {
 
       // Determine interval tariff rate based on time of day
       const hour = pt.hourDecimal !== undefined ? pt.hourDecimal : parseInt(pt.hour.split(':')[0], 10);
-      const isPeakWindow = hour >= 14 && hour <= 20;
-      const currentTariffRate = isPeakWindow ? TARIFF_PHP.peakRatePerKwh : TARIFF_PHP.offPeakRatePerKwh;
+      const isPeakWindow = hour >= activeTariff.peakStartHour && hour <= activeTariff.peakEndHour;
+      const currentTariffRate = isPeakWindow ? activeTariff.peakRate : activeTariff.offPeakRate;
 
       // Avoided grid electricity cost from self-consumption & battery discharge
       const avoidedGridCost = (directSelfConsKwh + batDischargedKwh) * currentTariffRate;
       // Net-metering export credit for surplus energy pushed to grid
-      const exportCredit = surplusExportKwh * TARIFF_PHP.exportCreditPerKwh;
+      const exportCredit = surplusExportKwh * activeTariff.exportCredit;
       const intervalSavings = avoidedGridCost + exportCredit;
 
       totalSavingsPhp += intervalSavings;
@@ -246,7 +248,7 @@ function formatPeso(val: number): string {
       monthlyProjectionPhp: monthlyProjection,
       co2Tons: yieldKwh * 0.0007,
     };
-  }, [chartData]);
+  }, [chartData, activeTariff]);
 
   const historyRows = React.useMemo(() => {
     if (chartData.length === 0 || totals.todayYieldKwh === 0) return [];
@@ -308,6 +310,32 @@ function formatPeso(val: number): string {
 
         {/* Time Range & View Mode Selectors */}
         <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Tariff Schedule Quick Control Button */}
+          <button
+            type="button"
+            onClick={() => setIsConfigModalOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-foreground transition-all cursor-pointer group text-xs"
+            title="Configure utility tariff rate schedule"
+          >
+            <Zap size={14} className="text-amber-500 group-hover:scale-110 transition-transform" />
+            <div className="flex items-center gap-1.5 font-medium">
+              <span className="text-muted-foreground font-mono">Tariff:</span>
+              <span className="font-semibold text-amber-400">{activeTariff.schedule.shortName}</span>
+              {activeTariff.isAutoDetected ? (
+                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
+                  Auto
+                </Badge>
+              ) : activeTariff.isCustom ? (
+                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-cyan-500/30 text-cyan-400 bg-cyan-500/10">
+                  Custom
+                </Badge>
+              ) : null}
+            </div>
+            <span className="text-[10px] text-muted-foreground font-mono pl-1 border-l border-border/50">
+              ₱{activeTariff.offPeakRate.toFixed(2)}/kWh
+            </span>
+          </button>
+
           <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-xl border border-border/50">
             {(['DAY', 'WEEK', 'MONTH', 'YEAR'] as const).map((range) => (
               <button
@@ -336,7 +364,7 @@ function formatPeso(val: number): string {
             content={
               <div className="space-y-1.5 min-w-[220px] text-[11px]">
                 <p className="text-muted-foreground leading-snug">
-                  Dynamic utility bill savings calculated from real-time solar self-consumption and peak tariff shaving (₱14.50/kWh peak, ₱10.20/kWh off-peak) + export credits (₱6.20/kWh).
+                  Dynamic utility bill savings calculated from real-time solar self-consumption and peak tariff shaving (₱{activeTariff.peakRate.toFixed(2)}/kWh peak, ₱{activeTariff.offPeakRate.toFixed(2)}/kWh off-peak) + export credits (₱{activeTariff.exportCredit.toFixed(2)}/kWh).
                 </p>
                 <div className="pt-1.5 border-t border-border/50 text-emerald-400 font-mono font-medium">
                   {totals.todaySavedPhp > 0

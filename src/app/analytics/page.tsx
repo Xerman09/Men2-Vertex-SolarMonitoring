@@ -52,6 +52,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { useAccount } from '@/lib/account-context';
+import { useTariff } from '@/lib/tariff-context';
 import { useRole } from '@/lib/role-context';
 import { CustomerOnboardingCard } from '@/components/account/CustomerOnboardingCard';
 import { Badge } from '@/components/ui/badge';
@@ -122,6 +123,7 @@ export interface InverterNode {
 }
 
 export default function AnalyticsDashboardPage() {
+  const { activeTariff, setIsConfigModalOpen } = useTariff();
   const {
     accounts,
     selectedAccountId,
@@ -2034,8 +2036,18 @@ export default function AnalyticsDashboardPage() {
                           </HoverInfo>
                         </th>
                         <th className="px-4 py-2.5">
-                          <HoverInfo title="Tariff Structure" content="Time-of-Use electricity tariff tier (Peak ₱14.50/kWh vs Off-Peak ₱10.20/kWh).">
-                            <span className="cursor-help">Tariff Rate</span>
+                          <HoverInfo
+                            title="Tariff Structure"
+                            content={`Time-of-Use electricity tariff tier (Peak ₱${activeTariff.peakRate.toFixed(2)}/kWh vs Off-Peak ₱${activeTariff.offPeakRate.toFixed(2)}/kWh via ${activeTariff.schedule.shortName}). Click to customize.`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setIsConfigModalOpen(true)}
+                              className="cursor-pointer hover:text-amber-400 transition-colors inline-flex items-center gap-1"
+                            >
+                              Tariff Rate
+                              <span className="text-[9px] font-mono text-amber-500">⚙</span>
+                            </button>
                           </HoverInfo>
                         </th>
                         <th className="px-4 py-2.5">
@@ -2080,10 +2092,10 @@ export default function AnalyticsDashboardPage() {
                                 {grid !== null ? `${grid > 0 ? `+${grid}` : grid} kW` : '—'}
                               </td>
                               <td className="px-4 py-2 text-muted-foreground">
-                                {row.hourDecimal >= 17 && row.hourDecimal <= 21 ? (
-                                  <span className="text-purple-400 font-semibold">₱14.50/kWh (Peak)</span>
+                                {row.hourDecimal >= activeTariff.peakStartHour && row.hourDecimal <= activeTariff.peakEndHour ? (
+                                  <span className="text-purple-400 font-semibold">₱{activeTariff.peakRate.toFixed(2)}/kWh (Peak)</span>
                                 ) : (
-                                  <span>₱10.20/kWh (Off-Peak)</span>
+                                  <span>₱{activeTariff.offPeakRate.toFixed(2)}/kWh (Off-Peak)</span>
                                 )}
                               </td>
                               <td className="px-4 py-2">

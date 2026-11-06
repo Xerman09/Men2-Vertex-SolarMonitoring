@@ -143,12 +143,6 @@ export function Sidebar() {
                   <span className="font-headline font-bold text-sm tracking-wider uppercase">
                     VO<span className="text-primary">Solar</span>
                   </span>
-                  <Badge
-                    variant="outline"
-                    className="text-[9px] px-1 py-0 h-4 border-emerald-500/30 text-emerald-500 bg-emerald-500/10 font-mono font-bold"
-                  >
-                    VOS
-                  </Badge>
                 </div>
                 <span className="text-[10px] text-muted-foreground font-mono">
                   Multi-Account Fleet

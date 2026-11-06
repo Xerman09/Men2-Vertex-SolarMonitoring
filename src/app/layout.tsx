@@ -3,6 +3,8 @@ import './globals.css';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { AccountProvider } from '@/lib/account-context';
+import { TariffProvider } from '@/lib/tariff-context';
+import { TariffSettingsModal } from '@/components/tariff/TariffSettingsModal';
 import ThemeProvider from '@/components/theme/ThemeProvider';
 
 import { SidebarProvider } from '@/components/layout/sidebar-context';
@@ -50,9 +52,12 @@ export default function RootLayout({
         <ThemeProvider>
           <RoleProvider>
             <AccountProvider>
-              <SidebarProvider>
-                <AppShell>{children}</AppShell>
-              </SidebarProvider>
+              <TariffProvider>
+                <SidebarProvider>
+                  <AppShell>{children}</AppShell>
+                  <TariffSettingsModal />
+                </SidebarProvider>
+              </TariffProvider>
             </AccountProvider>
           </RoleProvider>
         </ThemeProvider>
