@@ -321,15 +321,6 @@ function formatPeso(val: number): string {
             <div className="flex items-center gap-1.5 font-medium">
               <span className="text-muted-foreground font-mono">Tariff:</span>
               <span className="font-semibold text-amber-400">{activeTariff.schedule.shortName}</span>
-              {activeTariff.isAutoDetected ? (
-                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
-                  Auto
-                </Badge>
-              ) : activeTariff.isCustom ? (
-                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-cyan-500/30 text-cyan-400 bg-cyan-500/10">
-                  Custom
-                </Badge>
-              ) : null}
             </div>
             <span className="text-[10px] text-muted-foreground font-mono pl-1 border-l border-border/50">
               ₱{activeTariff.offPeakRate.toFixed(2)}/kWh

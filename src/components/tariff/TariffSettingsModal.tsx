@@ -3,20 +3,16 @@
 import React, { useState, useEffect } from 'react';
 import {
   Zap,
-  Building2,
-  Clock,
   Sparkles,
   Check,
   X,
   Sliders,
   RotateCcw,
   Info,
-  DollarSign,
 } from 'lucide-react';
 import { useTariff } from '@/lib/tariff-context';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
+import { HoverInfo } from '@/components/ui/tooltip';
 
 export function TariffSettingsModal() {
   const {
@@ -67,234 +63,243 @@ export function TariffSettingsModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={() => setIsConfigModalOpen(false)}
+    >
       <div
-        className="w-full max-w-xl bg-card border border-border shadow-2xl rounded-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-lg bg-card border border-border shadow-2xl rounded-2xl overflow-hidden flex flex-col max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border/70 bg-muted/30">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500">
-              <Zap size={20} />
+        {/* Minimal Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/70 bg-muted/20">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-500 shrink-0">
+              <Zap size={16} />
             </div>
-            <div>
-              <h2 className="text-base font-bold text-foreground font-headline flex items-center gap-2">
-                Electricity Tariff Schedule
-                {activeTariff.isAutoDetected && (
-                  <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
-                    Auto-Detected
-                  </Badge>
-                )}
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Configures Time-of-Use electricity rates and solar net-metering export credits
-              </p>
-            </div>
+            <h2 className="text-sm font-bold text-foreground font-headline">
+              Tariff Schedule
+            </h2>
           </div>
+
           <button
             onClick={() => setIsConfigModalOpen(false)}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+            aria-label="Close modal"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
-        {/* Body Content */}
-        <div className="p-6 overflow-y-auto space-y-5 text-xs">
-          {/* Active Summary Banner */}
-          <div className="p-3.5 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-between">
-            <div className="space-y-0.5">
-              <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">
-                Currently Active Schedule
-              </span>
-              <p className="font-bold text-sm text-foreground flex items-center gap-2">
-                {activeTariff.schedule.name}
-              </p>
-              <p className="text-muted-foreground text-[11px]">
-                {activeTariff.schedule.region}
-              </p>
-            </div>
-            <div className="text-right font-mono">
-              <div className="text-emerald-400 font-bold text-sm">
-                ₱{activeTariff.offPeakRate.toFixed(2)} - ₱{activeTariff.peakRate.toFixed(2)}
-              </div>
-              <div className="text-[10px] text-muted-foreground">
-                Export: ₱{activeTariff.exportCredit.toFixed(2)}/kWh
-              </div>
-            </div>
-          </div>
-
-          {/* Mode Switch Tabs */}
-          <div className="flex gap-2 p-1 bg-muted/40 rounded-xl border border-border/50">
+        {/* Compact Mode Switcher */}
+        <div className="px-5 pt-3.5">
+          <div className="flex gap-1.5 p-0.5 bg-muted/40 rounded-lg border border-border/50">
             <button
               type="button"
               onClick={() => setMode('preset')}
-              className={`flex-1 py-2 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-1.5 rounded-md font-semibold text-xs transition-all flex items-center justify-center gap-1.5 ${
                 mode === 'preset'
                   ? 'bg-card text-foreground shadow-xs border border-border/60'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              <Sparkles size={14} className="text-amber-500" />
-              Utility Presets & Auto-Detect
+              <Sparkles size={13} className="text-amber-500" />
+              Presets & Auto
             </button>
             <button
               type="button"
               onClick={() => setMode('custom')}
-              className={`flex-1 py-2 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-1.5 rounded-md font-semibold text-xs transition-all flex items-center justify-center gap-1.5 ${
                 mode === 'custom'
                   ? 'bg-card text-foreground shadow-xs border border-border/60'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              <Sliders size={14} className="text-cyan-400" />
-              Custom Bill Override
+              <Sliders size={13} className="text-cyan-400" />
+              Custom Bill
             </button>
           </div>
+        </div>
 
+        {/* Body Content */}
+        <div className="px-5 py-3 overflow-y-auto space-y-2 text-xs flex-1">
           {mode === 'preset' ? (
-            <div className="space-y-2.5">
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                Select Electric Utility Provider
-              </label>
-
-              {/* Automatic detection option */}
-              <div
-                onClick={() => setSelectedPresetId('auto')}
-                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                  selectedPresetId === 'auto'
-                    ? 'border-emerald-500/60 bg-emerald-500/10'
-                    : 'border-border/60 hover:border-border bg-card/60'
-                }`}
+            <div className="space-y-1.5">
+              {/* Clean Auto-Detect Row with Hover Description */}
+              <HoverInfo
+                className="w-full block"
+                title="Location Auto-Detect"
+                content="Automatically maps to local distribution utility (e.g., DECORP for Dagupan) based on plant address."
+                side="top"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
-                    <Sparkles size={16} />
+                <div
+                  onClick={() => setSelectedPresetId('auto')}
+                  className={`w-full p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                    selectedPresetId === 'auto'
+                      ? 'border-emerald-500/60 bg-emerald-500/10'
+                      : 'border-border/60 hover:border-border hover:bg-muted/30 bg-card/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 rounded-md bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
+                      <Sparkles size={13} />
+                    </div>
+                    <div className="font-semibold text-foreground truncate text-xs">
+                      Auto-Detect (Recommended)
+                    </div>
                   </div>
-                  <div>
-                    <div className="font-bold text-foreground flex items-center gap-2">
-                      Auto-Detect by Plant Location (Recommended)
-                      {selectedPresetId === 'auto' && (
-                        <Check size={14} className="text-emerald-400" />
-                      )}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5">
-                      Automatically selects utility company from plant address (e.g. DECORP for Dagupan)
-                    </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] font-mono text-muted-foreground hidden sm:inline">
+                      Plant Address Match
+                    </span>
+                    {selectedPresetId === 'auto' && <Check size={14} className="text-emerald-400" />}
                   </div>
                 </div>
-              </div>
+              </HoverInfo>
 
-              {/* Preset List */}
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {/* Minimal Preset List with Hover Tooltips for Details */}
+              <div className="space-y-1.5 pt-1">
                 {presets.map((preset) => {
                   const isSelected = selectedPresetId === preset.id;
                   return (
-                    <div
+                    <HoverInfo
                       key={preset.id}
-                      onClick={() => setSelectedPresetId(preset.id)}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                        isSelected
-                          ? 'border-primary/60 bg-primary/10'
-                          : 'border-border/60 hover:border-border bg-card/40'
-                      }`}
+                      className="w-full block"
+                      title={preset.name}
+                      content={
+                        <div className="space-y-1 text-[11px]">
+                          <p>{preset.description}</p>
+                          <div className="pt-1 border-t border-border/40 font-mono text-[10px] space-y-0.5 text-muted-foreground">
+                            <div>Coverage: {preset.region}</div>
+                            <div>Peak Window: {preset.peakStartHour}:00 - {preset.peakEndHour}:00 (₱{preset.peakRatePerKwh.toFixed(2)}/kWh)</div>
+                            <div>Off-Peak: ₱{preset.offPeakRatePerKwh.toFixed(2)}/kWh</div>
+                            <div>Net Export Credit: ₱{preset.exportCreditPerKwh.toFixed(2)}/kWh</div>
+                          </div>
+                        </div>
+                      }
+                      side="top"
                     >
-                      <div className="space-y-0.5 pr-2">
-                        <div className="font-semibold text-foreground flex items-center gap-2">
-                          {preset.name}
-                          {isSelected && <Check size={14} className="text-primary" />}
+                      <div
+                        onClick={() => setSelectedPresetId(preset.id)}
+                        className={`w-full p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                          isSelected
+                            ? 'border-primary/60 bg-primary/10'
+                            : 'border-border/60 hover:border-border hover:bg-muted/30 bg-card/40'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 pr-2">
+                          <span className="font-medium text-foreground truncate text-xs">
+                            {preset.shortName}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">
+                            · {preset.region.split(',')[0]}
+                          </span>
                         </div>
-                        <div className="text-[11px] text-muted-foreground">
-                          {preset.region}
+
+                        <div className="flex items-center gap-2.5 shrink-0 font-mono text-xs">
+                          <span className="font-bold text-foreground">
+                            ₱{preset.offPeakRatePerKwh.toFixed(2)} / ₱{preset.peakRatePerKwh.toFixed(2)}
+                          </span>
+                          {isSelected ? (
+                            <Check size={14} className="text-primary" />
+                          ) : (
+                            <span className="w-3.5" />
+                          )}
                         </div>
                       </div>
-                      <div className="text-right shrink-0 font-mono text-[11px]">
-                        <div className="text-foreground font-semibold">
-                          ₱{preset.offPeakRatePerKwh.toFixed(2)} - ₱{preset.peakRatePerKwh.toFixed(2)}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground">
-                          Exp: ₱{preset.exportCreditPerKwh.toFixed(2)}
-                        </div>
-                      </div>
-                    </div>
+                    </HoverInfo>
                   );
                 })}
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-[11px] text-cyan-300 leading-relaxed">
-                <Info size={14} className="inline mr-1 text-cyan-400 -mt-0.5" />
-                Look at your latest electric bill summary to input your exact retail rates.
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
+            <div className="space-y-3 pt-1">
+              <div className="grid grid-cols-3 gap-2.5 font-mono">
                 <div>
-                  <label className="text-[11px] font-sans font-semibold text-muted-foreground block mb-1">
-                    Off-Peak Rate (₱/kWh)
-                  </label>
+                  <HoverInfo
+                    title="Off-Peak Retail Rate"
+                    content="Electricity base rate during morning, midday, and late evening hours."
+                    side="top"
+                  >
+                    <label className="text-[10px] font-sans font-semibold text-muted-foreground block mb-1">
+                      Off-Peak (₱/kWh)
+                    </label>
+                  </HoverInfo>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₱</span>
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">₱</span>
                     <input
                       type="number"
                       step="0.01"
                       value={customOffPeak}
                       onChange={(e) => setCustomOffPeak(e.target.value)}
-                      className="w-full pl-7 pr-3 py-2 bg-background border border-border/80 rounded-xl text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="w-full pl-6 pr-2 py-1.5 bg-background border border-border/80 rounded-lg text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
-                  <span className="text-[9px] text-muted-foreground font-sans block mt-1">Daytime base rate</span>
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-sans font-semibold text-muted-foreground block mb-1">
-                    Peak Rate (₱/kWh)
-                  </label>
+                  <HoverInfo
+                    title="Peak Retail Rate"
+                    content="Highest utility tariff rate during 2:00 PM - 8:00 PM peak demand window."
+                    side="top"
+                  >
+                    <label className="text-[10px] font-sans font-semibold text-muted-foreground block mb-1">
+                      Peak Rate (₱/kWh)
+                    </label>
+                  </HoverInfo>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₱</span>
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">₱</span>
                     <input
                       type="number"
                       step="0.01"
                       value={customPeak}
                       onChange={(e) => setCustomPeak(e.target.value)}
-                      className="w-full pl-7 pr-3 py-2 bg-background border border-border/80 rounded-xl text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="w-full pl-6 pr-2 py-1.5 bg-background border border-border/80 rounded-lg text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
-                  <span className="text-[9px] text-muted-foreground font-sans block mt-1">2:00 PM - 8:00 PM</span>
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-sans font-semibold text-muted-foreground block mb-1">
-                    Net Export Credit (₱/kWh)
-                  </label>
+                  <HoverInfo
+                    title="Net-Metering Export Credit"
+                    content="ERC generation charge credit per kWh pushed back onto the grid."
+                    side="top"
+                  >
+                    <label className="text-[10px] font-sans font-semibold text-muted-foreground block mb-1">
+                      Export (₱/kWh)
+                    </label>
+                  </HoverInfo>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₱</span>
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">₱</span>
                     <input
                       type="number"
                       step="0.01"
                       value={customExport}
                       onChange={(e) => setCustomExport(e.target.value)}
-                      className="w-full pl-7 pr-3 py-2 bg-background border border-border/80 rounded-xl text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="w-full pl-6 pr-2 py-1.5 bg-background border border-border/80 rounded-lg text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
-                  <span className="text-[9px] text-muted-foreground font-sans block mt-1">Surplus feed-in rate</span>
                 </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-1">
+                <Info size={12} className="text-cyan-400 shrink-0" />
+                <span>Hover over fields to see definitions or match with your electric bill.</span>
               </div>
             </div>
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-border/70 bg-muted/20 flex items-center justify-between">
+        {/* Clean Footer */}
+        <div className="px-5 py-3 border-t border-border/70 bg-muted/20 flex items-center justify-between">
           <Button
             variant="ghost"
             size="sm"
             onClick={resetToAuto}
-            className="text-muted-foreground hover:text-foreground text-xs flex items-center gap-1.5"
+            className="text-muted-foreground hover:text-foreground text-xs h-8 flex items-center gap-1.5 px-2"
           >
-            <RotateCcw size={13} />
-            Reset to Auto
+            <RotateCcw size={12} />
+            Reset Auto
           </Button>
 
           <div className="flex items-center gap-2">
@@ -302,14 +307,14 @@ export function TariffSettingsModal() {
               variant="outline"
               size="sm"
               onClick={() => setIsConfigModalOpen(false)}
-              className="text-xs"
+              className="text-xs h-8 px-3"
             >
               Cancel
             </Button>
             <Button
               size="sm"
               onClick={handleSave}
-              className="text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4"
+              className="text-xs h-8 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4"
             >
               Apply Rates
             </Button>
@@ -319,4 +324,3 @@ export function TariffSettingsModal() {
     </div>
   );
 }
-
