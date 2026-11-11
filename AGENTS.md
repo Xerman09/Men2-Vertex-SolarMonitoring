@@ -83,6 +83,8 @@ Before concluding any UI/UX task, verify against this checklist:
 | **Consistent Sizing** | Are adjacent KPI cards or node boxes uniform in width and height? |
 | **Proper Currency** | Are financial figures formatted with `₱` (PHP)? |
 | **Clean Build** | Do `npx vitest run` and `npx next build` pass with 0 errors? |
+| **No Auto Server** | Did you refrain from starting `next dev` / `npm run dev` automatically? |
+| **Commit & Push** | Did you create a properly detailed conventional commit and push to `origin/main`? |
 
 ---
 
@@ -93,3 +95,10 @@ Before concluding any UI/UX task, verify against this checklist:
 3. **Multi-Tenancy & Scoping**: Account and station telemetry must always respect selected account isolation, plant IDs, and device serial numbers (`inverter-isolation.ts`, `station-aggregate-sn-filter.ts`).
 4. **Resilient Polling**: Use `usePolling` with proper jitter, exponential backoff, and tab visibility detection. Deduplicate concurrent requests via in-flight references.
 5. **No `any` or loose console logging**: Always use structured logging via `createLogger('<ModuleName>')` (`src/lib/logger.ts`).
+
+---
+
+## 4. Operational & Workflow Standards
+
+1. **Never Start Server Automatically**: Agents must never launch `npm run dev`, `next dev`, or background development server processes automatically unless explicitly instructed by the user. Verify implementations using automated test suites (`npx vitest run`), static/production build verification (`npm run build`), or targeted standalone scripts.
+2. **Properly Detailed Commit & Push After Every System Change**: After completing and verifying any bug fix, refactor, or feature implementation, agents must always craft a properly detailed conventional commit (`feat(...)`, `fix(...)`, `refactor(...)`) describing the exact problem, root cause, and changes made, and push immediately to `origin/main` without waiting to be prompted.
