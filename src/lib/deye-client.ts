@@ -9,10 +9,7 @@ import {
   DeviceInfo,
 } from './types';
 import {
-  getMockStationSummary,
-  getMockInverterTelemetry,
   getMockHourlyEnergyPoints,
-  getMockApiHealth,
 } from './mock-telemetry';
 import type { DailyAnalyticsPoint, MonthlyAnalyticsPoint } from './analytics-data';
 import { sanitizeDeyeBaseUrl } from './url-validator';

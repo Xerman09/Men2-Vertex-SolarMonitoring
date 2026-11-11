@@ -192,9 +192,6 @@ export default function AnalyticsDashboardPage() {
   const [tablePage, setTablePage] = useState<number>(1);
   const TABLE_PAGE_SIZE = 50;
 
-  // Plant & Inverter/Logger isolation states
-  const [previewEssModel, setPreviewEssModel] = useState<boolean>(false);
-
   // Raw and computed data states (initialized with 288 slots with nulls so chart coordinate system is solid on mount)
   const [hourlyData, setHourlyData] = useState<HourlyEnergyPoint[]>(createInitial24hDiurnalSlots);
   const [historyIsLive, setHistoryIsLive] = useState<boolean>(false);
@@ -1006,15 +1003,13 @@ export default function AnalyticsDashboardPage() {
   ]);
 
   const batteryCurveData = useMemo<BatteryTelemetryPoint[]>(() => {
-    return generateBatteryHourlyTelemetry(isolatedHourlyData, hasBattery || previewEssModel);
-  }, [isolatedHourlyData, hasBattery, previewEssModel]);
+    return generateBatteryHourlyTelemetry(isolatedHourlyData, hasBattery);
+  }, [isolatedHourlyData, hasBattery]);
 
-  // Today 24h diurnal curve with modeled clear-sky curve
+  // Today 24h diurnal curve (100% genuine DeyeCloud hardware telemetry)
   const diurnalChartData = useMemo(() => {
     const raw = isolatedHourlyData.length > 0 ? isolatedHourlyData : [];
     const nowHour = getManilaNowParts().hourFloat;
-    const liveSolar = effectiveLiveSolar;
-    const liveDemand = effectiveLiveDemand;
 
     return raw.map((pt) => {
       const parts = (pt.hour || '00:00').split(':');
@@ -1023,30 +1018,8 @@ export default function AnalyticsDashboardPage() {
       const hDec = h + m / 60;
       const isFuture = pt.isElapsed === false || (isViewingToday && hDec > nowHour);
 
-      // Theoretical clear-sky insolation curve (peak at 12:15)
-      let clearSkyKw = 0;
-      if (hDec >= 5.75 && hDec <= 18.25) {
-        const prog = (hDec - 5.75) / (18.25 - 5.75);
-        clearSkyKw = Number((Math.sin(prog * Math.PI) * (effectiveCapacityKw * 0.98)).toFixed(1));
-      }
-
-      let solar = isFuture ? null : (pt.solarYieldKw ?? null);
-      let load = isFuture ? null : (pt.loadDemandKw ?? null);
-
-      // In Today's view, anchor latest elapsed telemetry near current hour to live reading
-      if (isViewingToday && solar !== null && !isFuture && liveSolar !== undefined && liveSolar > 0) {
-        if (Math.abs(hDec - nowHour) <= 0.5) {
-          const weight = 1 - Math.abs(hDec - nowHour) / 0.5;
-          solar = Number((solar * (1 - weight) + liveSolar * weight).toFixed(2));
-        }
-      }
-
-      if (isViewingToday && load !== null && !isFuture && liveDemand !== undefined && liveDemand > 0) {
-        if (Math.abs(hDec - nowHour) <= 0.5) {
-          const weight = 1 - Math.abs(hDec - nowHour) / 0.5;
-          load = Number((load * (1 - weight) + liveDemand * weight).toFixed(2));
-        }
-      }
+      const solar = isFuture ? null : (pt.solarYieldKw ?? null);
+      const load = isFuture ? null : (pt.loadDemandKw ?? null);
 
       const bat = !isFuture && solar !== null ? (pt.batteryFlowKw ?? 0) : null;
       const grid = !isFuture && solar !== null && load !== null
@@ -1057,7 +1030,6 @@ export default function AnalyticsDashboardPage() {
         hour: pt.hour,
         hourDecimal: hDec,
         solarYieldKw: solar,
-        clearSkyKw,
         loadDemandKw: load,
         batteryFlowKw: bat,
         gridFlowKw: grid,
@@ -1066,7 +1038,7 @@ export default function AnalyticsDashboardPage() {
         isElapsed: !isFuture,
       };
     });
-  }, [isolatedHourlyData, effectiveCapacityKw, hasBattery, isViewingToday, isFleetView, selectedPlant, selectedAccount, selectedInverter, effectiveLiveSolar, effectiveLiveDemand]);
+  }, [isolatedHourlyData, isViewingToday]);
 
   // Pie chart energy distribution data
   const energyDistributionData = useMemo(() => {
@@ -1905,7 +1877,7 @@ export default function AnalyticsDashboardPage() {
                         isAnimationActive={false}
                       />
                     )}
-                    {(streamFilter === 'ALL' || streamFilter === 'BATTERY') && (hasBattery || previewEssModel || streamFilter === 'BATTERY') && (
+                    {(streamFilter === 'ALL' || streamFilter === 'BATTERY') && (hasBattery || streamFilter === 'BATTERY') && (
                       <Area
                         type="monotone"
                         dataKey="batteryStoredKwh"
@@ -2038,7 +2010,7 @@ export default function AnalyticsDashboardPage() {
                     )}
 
                     {/* Battery Flow (active when battery is attached or previewed, or when isolated) */}
-                    {(streamFilter === 'ALL' || streamFilter === 'BATTERY') && (hasBattery || previewEssModel || streamFilter === 'BATTERY') && (
+                    {(streamFilter === 'ALL' || streamFilter === 'BATTERY') && (hasBattery || streamFilter === 'BATTERY') && (
                       <Area
                         type="monotone"
                         dataKey="batteryFlowKw"

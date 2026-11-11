@@ -325,18 +325,7 @@ export function computeAnalyticsSummary(
     }
   });
 
-  // Fallbacks if data empty or zero (disabled when explicitly tracking live zero-generation dates)
-  if (totalSolarYield === 0 && !options?.allowZeroYield) {
-    const scale = capacityKw > 0 ? capacityKw / 120 : 1;
-    totalSolarYield = Number((512.4 * scale).toFixed(1));
-    peakSolar = Number((119.5 * scale).toFixed(1));
-    peakHour = '12:15';
-    totalLoad = Number((478.2 * scale).toFixed(1));
-    totalExport = Number((94.6 * scale).toFixed(1));
-    totalImport = Number((60.4 * scale).toFixed(1));
-    totalBatCharge = hasExplicitBattery ? Number((48.2 * scale).toFixed(1)) : 0;
-    totalBatDischarge = hasExplicitBattery ? Number((45.1 * scale).toFixed(1)) : 0;
-  }
+  // Zero fallback: when no solar yield is recorded, preserve honest zero telemetry without synthetic fallback values.
 
   // If reported daily yield from live hardware/telemetry is available, honor it exactly
   if (options?.dailyYieldKwh !== undefined && (options.dailyYieldKwh > 0 || options.allowZeroYield)) {
@@ -381,8 +370,8 @@ export function computeAnalyticsSummary(
     }
   });
 
-  let pr = 82.5;
-  if (totalSolarYield === 0 && options?.allowZeroYield) {
+  let pr = 0;
+  if (totalSolarYield === 0) {
     pr = 0;
   } else if (clearSkyElapsedKwh > 0 && totalSolarYield > 0) {
     const rawPr = (totalSolarYield / clearSkyElapsedKwh) * 100;

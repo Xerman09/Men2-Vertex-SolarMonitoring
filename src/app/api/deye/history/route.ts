@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
-  deyeClient,
   DeyeCloudClient,
   getInverterShareInfo,
-  getInverterSnScaleFactor,
   getManilaDateParts,
   LiveDayHistoryResult,
   mergeDailySeries,
@@ -335,29 +333,20 @@ export const GET = withGate(
           }
         }
 
-        // Resilient deterministic fallback when no live DeyeCloud credentials or upstream timeout
-        if (part === 'period') {
-          return NextResponse.json({
-            data: [],
-            isLive: false,
-            isModelSimulated: true,
-            range,
-            stepMinutes: step,
-            date: date || undefined,
-            notice: 'Simulated fallback period data.',
-          });
-        }
-        const fallbackClient = scopedClients[0] ?? (tenantCheck.targetAccountId ? accountManager.getClient(tenantCheck.targetAccountId) : null) ?? deyeClient;
-        const points = fallbackClient.getHourlyEnergy(range, step, dateStr);
+        // Zero / Empty state when real DeyeCloud historical telemetry is unavailable
         return NextResponse.json({
-          data: points,
+          data: [],
           isLive: false,
-          isModelSimulated: true,
+          isModelSimulated: false,
+          recordedCount: 0,
           range,
           stepMinutes: step,
           date: date || undefined,
-          notice:
-            'Historical interval data is synthesized via date-seeded clear-sky model (offline / simulated fallback).',
+          stationId: normalizedStationId,
+          dailySummary: undefined,
+          dailySeries: undefined,
+          monthlySeries: undefined,
+          notice: 'No live DeyeCloud historical telemetry recorded for this selection.',
         });
       }
 
@@ -443,36 +432,20 @@ export const GET = withGate(
         }
       }
 
-      if (part === 'period') {
-        return NextResponse.json({
-          data: [],
-          isLive: false,
-          isModelSimulated: true,
-          range,
-          stepMinutes: step,
-          date: date || undefined,
-          deviceSn: cleanSn,
-          notice: 'Simulated fallback period data for inverter.',
-        });
-      }
-
-      const snFactor = getInverterSnScaleFactor(cleanSn);
-      const appliedRatio = Number((snFactor * shareInfo.ratio).toFixed(4));
-      const points = ownerClient.getHourlyEnergy(range, step, dateStr, {
-        deviceSn: cleanSn,
-        capacityRatio: shareInfo.ratio,
-      });
+      // Zero / Empty state when real DeyeCloud per-inverter telemetry is unavailable
       return NextResponse.json({
-        data: points,
+        data: [],
         isLive: false,
-        isModelSimulated: true,
+        isModelSimulated: false,
+        recordedCount: 0,
         range,
         stepMinutes: step,
         date: date || undefined,
         deviceSn: cleanSn,
-        appliedRatio,
-        notice:
-          `Historical interval data is synthesized via date-seeded clear-sky model (offline fallback). Per-inverter estimate for SN ${cleanSn} (appliedRatio ${appliedRatio}).`,
+        dailySummary: undefined,
+        dailySeries: undefined,
+        monthlySeries: undefined,
+        notice: `No live DeyeCloud historical telemetry recorded for inverter SN ${cleanSn}.`,
       });
     } catch (error) {
       log.error('Error retrieving hourly history', error, { route: 'history', range, step, date });

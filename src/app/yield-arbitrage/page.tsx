@@ -37,17 +37,14 @@ import {
 } from 'recharts';
 import { HourlyEnergyPoint } from '@/lib/types';
 import {
-  generateDailyAnalytics,
-  generateMonthlyAnalytics,
   type DailyAnalyticsPoint,
   type MonthlyAnalyticsPoint,
 } from '@/lib/analytics-data';
 import {
-  toLocalIsoDate,
   shiftDays,
-  parseLocalIsoDate,
   formatHumanDate,
 } from '@/components/analytics/AnalyticsDatePicker';
+import { getManilaToday } from '@/lib/manila-time';
 import { useAccount } from '@/lib/account-context';
 import { useTariff } from '@/lib/tariff-context';
 import { useRole } from '@/lib/role-context';
@@ -80,7 +77,7 @@ export default function YieldArbitragePage() {
   } = useAccount();
 
   const [timeRange, setTimeRange] = useState<'DAY' | 'WEEK' | 'MONTH' | 'YEAR'>('DAY');
-  const [selectedDate, setSelectedDate] = useState<string>(() => toLocalIsoDate(new Date()));
+  const [selectedDate, setSelectedDate] = useState<string>(() => getManilaToday());
   const [hourlyData, setHourlyData] = useState<HourlyEnergyPoint[]>([]);
   const [historyIsLive, setHistoryIsLive] = useState<boolean>(false);
   const [liveDailySummary, setLiveDailySummary] = useState<DailyAnalyticsPoint | null>(null);
@@ -89,7 +86,7 @@ export default function YieldArbitragePage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isMounted, setIsMounted] = useState(false);
 
-  const todayIso = React.useMemo(() => toLocalIsoDate(new Date()), []);
+  const todayIso = React.useMemo(() => getManilaToday(), []);
 
   useEffect(() => {
     setIsMounted(true);
@@ -201,9 +198,18 @@ export default function YieldArbitragePage() {
             : timeRange === 'WEEK'
             ? 'WEEK'
             : 'TODAY';
-        const stationParam = selectedStationId && selectedStationId !== 'ALL' ? `&station_id=${encodeURIComponent(selectedStationId)}` : '';
-        const snParam = selectedInverterSn && selectedInverterSn !== 'ALL' ? `&device_sn=${encodeURIComponent(selectedInverterSn)}` : '';
-        const accountParam = !isFleetView && selectedAccountId && selectedAccountId !== 'ALL' ? `&accountId=${encodeURIComponent(selectedAccountId)}` : '';
+        const stationParam =
+          !isFleetView && selectedStationId && selectedStationId !== 'ALL'
+            ? `&station_id=${encodeURIComponent(selectedStationId)}`
+            : '';
+        const snParam =
+          !isFleetView && selectedInverterSn && selectedInverterSn !== 'ALL'
+            ? `&device_sn=${encodeURIComponent(selectedInverterSn)}`
+            : '';
+        const accountParam =
+          !isFleetView && selectedAccountId && selectedAccountId !== 'ALL'
+            ? `&accountId=${encodeURIComponent(selectedAccountId)}`
+            : '';
 
         const res = await fetch(
           `/api/deye/history?range=${apiRange}&step=5&date=${encodeURIComponent(selectedDate)}${accountParam}${stationParam}${snParam}`,
@@ -211,21 +217,28 @@ export default function YieldArbitragePage() {
         );
         if (res.ok && active) {
           const json = await res.json();
-          if (json.data && Array.isArray(json.data)) {
+          const isLive = Boolean(json.isLive);
+          if (json.data && Array.isArray(json.data) && isLive) {
             telemetryCache.set(cacheKey, {
               data: json.data,
-              isLive: Boolean(json.isLive),
+              isLive: true,
               dailySummary: json.dailySummary ?? null,
               dailySeries: Array.isArray(json.dailySeries) ? json.dailySeries : null,
               monthlySeries: Array.isArray(json.monthlySeries) ? json.monthlySeries : null,
             });
             setHourlyData(json.data);
-            setHistoryIsLive(Boolean(json.isLive));
+            setHistoryIsLive(true);
             setLiveDailySummary(json.dailySummary ?? null);
             setLiveDailySeries(Array.isArray(json.dailySeries) ? json.dailySeries : null);
             setLiveMonthlySeries(Array.isArray(json.monthlySeries) ? json.monthlySeries : null);
-            setLoading(false);
+          } else {
+            setHourlyData([]);
+            setHistoryIsLive(false);
+            setLiveDailySummary(null);
+            setLiveDailySeries(null);
+            setLiveMonthlySeries(null);
           }
+          setLoading(false);
         }
       } catch (err: unknown) {
         if ((err as Error)?.name !== 'AbortError') {
@@ -263,22 +276,22 @@ export default function YieldArbitragePage() {
   const periodDailySeries = React.useMemo<DailyAnalyticsPoint[]>(() => {
     if (timeRange === 'WEEK') {
       if (liveDailySeries && liveDailySeries.length > 0) return liveDailySeries.slice(-7);
-      return generateDailyAnalytics(7, targetCapacityKw, false, parseLocalIsoDate(selectedDate));
+      return [];
     }
     if (timeRange === 'MONTH') {
       if (liveDailySeries && liveDailySeries.length > 0) return liveDailySeries;
-      return generateDailyAnalytics(30, targetCapacityKw, false, parseLocalIsoDate(selectedDate));
+      return [];
     }
     return [];
-  }, [timeRange, liveDailySeries, targetCapacityKw, selectedDate]);
+  }, [timeRange, liveDailySeries]);
 
   const periodMonthlySeries = React.useMemo<MonthlyAnalyticsPoint[]>(() => {
     if (timeRange === 'YEAR') {
       if (liveMonthlySeries && liveMonthlySeries.length > 0) return liveMonthlySeries;
-      return generateMonthlyAnalytics(targetCapacityKw);
+      return [];
     }
     return [];
-  }, [timeRange, liveMonthlySeries, targetCapacityKw]);
+  }, [timeRange, liveMonthlySeries]);
 
   // Calculate real ledger metrics dynamically from available telemetry
   const totals = React.useMemo(() => {
@@ -891,7 +904,7 @@ export default function YieldArbitragePage() {
               </ResponsiveContainer>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground font-mono text-xs">
-                No diurnal energy curve recorded for this period.
+                No live DeyeCloud telemetry for this selection.
               </div>
             )}
           </div>
