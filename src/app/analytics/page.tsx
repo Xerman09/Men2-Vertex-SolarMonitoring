@@ -124,6 +124,27 @@ export interface InverterNode {
   efficiencyPct?: number;
 }
 
+// 24-hour diurnal interval grid generator (288 slots) ensuring chart axes, grid, and timeline stay solid on mount
+function createInitial24hDiurnalSlots(): HourlyEnergyPoint[] {
+  const points: HourlyEnergyPoint[] = [];
+  for (let m = 0; m < 24 * 60; m += 5) {
+    const hh = String(Math.floor(m / 60)).padStart(2, '0');
+    const mm = String(m % 60).padStart(2, '0');
+    points.push({
+      hour: `${hh}:${mm}`,
+      hourDecimal: Number((m / 60).toFixed(4)),
+      solarYieldKw: null,
+      loadDemandKw: null,
+      batteryFlowKw: null,
+      gridFlowKw: null,
+      gridExportKw: null,
+      tariffRateUsd: 0.14,
+      isElapsed: false,
+    });
+  }
+  return points;
+}
+
 export default function AnalyticsDashboardPage() {
   const { activeTariff, setIsConfigModalOpen } = useTariff();
   const {
@@ -177,8 +198,8 @@ export default function AnalyticsDashboardPage() {
   // Plant & Inverter/Logger isolation states
   const [previewEssModel, setPreviewEssModel] = useState<boolean>(false);
 
-  // Raw and computed data states (initialized empty so mock curve is never flashed)
-  const [hourlyData, setHourlyData] = useState<HourlyEnergyPoint[]>([]);
+  // Raw and computed data states (initialized with 288 slots with nulls so chart coordinate system is solid on mount)
+  const [hourlyData, setHourlyData] = useState<HourlyEnergyPoint[]>(createInitial24hDiurnalSlots);
   const [historyIsLive, setHistoryIsLive] = useState<boolean>(false);
   const [liveDailySummary, setLiveDailySummary] = useState<DailyAnalyticsPoint | null>(null);
   const [liveDailySeries, setLiveDailySeries] = useState<DailyAnalyticsPoint[] | null>(null);
@@ -196,6 +217,8 @@ export default function AnalyticsDashboardPage() {
     `${dateSelection.preset}:${dateSelection.selectedDate}`
   );
   const [displayedTargetKey, setDisplayedTargetKey] = useState<string>('');
+  const displayedTargetKeyRef = useRef<string>('');
+  const isDataLoadedRef = useRef<boolean>(false);
   const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
   const inFlightControllerRef = useRef<AbortController | null>(null);
   // Backend-preferred scale factor for the currently displayed SN series.
@@ -219,7 +242,9 @@ export default function AnalyticsDashboardPage() {
       setLiveDailySeries(cached.dailySeries ?? null);
       setLiveMonthlySeries(cached.monthlySeries ?? null);
       setDisplayedTargetKey(currentTargetKey);
+      displayedTargetKeyRef.current = currentTargetKey;
       setIsDataLoaded(true);
+      isDataLoadedRef.current = true;
       setIsPlantSwitching(false);
       setFetchingDeye(false, null);
       // Cached SN series was already backend-scaled at fetch time: mark it so
@@ -554,10 +579,11 @@ export default function AnalyticsDashboardPage() {
         `${dateVal.preset}:${dateVal.selectedDate}`
       );
 
+      if (!forceReload && targetKeyAtStart === displayedTargetKeyRef.current && isDataLoadedRef.current) {
+        return;
+      }
+
       if (inFlightControllerRef.current) {
-        if (!forceReload && targetKeyAtStart === displayedTargetKey) {
-          return;
-        }
         inFlightControllerRef.current.abort();
       }
 
@@ -628,7 +654,9 @@ export default function AnalyticsDashboardPage() {
             setLiveDailySeries(payloadToCache.dailySeries);
             setLiveMonthlySeries(payloadToCache.monthlySeries);
             setDisplayedTargetKey(targetKeyAtStart);
+            displayedTargetKeyRef.current = targetKeyAtStart;
             setIsDataLoaded(true);
+            isDataLoadedRef.current = true;
             setIsPlantSwitching(false);
             setFetchingDeye(false, null);
             setLastRefreshedAt(new Date());
@@ -645,7 +673,9 @@ export default function AnalyticsDashboardPage() {
         setLiveDailySeries(null);
         setLiveMonthlySeries(null);
         setDisplayedTargetKey(targetKeyAtStart);
+        displayedTargetKeyRef.current = targetKeyAtStart;
         setIsDataLoaded(true);
+        isDataLoadedRef.current = true;
         setIsPlantSwitching(false);
         setFetchingDeye(false, null);
       } catch (err: unknown) {
@@ -659,7 +689,9 @@ export default function AnalyticsDashboardPage() {
         setLiveDailySeries(null);
         setLiveMonthlySeries(null);
         setDisplayedTargetKey(targetKeyAtStart);
+        displayedTargetKeyRef.current = targetKeyAtStart;
         setIsDataLoaded(true);
+        isDataLoadedRef.current = true;
         setIsPlantSwitching(false);
         setFetchingDeye(false, null);
       } finally {
@@ -672,7 +704,7 @@ export default function AnalyticsDashboardPage() {
         }
       }
     },
-    [isFleetView, selectedAccountId, selectedStationId, selectedInverterSn, dateSelection, displayedTargetKey, setIsPlantSwitching, setFetchingDeye]
+    [isFleetView, selectedAccountId, selectedStationId, selectedInverterSn, scheduleIdlePrefetch, setIsPlantSwitching, setFetchingDeye]
   );
 
   useEffect(() => {
@@ -971,8 +1003,8 @@ export default function AnalyticsDashboardPage() {
         clearSkyKw = Number((Math.sin(prog * Math.PI) * (effectiveCapacityKw * 0.98)).toFixed(1));
       }
 
-      let solar = pt.solarYieldKw ?? null;
-      let load = pt.loadDemandKw ?? null;
+      let solar = isFuture ? null : (pt.solarYieldKw ?? null);
+      let load = isFuture ? null : (pt.loadDemandKw ?? null);
 
       // In Today's view, anchor latest elapsed telemetry near current hour to live reading
       if (isViewingToday && solar !== null && !isFuture && liveSolar !== undefined && liveSolar > 0) {
@@ -989,8 +1021,10 @@ export default function AnalyticsDashboardPage() {
         }
       }
 
-      const bat = solar !== null ? (pt.batteryFlowKw ?? 0) : null;
-      const grid = solar !== null && load !== null ? Number((solar - load - (bat ?? 0)).toFixed(2)) : (pt.gridFlowKw ?? null);
+      const bat = !isFuture && solar !== null ? (pt.batteryFlowKw ?? 0) : null;
+      const grid = !isFuture && solar !== null && load !== null
+        ? Number((solar - load - (bat ?? 0)).toFixed(2))
+        : (!isFuture ? (pt.gridFlowKw ?? null) : null);
 
       return {
         hour: pt.hour,
@@ -1828,7 +1862,7 @@ export default function AnalyticsDashboardPage() {
                         isAnimationActive={false}
                       />
                     )}
-                    {(streamFilter === 'ALL' || streamFilter === 'BATTERY') && (
+                    {(streamFilter === 'ALL' || streamFilter === 'BATTERY') && (hasBattery || previewEssModel || streamFilter === 'BATTERY') && (
                       <Area
                         type="monotone"
                         dataKey="batteryStoredKwh"
@@ -1869,7 +1903,7 @@ export default function AnalyticsDashboardPage() {
                         <stop offset="95%" stopColor={COLORS.battery} stopOpacity={0.0} />
                       </linearGradient>
                       <linearGradient id="colorGrid" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={COLORS.gridExport} stopOpacity={0.6} />
+                        <stop offset="5%" stopColor={COLORS.gridExport} stopOpacity={0.4} />
                         <stop offset="95%" stopColor={COLORS.gridExport} stopOpacity={0.0} />
                       </linearGradient>
                     </defs>
@@ -1880,36 +1914,51 @@ export default function AnalyticsDashboardPage() {
                       tickLine={false}
                       axisLine={{ stroke: 'hsl(var(--border) / 0.6)' }}
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                      interval={24}
+                      ticks={['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00']}
                     />
                     <YAxis
                       tickLine={false}
                       axisLine={{ stroke: 'hsl(var(--border) / 0.6)' }}
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                       unit=" kW"
+                      domain={[
+                        0,
+                        (dataMax: number) => {
+                          const baseline = effectiveCapacityKw > 0 ? effectiveCapacityKw * 0.9 : 100;
+                          const peak = Math.max(dataMax || 0, baseline);
+                          return Math.max(10, Math.ceil(peak * 1.1));
+                        },
+                      ]}
                     />
                     <Tooltip
                       content={({ active, payload, label }) => {
                         if (!active || !payload?.length) return null;
+                        const isAllFuture = payload.every((entry: any) => entry.value === null || entry.value === undefined);
                         return (
                           <div className="rounded-xl border border-border/80 bg-popover/95 p-3 text-xs shadow-xl backdrop-blur-md min-w-[190px]">
                             <div className="font-semibold text-foreground border-b border-border/60 pb-1.5 mb-2 flex items-center justify-between font-mono">
                               <span>Interval: {label}</span>
                               <span className="text-[10px] text-amber-500 font-bold">5-min</span>
                             </div>
-                            <div className="space-y-1.5">
-                              {payload.map((entry: any) => (
-                                <div key={entry.name} className="flex items-center justify-between">
-                                  <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
-                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                                    {entry.name}:
-                                  </span>
-                                  <span className="font-mono font-bold text-foreground">
-                                    {entry.value !== null && entry.value !== undefined ? `${entry.value} kW` : '—'}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
+                            {isAllFuture ? (
+                              <div className="text-[11px] text-muted-foreground italic py-1">
+                                Pending interval (awaiting telemetry)
+                              </div>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {payload.map((entry: any) => (
+                                  <div key={entry.name} className="flex items-center justify-between">
+                                    <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                      {entry.name}:
+                                    </span>
+                                    <span className="font-mono font-bold text-foreground">
+                                      {entry.value !== null && entry.value !== undefined ? `${entry.value} kW` : '—'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         );
                       }}
@@ -1926,6 +1975,7 @@ export default function AnalyticsDashboardPage() {
                         fillOpacity={1}
                         fill="url(#colorSolar)"
                         isAnimationActive={false}
+                        connectNulls={false}
                       />
                     )}
 
@@ -1940,11 +1990,12 @@ export default function AnalyticsDashboardPage() {
                         fillOpacity={1}
                         fill="url(#colorLoad)"
                         isAnimationActive={false}
+                        connectNulls={false}
                       />
                     )}
 
-                    {/* Battery Flow (0 kW line when pure grid-tied, active when battery is attached) */}
-                    {(streamFilter === 'ALL' || streamFilter === 'BATTERY') && (
+                    {/* Battery Flow (active when battery is attached or previewed, or when isolated) */}
+                    {(streamFilter === 'ALL' || streamFilter === 'BATTERY') && (hasBattery || previewEssModel || streamFilter === 'BATTERY') && (
                       <Area
                         type="monotone"
                         dataKey="batteryFlowKw"
@@ -1954,6 +2005,7 @@ export default function AnalyticsDashboardPage() {
                         fillOpacity={1}
                         fill="url(#colorBat)"
                         isAnimationActive={false}
+                        connectNulls={false}
                       />
                     )}
 
@@ -1965,9 +2017,10 @@ export default function AnalyticsDashboardPage() {
                         name="Grid Net (+Exp/-Imp)"
                         stroke={COLORS.gridExport}
                         strokeWidth={1.8}
-                        fillOpacity={1}
+                        fillOpacity={streamFilter === 'GRID' ? 0.6 : 0.25}
                         fill="url(#colorGrid)"
                         isAnimationActive={false}
+                        connectNulls={false}
                       />
                     )}
                   </AreaChart>
