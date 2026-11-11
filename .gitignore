@@ -15,6 +15,8 @@ dist/
 .env*
 !.env.example
 deye-accounts.json
+deye-history-cache.json
+*.tmp.*
 
 # Java & compiled binaries
 *.class

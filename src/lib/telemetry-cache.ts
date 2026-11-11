@@ -34,6 +34,24 @@ export function inverterCacheKey(
 }
 
 /**
+ * Unified historical telemetry cache key across /analytics, /yield-arbitrage, /fleet, and /hardware-telemetry.
+ */
+export function getHistoryCacheKey(opts: {
+  accountId?: string | null;
+  stationId?: string | null;
+  deviceSn?: string | null;
+  preset?: string | null;
+  date?: string | null;
+}): string {
+  const cleanAcc = opts.accountId && opts.accountId !== 'ALL' && opts.accountId !== 'ALL_FLEET' ? opts.accountId : 'FLEET';
+  const cleanSt = opts.stationId && opts.stationId !== 'ALL' ? opts.stationId : 'ALL';
+  const cleanSn = opts.deviceSn && opts.deviceSn !== 'ALL' && opts.deviceSn !== 'ALL_FLEET' ? String(opts.deviceSn).trim() : 'ALL';
+  const cleanPreset = opts.preset || 'TODAY';
+  const cleanDate = opts.date || '';
+  return `history:${cleanAcc}:${cleanSt}:${cleanSn}:${cleanPreset}:${cleanDate}`;
+}
+
+/**
  * Ownership check: SN belongs to one of the tenant's plants' devices.
  * 'ALL' / 'ALL_FLEET' / undefined pass through as true so fleet views
  * stay byte-identical (no filtering). Unknown SN returns false.

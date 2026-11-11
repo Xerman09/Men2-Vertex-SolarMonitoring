@@ -117,15 +117,15 @@ export function calculateSinusoidalFit(
       sinusoidalClearSkyKw = Math.max(0, theoreticalPeakKw * Math.sin(theta));
     }
 
-    const isEl = pt.isElapsed ?? (pt.solarYieldKw !== null);
-    const residualKw = pt.solarYieldKw !== null ? pt.solarYieldKw - sinusoidalClearSkyKw : null;
+    const isEl = pt.isElapsed ?? (pt.solarYieldKw != null);
+    const residualKw = pt.solarYieldKw != null && Number.isFinite(pt.solarYieldKw) ? pt.solarYieldKw - sinusoidalClearSkyKw : null;
 
     return {
       hour: pt.hour,
       hourDecimal: pt.hourDecimal,
-      actualSolarKw: pt.solarYieldKw !== null ? Number(pt.solarYieldKw.toFixed(2)) : null,
-      sinusoidalClearSkyKw: Number(sinusoidalClearSkyKw.toFixed(2)),
-      residualKw: residualKw !== null ? Number(residualKw.toFixed(2)) : null,
+      actualSolarKw: pt.solarYieldKw != null && Number.isFinite(pt.solarYieldKw) ? Number(pt.solarYieldKw.toFixed(2)) : null,
+      sinusoidalClearSkyKw: Number((sinusoidalClearSkyKw || 0).toFixed(2)),
+      residualKw: residualKw != null && Number.isFinite(residualKw) ? Number(residualKw.toFixed(2)) : null,
       isElapsed: isEl,
     };
   });
@@ -189,7 +189,12 @@ export function calculateFourierDecomposition(
 
   let elapsedCount = 0;
   data.forEach((pt) => {
-    if (pt.solarYieldKw !== null && pt.loadDemandKw !== null) {
+    if (
+      pt.solarYieldKw != null &&
+      pt.loadDemandKw != null &&
+      Number.isFinite(pt.solarYieldKw) &&
+      Number.isFinite(pt.loadDemandKw)
+    ) {
       elapsedCount++;
       const t = pt.hourDecimal;
       const sYield = pt.solarYieldKw;
@@ -229,17 +234,17 @@ export function calculateFourierDecomposition(
     const h3 = a3_solar * Math.cos(3 * omega0 * t) + b3_solar * Math.sin(3 * omega0 * t);
     const recon = Math.max(0, a0_solar + h1 + h2 + h3);
     const loadH1 = a0_load + a1_load * Math.cos(omega0 * t) + b1_load * Math.sin(omega0 * t);
-    const isEl = pt.isElapsed ?? (pt.solarYieldKw !== null);
+    const isEl = pt.isElapsed ?? (pt.solarYieldKw != null);
 
     return {
       hour: pt.hour,
       hourDecimal: pt.hourDecimal,
-      actualSolarKw: pt.solarYieldKw !== null ? Number(pt.solarYieldKw.toFixed(1)) : null,
-      fundamentalHarmonicKw: Number((a0_solar + h1).toFixed(1)),
-      secondHarmonicKw: Number(h2.toFixed(1)),
-      thirdHarmonicKw: Number(h3.toFixed(1)),
-      fourierReconstructedKw: Number(recon.toFixed(1)),
-      loadFundamentalKw: Number(loadH1.toFixed(1)),
+      actualSolarKw: pt.solarYieldKw != null && Number.isFinite(pt.solarYieldKw) ? Number(pt.solarYieldKw.toFixed(1)) : null,
+      fundamentalHarmonicKw: Number((a0_solar + h1 || 0).toFixed(1)),
+      secondHarmonicKw: Number((h2 || 0).toFixed(1)),
+      thirdHarmonicKw: Number((h3 || 0).toFixed(1)),
+      fourierReconstructedKw: Number((recon || 0).toFixed(1)),
+      loadFundamentalKw: Number((loadH1 || 0).toFixed(1)),
       isElapsed: isEl,
     };
   });
@@ -253,13 +258,13 @@ export function calculatePolarCyclicalPoints(
 ): PolarCyclePoint[] {
   return data.map((pt) => {
     const angleDeg = Math.round((pt.hourDecimal / 24) * 360);
-    const isEl = pt.isElapsed ?? (pt.solarYieldKw !== null);
+    const isEl = pt.isElapsed ?? (pt.solarYieldKw != null);
     return {
       angleDeg,
       hourLabel: pt.hour,
-      solarHarvestRadius: pt.solarYieldKw !== null ? Number(pt.solarYieldKw.toFixed(1)) : null,
-      loadDemandRadius: pt.loadDemandKw !== null ? Number(pt.loadDemandKw.toFixed(1)) : null,
-      batteryRadius: pt.batteryFlowKw !== null ? Number(Math.abs(pt.batteryFlowKw).toFixed(1)) : null,
+      solarHarvestRadius: pt.solarYieldKw != null && Number.isFinite(pt.solarYieldKw) ? Number(pt.solarYieldKw.toFixed(1)) : null,
+      loadDemandRadius: pt.loadDemandKw != null && Number.isFinite(pt.loadDemandKw) ? Number(pt.loadDemandKw.toFixed(1)) : null,
+      batteryRadius: pt.batteryFlowKw != null && Number.isFinite(pt.batteryFlowKw) ? Number(Math.abs(pt.batteryFlowKw).toFixed(1)) : null,
       isElapsed: isEl,
     };
   });

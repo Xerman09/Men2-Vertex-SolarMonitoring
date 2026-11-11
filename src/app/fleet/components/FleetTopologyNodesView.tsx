@@ -755,11 +755,11 @@ export function FleetTopologyNodesView({
                       <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
                         <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800/60">
                           <span className="text-[9px] uppercase text-slate-500 block">Live Power</span>
-                          <strong className="text-amber-400 text-xs font-bold">{acc.livePowerKw.toFixed(1)} kW</strong>
+                          <strong className="text-amber-400 text-xs font-bold">{(acc.livePowerKw ?? 0).toFixed(1)} kW</strong>
                         </div>
                         <div className="bg-slate-950/60 p-2 rounded-xl border border-slate-800/60">
                           <span className="text-[9px] uppercase text-slate-500 block">Capacity</span>
-                          <strong className="text-slate-200 text-xs font-bold">{acc.capacityKw.toFixed(0)} kW</strong>
+                          <strong className="text-slate-200 text-xs font-bold">{(acc.capacityKw ?? 0).toFixed(0)} kW</strong>
                         </div>
                       </div>
 
@@ -767,7 +767,7 @@ export function FleetTopologyNodesView({
                       <div className="space-y-1">
                         <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
                           <span>Utilization</span>
-                          <span className="text-emerald-400 font-bold">{accUtil.toFixed(1)}%</span>
+                          <span className="text-emerald-400 font-bold">{(accUtil ?? 0).toFixed(1)}%</span>
                         </div>
                         <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
                           <div
@@ -870,19 +870,19 @@ export function FleetTopologyNodesView({
                               <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
                                 <div className="bg-slate-950/60 p-1.5 rounded-xl border border-slate-800/60">
                                   <span className="text-[9px] uppercase text-slate-500 block">Live Output</span>
-                                  <strong className="text-amber-400 text-xs font-bold">{p.livePowerKw.toFixed(1)} kW</strong>
+                                  <strong className="text-amber-400 text-xs font-bold">{(p.livePowerKw ?? 0).toFixed(1)} kW</strong>
                                 </div>
                                 <div className="bg-slate-950/60 p-1.5 rounded-xl border border-slate-800/60">
                                   <span className="text-[9px] uppercase text-slate-500 block">Today's Yield</span>
-                                  <strong className="text-slate-200 text-xs font-bold">{p.dailyYieldKwh.toFixed(1)} kWh</strong>
+                                  <strong className="text-slate-200 text-xs font-bold">{(p.dailyYieldKwh ?? 0).toFixed(1)} kWh</strong>
                                 </div>
                               </div>
 
                               {/* Capacity Bar */}
                               <div className="space-y-1">
                                 <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
-                                  <span>Plant Load ({plantUtil.toFixed(0)}%)</span>
-                                  <span className="text-slate-300 font-bold">{p.capacityKw.toFixed(0)} kW max</span>
+                                  <span>Plant Load ({(plantUtil ?? 0).toFixed(0)}%)</span>
+                                  <span className="text-slate-300 font-bold">{(p.capacityKw ?? 0).toFixed(0)} kW max</span>
                                 </div>
                                 <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
                                   <div
@@ -1008,7 +1008,7 @@ export function FleetTopologyNodesView({
                                       <div className="flex items-center justify-between text-[10px]">
                                         <span className="text-slate-400">Live Yield</span>
                                         <span className="text-amber-400 font-bold">
-                                          {inv.liveSolarPowerKw.toFixed(1)} kW ({invUtil.toFixed(0)}%)
+                                          {(inv.liveSolarPowerKw ?? 0).toFixed(1)} kW ({(invUtil ?? 0).toFixed(0)}%)
                                         </span>
                                       </div>
                                       <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
@@ -1020,7 +1020,7 @@ export function FleetTopologyNodesView({
                                     </div>
 
                                     <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5 border-t border-slate-800/60">
-                                      <span>Day: <strong className="text-slate-200">{inv.dailyYieldKwh.toFixed(1)} kWh</strong></span>
+                                      <span>Day: <strong className="text-slate-200">{(inv.dailyYieldKwh ?? 0).toFixed(1)} kWh</strong></span>
                                       {inv.loggerSn && (
                                         <span className="flex items-center gap-1 text-[9px] text-slate-500 truncate max-w-[100px]" title={`Logger: ${inv.loggerSn}`}>
                                           <Radio size={9} /> {inv.loggerSn}
@@ -1250,19 +1250,19 @@ export function FleetTopologyNodesView({
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
                     <div className="text-[9px] uppercase text-slate-500">Live Power</div>
                     <div className="text-sm font-bold text-amber-400 mt-0.5">
-                      {selectedNode.data.livePowerKw.toFixed(1)} kW
+                      {(selectedNode.data.livePowerKw ?? 0).toFixed(1)} kW
                     </div>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
                     <div className="text-[9px] uppercase text-slate-500">Harvest</div>
                     <div className="text-sm font-bold text-slate-100 mt-0.5">
-                      {selectedNode.data.dailyYieldKwh.toFixed(1)} kWh
+                      {(selectedNode.data.dailyYieldKwh ?? 0).toFixed(1)} kWh
                     </div>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
                     <div className="text-[9px] uppercase text-slate-500">Capacity</div>
                     <div className="text-sm font-bold text-slate-400 mt-0.5">
-                      {selectedNode.data.capacityKw.toFixed(0)} kW
+                      {(selectedNode.data.capacityKw ?? 0).toFixed(0)} kW
                     </div>
                   </div>
                 </div>
@@ -1296,19 +1296,19 @@ export function FleetTopologyNodesView({
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
                     <div className="text-[9px] uppercase text-slate-500">Live Power</div>
                     <div className="text-sm font-bold text-amber-400 mt-0.5">
-                      {selectedNode.data.livePowerKw.toFixed(1)} kW
+                      {(selectedNode.data.livePowerKw ?? 0).toFixed(1)} kW
                     </div>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
                     <div className="text-[9px] uppercase text-slate-500">Harvest</div>
                     <div className="text-sm font-bold text-slate-100 mt-0.5">
-                      {selectedNode.data.dailyYieldKwh.toFixed(1)} kWh
+                      {(selectedNode.data.dailyYieldKwh ?? 0).toFixed(1)} kWh
                     </div>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
                     <div className="text-[9px] uppercase text-slate-500">Capacity</div>
                     <div className="text-sm font-bold text-slate-400 mt-0.5">
-                      {selectedNode.data.capacityKw.toFixed(0)} kW
+                      {(selectedNode.data.capacityKw ?? 0).toFixed(0)} kW
                     </div>
                   </div>
                 </div>
@@ -1342,13 +1342,13 @@ export function FleetTopologyNodesView({
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
                     <div className="text-[9px] uppercase text-slate-500">Live Solar Output</div>
                     <div className="text-sm font-bold text-amber-400 mt-0.5">
-                      {selectedNode.data.liveSolarPowerKw.toFixed(1)} kW
+                      {(selectedNode.data.liveSolarPowerKw ?? 0).toFixed(1)} kW
                     </div>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
                     <div className="text-[9px] uppercase text-slate-500">Today's Harvest</div>
                     <div className="text-sm font-bold text-slate-100 mt-0.5">
-                      {selectedNode.data.dailyYieldKwh.toFixed(1)} kWh
+                      {(selectedNode.data.dailyYieldKwh ?? 0).toFixed(1)} kWh
                     </div>
                   </div>
                 </div>

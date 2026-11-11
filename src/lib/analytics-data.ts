@@ -104,9 +104,9 @@ export function generateDailyAnalytics(
     const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
 
-    // Weather variability factor (0.75 - 1.05)
-    const seed = (d.getDate() * 17 + d.getMonth() * 31) % 100;
-    const weatherFactor = 0.8 + (seed / 100) * 0.25;
+    // Weather variability factor (0.65 - 1.03) across year/month/day
+    const seed = (d.getFullYear() * 7 + (d.getMonth() + 1) * 31 + d.getDate() * 17) % 100;
+    const weatherFactor = 0.65 + (seed / 100) * 0.38;
 
     const baseSolar = 490 * scale * weatherFactor;
     const baseLoad = (460 + ((seed % 20) - 10)) * scale;
@@ -265,6 +265,10 @@ export interface AnalyticsSummaryOptions {
   ambientTempC?: number;
   liveSolarPowerKw?: number;
   dailyYieldKwh?: number;
+  dailyLoadKwh?: number;
+  dailyExportKwh?: number;
+  dailyImportKwh?: number;
+  allowZeroYield?: boolean;
 }
 
 /**
@@ -292,8 +296,7 @@ export function computeAnalyticsSummary(
   let totalExport = 0;
   let totalImport = 0;
 
-  // Assuming step is 5 mins = 1/12 hour
-  const hoursPerStep = 1 / 12;
+  const hoursPerStep = hourly.length >= 24 ? 24 / hourly.length : 1 / 12;
 
   data.forEach((pt) => {
     const solar = pt.solarYieldKw ?? 0;
@@ -322,8 +325,8 @@ export function computeAnalyticsSummary(
     }
   });
 
-  // Fallbacks if data empty or zero
-  if (totalSolarYield === 0) {
+  // Fallbacks if data empty or zero (disabled when explicitly tracking live zero-generation dates)
+  if (totalSolarYield === 0 && !options?.allowZeroYield) {
     const scale = capacityKw > 0 ? capacityKw / 120 : 1;
     totalSolarYield = Number((512.4 * scale).toFixed(1));
     peakSolar = Number((119.5 * scale).toFixed(1));
@@ -336,12 +339,20 @@ export function computeAnalyticsSummary(
   }
 
   // If reported daily yield from live hardware/telemetry is available, honor it exactly
-  if (options?.dailyYieldKwh !== undefined && options.dailyYieldKwh > 0) {
+  if (options?.dailyYieldKwh !== undefined && (options.dailyYieldKwh > 0 || options.allowZeroYield)) {
     const rawSum = totalSolarYield;
     totalSolarYield = options.dailyYieldKwh;
-    if (rawSum > 0) {
+    if (options.dailyExportKwh !== undefined) {
+      totalExport = options.dailyExportKwh;
+    } else if (rawSum > 0) {
       const ratio = options.dailyYieldKwh / rawSum;
       totalExport = Number((totalExport * ratio).toFixed(1));
+    }
+    if (options.dailyImportKwh !== undefined) {
+      totalImport = options.dailyImportKwh;
+    }
+    if (options.dailyLoadKwh !== undefined) {
+      totalLoad = options.dailyLoadKwh;
     }
   }
   if (options?.liveSolarPowerKw !== undefined && options.liveSolarPowerKw > 0) {
@@ -359,7 +370,7 @@ export function computeAnalyticsSummary(
   // Dynamic PR calculation: Actual Generation / Reference Clear-Sky Generation for elapsed daytime hours
   let clearSkyElapsedKwh = 0;
   data.forEach((pt) => {
-    const parts = pt.hour.split(':');
+    const parts = (pt.hour || '00:00').split(':');
     const h = parseInt(parts[0], 10) || 0;
     const m = parseInt(parts[1], 10) || 0;
     const hDec = h + m / 60;
@@ -371,7 +382,9 @@ export function computeAnalyticsSummary(
   });
 
   let pr = 82.5;
-  if (clearSkyElapsedKwh > 0 && totalSolarYield > 0) {
+  if (totalSolarYield === 0 && options?.allowZeroYield) {
+    pr = 0;
+  } else if (clearSkyElapsedKwh > 0 && totalSolarYield > 0) {
     const rawPr = (totalSolarYield / clearSkyElapsedKwh) * 100;
     pr = Number(Math.min(92.0, Math.max(72.0, rawPr)).toFixed(1));
   } else {

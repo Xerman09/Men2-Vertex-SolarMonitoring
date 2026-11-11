@@ -61,9 +61,13 @@ export function InverterSolarCurve({
   const rawId = useId();
   const gradId = `invSolarGrad-${rawId.replace(/:/g, '')}`;
 
-  const currentLoadPct = loadPct !== undefined
+  const safeRatedKw = Number.isFinite(ratedKw) && ratedKw > 0 ? ratedKw : 10;
+  const safeLiveSolarPowerKw = Number.isFinite(liveSolarPowerKw) && liveSolarPowerKw >= 0 ? liveSolarPowerKw : 0;
+  const safeDailyYieldKwh = Number.isFinite(dailyYieldKwh) && dailyYieldKwh >= 0 ? dailyYieldKwh : 0;
+
+  const currentLoadPct = loadPct !== undefined && Number.isFinite(loadPct)
     ? loadPct
-    : (ratedKw > 0 ? Math.min(100, (liveSolarPowerKw / ratedKw) * 100) : 0);
+    : (safeRatedKw > 0 ? Math.min(100, (safeLiveSolarPowerKw / safeRatedKw) * 100) : 0);
 
   const nowHour = useMemo(() => {
     return new Date().getHours() + new Date().getMinutes() / 60;
@@ -71,7 +75,7 @@ export function InverterSolarCurve({
 
   // Generate 24 diurnal points (00:00 - 23:00) scaled to inverter rated capacity, strictly up to current time
   const points = useMemo(() => {
-    const peakEstimate = Math.max(liveSolarPowerKw * 1.15, (ratedKw || 50) * 0.78, 5);
+    const peakEstimate = Math.max(safeLiveSolarPowerKw * 1.15, (safeRatedKw || 50) * 0.78, 5);
 
     const data: Array<{ hour: number; label: string; power: number; isNow: boolean; isFuture: boolean }> = [];
 
@@ -83,12 +87,12 @@ export function InverterSolarCurve({
         if (h >= 5.5 && h <= 18.5) {
           const norm = (h - 5.5) / 13;
           const rad = norm * Math.PI;
-          const curveFactor = Math.pow(Math.sin(rad), 1.25);
+          const curveFactor = Math.pow(Math.max(0, Math.sin(rad)), 1.25);
           power = peakEstimate * curveFactor;
 
-          if (Math.abs(h - nowHour) <= 1.5 && liveSolarPowerKw > 0) {
+          if (Math.abs(h - nowHour) <= 1.5 && safeLiveSolarPowerKw > 0) {
             const weight = 1 - Math.abs(h - nowHour) / 1.5;
-            power = power * (1 - weight) + liveSolarPowerKw * weight;
+            power = power * (1 - weight) + safeLiveSolarPowerKw * weight;
           }
         }
       }
@@ -96,14 +100,14 @@ export function InverterSolarCurve({
       data.push({
         hour: h,
         label: `${String(h).padStart(2, '0')}:00`,
-        power: parseFloat(Math.max(0, power).toFixed(1)),
+        power: parseFloat(Math.max(0, Number.isFinite(power) ? power : 0).toFixed(1)),
         isNow: Math.floor(nowHour) === h,
         isFuture,
       });
     }
 
     return data;
-  }, [ratedKw, liveSolarPowerKw, nowHour]);
+  }, [safeRatedKw, safeLiveSolarPowerKw, nowHour]);
 
   const width = 240;
   const svgHeight = 42;
@@ -114,23 +118,24 @@ export function InverterSolarCurve({
 
   // Set kW (ratedKw) is the minimum baseline ceiling, but dynamically expands if actual telemetry exceeds it
   const maxPower = useMemo(() => {
-    const setKw = Math.max(ratedKw || 10, 10);
-    let peakValue = Math.max(liveSolarPowerKw || 0, 0);
+    const setKw = Math.max(safeRatedKw || 10, 10);
+    let peakValue = Math.max(safeLiveSolarPowerKw || 0, 0);
 
     for (const p of points) {
-      if (p.power > peakValue) peakValue = p.power;
+      if (Number.isFinite(p.power) && p.power > peakValue) peakValue = p.power;
     }
 
     const ceiling = Math.max(setKw, peakValue);
     // 10% headroom so curves comfortably fit inside without touching the top border
-    return Math.max(10, Math.ceil(ceiling * 1.10));
-  }, [ratedKw, liveSolarPowerKw, points]);
+    return Math.max(10, Math.ceil((Number.isFinite(ceiling) ? ceiling : 10) * 1.10));
+  }, [safeRatedKw, safeLiveSolarPowerKw, points]);
 
   const coords = useMemo(() => {
     return points.map((p, idx) => {
       const x = paddingX + (idx / Math.max(1, points.length - 1)) * plotWidth;
-      const rawY = paddingY + plotHeight - (p.power / maxPower) * plotHeight;
-      const y = Math.max(paddingY, Math.min(paddingY + plotHeight, rawY));
+      const validPower = Number.isFinite(p.power) ? p.power : 0;
+      const rawY = paddingY + plotHeight - (validPower / maxPower) * plotHeight;
+      const y = Math.max(paddingY, Math.min(paddingY + plotHeight, Number.isFinite(rawY) ? rawY : paddingY + plotHeight));
       return { ...p, x, y };
     });
   }, [points, maxPower, plotWidth, plotHeight, paddingX, paddingY]);
@@ -139,15 +144,15 @@ export function InverterSolarCurve({
   const elapsedCoords = useMemo(() => {
     const elapsed = coords.filter((c) => c.hour <= Math.floor(nowHour));
     const nowX = paddingX + (Math.min(23, nowHour) / 23) * plotWidth;
-    const rawNowY = paddingY + plotHeight - (liveSolarPowerKw / maxPower) * plotHeight;
-    const nowY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawNowY));
+    const rawNowY = paddingY + plotHeight - (safeLiveSolarPowerKw / maxPower) * plotHeight;
+    const nowY = Math.max(paddingY, Math.min(paddingY + plotHeight, Number.isFinite(rawNowY) ? rawNowY : paddingY + plotHeight));
 
     const list = [...elapsed];
     if (list.length === 0 || Math.abs(list[list.length - 1].x - nowX) > 2) {
       list.push({
         hour: nowHour,
         label: `${String(Math.floor(nowHour)).padStart(2, '0')}:${String(Math.floor((nowHour % 1) * 60)).padStart(2, '0')}`,
-        power: liveSolarPowerKw,
+        power: safeLiveSolarPowerKw,
         isNow: true,
         isFuture: false,
         x: nowX,
@@ -156,15 +161,15 @@ export function InverterSolarCurve({
     } else {
       list[list.length - 1] = {
         ...list[list.length - 1],
-        power: liveSolarPowerKw,
+        power: safeLiveSolarPowerKw,
         x: nowX,
         y: nowY,
       };
     }
     return list;
-  }, [coords, nowHour, paddingX, plotWidth, paddingY, plotHeight, maxPower, liveSolarPowerKw]);
+  }, [coords, nowHour, paddingX, plotWidth, paddingY, plotHeight, maxPower, safeLiveSolarPowerKw]);
 
-  const nowCoord = elapsedCoords[elapsedCoords.length - 1];
+  const nowCoord = elapsedCoords.length > 0 ? elapsedCoords[elapsedCoords.length - 1] : null;
 
   const svgPaths = useMemo(() => {
     if (elapsedCoords.length === 0) return { linePath: '', areaPath: '' };
@@ -198,11 +203,11 @@ export function InverterSolarCurve({
             <div className="flex items-center gap-1">
               <span className="size-1.5 rounded-full inline-block shrink-0 bg-[#f59e0b]" />
               <span className="text-muted-foreground/80">PV:</span>
-              <span className="font-bold text-amber-500">{hoveredPoint.power.toFixed(2)} kW</span>
+              <span className="font-bold text-amber-500">{(hoveredPoint.power ?? 0).toFixed(2)} kW</span>
             </div>
-            {dailyYieldKwh > 0 && (
+            {dailyYieldKwh !== undefined && dailyYieldKwh > 0 && (
               <span className="text-muted-foreground/70">
-                (Yield: <strong className="text-foreground/90 font-semibold">{dailyYieldKwh.toFixed(1)} kWh</strong>)
+                (Yield: <strong className="text-foreground/90 font-semibold">{(dailyYieldKwh ?? 0).toFixed(1)} kWh</strong>)
               </span>
             )}
           </div>
@@ -211,10 +216,10 @@ export function InverterSolarCurve({
             <div className="flex items-center gap-1">
               <span className="size-1.5 rounded-full inline-block shrink-0 bg-amber-500 animate-pulse" />
               <span className="text-muted-foreground/80">Live:</span>
-              <span className="font-bold text-amber-500">{liveSolarPowerKw.toFixed(1)} kW</span>
-              {dailyYieldKwh > 0 && (
+              <span className="font-bold text-amber-500">{(liveSolarPowerKw ?? 0).toFixed(1)} kW</span>
+              {dailyYieldKwh !== undefined && dailyYieldKwh > 0 && (
                 <span className="text-amber-500/80 font-normal text-[7px]">
-                  ({dailyYieldKwh.toFixed(1)} kWh)
+                  ({(dailyYieldKwh ?? 0).toFixed(1)} kWh)
                 </span>
               )}
             </div>
@@ -315,22 +320,26 @@ export function InverterSolarCurve({
             </g>
 
             {/* Vertical 'Now' Reference Line */}
-            <line
-              x1={nowCoord.x}
-              y1={paddingY}
-              x2={nowCoord.x}
-              y2={paddingY + plotHeight}
-              stroke="#94a3b8"
-              strokeDasharray="2 2"
-              strokeWidth="1"
-              vectorEffect="non-scaling-stroke"
-            />
+            {nowCoord && Number.isFinite(nowCoord.x) && Number.isFinite(nowCoord.y) && (
+              <>
+                <line
+                  x1={nowCoord.x}
+                  y1={paddingY}
+                  x2={nowCoord.x}
+                  y2={paddingY + plotHeight}
+                  stroke="#94a3b8"
+                  strokeDasharray="2 2"
+                  strokeWidth="1"
+                  vectorEffect="non-scaling-stroke"
+                />
 
-            {/* Current Live Operating Point */}
-            <g transform={`translate(${nowCoord.x}, ${nowCoord.y})`}>
-              <circle r="3" fill={COLOR_SOLAR} className="animate-ping opacity-60" />
-              <circle r="2" fill={COLOR_SOLAR} stroke="hsl(var(--background))" strokeWidth="1" />
-            </g>
+                {/* Current Live Operating Point */}
+                <g transform={`translate(${nowCoord.x}, ${nowCoord.y})`}>
+                  <circle r="3" fill={COLOR_SOLAR} className="animate-ping opacity-60" />
+                  <circle r="2" fill={COLOR_SOLAR} stroke="hsl(var(--background))" strokeWidth="1" />
+                </g>
+              </>
+            )}
 
             {/* Interactive Hover Hit Areas (only elapsed hours, no future values!) */}
             {coords.filter((c) => !c.isFuture).map((c) => (
@@ -382,15 +391,15 @@ export function InverterSolarCurve({
               <p className="text-muted-foreground">Inverter load utilization relative to rated capacity.</p>
               <div className="pt-1 border-t border-border/50 flex justify-between font-mono">
                 <span className="text-muted-foreground">Live Power:</span>
-                <span className="font-bold text-amber-500">{liveSolarPowerKw.toFixed(2)} kW</span>
+                <span className="font-bold text-amber-500">{(liveSolarPowerKw ?? 0).toFixed(2)} kW</span>
               </div>
-              {dailyYieldKwh > 0 && (
+              {dailyYieldKwh !== undefined && dailyYieldKwh > 0 && (
                 <div className="flex justify-between font-mono">
                   <span className="text-muted-foreground">Daily Yield:</span>
-                  <span className="font-bold text-foreground">{dailyYieldKwh.toFixed(1)} kWh</span>
+                  <span className="font-bold text-foreground">{(dailyYieldKwh ?? 0).toFixed(1)} kWh</span>
                 </div>
               )}
-              {ratedKw > 0 && (
+              {ratedKw !== undefined && ratedKw > 0 && (
                 <div className="flex justify-between font-mono">
                   <span className="text-muted-foreground">Rated Cap:</span>
                   <span className="font-semibold text-foreground">{ratedKw} kW</span>
@@ -403,7 +412,7 @@ export function InverterSolarCurve({
                     isFault ? 'text-destructive' : isStandby ? 'text-amber-500' : 'text-emerald-500'
                   }`}
                 >
-                  {currentLoadPct.toFixed(1)}%
+                  {(currentLoadPct ?? 0).toFixed(1)}%
                 </span>
               </div>
             </div>
@@ -424,7 +433,7 @@ export function InverterSolarCurve({
                     ? 'bg-amber-500'
                     : 'bg-emerald-500'
                 }`}
-                style={{ height: `${Math.max(4, Math.min(100, currentLoadPct))}%` }}
+                style={{ height: `${Math.max(4, Math.min(100, currentLoadPct ?? 0))}%` }}
               />
             </div>
 
@@ -433,7 +442,7 @@ export function InverterSolarCurve({
                 isFault ? 'text-destructive' : isStandby ? 'text-amber-500' : 'text-emerald-500'
               }`}
             >
-              {currentLoadPct.toFixed(0)}%
+              {(currentLoadPct ?? 0).toFixed(0)}%
             </span>
           </div>
         </HoverInfo>

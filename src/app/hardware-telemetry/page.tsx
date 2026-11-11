@@ -425,7 +425,7 @@ export default function HardwareTelemetryPage() {
               </div>
             </div>
             <span className="font-mono text-xl font-bold text-amber-500">
-              {pv1.powerKw.toFixed(2)} kW
+              {(pv1.powerKw ?? 0).toFixed(2)} kW
             </span>
           </CardHeader>
           <CardContent className="p-5">
@@ -435,10 +435,10 @@ export default function HardwareTelemetryPage() {
                   DC Voltage
                 </span>
                 <span className="text-base font-bold font-mono text-foreground block mt-0.5">
-                  {pv1.voltageV.toFixed(1)} V
+                  {(pv1.voltageV ?? 0).toFixed(1)} V
                 </span>
                 <span className="text-[10px] text-emerald-500">
-                  {pv1.voltageV > 0 ? `${pv1.voltageV.toFixed(1)} V Active` : '0.0 V'}
+                  {(pv1.voltageV ?? 0) > 0 ? `${(pv1.voltageV ?? 0).toFixed(1)} V Active` : '0.0 V'}
                 </span>
               </div>
               <div className="p-3 bg-muted/40 rounded-xl border border-border/40">
@@ -446,10 +446,10 @@ export default function HardwareTelemetryPage() {
                   DC Current
                 </span>
                 <span className="text-base font-bold font-mono text-foreground block mt-0.5">
-                  {pv1.currentA.toFixed(1)} A
+                  {(pv1.currentA ?? 0).toFixed(1)} A
                 </span>
                 <span className="text-[10px] text-muted-foreground">
-                  {pv1.currentA > 0 ? `${pv1.currentA.toFixed(1)} A Flow` : '0.0 A'}
+                  {(pv1.currentA ?? 0) > 0 ? `${(pv1.currentA ?? 0).toFixed(1)} A Flow` : '0.0 A'}
                 </span>
               </div>
               <div className="p-3 bg-muted/40 rounded-xl border border-border/40">
@@ -484,7 +484,7 @@ export default function HardwareTelemetryPage() {
               </div>
             </div>
             <span className="font-mono text-xl font-bold text-amber-500">
-              {pv2.powerKw.toFixed(2)} kW
+              {(pv2.powerKw ?? 0).toFixed(2)} kW
             </span>
           </CardHeader>
           <CardContent className="p-5">
@@ -494,10 +494,10 @@ export default function HardwareTelemetryPage() {
                   DC Voltage
                 </span>
                 <span className="text-base font-bold font-mono text-foreground block mt-0.5">
-                  {pv2.voltageV.toFixed(1)} V
+                  {(pv2.voltageV ?? 0).toFixed(1)} V
                 </span>
                 <span className="text-[10px] text-emerald-500">
-                  {pv2.voltageV > 0 ? `${pv2.voltageV.toFixed(1)} V Active` : '0.0 V'}
+                  {(pv2.voltageV ?? 0) > 0 ? `${(pv2.voltageV ?? 0).toFixed(1)} V Active` : '0.0 V'}
                 </span>
               </div>
               <div className="p-3 bg-muted/40 rounded-xl border border-border/40">
@@ -505,10 +505,10 @@ export default function HardwareTelemetryPage() {
                   DC Current
                 </span>
                 <span className="text-base font-bold font-mono text-foreground block mt-0.5">
-                  {pv2.currentA.toFixed(1)} A
+                  {(pv2.currentA ?? 0).toFixed(1)} A
                 </span>
                 <span className="text-[10px] text-muted-foreground">
-                  {pv2.currentA > 0 ? `${pv2.currentA.toFixed(1)} A Flow` : '0.0 A'}
+                  {(pv2.currentA ?? 0) > 0 ? `${(pv2.currentA ?? 0).toFixed(1)} A Flow` : '0.0 A'}
                 </span>
               </div>
               <div className="p-3 bg-muted/40 rounded-xl border border-border/40">
@@ -565,13 +565,13 @@ export default function HardwareTelemetryPage() {
                   <div>
                     <span className="text-[10px] text-muted-foreground block font-mono">Voltage</span>
                     <span className="text-lg font-bold font-mono text-foreground">
-                      {ph.voltageV > 0 ? `${ph.voltageV.toFixed(1)} V` : '--'}
+                      {(ph.voltageV ?? 0) > 0 && Number.isFinite(ph.voltageV) ? `${(ph.voltageV ?? 0).toFixed(1)} V` : '--'}
                     </span>
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] text-muted-foreground block font-mono">Current</span>
                     <span className="text-lg font-bold font-mono text-cyan-500">
-                      {ph.currentA > 0 ? `${ph.currentA.toFixed(1)} A` : '--'}
+                      {(ph.currentA ?? 0) > 0 && Number.isFinite(ph.currentA) ? `${(ph.currentA ?? 0).toFixed(1)} A` : '--'}
                     </span>
                   </div>
                 </div>
@@ -580,7 +580,13 @@ export default function HardwareTelemetryPage() {
           </div>
 
           {/* Full Waveform Analytics Engine */}
-          <TrigonometricHistoryGraph compact={true} />
+          <TrigonometricHistoryGraph
+            compact={true}
+            accountId={!isFleetView ? selectedAccountId : undefined}
+            stationId={selectedStationId !== 'ALL' ? selectedStationId : undefined}
+            deviceSn={telemetry?.deviceSn || (selectedInverterSn !== 'ALL' ? selectedInverterSn : undefined)}
+            installedCapacityKw={selectedPlant?.installedCapacityKw || 120}
+          />
         </CardContent>
       </Card>
 

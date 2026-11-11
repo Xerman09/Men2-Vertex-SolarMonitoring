@@ -93,41 +93,45 @@ export function PlantSolarCurve({
   const rawId = useId();
   const gradId = `analyticsDiurnalGrad-${rawId.replace(/:/g, '')}`;
 
+  const safeCapacityKw = Number.isFinite(capacityKw) && capacityKw > 0 ? capacityKw : 10;
+  const safeLivePowerKw = Number.isFinite(livePowerKw) && livePowerKw >= 0 ? livePowerKw : 0;
+  const safeDailyYieldKwh = Number.isFinite(dailyYieldKwh) && dailyYieldKwh >= 0 ? dailyYieldKwh : 0;
+
   const nowHour = useMemo(() => {
     return new Date().getHours() + new Date().getMinutes() / 60;
   }, []);
 
-  const baselineLoad = capacityKw * 0.35;
+  const baselineLoad = safeCapacityKw * 0.35;
   const dayFactor = nowHour >= 8 && nowHour <= 17 ? 1.25 : 0.85;
   const computedDemand = parseFloat((baselineLoad * dayFactor).toFixed(1));
-  const currentDemand = demandKw !== undefined && demandKw > 0 ? demandKw : computedDemand;
-  const currentGridNet = gridPowerKw !== undefined && gridPowerKw !== 0
+  const currentDemand = demandKw !== undefined && Number.isFinite(demandKw) && demandKw > 0 ? demandKw : computedDemand;
+  const currentGridNet = gridPowerKw !== undefined && Number.isFinite(gridPowerKw) && gridPowerKw !== 0
     ? gridPowerKw
-    : parseFloat((livePowerKw - currentDemand).toFixed(1));
-  const currentUtil = utilizationPct !== undefined
+    : parseFloat((safeLivePowerKw - currentDemand).toFixed(1));
+  const currentUtil = utilizationPct !== undefined && Number.isFinite(utilizationPct)
     ? utilizationPct
-    : (capacityKw > 0 ? Math.min(100, Math.max(0, (livePowerKw / capacityKw) * 100)) : 0);
+    : (safeCapacityKw > 0 ? Math.min(100, Math.max(0, (safeLivePowerKw / safeCapacityKw) * 100)) : 0);
 
   const peakEstimate = useMemo(() => {
-    return Math.max(livePowerKw * 1.15, capacityKw * 0.78, 10);
-  }, [livePowerKw, capacityKw]);
+    return Math.max(safeLivePowerKw * 1.15, safeCapacityKw * 0.78, 10);
+  }, [safeLivePowerKw, safeCapacityKw]);
 
   // Baseline synthetic history in /api/deye/history is calibrated to a 120 kWp reference system.
   // Standardize scaling ratio to capacityKw / 120, exactly matching Analytics Dashboard scopeScaleFactor.
   const historyScaleRatio = useMemo(() => {
-    if (!historyPoints || historyPoints.length === 0 || !capacityKw || capacityKw <= 0) return 1;
+    if (!historyPoints || historyPoints.length === 0 || !safeCapacityKw || safeCapacityKw <= 0) return 1;
     let maxHistorySolar = 0;
     for (const pt of historyPoints) {
-      if (pt.solarYieldKw && pt.solarYieldKw > maxHistorySolar) {
+      if (pt.solarYieldKw && Number.isFinite(pt.solarYieldKw) && pt.solarYieldKw > maxHistorySolar) {
         maxHistorySolar = pt.solarYieldKw;
       }
     }
     // If points are already isolated/scaled to this station capacity (within 2%), do not re-scale
-    if (maxHistorySolar > 0 && Math.abs(maxHistorySolar - capacityKw * (119.5 / 120)) < 1.0) {
+    if (maxHistorySolar > 0 && Math.abs(maxHistorySolar - safeCapacityKw * (119.5 / 120)) < 1.0) {
       return 1;
     }
-    return capacityKw / 120;
-  }, [historyPoints, capacityKw]);
+    return safeCapacityKw / 120;
+  }, [historyPoints, safeCapacityKw]);
 
   // Generate diurnal points or map actual 5-minute continuous telemetry points from history
   const points = useMemo(() => {
@@ -138,32 +142,32 @@ export function PlantSolarCurve({
         const m = parseInt(parts[1], 10) || 0;
         const hourFloat = h + m / 60;
         const isFuture = hourFloat > nowHour;
-        const rawSolar = (pt.solarYieldKw !== null && pt.solarYieldKw !== undefined ? pt.solarYieldKw : 0) * historyScaleRatio;
-        const rawLoad = (pt.loadDemandKw !== null && pt.loadDemandKw !== undefined ? pt.loadDemandKw : baselineLoad) * historyScaleRatio;
+        const rawSolar = (pt.solarYieldKw !== null && pt.solarYieldKw !== undefined && Number.isFinite(pt.solarYieldKw) ? pt.solarYieldKw : 0) * historyScaleRatio;
+        const rawLoad = (pt.loadDemandKw !== null && pt.loadDemandKw !== undefined && Number.isFinite(pt.loadDemandKw) ? pt.loadDemandKw : baselineLoad) * historyScaleRatio;
 
         // Smoothly blend latest elapsed telemetry towards live readings near current moment (within 30m)
         let solar = rawSolar;
-        if (!isFuture && livePowerKw > 0 && Math.abs(hourFloat - nowHour) <= 0.5) {
+        if (!isFuture && safeLivePowerKw > 0 && Math.abs(hourFloat - nowHour) <= 0.5) {
           const weight = 1 - Math.abs(hourFloat - nowHour) / 0.5;
-          solar = rawSolar * (1 - weight) + livePowerKw * weight;
+          solar = rawSolar * (1 - weight) + safeLivePowerKw * weight;
         }
 
         let load = rawLoad;
         if (!isFuture && demandKw !== undefined && demandKw > 0 && Math.abs(hourFloat - nowHour) <= 0.5) {
           const weight = 1 - Math.abs(hourFloat - nowHour) / 0.5;
-          load = rawLoad * (1 - weight) + demandKw * weight;
+          load = rawLoad * (1 - weight) + currentDemand * weight;
         }
 
-        const rawGrid = pt.gridFlowKw !== null && pt.gridFlowKw !== undefined && livePowerKw === 0
+        const rawGrid = pt.gridFlowKw !== null && pt.gridFlowKw !== undefined && Number.isFinite(pt.gridFlowKw) && safeLivePowerKw === 0
           ? pt.gridFlowKw * historyScaleRatio
           : (solar - load);
 
         return {
           hour: hourFloat,
           label: pt.hour || `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
-          solar: parseFloat(Math.max(0, solar).toFixed(2)),
-          load: parseFloat(Math.max(0, load).toFixed(2)),
-          gridNet: parseFloat(rawGrid.toFixed(2)),
+          solar: parseFloat(Math.max(0, Number.isFinite(solar) ? solar : 0).toFixed(2)),
+          load: parseFloat(Math.max(0, Number.isFinite(load) ? load : 0).toFixed(2)),
+          gridNet: parseFloat((Number.isFinite(rawGrid) ? rawGrid : 0).toFixed(2)),
           isNow: Math.abs(hourFloat - nowHour) <= 0.05,
           isFuture,
         };
@@ -189,12 +193,12 @@ export function PlantSolarCurve({
         if (h >= 5.5 && h <= 18.5) {
           const norm = (h - 5.5) / 13;
           const rad = norm * Math.PI;
-          const curveFactor = Math.pow(Math.sin(rad), 1.25);
+          const curveFactor = Math.pow(Math.max(0, Math.sin(rad)), 1.25);
           solar = peakEstimate * curveFactor;
 
-          if (Math.abs(h - nowHour) <= 1.5 && livePowerKw > 0) {
+          if (Math.abs(h - nowHour) <= 1.5 && safeLivePowerKw > 0) {
             const weight = 1 - Math.abs(h - nowHour) / 1.5;
-            solar = solar * (1 - weight) + livePowerKw * weight;
+            solar = solar * (1 - weight) + safeLivePowerKw * weight;
           }
         }
 
@@ -207,8 +211,8 @@ export function PlantSolarCurve({
         }
       }
 
-      const s = parseFloat(Math.max(0, solar).toFixed(2));
-      const l = parseFloat(Math.max(0, load).toFixed(2));
+      const s = parseFloat(Math.max(0, Number.isFinite(solar) ? solar : 0).toFixed(2));
+      const l = parseFloat(Math.max(0, Number.isFinite(load) ? load : 0).toFixed(2));
       data.push({
         hour: h,
         label: `${String(h).padStart(2, '0')}:00`,
@@ -221,7 +225,7 @@ export function PlantSolarCurve({
     }
 
     return data;
-  }, [historyPoints, historyScaleRatio, nowHour, baselineLoad, peakEstimate, livePowerKw, currentDemand]);
+  }, [historyPoints, historyScaleRatio, nowHour, baselineLoad, peakEstimate, safeLivePowerKw, currentDemand, demandKw]);
 
   // SVG dimensions: bigger graph drawing area
   const width = 280;
@@ -233,27 +237,30 @@ export function PlantSolarCurve({
 
   // Set kWp (capacityKw) is the minimum baseline ceiling, but dynamically expands if actual telemetry exceeds it
   const maxPower = useMemo(() => {
-    const setKwp = Math.max(capacityKw || 10, 10);
-    let peakData = Math.max(livePowerKw || 0, currentDemand || 0);
+    const setKwp = Math.max(safeCapacityKw || 10, 10);
+    let peakData = Math.max(safeLivePowerKw || 0, currentDemand || 0);
 
     for (const p of points) {
-      if (p.solar > peakData) peakData = p.solar;
-      if (p.load > peakData) peakData = p.load;
+      if (Number.isFinite(p.solar) && p.solar > peakData) peakData = p.solar;
+      if (Number.isFinite(p.load) && p.load > peakData) peakData = p.load;
     }
 
     const ceiling = Math.max(setKwp, peakData);
     // 10% headroom so curves comfortably fit inside without touching the top border
-    return Math.max(10, Math.ceil(ceiling * 1.10));
-  }, [capacityKw, livePowerKw, currentDemand, points]);
+    return Math.max(10, Math.ceil((Number.isFinite(ceiling) ? ceiling : 10) * 1.10));
+  }, [safeCapacityKw, safeLivePowerKw, currentDemand, points]);
 
   const coords = useMemo(() => {
     return points.map((p) => {
       // Linear mapping of 0..24 hours across [paddingX, paddingX + plotWidth]
-      const x = paddingX + (Math.min(24, Math.max(0, p.hour)) / 24) * plotWidth;
-      const rawSolarY = paddingY + plotHeight - (p.solar / maxPower) * plotHeight;
-      const rawLoadY = paddingY + plotHeight - (p.load / maxPower) * plotHeight;
-      const solarY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawSolarY));
-      const loadY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawLoadY));
+      const validHour = Number.isFinite(p.hour) ? Math.min(24, Math.max(0, p.hour)) : 0;
+      const x = paddingX + (validHour / 24) * plotWidth;
+      const validSolar = Number.isFinite(p.solar) ? p.solar : 0;
+      const validLoad = Number.isFinite(p.load) ? p.load : 0;
+      const rawSolarY = paddingY + plotHeight - (validSolar / maxPower) * plotHeight;
+      const rawLoadY = paddingY + plotHeight - (validLoad / maxPower) * plotHeight;
+      const solarY = Math.max(paddingY, Math.min(paddingY + plotHeight, Number.isFinite(rawSolarY) ? rawSolarY : paddingY + plotHeight));
+      const loadY = Math.max(paddingY, Math.min(paddingY + plotHeight, Number.isFinite(rawLoadY) ? rawLoadY : paddingY + plotHeight));
       return { ...p, x, solarY, loadY };
     });
   }, [points, maxPower, plotWidth, plotHeight, paddingX, paddingY]);
@@ -264,22 +271,22 @@ export function PlantSolarCurve({
     const nowX = paddingX + (Math.min(24, Math.max(0, nowHour)) / 24) * plotWidth;
     const lastElapsed = elapsed.length > 0 ? elapsed[elapsed.length - 1] : null;
     const effectiveNowSolar =
-      livePowerKw > 0 || !historyPoints || historyPoints.length === 0
-        ? livePowerKw
-        : (lastElapsed?.solar ?? livePowerKw);
+      safeLivePowerKw > 0 || !historyPoints || historyPoints.length === 0
+        ? safeLivePowerKw
+        : (lastElapsed?.solar ?? safeLivePowerKw);
     const effectiveNowLoad =
       (demandKw !== undefined && demandKw > 0) || !historyPoints || historyPoints.length === 0
         ? currentDemand
         : (lastElapsed?.load ?? currentDemand);
     const effectiveNowGrid =
       gridPowerKw !== undefined && gridPowerKw !== 0
-        ? gridPowerKw
+        ? (Number.isFinite(gridPowerKw) ? gridPowerKw : 0)
         : parseFloat((effectiveNowSolar - effectiveNowLoad).toFixed(2));
 
     const rawNowSolarY = paddingY + plotHeight - (effectiveNowSolar / maxPower) * plotHeight;
     const rawNowLoadY = paddingY + plotHeight - (effectiveNowLoad / maxPower) * plotHeight;
-    const nowSolarY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawNowSolarY));
-    const nowLoadY = Math.max(paddingY, Math.min(paddingY + plotHeight, rawNowLoadY));
+    const nowSolarY = Math.max(paddingY, Math.min(paddingY + plotHeight, Number.isFinite(rawNowSolarY) ? rawNowSolarY : paddingY + plotHeight));
+    const nowLoadY = Math.max(paddingY, Math.min(paddingY + plotHeight, Number.isFinite(rawNowLoadY) ? rawNowLoadY : paddingY + plotHeight));
 
     const list = [...elapsed];
     // Ensure final coordinate anchors precisely at the current moment
@@ -308,9 +315,9 @@ export function PlantSolarCurve({
       };
     }
     return list;
-  }, [coords, nowHour, paddingX, plotWidth, paddingY, plotHeight, maxPower, livePowerKw, demandKw, gridPowerKw, historyPoints, currentDemand]);
+  }, [coords, nowHour, paddingX, plotWidth, paddingY, plotHeight, maxPower, safeLivePowerKw, demandKw, gridPowerKw, historyPoints, currentDemand]);
 
-  const nowCoord = elapsedCoords[elapsedCoords.length - 1];
+  const nowCoord = elapsedCoords.length > 0 ? elapsedCoords[elapsedCoords.length - 1] : null;
 
   const svgPaths = useMemo(() => {
     if (elapsedCoords.length === 0) return { solarLine: '', solarArea: '', loadLine: '', loadArea: '' };
@@ -390,21 +397,21 @@ export function PlantSolarCurve({
               <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_SOLAR }} />
               <span className="text-muted-foreground/80">PV:</span>
               <span className="font-bold text-amber-500 whitespace-nowrap">
-                {hoveredPoint.solar.toFixed(2)} kW
+                {(hoveredPoint.solar ?? 0).toFixed(2)} kW
               </span>
             </div>
             <div className="flex items-center gap-1">
               <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_LOAD }} />
               <span className="text-muted-foreground/80">Demand:</span>
               <span className="font-bold text-indigo-400 whitespace-nowrap">
-                {hoveredPoint.load.toFixed(2)} kW
+                {(hoveredPoint.load ?? 0).toFixed(2)} kW
               </span>
             </div>
             <div className="flex items-center gap-1">
               <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_GRID }} />
               <span className="text-muted-foreground/80">Grid:</span>
-              <span className={`font-bold whitespace-nowrap ${hoveredPoint.gridNet >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
-                {hoveredPoint.gridNet >= 0 ? `+${hoveredPoint.gridNet.toFixed(2)}` : hoveredPoint.gridNet.toFixed(2)} kW
+              <span className={`font-bold whitespace-nowrap ${(hoveredPoint.gridNet ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
+                {(hoveredPoint.gridNet ?? 0) >= 0 ? `+${(hoveredPoint.gridNet ?? 0).toFixed(2)}` : (hoveredPoint.gridNet ?? 0).toFixed(2)} kW
               </span>
             </div>
           </div>
@@ -419,11 +426,11 @@ export function PlantSolarCurve({
                 <span className="size-1.5 rounded-full bg-amber-500 inline-block animate-pulse shrink-0" />
                 <span className="text-muted-foreground/80">Solar:</span>
                 <span className="font-bold text-amber-500 whitespace-nowrap">
-                  {livePowerKw.toFixed(1)} kW
+                  {(livePowerKw ?? 0).toFixed(1)} kW
                 </span>
-                {dailyYieldKwh > 0 && (
+                {dailyYieldKwh !== undefined && dailyYieldKwh > 0 && (
                   <span className="text-amber-500/80 font-normal text-[7.5px] sm:text-[8px] whitespace-nowrap">
-                    ({dailyYieldKwh.toFixed(1)} kWh)
+                    ({(dailyYieldKwh ?? 0).toFixed(1)} kWh)
                   </span>
                 )}
               </div>
@@ -438,7 +445,7 @@ export function PlantSolarCurve({
                 <span className="size-1.5 rounded-full bg-indigo-500 inline-block shrink-0" />
                 <span className="text-muted-foreground/80">Demand:</span>
                 <span className="font-bold text-indigo-400 whitespace-nowrap">
-                  {currentDemand.toFixed(1)} kW
+                  {(currentDemand ?? 0).toFixed(1)} kW
                 </span>
               </div>
             </HoverInfo>
@@ -452,7 +459,7 @@ export function PlantSolarCurve({
                 <span className="size-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
                 <span className="text-muted-foreground/80">Grid Net:</span>
                 <span className="font-bold text-emerald-500 whitespace-nowrap">
-                  {currentGridNet >= 0 ? `+${currentGridNet.toFixed(1)}` : currentGridNet.toFixed(1)} kW
+                  {(currentGridNet ?? 0) >= 0 ? `+${(currentGridNet ?? 0).toFixed(1)}` : (currentGridNet ?? 0).toFixed(1)} kW
                 </span>
               </div>
             </HoverInfo>
@@ -460,8 +467,8 @@ export function PlantSolarCurve({
         ) : (
           <div className="flex items-center gap-2 font-mono text-[7.5px] sm:text-[8px] text-muted-foreground/70">
             <span className="size-1.5 rounded-full bg-amber-500/70 inline-block shrink-0" />
-            <span>Solar: <strong className="text-amber-500">{livePowerKw.toFixed(1)} kW</strong></span>
-            {dailyYieldKwh > 0 && <span>({dailyYieldKwh.toFixed(1)} kWh)</span>}
+            <span>Solar: <strong className="text-amber-500">{(livePowerKw ?? 0).toFixed(1)} kW</strong></span>
+            {dailyYieldKwh !== undefined && dailyYieldKwh > 0 && <span>({(dailyYieldKwh ?? 0).toFixed(1)} kWh)</span>}
           </div>
         )}
       </div>
@@ -573,22 +580,26 @@ export function PlantSolarCurve({
               </g>
 
               {/* Vertical 'Now' Reference Line matching Analytics Dashboard */}
-              <line
-                x1={nowCoord.x}
-                y1={paddingY}
-                x2={nowCoord.x}
-                y2={paddingY + plotHeight}
-                stroke="#94a3b8"
-                strokeDasharray="2 2"
-                strokeWidth="1"
-                vectorEffect="non-scaling-stroke"
-              />
+              {nowCoord && Number.isFinite(nowCoord.x) && Number.isFinite(nowCoord.solarY) && (
+                <>
+                  <line
+                    x1={nowCoord.x}
+                    y1={paddingY}
+                    x2={nowCoord.x}
+                    y2={paddingY + plotHeight}
+                    stroke="#94a3b8"
+                    strokeDasharray="2 2"
+                    strokeWidth="1"
+                    vectorEffect="non-scaling-stroke"
+                  />
 
-              {/* Current Live Operating Point */}
-              <g transform={`translate(${nowCoord.x}, ${nowCoord.solarY})`}>
-                <circle r="4" fill={COLOR_SOLAR} className="animate-ping opacity-60" />
-                <circle r="2.5" fill={COLOR_SOLAR} stroke="hsl(var(--background))" strokeWidth="1.5" />
-              </g>
+                  {/* Current Live Operating Point */}
+                  <g transform={`translate(${nowCoord.x}, ${nowCoord.solarY})`}>
+                    <circle r="4" fill={COLOR_SOLAR} className="animate-ping opacity-60" />
+                    <circle r="2.5" fill={COLOR_SOLAR} stroke="hsl(var(--background))" strokeWidth="1.5" />
+                  </g>
+                </>
+              )}
 
               {/* Snapped Hover Indicators matching Analytics Dashboard */}
               {hoveredPoint && (
@@ -648,7 +659,7 @@ export function PlantSolarCurve({
                         Solar:
                       </span>
                       <span className="font-bold text-amber-500">
-                        {hoveredPoint.solar.toFixed(2)} kW
+                        {(hoveredPoint.solar ?? 0).toFixed(2)} kW
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -657,7 +668,7 @@ export function PlantSolarCurve({
                         Demand:
                       </span>
                       <span className="font-bold text-indigo-400">
-                        {hoveredPoint.load.toFixed(2)} kW
+                        {(hoveredPoint.load ?? 0).toFixed(2)} kW
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -665,8 +676,8 @@ export function PlantSolarCurve({
                         <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_GRID }} />
                         Grid Net:
                       </span>
-                      <span className={`font-bold ${hoveredPoint.gridNet >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
-                        {hoveredPoint.gridNet >= 0 ? `+${hoveredPoint.gridNet.toFixed(2)}` : hoveredPoint.gridNet.toFixed(2)} kW
+                      <span className={`font-bold ${(hoveredPoint.gridNet ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
+                        {(hoveredPoint.gridNet ?? 0) >= 0 ? `+${(hoveredPoint.gridNet ?? 0).toFixed(2)}` : (hoveredPoint.gridNet ?? 0).toFixed(2)} kW
                       </span>
                     </div>
                   </div>
@@ -692,23 +703,23 @@ export function PlantSolarCurve({
                 <p className="text-muted-foreground">Operating utilization relative to installed rated capacity.</p>
                 <div className="pt-1 border-t border-border/50 flex justify-between font-mono">
                   <span className="text-muted-foreground">Solar Output:</span>
-                  <span className="font-bold text-amber-500">{livePowerKw.toFixed(1)} kW</span>
+                  <span className="font-bold text-amber-500">{(livePowerKw ?? 0).toFixed(1)} kW</span>
                 </div>
                 <div className="flex justify-between font-mono">
                   <span className="text-muted-foreground">Facility Demand:</span>
-                  <span className="font-bold text-indigo-400">{currentDemand.toFixed(1)} kW</span>
+                  <span className="font-bold text-indigo-400">{(currentDemand ?? 0).toFixed(1)} kW</span>
                 </div>
                 <div className="flex justify-between font-mono">
                   <span className="text-muted-foreground">Rated Cap:</span>
-                  <span className="font-semibold text-foreground">{capacityKw.toFixed(0)} kWp</span>
+                  <span className="font-semibold text-foreground">{(safeCapacityKw ?? 0).toFixed(0)} kWp</span>
                 </div>
                 <div className="flex justify-between font-mono">
                   <span className="text-muted-foreground">Daily Yield:</span>
-                  <span className="font-bold text-foreground">{dailyYieldKwh.toFixed(1)} kWh</span>
+                  <span className="font-bold text-foreground">{(dailyYieldKwh ?? 0).toFixed(1)} kWh</span>
                 </div>
                 <div className="flex justify-between font-mono pt-0.5 border-t border-border/40">
                   <span className="text-muted-foreground">Utilization:</span>
-                  <span className="font-bold text-amber-500">{currentUtil.toFixed(1)}%</span>
+                  <span className="font-bold text-amber-500">{(currentUtil ?? 0).toFixed(1)}%</span>
                 </div>
               </div>
             }
@@ -727,7 +738,7 @@ export function PlantSolarCurve({
               </div>
 
               <span className="text-[8px] sm:text-[9px] font-bold font-mono text-amber-500 leading-none">
-                {currentUtil.toFixed(0)}%
+                {(currentUtil ?? 0).toFixed(0)}%
               </span>
             </div>
           </HoverInfo>

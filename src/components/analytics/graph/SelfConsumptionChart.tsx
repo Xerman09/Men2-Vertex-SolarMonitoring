@@ -191,7 +191,7 @@ export function SelfConsumptionChart({
         <div className={`flex items-stretch gap-2.5 sm:gap-3 ${compact ? 'h-[270px]' : 'h-[360px]'}`}>
           {verticalNav}
           <div className="flex-1 min-w-0 h-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={selfConsumptionMetrics.hourlyRatios} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
                   <linearGradient id="utilGrad" x1="0" y1="0" x2="0" y2="1">

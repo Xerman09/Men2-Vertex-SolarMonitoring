@@ -98,24 +98,44 @@ export function getMockHourlyEnergyPoints(
 ): HourlyEnergyPoint[] {
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const isToday = range.toUpperCase() === 'TODAY' && (!date || date === todayStr);
+  const normalizedRange = (range || 'TODAY').toUpperCase();
+  const isToday = normalizedRange === 'TODAY' && (!date || date === todayStr);
 
   const currentMinutes =
     currentHour !== undefined
       ? currentHour * 60 + now.getMinutes()
       : now.getHours() * 60 + now.getMinutes();
 
-  // Deterministic variance factor based on date string (for historical dates).
-  // For Today, keep dateVariance = 1.0 so Today's baseline is always reference clear-sky calibrated across all views.
-  let dateVariance = 1.0;
-  if (date && !isToday) {
-    let hash = 0;
-    for (let c = 0; c < date.length; c++) {
-      hash = (hash * 31 + date.charCodeAt(c)) & 0xffffffff;
-    }
-    // Variance between 0.88 and 1.08
-    dateVariance = 0.88 + ((Math.abs(hash) % 21) / 100);
+  // Deterministic seed derived from BOTH effective date and range so every date/period renders a distinct profile.
+  const seedKey = `${date || todayStr}:${normalizedRange}`;
+  let hash = 2166136261;
+  for (let c = 0; c < seedKey.length; c++) {
+    hash ^= seedKey.charCodeAt(c);
+    hash = Math.imul(hash, 16777619) >>> 0;
   }
+  const unit0 = (hash % 1000) / 1000;
+  const unit1 = ((hash >>> 8) % 1000) / 1000;
+  const unit2 = ((hash >>> 16) % 1000) / 1000;
+  const unit3 = ((hash >>> 24) % 256) / 256;
+
+  // Determine weekday vs weekend baseline from requested date
+  let isWeekend = false;
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [yy, mm, dd] = date.split('-').map(Number);
+    const dow = new Date(yy, (mm || 1) - 1, dd || 1).getDay();
+    isWeekend = dow === 0 || dow === 6;
+  }
+
+  // Date-seeded irradiance factor: keep today near clear-sky 1.0, vary past dates realistically (0.62 - 1.04)
+  const dateVariance = isToday ? 1.0 : 0.62 + unit0 * 0.42;
+  // Distinct primary and secondary cloud transients per date
+  const cloudCenter1 = isToday ? 9.5 : 8.2 + unit1 * 7.2; // Between 08:12 and 15:24
+  const cloudWidth1 = isToday ? 0.35 : 0.35 + unit2 * 1.15;
+  const cloudDepth1 = isToday ? 0.16 : 0.18 + unit3 * 0.42;
+  const cloudCenter2 = isToday ? 14.5 : 11.5 + unit2 * 5.0;
+  const cloudDepth2 = isToday || unit1 < 0.45 ? 0 : 0.14 + unit0 * 0.30;
+  const phaseShift = isToday ? 0 : unit1 * Math.PI * 2;
+  const loadMultiplier = isToday ? 1.0 : (isWeekend ? 0.72 : 0.88) + unit2 * 0.24;
 
   const totalSteps = Math.floor((24 * 60) / stepMinutes);
   const points: HourlyEnergyPoint[] = [];
@@ -132,6 +152,7 @@ export function getMockHourlyEnergyPoints(
       // Future unelapsed 5-minute intervals — strictly null
       points.push({
         hour: hourLabel,
+        hourDecimal,
         solarYieldKw: null,
         loadDemandKw: null,
         batteryFlowKw: null,
@@ -146,31 +167,32 @@ export function getMockHourlyEnergyPoints(
       if (hourDecimal >= 5.75 && hourDecimal <= 18.25) {
         const progress = (hourDecimal - 5.75) / (18.25 - 5.75);
         const baseSine = Math.sin(progress * Math.PI);
-        // Realistic dynamic telemetry: morning cloud transient and MPPT tracking ripples
-        const cloudDip = hourDecimal >= 9.25 && hourDecimal <= 9.75 ? 0.84 : 1.0;
-        const ripple = Math.sin(hourDecimal * 7.5) * 1.8 + Math.cos(hourDecimal * 18.3) * 0.9;
-        solar = Math.max(0, Number((baseSine * 119.5 * dateVariance * cloudDip + (baseSine > 0.05 ? ripple : 0)).toFixed(2)));
+        const g1 = Math.exp(-Math.pow((hourDecimal - cloudCenter1) / cloudWidth1, 2));
+        const g2 = cloudDepth2 > 0 ? Math.exp(-Math.pow((hourDecimal - cloudCenter2) / 0.55, 2)) : 0;
+        const cloudAtten = Math.max(0.28, (1 - cloudDepth1 * g1) * (1 - cloudDepth2 * g2));
+        const ripple =
+          Math.sin(hourDecimal * 7.5 + phaseShift) * 2.2 +
+          Math.cos(hourDecimal * 18.3 - phaseShift) * 1.1;
+        solar = Math.max(
+          0,
+          Number((baseSine * 119.5 * dateVariance * cloudAtten + (baseSine > 0.05 ? ripple : 0)).toFixed(2))
+        );
       }
 
-      // Industrial Load Demand profile (morning ramp, daytime industrial operation, evening drop)
+      // Industrial Load Demand profile shifted by date seed & weekday/weekend schedule
       let load = 40.0;
       if (hourDecimal < 6.0) {
-        load = 39.0 + Math.sin(hourDecimal * 2) * 2.5;
+        load = 39.0 + Math.sin(hourDecimal * 2 + phaseShift * 0.5) * 2.5;
       } else if (hourDecimal >= 6.0 && hourDecimal < 8.5) {
         load = 45.0 + (hourDecimal - 6.0) * 9.5; // Morning ramp
       } else if (hourDecimal >= 8.5 && hourDecimal < 17.5) {
-        // High industrial activity with authentic 5-min machine variations
-        load = 68.0 + Math.sin(hourDecimal * 4.2) * 4.5 + Math.cos(hourDecimal * 11.7) * 2.0;
+        load = 68.0 + Math.sin(hourDecimal * 4.2 + phaseShift) * 5.2 + Math.cos(hourDecimal * 11.7 + phaseShift) * 2.4;
       } else if (hourDecimal >= 17.5 && hourDecimal < 21.0) {
         load = 65.0 - (hourDecimal - 17.5) * 3.5;
       } else {
         load = 48.0 - (hourDecimal - 21.0) * 2.0;
       }
-      load = Number(Math.max(20, load).toFixed(2));
-
-      // Pure Grid-Tied solar system (No physical battery installed)
-      // When physical battery banks are added in the future, battery dispatch will be populated
-      const battery = 0;
+      load = Number(Math.max(15, load * loadMultiplier).toFixed(2));
 
       // Net grid exchange: solar - load (+ = export, - = import)
       const gridFlow = Number((solar - load).toFixed(2));
@@ -179,6 +201,7 @@ export function getMockHourlyEnergyPoints(
 
       points.push({
         hour: hourLabel,
+        hourDecimal,
         solarYieldKw: solar,
         loadDemandKw: load,
         batteryFlowKw: 0,

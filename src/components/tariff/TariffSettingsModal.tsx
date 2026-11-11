@@ -192,7 +192,7 @@ export function TariffSettingsModal() {
                             {preset.shortName}
                           </span>
                           <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">
-                            · {preset.region.split(',')[0]}
+                            · {(preset.region || '').split(',')[0]}
                           </span>
                         </div>
 

@@ -1,10 +1,15 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { HourlySolarPoint } from '@/lib/trigonometric-math';
 import { usePolling } from '@/lib/usePolling';
+import { telemetryCache, getHistoryCacheKey } from '@/lib/telemetry-cache';
 
 export interface UseTrigonometricGraphProps {
   data?: HourlySolarPoint[];
   installedCapacityKw?: number;
+  accountId?: string;
+  stationId?: string;
+  deviceSn?: string;
+  date?: string;
 }
 
 export type TimeResolution = 5 | 15 | 60;
@@ -56,6 +61,10 @@ export const COLOR_GRID = '#10b981';     // Emerald / Green Grid (+Export / -Imp
 export function useTrigonometricGraph({
   data,
   installedCapacityKw = 120,
+  accountId,
+  stationId,
+  deviceSn,
+  date,
 }: UseTrigonometricGraphProps = {}) {
   const [timeResolution, setTimeResolution] = useState<TimeResolution>(5);
 
@@ -101,31 +110,61 @@ export function useTrigonometricGraph({
 
   const fallbackDataRef = useRef<HourlySolarPoint[] | null>(null);
 
-  // Self-healing fallback: If parent does not supply data, fetch today's 5-minute telemetry curve
+  // Self-healing fallback: If parent does not supply data, fetch scoped 5-minute telemetry curve
   useEffect(() => {
     if (data && data.length > 0) return;
     let isCancelled = false;
 
     async function fetchFallbackHistory() {
       try {
-        const res = await fetch('/api/deye/history?range=TODAY&step=5');
+        const nowLocal = new Date();
+        const todayStr = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, '0')}-${String(nowLocal.getDate()).padStart(2, '0')}`;
+        const cacheKey = getHistoryCacheKey({
+          accountId,
+          stationId,
+          deviceSn,
+          preset: 'TODAY',
+          date: date || todayStr,
+        });
+
+        const cached = telemetryCache.get<{ points?: HourlySolarPoint[]; data?: HourlySolarPoint[] }>(cacheKey);
+        const cachedPoints = cached?.points || cached?.data;
+        if (cachedPoints && Array.isArray(cachedPoints) && cachedPoints.length > 0) {
+          fallbackDataRef.current = cachedPoints as HourlySolarPoint[];
+          if (timeResolution === 5) {
+            setActiveData(cachedPoints as HourlySolarPoint[]);
+          } else {
+            const step = timeResolution / 5;
+            setActiveData((cachedPoints as HourlySolarPoint[]).filter((_, idx) => idx % step === 0));
+          }
+          return;
+        }
+
+        const accParam = accountId && accountId !== 'ALL' ? `&accountId=${encodeURIComponent(accountId)}` : '';
+        const stParam = stationId && stationId !== 'ALL' ? `&station_id=${encodeURIComponent(stationId)}` : '';
+        const snParam = deviceSn && deviceSn !== 'ALL' ? `&device_sn=${encodeURIComponent(deviceSn)}` : '';
+        const dateParam = `&date=${encodeURIComponent(date || todayStr)}`;
+        const res = await fetch(`/api/deye/history?range=TODAY&step=5${dateParam}${accParam}${stParam}${snParam}`);
         if (res.ok && !isCancelled) {
           const json = await res.json();
           if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+            const scale = json.isLive || (deviceSn && deviceSn !== 'ALL') ? 1 : (installedCapacityKw > 0 ? installedCapacityKw / 120 : 1);
             const mapped: HourlySolarPoint[] = json.data.map((item: any) => {
               const parts = String(item.hour || '00:00').split(':');
               const h = parseInt(parts[0], 10) || 0;
               const m = parseInt(parts[1], 10) || 0;
+              const gridRaw = item.gridFlowKw ?? item.gridExportKw ?? null;
               return {
                 hour: item.hour,
                 hourDecimal: Number((h + m / 60).toFixed(4)),
-                solarYieldKw: item.solarYieldKw ?? null,
-                loadDemandKw: item.loadDemandKw ?? null,
-                batteryFlowKw: item.batteryFlowKw ?? null,
-                gridExportKw: item.gridExportKw ?? (item.gridFlowKw !== null && item.gridFlowKw !== undefined ? Math.max(0, item.gridFlowKw) : null),
+                solarYieldKw: item.solarYieldKw != null ? Number((item.solarYieldKw * scale).toFixed(2)) : null,
+                loadDemandKw: item.loadDemandKw != null ? Number((item.loadDemandKw * scale).toFixed(2)) : null,
+                batteryFlowKw: item.batteryFlowKw != null ? Number((item.batteryFlowKw * scale).toFixed(2)) : null,
+                gridExportKw: gridRaw != null ? Number((gridRaw * scale).toFixed(2)) : null,
                 isElapsed: item.isElapsed ?? (item.solarYieldKw !== null),
               };
             });
+            telemetryCache.set(cacheKey, { data: mapped });
             fallbackDataRef.current = mapped;
             if (timeResolution === 5) {
               setActiveData(mapped);
@@ -145,7 +184,7 @@ export function useTrigonometricGraph({
     return () => {
       isCancelled = true;
     };
-  }, [data, timeResolution]);
+  }, [data, timeResolution, accountId, stationId, deviceSn, date, installedCapacityKw]);
 
   // Handle resolution change
   const handleResolutionChange = useCallback((newRes: TimeResolution) => {
@@ -246,8 +285,8 @@ export function useTrigonometricGraph({
   // Exact power series data (PV, Consumption, Grid)
   const powerSeriesData: PowerSeriesPoint[] = useMemo(() => {
     return activeData.map((pt) => {
-      const isEl = pt.isElapsed ?? (pt.solarYieldKw !== null);
-      if (!isEl || pt.solarYieldKw === null) {
+      const isEl = pt.isElapsed ?? (pt.solarYieldKw !== null && pt.solarYieldKw !== undefined);
+      if (!isEl || pt.solarYieldKw === null || pt.solarYieldKw === undefined || !Number.isFinite(pt.solarYieldKw)) {
         return {
           hour: pt.hour,
           hourDecimal: pt.hourDecimal,
@@ -260,7 +299,7 @@ export function useTrigonometricGraph({
           isElapsed: false,
         };
       }
-      const pv = Number(pt.solarYieldKw.toFixed(2));
+      const pv = Number((pt.solarYieldKw ?? 0).toFixed(2));
       const load = Number((pt.loadDemandKw ?? 0).toFixed(2));
       const grid = Number((pt.gridExportKw ?? 0).toFixed(2));
       return {
@@ -271,7 +310,7 @@ export function useTrigonometricGraph({
         gridPowerKw: grid,
         gridImportKw: Number(Math.max(0, -grid).toFixed(2)),
         gridExportKw: Number(Math.max(0, grid).toFixed(2)),
-        batteryFlowKw: pt.batteryFlowKw !== null ? Number(pt.batteryFlowKw.toFixed(2)) : null,
+        batteryFlowKw: pt.batteryFlowKw != null && Number.isFinite(pt.batteryFlowKw) ? Number(pt.batteryFlowKw.toFixed(2)) : null,
         isElapsed: true,
       };
     });
@@ -286,11 +325,11 @@ export function useTrigonometricGraph({
     const intervalHours = timeResolution / 60;
 
     activeData.forEach((pt) => {
-      if (pt.solarYieldKw !== null) {
+      if (pt.solarYieldKw != null && Number.isFinite(pt.solarYieldKw)) {
         totalPv += pt.solarYieldKw * intervalHours;
-        totalLoad += (pt.loadDemandKw ?? 0) * intervalHours;
-        totalGridExport += Math.max(0, pt.gridExportKw ?? 0) * intervalHours;
-        totalGridImport += Math.max(0, -(pt.gridExportKw ?? 0)) * intervalHours;
+        totalLoad += (Number.isFinite(pt.loadDemandKw) ? (pt.loadDemandKw ?? 0) : 0) * intervalHours;
+        totalGridExport += Math.max(0, Number.isFinite(pt.gridExportKw) ? (pt.gridExportKw ?? 0) : 0) * intervalHours;
+        totalGridImport += Math.max(0, -(Number.isFinite(pt.gridExportKw) ? (pt.gridExportKw ?? 0) : 0)) * intervalHours;
       }
     });
 
@@ -301,7 +340,7 @@ export function useTrigonometricGraph({
     const consumptionToExportRatio = productionSelfConsumptionRate * 100;
 
     const hourlyRatios: HourlyRatioPoint[] = activeData.map((pt) => {
-      if (pt.solarYieldKw === null) {
+      if (pt.solarYieldKw === null || pt.solarYieldKw === undefined || !Number.isFinite(pt.solarYieldKw)) {
         return {
           hour: pt.hour,
           utilizationPct: null,
@@ -314,10 +353,10 @@ export function useTrigonometricGraph({
           isElapsed: false,
         };
       }
-      const pvKw = pt.solarYieldKw;
-      const loadKw = pt.loadDemandKw ?? 0;
-      const exportKw = Math.max(0, pt.gridExportKw ?? 0);
-      const importKw = Math.max(0, -(pt.gridExportKw ?? 0));
+      const pvKw = Number.isFinite(pt.solarYieldKw) ? pt.solarYieldKw : 0;
+      const loadKw = Number.isFinite(pt.loadDemandKw) ? (pt.loadDemandKw ?? 0) : 0;
+      const exportKw = Math.max(0, Number.isFinite(pt.gridExportKw) ? (pt.gridExportKw ?? 0) : 0);
+      const importKw = Math.max(0, -(Number.isFinite(pt.gridExportKw) ? (pt.gridExportKw ?? 0) : 0));
       const selfConsumed = Math.max(0, pvKw - exportKw);
       const utilRate = loadKw > 0 ? Math.min(100, (selfConsumed / loadKw) * 100) : 0;
       const prodRate = pvKw > 0 ? Math.min(100, (selfConsumed / pvKw) * 100) : 0;
@@ -347,9 +386,9 @@ export function useTrigonometricGraph({
   }, [activeData, timeResolution]);
 
   // Peak metrics for elapsed points
-  const elapsedData = powerSeriesData.filter((d) => d.pvPowerKw !== null);
-  const peakPv = elapsedData.length > 0 ? Math.max(...elapsedData.map((d) => d.pvPowerKw || 0)) : 0;
-  const peakLoad = elapsedData.length > 0 ? Math.max(...elapsedData.map((d) => d.consumptionKw || 0)) : 0;
+  const elapsedData = powerSeriesData.filter((d) => d.pvPowerKw !== null && Number.isFinite(d.pvPowerKw));
+  const peakPv = elapsedData.length > 0 ? Math.max(0, ...elapsedData.map((d) => d.pvPowerKw || 0)) : 0;
+  const peakLoad = elapsedData.length > 0 ? Math.max(0, ...elapsedData.map((d) => d.consumptionKw || 0)) : 0;
 
   // Discrete 2-hour major ticks for uncluttered X-axis labels
   const majorXTicks = useMemo(() => {

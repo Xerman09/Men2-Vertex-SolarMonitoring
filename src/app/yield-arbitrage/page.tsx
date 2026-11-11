@@ -18,12 +18,16 @@ import {
   Globe,
   Building2,
   Sun,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   AreaChart,
   Area,
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -32,6 +36,18 @@ import {
   Legend,
 } from 'recharts';
 import { HourlyEnergyPoint } from '@/lib/types';
+import {
+  generateDailyAnalytics,
+  generateMonthlyAnalytics,
+  type DailyAnalyticsPoint,
+  type MonthlyAnalyticsPoint,
+} from '@/lib/analytics-data';
+import {
+  toLocalIsoDate,
+  shiftDays,
+  parseLocalIsoDate,
+  formatHumanDate,
+} from '@/components/analytics/AnalyticsDatePicker';
 import { useAccount } from '@/lib/account-context';
 import { useTariff } from '@/lib/tariff-context';
 import { useRole } from '@/lib/role-context';
@@ -40,9 +56,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { HoverInfo } from '@/components/ui/tooltip';
+import { telemetryCache, getHistoryCacheKey } from '@/lib/telemetry-cache';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('YieldArbitrage');
+
+function formatPeso(val: number): string {
+  return `₱${val.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 export default function YieldArbitragePage() {
   const { isAdmin } = useRole();
@@ -59,7 +80,20 @@ export default function YieldArbitragePage() {
   } = useAccount();
 
   const [timeRange, setTimeRange] = useState<'DAY' | 'WEEK' | 'MONTH' | 'YEAR'>('DAY');
+  const [selectedDate, setSelectedDate] = useState<string>(() => toLocalIsoDate(new Date()));
   const [hourlyData, setHourlyData] = useState<HourlyEnergyPoint[]>([]);
+  const [historyIsLive, setHistoryIsLive] = useState<boolean>(false);
+  const [liveDailySummary, setLiveDailySummary] = useState<DailyAnalyticsPoint | null>(null);
+  const [liveDailySeries, setLiveDailySeries] = useState<DailyAnalyticsPoint[] | null>(null);
+  const [liveMonthlySeries, setLiveMonthlySeries] = useState<MonthlyAnalyticsPoint[] | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [isMounted, setIsMounted] = useState(false);
+
+  const todayIso = React.useMemo(() => toLocalIsoDate(new Date()), []);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Resolve isolated inverter metadata if selected
   const selectedInverter = React.useMemo(() => {
@@ -120,36 +154,95 @@ export default function YieldArbitragePage() {
   }, [selectedInverter, selectedPlant, selectedAccount, isFleetView, accounts]);
 
   const scaleRatio = React.useMemo(() => {
+    if (historyIsLive) return 1.0;
     if (selectedInverterSn && selectedInverterSn !== 'ALL') return 1.0;
     return targetCapacityKw > 0 ? targetCapacityKw / 120 : 1.0;
-  }, [selectedInverterSn, targetCapacityKw]);
+  }, [historyIsLive, selectedInverterSn, targetCapacityKw]);
+
+  const cacheKey = getHistoryCacheKey({
+    accountId: isFleetView ? 'FLEET' : selectedAccountId,
+    stationId: selectedStationId,
+    deviceSn: selectedInverterSn,
+    preset: timeRange,
+    date: selectedDate,
+  });
+
+  // Apply instant cached telemetry on switch (0ms SWR)
+  useEffect(() => {
+    const cached = telemetryCache.get<{
+      data: HourlyEnergyPoint[];
+      isLive?: boolean;
+      dailySummary?: DailyAnalyticsPoint | null;
+      dailySeries?: DailyAnalyticsPoint[] | null;
+      monthlySeries?: MonthlyAnalyticsPoint[] | null;
+    }>(cacheKey);
+    if (cached && Array.isArray(cached.data) && cached.data.length > 0) {
+      setHourlyData(cached.data);
+      setHistoryIsLive(Boolean(cached.isLive));
+      setLiveDailySummary(cached.dailySummary ?? null);
+      setLiveDailySeries(cached.dailySeries ?? null);
+      setLiveMonthlySeries(cached.monthlySeries ?? null);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+  }, [cacheKey]);
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     async function loadHistory() {
       try {
-        const now = new Date();
-        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const apiRange =
+          timeRange === 'YEAR'
+            ? 'YEAR'
+            : timeRange === 'MONTH'
+            ? 'MONTH'
+            : timeRange === 'WEEK'
+            ? 'WEEK'
+            : 'TODAY';
         const stationParam = selectedStationId && selectedStationId !== 'ALL' ? `&station_id=${encodeURIComponent(selectedStationId)}` : '';
         const snParam = selectedInverterSn && selectedInverterSn !== 'ALL' ? `&device_sn=${encodeURIComponent(selectedInverterSn)}` : '';
         const accountParam = !isFleetView && selectedAccountId && selectedAccountId !== 'ALL' ? `&accountId=${encodeURIComponent(selectedAccountId)}` : '';
 
-        const res = await fetch(`/api/deye/history?range=TODAY&step=5&date=${todayStr}${accountParam}${stationParam}${snParam}`);
+        const res = await fetch(
+          `/api/deye/history?range=${apiRange}&step=5&date=${encodeURIComponent(selectedDate)}${accountParam}${stationParam}${snParam}`,
+          { signal: controller.signal }
+        );
         if (res.ok && active) {
           const json = await res.json();
           if (json.data && Array.isArray(json.data)) {
+            telemetryCache.set(cacheKey, {
+              data: json.data,
+              isLive: Boolean(json.isLive),
+              dailySummary: json.dailySummary ?? null,
+              dailySeries: Array.isArray(json.dailySeries) ? json.dailySeries : null,
+              monthlySeries: Array.isArray(json.monthlySeries) ? json.monthlySeries : null,
+            });
             setHourlyData(json.data);
+            setHistoryIsLive(Boolean(json.isLive));
+            setLiveDailySummary(json.dailySummary ?? null);
+            setLiveDailySeries(Array.isArray(json.dailySeries) ? json.dailySeries : null);
+            setLiveMonthlySeries(Array.isArray(json.monthlySeries) ? json.monthlySeries : null);
+            setLoading(false);
           }
         }
-      } catch (err) {
-        log.error('Failed to load history', err);
+      } catch (err: unknown) {
+        if ((err as Error)?.name !== 'AbortError') {
+          log.error('Failed to load history', err);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
     }
     loadHistory();
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [selectedAccountId, selectedStationId, selectedInverterSn, isFleetView]);
+  }, [cacheKey, selectedAccountId, selectedStationId, selectedInverterSn, isFleetView, timeRange, selectedDate]);
 
   const chartData = React.useMemo(() => {
     return (hourlyData.length > 0 ? hourlyData : []).map((pt) => {
@@ -161,26 +254,89 @@ export default function YieldArbitragePage() {
         solarYieldKw: parseFloat(rawSolar.toFixed(2)),
         loadDemandKw: parseFloat(rawLoad.toFixed(2)),
         batteryFlowKw: parseFloat(bat.toFixed(2)),
-        hourDecimal: parseInt(pt.hour.split(':')[0], 10),
+        hourDecimal: pt.hourDecimal ?? (parseInt((pt.hour || '00:00').split(':')[0], 10) || 0),
         gridExportKw: parseFloat(Math.max(0, rawSolar - rawLoad - Math.max(0, bat)).toFixed(2)),
       };
     });
   }, [hourlyData, scaleRatio]);
 
-// Philippine commercial electricity tariff structure (Meralco / commercial TOU rate schedule)
-const TARIFF_PHP = {
-  peakRatePerKwh: 14.50, // Peak window (14:00 - 20:00)
-  offPeakRatePerKwh: 10.20, // Off-peak baseline
-  exportCreditPerKwh: 6.20, // Net-metering generation charge credit
-  averageRatePerKwh: 11.85, // Blended commercial rate
-};
+  const periodDailySeries = React.useMemo<DailyAnalyticsPoint[]>(() => {
+    if (timeRange === 'WEEK') {
+      if (liveDailySeries && liveDailySeries.length > 0) return liveDailySeries.slice(-7);
+      return generateDailyAnalytics(7, targetCapacityKw, false, parseLocalIsoDate(selectedDate));
+    }
+    if (timeRange === 'MONTH') {
+      if (liveDailySeries && liveDailySeries.length > 0) return liveDailySeries;
+      return generateDailyAnalytics(30, targetCapacityKw, false, parseLocalIsoDate(selectedDate));
+    }
+    return [];
+  }, [timeRange, liveDailySeries, targetCapacityKw, selectedDate]);
 
-function formatPeso(val: number): string {
-  return `₱${val.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+  const periodMonthlySeries = React.useMemo<MonthlyAnalyticsPoint[]>(() => {
+    if (timeRange === 'YEAR') {
+      if (liveMonthlySeries && liveMonthlySeries.length > 0) return liveMonthlySeries;
+      return generateMonthlyAnalytics(targetCapacityKw);
+    }
+    return [];
+  }, [timeRange, liveMonthlySeries, targetCapacityKw]);
 
   // Calculate real ledger metrics dynamically from available telemetry
   const totals = React.useMemo(() => {
+    const blendedRate = activeTariff.peakRate * 0.35 + activeTariff.offPeakRate * 0.65;
+
+    if (timeRange === 'WEEK' || timeRange === 'MONTH') {
+      if (periodDailySeries.length === 0) {
+        return { todayYieldKwh: 0, selfConsPct: 0, gridExportKwh: 0, todaySavedPhp: 0, peakSavedPhp: 0, monthlyProjectionPhp: 0, co2Tons: 0 };
+      }
+      let yieldKwh = 0;
+      let exportKwh = 0;
+      let totalSavingsPhp = 0;
+      for (const d of periodDailySeries) {
+        const selfCons = Math.max(0, d.solarYieldKwh - d.gridExportKwh);
+        yieldKwh += d.solarYieldKwh;
+        exportKwh += d.gridExportKwh;
+        totalSavingsPhp += selfCons * blendedRate + d.gridExportKwh * activeTariff.exportCredit;
+      }
+      const selfCons = yieldKwh > 0 ? Math.min(100, Math.max(0, ((yieldKwh - exportKwh) / yieldKwh) * 100)) : 0;
+      const avgDailySaved = totalSavingsPhp / periodDailySeries.length;
+      return {
+        todayYieldKwh: yieldKwh,
+        selfConsPct: selfCons,
+        gridExportKwh: exportKwh,
+        todaySavedPhp: totalSavingsPhp,
+        peakSavedPhp: totalSavingsPhp * 0.38,
+        monthlyProjectionPhp: avgDailySaved * 30,
+        co2Tons: yieldKwh * 0.0007,
+      };
+    }
+
+    if (timeRange === 'YEAR') {
+      if (periodMonthlySeries.length === 0) {
+        return { todayYieldKwh: 0, selfConsPct: 0, gridExportKwh: 0, todaySavedPhp: 0, peakSavedPhp: 0, monthlyProjectionPhp: 0, co2Tons: 0 };
+      }
+      let yieldKwh = 0;
+      let exportKwh = 0;
+      let totalSavingsPhp = 0;
+      for (const m of periodMonthlySeries) {
+        const yKwh = m.solarYieldMwh * 1000;
+        const eKwh = m.gridExportMwh * 1000;
+        const selfCons = Math.max(0, yKwh - eKwh);
+        yieldKwh += yKwh;
+        exportKwh += eKwh;
+        totalSavingsPhp += selfCons * blendedRate + eKwh * activeTariff.exportCredit;
+      }
+      const selfCons = yieldKwh > 0 ? Math.min(100, Math.max(0, ((yieldKwh - exportKwh) / yieldKwh) * 100)) : 0;
+      return {
+        todayYieldKwh: yieldKwh,
+        selfConsPct: selfCons,
+        gridExportKwh: exportKwh,
+        todaySavedPhp: totalSavingsPhp,
+        peakSavedPhp: totalSavingsPhp * 0.38,
+        monthlyProjectionPhp: totalSavingsPhp / Math.max(1, periodMonthlySeries.length),
+        co2Tons: yieldKwh * 0.0007,
+      };
+    }
+
     if (chartData.length === 0) {
       return {
         todayYieldKwh: 0,
@@ -220,7 +376,7 @@ function formatPeso(val: number): string {
       exportKwh += surplusExportKwh;
 
       // Determine interval tariff rate based on time of day
-      const hour = pt.hourDecimal !== undefined ? pt.hourDecimal : parseInt(pt.hour.split(':')[0], 10);
+      const hour = pt.hourDecimal !== undefined ? pt.hourDecimal : (parseInt((pt.hour || '00:00').split(':')[0], 10) || 0);
       const isPeakWindow = hour >= activeTariff.peakStartHour && hour <= activeTariff.peakEndHour;
       const currentTariffRate = isPeakWindow ? activeTariff.peakRate : activeTariff.offPeakRate;
 
@@ -236,6 +392,15 @@ function formatPeso(val: number): string {
       }
     }
 
+    // Align with official station daily cumulative if live DeyeCloud summary returned for single day
+    if (liveDailySummary && liveDailySummary.solarYieldKwh > 0 && yieldKwh > 0) {
+      const scale = liveDailySummary.solarYieldKwh / yieldKwh;
+      yieldKwh = liveDailySummary.solarYieldKwh;
+      exportKwh = liveDailySummary.gridExportKwh;
+      totalSavingsPhp *= scale;
+      peakSavingsPhp *= scale;
+    }
+
     const selfCons = yieldKwh > 0 ? Math.min(100, Math.max(0, ((yieldKwh - exportKwh) / yieldKwh) * 100)) : 0;
     const monthlyProjection = totalSavingsPhp * 30;
 
@@ -248,21 +413,57 @@ function formatPeso(val: number): string {
       monthlyProjectionPhp: monthlyProjection,
       co2Tons: yieldKwh * 0.0007,
     };
-  }, [chartData, activeTariff]);
+  }, [timeRange, periodDailySeries, periodMonthlySeries, chartData, activeTariff, liveDailySummary]);
 
   const historyRows = React.useMemo(() => {
+    const cap = targetCapacityKw && targetCapacityKw > 0 ? targetCapacityKw : 120;
+    const blendedRate = activeTariff.peakRate * 0.35 + activeTariff.offPeakRate * 0.65;
+
+    if (timeRange === 'WEEK' || timeRange === 'MONTH') {
+      return [...periodDailySeries].reverse().map((d) => {
+        const selfCons = Math.max(0, d.solarYieldKwh - d.gridExportKwh);
+        const saved = selfCons * blendedRate + d.gridExportKwh * activeTariff.exportCredit;
+        const pct = d.solarYieldKwh > 0 ? Math.min(100, (selfCons / d.solarYieldKwh) * 100) : 0;
+        return {
+          date: `${d.date} (${d.dayLabel})`,
+          yieldKwh: d.solarYieldKwh,
+          selfConsPct: pct,
+          gridExportKwh: d.gridExportKwh,
+          todaySavedPhp: saved,
+          roiScore: d.solarYieldKwh > 0 ? `+${((d.solarYieldKwh / cap) * 10).toFixed(1)}%` : '--',
+        };
+      });
+    }
+
+    if (timeRange === 'YEAR') {
+      return [...periodMonthlySeries].reverse().map((m) => {
+        const yKwh = m.solarYieldMwh * 1000;
+        const eKwh = m.gridExportMwh * 1000;
+        const selfCons = Math.max(0, yKwh - eKwh);
+        const saved = selfCons * blendedRate + eKwh * activeTariff.exportCredit;
+        return {
+          date: m.month,
+          yieldKwh: yKwh,
+          selfConsPct: m.selfConsumptionPct,
+          gridExportKwh: eKwh,
+          todaySavedPhp: saved,
+          roiScore: yKwh > 0 ? `+${((yKwh / (cap * 30)) * 10).toFixed(1)}%` : '--',
+        };
+      });
+    }
+
     if (chartData.length === 0 || totals.todayYieldKwh === 0) return [];
     return [
       {
-        date: `Today · ${selectedScopeTitle}`,
+        date: `${formatHumanDate(selectedDate)} · ${selectedScopeTitle}`,
         yieldKwh: totals.todayYieldKwh,
         selfConsPct: totals.selfConsPct,
         gridExportKwh: totals.gridExportKwh,
         todaySavedPhp: totals.todaySavedPhp,
-        roiScore: totals.todayYieldKwh > 0 ? `+${((totals.todayYieldKwh / (targetCapacityKw || 120)) * 10).toFixed(1)}%` : '--',
+        roiScore: totals.todayYieldKwh > 0 ? `+${((totals.todayYieldKwh / cap) * 10).toFixed(1)}%` : '--',
       },
     ];
-  }, [chartData, totals, selectedScopeTitle, targetCapacityKw]);
+  }, [timeRange, periodDailySeries, periodMonthlySeries, chartData, totals, selectedScopeTitle, targetCapacityKw, activeTariff, selectedDate]);
 
   // Exact label for the monitored Solar PV series
   const monitoredSolarLabel = React.useMemo(() => {
@@ -286,17 +487,7 @@ function formatPeso(val: number): string {
               <div className="flex items-center gap-2">
                 <HoverInfo
                   title="Yield Analytics & Time-of-Use Arbitrage"
-                  content={
-                    <div className="space-y-2">
-                      <p>{TELEMETRY_DESCRIPTIONS.yieldArbitrage.subtitle}</p>
-                      <div className="pt-1.5 border-t border-border/40 flex items-center justify-between gap-2">
-                        <span className="text-[10px] text-muted-foreground font-mono">Accounting Mode</span>
-                        <Badge variant="outline" className="h-4 px-1.5 text-[9px] font-mono border-amber-500/30 text-amber-500 bg-amber-500/10">
-                          Modeled Financial Ledger
-                        </Badge>
-                      </div>
-                    </div>
-                  }
+                  content={TELEMETRY_DESCRIPTIONS.yieldArbitrage.subtitle}
                   showIcon
                 >
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline cursor-help">
@@ -308,7 +499,7 @@ function formatPeso(val: number): string {
           </div>
         </div>
 
-        {/* Time Range & View Mode Selectors */}
+        {/* Time Range, Date Stepper & Tariff Selectors */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Tariff Schedule Quick Control Button */}
           <button
@@ -326,6 +517,32 @@ function formatPeso(val: number): string {
               ₱{activeTariff.offPeakRate.toFixed(2)}/kWh
             </span>
           </button>
+
+          {/* Compact Date Navigation Stepper */}
+          <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-xl border border-border/50">
+            <button
+              type="button"
+              onClick={() => setSelectedDate((prev) => shiftDays(prev, -1))}
+              className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background/60 transition-colors cursor-pointer"
+              title="Previous day"
+              aria-label="Previous day"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <span className="px-2 text-xs font-mono font-semibold text-foreground select-none">
+              {selectedDate === todayIso ? `Today · ${formatHumanDate(selectedDate, { month: 'short', day: 'numeric' })}` : formatHumanDate(selectedDate)}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedDate((prev) => (prev < todayIso ? shiftDays(prev, 1) : prev))}
+              disabled={selectedDate >= todayIso}
+              className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background/60 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Next day"
+              aria-label="Next day"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
 
           <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-xl border border-border/50">
             {(['DAY', 'WEEK', 'MONTH', 'YEAR'] as const).map((range) => (
@@ -367,7 +584,15 @@ function formatPeso(val: number): string {
           >
             <div className="flex items-center justify-between pb-1">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
-                Today Arbitrage Savings
+                {timeRange === 'DAY'
+                  ? selectedDate === todayIso
+                    ? 'Today Arbitrage Savings'
+                    : `Daily Savings (${formatHumanDate(selectedDate, { month: 'short', day: 'numeric' })})`
+                  : timeRange === 'WEEK'
+                  ? '7-Day Arbitrage Savings'
+                  : timeRange === 'MONTH'
+                  ? '30-Day Arbitrage Savings'
+                  : '12-Month Arbitrage Savings'}
               </span>
               <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
                 <span className="text-xs font-bold font-mono">₱</span>
@@ -375,10 +600,10 @@ function formatPeso(val: number): string {
             </div>
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-2xl font-black font-mono text-emerald-500">
-                {formatPeso(totals.todaySavedPhp)}
+                {loading ? <span className="text-muted-foreground/50">--</span> : formatPeso(totals.todaySavedPhp)}
               </span>
               <span className="text-xs font-mono font-bold text-emerald-500">
-                {totals.todaySavedPhp > 0 ? `+${((totals.todayYieldKwh / (targetCapacityKw || 120)) * 10).toFixed(1)}%` : '--'}
+                {!loading && totals.todaySavedPhp > 0 ? `+${((totals.todayYieldKwh / (targetCapacityKw || 120)) * 10).toFixed(1)}%` : '--'}
               </span>
             </div>
           </HoverInfo>
@@ -412,10 +637,10 @@ function formatPeso(val: number): string {
             </div>
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-2xl font-black font-mono text-primary">
-                {formatPeso(totals.monthlyProjectionPhp)}
+                {loading ? <span className="text-muted-foreground/50">--</span> : formatPeso(totals.monthlyProjectionPhp)}
               </span>
               <span className="text-xs font-mono font-bold text-primary">
-                {totals.monthlyProjectionPhp > 0 ? '30-Day Est' : '--'}
+                {!loading && totals.monthlyProjectionPhp > 0 ? '30-Day Est' : '--'}
               </span>
             </div>
           </HoverInfo>
@@ -447,10 +672,10 @@ function formatPeso(val: number): string {
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-black font-mono text-cyan-500">
-                {totals.todayYieldKwh > 0 ? 'Nominal' : '--'}
+                {loading ? <span className="text-muted-foreground/50">--</span> : totals.todayYieldKwh > 0 ? 'Nominal' : '--'}
               </span>
               <span className="text-xs font-mono font-bold text-cyan-500">
-                {totals.todayYieldKwh > 0 ? 'Grid-Tied' : 'Standby'}
+                {!loading && totals.todayYieldKwh > 0 ? 'Grid-Tied' : 'Standby'}
               </span>
             </div>
           </HoverInfo>
@@ -484,7 +709,7 @@ function formatPeso(val: number): string {
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-black font-mono text-emerald-500">
-                {totals.co2Tons > 0 ? totals.co2Tons.toFixed(2) : '0.00'}
+                {loading ? <span className="text-muted-foreground/50">--</span> : totals.co2Tons > 0 ? totals.co2Tons.toFixed(2) : '0.00'}
               </span>
               <span className="text-xs text-muted-foreground font-normal">Tons CO₂e</span>
             </div>
@@ -493,7 +718,7 @@ function formatPeso(val: number): string {
       </div>
 
       {/* Diurnal Time-of-Use Arbitrage Curve */}
-      <Card className="border-border/60 bg-card/80 shadow-sm">
+      <Card className="border-border/60 bg-card/80 shadow-sm relative">
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-border/50 p-5">
           <div>
             <HoverInfo
@@ -527,75 +752,142 @@ function formatPeso(val: number): string {
                   )}
                 </CardTitle>
                 <CardDescription className="text-xs text-muted-foreground">
-                  Diurnal Generation vs Facility Load & Battery ESS Profile
+                  {timeRange === 'YEAR'
+                    ? '12-Month Seasonal Solar Yield vs Demand (MWh)'
+                    : timeRange === 'MONTH'
+                    ? `30-Day Arbitrage Envelope ending ${formatHumanDate(selectedDate)} (kWh)`
+                    : timeRange === 'WEEK'
+                    ? `7-Day Arbitrage Envelope ending ${formatHumanDate(selectedDate)} (kWh)`
+                    : `${formatHumanDate(selectedDate)} · 5-Min Generation vs Load (kW)`}
                 </CardDescription>
               </div>
             </HoverInfo>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs font-mono border-amber-500/30 text-amber-500 bg-amber-500/10">
-              <span className="w-2 h-2 rounded-full bg-amber-500 mr-1.5 animate-pulse" />
-              Monitored: Solar PV Generation
-            </Badge>
-          </div>
         </CardHeader>
-        <CardContent className="p-5 pt-4">
-          <div className="h-[320px] w-full">
-            {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="solarGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
-                    </linearGradient>
-                    <linearGradient id="loadGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
-                  <XAxis dataKey="hour" stroke="currentColor" className="text-[10px] opacity-60" />
-                  <YAxis stroke="currentColor" className="text-[10px] opacity-60" unit="kW" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgba(23, 31, 51, 0.95)',
-                      borderRadius: '0.75rem',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      fontSize: '12px',
-                    }}
-                    formatter={(value: any, name: any) => [
-                      `${typeof value === 'number' ? value.toFixed(1) : value} kW`,
-                      name,
-                    ]}
-                  />
-                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                  <Area
-                    type="monotone"
-                    dataKey="solarYieldKw"
-                    name={monitoredSolarLabel}
-                    stroke="#f59e0b"
-                    strokeWidth={2}
-                    fill="url(#solarGrad)"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="loadDemandKw"
-                    name="Facility Demand (kW)"
-                    stroke="#6366f1"
-                    strokeWidth={2}
-                    fill="url(#loadGrad)"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="batteryFlowKw"
-                    name="Battery ESS Arbitrage (kW)"
-                    stroke="#06b6d4"
-                    strokeWidth={2}
-                    strokeDasharray="3 3"
-                    dot={false}
-                  />
-                </AreaChart>
+        <CardContent className="p-5 pt-4 relative">
+          {loading && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/40 backdrop-blur-[2px] rounded-b-xl transition-all">
+              <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-lg bg-card/95 border border-border/80 shadow-md">
+                <div className="w-4 h-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                <span className="text-xs font-medium text-foreground">
+                  Loading arbitrage telemetry for {formatHumanDate(selectedDate)}...
+                </span>
+              </div>
+            </div>
+          )}
+          <div className={`h-[320px] w-full min-w-0 transition-opacity duration-200 ${loading ? 'opacity-40 pointer-events-none' : ''}`}>
+            {isMounted &&
+            ((timeRange === 'DAY' && chartData.length > 0) ||
+              ((timeRange === 'WEEK' || timeRange === 'MONTH') && periodDailySeries.length > 0) ||
+              (timeRange === 'YEAR' && periodMonthlySeries.length > 0)) ? (
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 800, height: 320 }}>
+                {timeRange === 'YEAR' ? (
+                  <BarChart key="ya-year" data={periodMonthlySeries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
+                    <XAxis dataKey="month" stroke="currentColor" className="text-[10px] opacity-60" />
+                    <YAxis stroke="currentColor" className="text-[10px] opacity-60" unit=" MWh" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(23, 31, 51, 0.95)',
+                        borderRadius: '0.75rem',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        fontSize: '12px',
+                      }}
+                      formatter={(value: any, name: any) => [
+                        `${typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : value} MWh`,
+                        name,
+                      ]}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                    <Bar dataKey="solarYieldMwh" name={monitoredSolarLabel} fill="#f59e0b" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="loadDemandMwh" name="Facility Demand (MWh)" fill="#6366f1" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="gridExportMwh" name="Grid Export (MWh)" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                  </BarChart>
+                ) : timeRange === 'WEEK' || timeRange === 'MONTH' ? (
+                  <BarChart key={`ya-${timeRange}`} data={periodDailySeries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
+                    <XAxis
+                      dataKey="dayLabel"
+                      stroke="currentColor"
+                      className="text-[10px] opacity-60"
+                      interval={timeRange === 'MONTH' ? 4 : 0}
+                    />
+                    <YAxis stroke="currentColor" className="text-[10px] opacity-60" unit=" kWh" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(23, 31, 51, 0.95)',
+                        borderRadius: '0.75rem',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        fontSize: '12px',
+                      }}
+                      formatter={(value: any, name: any) => [
+                        `${typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : value} kWh`,
+                        name,
+                      ]}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                    <Bar dataKey="solarYieldKwh" name={monitoredSolarLabel} fill="#f59e0b" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="loadDemandKwh" name="Facility Demand (kWh)" fill="#6366f1" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="gridExportKwh" name="Grid Export (kWh)" fill="#10b981" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                  </BarChart>
+                ) : (
+                  <AreaChart key="ya-day" data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="solarGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="loadGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
+                    <XAxis dataKey="hour" stroke="currentColor" className="text-[10px] opacity-60" />
+                    <YAxis stroke="currentColor" className="text-[10px] opacity-60" unit="kW" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(23, 31, 51, 0.95)',
+                        borderRadius: '0.75rem',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        fontSize: '12px',
+                      }}
+                      formatter={(value: any, name: any) => [
+                        `${typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : value} kW`,
+                        name,
+                      ]}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                    <Area
+                      type="monotone"
+                      dataKey="solarYieldKw"
+                      name={monitoredSolarLabel}
+                      stroke="#f59e0b"
+                      strokeWidth={2}
+                      fill="url(#solarGrad)"
+                      isAnimationActive={false}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="loadDemandKw"
+                      name="Facility Demand (kW)"
+                      stroke="#6366f1"
+                      strokeWidth={2}
+                      fill="url(#loadGrad)"
+                      isAnimationActive={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="batteryFlowKw"
+                      name="Battery ESS Arbitrage (kW)"
+                      stroke="#06b6d4"
+                      strokeWidth={2}
+                      strokeDasharray="3 3"
+                      dot={false}
+                      isAnimationActive={false}
+                    />
+                  </AreaChart>
+                )}
               </ResponsiveContainer>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground font-mono text-xs">
@@ -637,13 +929,13 @@ function formatPeso(val: number): string {
                         {row.date}
                       </td>
                       <td className="td-num text-amber-500 font-bold text-left">
-                        {row.yieldKwh.toFixed(1)} kWh
+                        {(row.yieldKwh ?? 0).toFixed(1)} kWh
                       </td>
                       <td className="td-num text-foreground text-left">
-                        {row.selfConsPct.toFixed(1)}%
+                        {(row.selfConsPct ?? 0).toFixed(1)}%
                       </td>
                       <td className="td-num text-cyan-500 text-left">
-                        {row.gridExportKwh.toFixed(1)} kWh
+                        {(row.gridExportKwh ?? 0).toFixed(1)} kWh
                       </td>
                       <td className="td-num text-emerald-500 font-bold text-left">
                         {formatPeso(row.todaySavedPhp)}

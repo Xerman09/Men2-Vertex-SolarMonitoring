@@ -31,6 +31,7 @@ import {
   ChevronDown,
   ChevronUp,
   Globe,
+  PieChart as PieChartIcon,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -81,6 +82,7 @@ import {
   toLocalIsoDate,
   formatHumanDate,
   parseLocalIsoDate,
+  shiftDays,
 } from '@/components/analytics/AnalyticsDatePicker';
 
 const log = createLogger('AnalyticsDashboard');
@@ -175,10 +177,12 @@ export default function AnalyticsDashboardPage() {
   // Plant & Inverter/Logger isolation states
   const [previewEssModel, setPreviewEssModel] = useState<boolean>(false);
 
-  // Raw and computed data states (initialized with baseline points so graph is never blank on mount)
-  const [hourlyData, setHourlyData] = useState<HourlyEnergyPoint[]>(() =>
-    getMockHourlyEnergyPoints('TODAY', undefined, 5, toLocalIsoDate(new Date()))
-  );
+  // Raw and computed data states (initialized empty so mock curve is never flashed)
+  const [hourlyData, setHourlyData] = useState<HourlyEnergyPoint[]>([]);
+  const [historyIsLive, setHistoryIsLive] = useState<boolean>(false);
+  const [liveDailySummary, setLiveDailySummary] = useState<DailyAnalyticsPoint | null>(null);
+  const [liveDailySeries, setLiveDailySeries] = useState<DailyAnalyticsPoint[] | null>(null);
+  const [liveMonthlySeries, setLiveMonthlySeries] = useState<MonthlyAnalyticsPoint[] | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
@@ -200,9 +204,20 @@ export default function AnalyticsDashboardPage() {
 
   // Instantly apply cached analytics telemetry on plant/range/SN switch (0ms instant switch)
   useEffect(() => {
-    const cached = telemetryCache.get<HourlyEnergyPoint[]>(`analytics:${currentTargetKey}`);
-    if (cached && cached.length > 0) {
-      setHourlyData(cached);
+    setTablePage(1);
+    const cached = telemetryCache.get<{
+      points: HourlyEnergyPoint[];
+      isLive?: boolean;
+      dailySummary?: DailyAnalyticsPoint | null;
+      dailySeries?: DailyAnalyticsPoint[] | null;
+      monthlySeries?: MonthlyAnalyticsPoint[] | null;
+    }>(`analytics:v2:${currentTargetKey}`);
+    if (cached && Array.isArray(cached.points) && cached.points.length > 0) {
+      setHourlyData(cached.points);
+      setHistoryIsLive(Boolean(cached.isLive));
+      setLiveDailySummary(cached.dailySummary ?? null);
+      setLiveDailySeries(cached.dailySeries ?? null);
+      setLiveMonthlySeries(cached.monthlySeries ?? null);
       setDisplayedTargetKey(currentTargetKey);
       setIsDataLoaded(true);
       setIsPlantSwitching(false);
@@ -440,6 +455,91 @@ export default function AnalyticsDashboardPage() {
     return Math.min(1.0, selectedInverter.ratedKw / (baseCapacityKw || selectedInverter.ratedKw));
   }, [selectedInverter, baseCapacityKw]);
 
+  // Background idle prefetching for adjacent periods (B1)
+  const scheduleIdlePrefetch = useCallback(
+    (currentDate: string, currentPreset: DatePreset) => {
+      const runPrefetch = async () => {
+        const today = toLocalIsoDate(new Date());
+        const targets: Array<{ preset: DatePreset; date: string; range: string }> = [];
+
+        if (currentPreset === 'TODAY') {
+          targets.push(
+            { preset: 'YESTERDAY', date: shiftDays(today, -1), range: 'TODAY' },
+            { preset: '7D', date: today, range: 'WEEK' }
+          );
+        } else if (currentPreset === 'YESTERDAY') {
+          targets.push(
+            { preset: 'TODAY', date: today, range: 'TODAY' },
+            { preset: '7D', date: today, range: 'WEEK' }
+          );
+        } else if (currentPreset === '7D') {
+          targets.push(
+            { preset: 'TODAY', date: today, range: 'TODAY' },
+            { preset: '30D', date: today, range: 'MONTH' }
+          );
+        }
+
+        const sn = selectedInverterSn && selectedInverterSn !== 'ALL' ? String(selectedInverterSn).trim() : 'ALL';
+        const accountParam =
+          !isFleetView && selectedAccountId && selectedAccountId !== 'ALL'
+            ? `&accountId=${encodeURIComponent(selectedAccountId)}`
+            : '';
+        const stationParam =
+          selectedStationId !== 'ALL' ? `&station_id=${encodeURIComponent(selectedStationId)}` : '';
+        const snParam = sn !== 'ALL' ? `&device_sn=${encodeURIComponent(sn)}` : '';
+
+        for (const target of targets) {
+          const cacheKey = `analytics:v2:${inverterCacheKey(
+            isFleetView ? 'FLEET' : selectedAccountId,
+            selectedStationId,
+            sn,
+            `${target.preset}:${target.date}`
+          )}`;
+
+          if (telemetryCache.isFresh(cacheKey, 120_000)) continue;
+
+          try {
+            const res = await fetch(
+              `/api/deye/history?range=${target.range}&step=5&date=${encodeURIComponent(target.date)}${accountParam}${stationParam}${snParam}`
+            );
+            if (res.ok) {
+              const json = (await res.json()) as {
+                data?: unknown;
+                isLive?: boolean;
+                dailySummary?: DailyAnalyticsPoint | null;
+                dailySeries?: DailyAnalyticsPoint[] | null;
+                monthlySeries?: MonthlyAnalyticsPoint[] | null;
+              };
+              if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+                telemetryCache.set(cacheKey, {
+                  points: json.data as HourlyEnergyPoint[],
+                  isLive: Boolean(json.isLive),
+                  dailySummary: json.dailySummary ?? null,
+                  dailySeries: Array.isArray(json.dailySeries) ? json.dailySeries : null,
+                  monthlySeries: Array.isArray(json.monthlySeries) ? json.monthlySeries : null,
+                });
+              }
+            }
+          } catch {
+            // Non-blocking background prefetch
+          }
+        }
+      };
+
+      if (typeof window !== 'undefined') {
+        if ('requestIdleCallback' in window) {
+          (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => void }).requestIdleCallback(
+            () => runPrefetch(),
+            { timeout: 3000 }
+          );
+        } else {
+          setTimeout(runPrefetch, 1000);
+        }
+      }
+    },
+    [isFleetView, selectedAccountId, selectedStationId, selectedInverterSn]
+  );
+
   // Telemetry Fetcher (SN-isolated, AbortController race-safe)
   const fetchAnalyticsData = useCallback(
     async (
@@ -475,24 +575,44 @@ export default function AnalyticsDashboardPage() {
 
       try {
         setRefreshing(true);
+        const accountParam =
+          !isFleetView && selectedAccountId && selectedAccountId !== 'ALL'
+            ? `&accountId=${encodeURIComponent(selectedAccountId)}`
+            : '';
         const stationParam =
           selectedStationId !== 'ALL' ? `&station_id=${encodeURIComponent(selectedStationId)}` : '';
         const dateParam = `&date=${encodeURIComponent(dateVal.selectedDate)}`;
+        const startDateParam = dateVal.startDate ? `&startDate=${encodeURIComponent(dateVal.startDate)}` : '';
+        const endDateParam = dateVal.endDate ? `&endDate=${encodeURIComponent(dateVal.endDate)}` : '';
         const deviceSnParam =
           snAtStart !== 'ALL' ? `&device_sn=${encodeURIComponent(snAtStart)}` : '';
-        const res = await fetch(`/api/deye/history?range=${apiRange}&step=5${dateParam}${stationParam}${deviceSnParam}`, {
-          signal: controller.signal,
-        });
+        const res = await fetch(
+          `/api/deye/history?range=${apiRange}&step=5${dateParam}${startDateParam}${endDateParam}${accountParam}${stationParam}${deviceSnParam}`,
+          {
+            signal: controller.signal,
+          }
+        );
 
         if (res.ok) {
           const json = await res.json() as {
             data?: unknown;
+            isLive?: boolean;
             appliedRatio?: unknown;
             deviceSn?: unknown;
+            dailySummary?: DailyAnalyticsPoint | null;
+            dailySeries?: DailyAnalyticsPoint[] | null;
+            monthlySeries?: MonthlyAnalyticsPoint[] | null;
           };
           if (controller.signal.aborted) return;
           if (json.data && Array.isArray(json.data) && json.data.length > 0) {
-            telemetryCache.set(`analytics:${targetKeyAtStart}`, json.data);
+            const payloadToCache = {
+              points: json.data as HourlyEnergyPoint[],
+              isLive: Boolean(json.isLive),
+              dailySummary: json.dailySummary ?? null,
+              dailySeries: Array.isArray(json.dailySeries) ? json.dailySeries : null,
+              monthlySeries: Array.isArray(json.monthlySeries) ? json.monthlySeries : null,
+            };
+            telemetryCache.set(`analytics:v2:${targetKeyAtStart}`, payloadToCache);
             const backendRatio =
               typeof json.appliedRatio === 'number' && Number.isFinite(json.appliedRatio)
                 ? json.appliedRatio
@@ -502,12 +622,17 @@ export default function AnalyticsDashboardPage() {
             } else {
               setServerScale(null);
             }
-            setHourlyData(json.data as HourlyEnergyPoint[]);
+            setHourlyData(payloadToCache.points);
+            setHistoryIsLive(payloadToCache.isLive);
+            setLiveDailySummary(payloadToCache.dailySummary);
+            setLiveDailySeries(payloadToCache.dailySeries);
+            setLiveMonthlySeries(payloadToCache.monthlySeries);
             setDisplayedTargetKey(targetKeyAtStart);
             setIsDataLoaded(true);
             setIsPlantSwitching(false);
             setFetchingDeye(false, null);
             setLastRefreshedAt(new Date());
+            scheduleIdlePrefetch(dateVal.selectedDate, dateVal.preset);
             return;
           }
         }
@@ -515,6 +640,10 @@ export default function AnalyticsDashboardPage() {
         // Resilient fallback: ensure chart points are always present even if API response is empty/offline
         const fallback = getMockHourlyEnergyPoints(apiRange, undefined, 5, dateVal.selectedDate);
         setHourlyData(fallback);
+        setHistoryIsLive(false);
+        setLiveDailySummary(null);
+        setLiveDailySeries(null);
+        setLiveMonthlySeries(null);
         setDisplayedTargetKey(targetKeyAtStart);
         setIsDataLoaded(true);
         setIsPlantSwitching(false);
@@ -525,6 +654,10 @@ export default function AnalyticsDashboardPage() {
         }
         const fallback = getMockHourlyEnergyPoints(apiRange, undefined, 5, dateVal.selectedDate);
         setHourlyData(fallback);
+        setHistoryIsLive(false);
+        setLiveDailySummary(null);
+        setLiveDailySeries(null);
+        setLiveMonthlySeries(null);
         setDisplayedTargetKey(targetKeyAtStart);
         setIsDataLoaded(true);
         setIsPlantSwitching(false);
@@ -550,10 +683,11 @@ export default function AnalyticsDashboardPage() {
   }, [fetchAnalyticsData, dateSelection, selectedInverterSn]);
 
   // Scale raw hourly telemetry according to the active selection scope (Fleet / Account / Plant / Inverter).
-  // The backend synthetic baseline is calibrated against a 120 kWp reference system.
-  // If backend per-inverter scaling already applied (serverScale), render as-is.
-  // Otherwise, scale by inverterPowerRatio or effectiveCapacityKw / 120.
+  // Live telemetry from DeyeCloud is already in actual kW for the target scope and should never be re-scaled by 120 kWp.
   const scopeScaleFactor = useMemo(() => {
+    if (historyIsLive) {
+      return 1.0;
+    }
     if (selectedInverter && serverScale && serverScale.sn === selectedInverterSn) {
       return 1.0;
     }
@@ -564,15 +698,15 @@ export default function AnalyticsDashboardPage() {
       return Number((effectiveCapacityKw / 120).toFixed(4));
     }
     return 1.0;
-  }, [selectedInverter, serverScale, selectedInverterSn, inverterPowerRatio, effectiveCapacityKw]);
+  }, [historyIsLive, selectedInverter, serverScale, selectedInverterSn, inverterPowerRatio, effectiveCapacityKw]);
 
   const isolatedHourlyData = useMemo(() => {
     if (scopeScaleFactor === 1.0) return hourlyData;
     return hourlyData.map((pt) => {
-      const solar = pt.solarYieldKw !== null ? Number((pt.solarYieldKw * scopeScaleFactor).toFixed(2)) : null;
-      const load = pt.loadDemandKw !== null ? Number((pt.loadDemandKw * scopeScaleFactor).toFixed(2)) : null;
-      const bat = pt.batteryFlowKw !== null ? Number((pt.batteryFlowKw * scopeScaleFactor).toFixed(2)) : null;
-      const grid = pt.gridFlowKw !== null ? Number((pt.gridFlowKw * scopeScaleFactor).toFixed(2)) : null;
+      const solar = pt.solarYieldKw != null && Number.isFinite(pt.solarYieldKw) ? Number((pt.solarYieldKw * scopeScaleFactor).toFixed(2)) : null;
+      const load = pt.loadDemandKw != null && Number.isFinite(pt.loadDemandKw) ? Number((pt.loadDemandKw * scopeScaleFactor).toFixed(2)) : null;
+      const bat = pt.batteryFlowKw != null && Number.isFinite(pt.batteryFlowKw) ? Number((pt.batteryFlowKw * scopeScaleFactor).toFixed(2)) : null;
+      const grid = pt.gridFlowKw != null && Number.isFinite(pt.gridFlowKw) ? Number((pt.gridFlowKw * scopeScaleFactor).toFixed(2)) : null;
       return {
         ...pt,
         solarYieldKw: solar,
@@ -673,43 +807,144 @@ export default function AnalyticsDashboardPage() {
     return undefined;
   }, [selectedInverter, selectedPlant, selectedAccount, isFleetView, accounts]);
 
-  // Calculate high-level KPIs and multi-period datasets
-  const analyticsSummary = useMemo<AnalyticsSummary>(() => {
-    const fleetSoc =
-      isFleetView && accounts.length > 0
-        ? accounts.reduce((s, a) => s + (a.batterySoc || 0), 0) / accounts.length
-        : undefined;
-    const liveSoc = selectedPlant?.batterySoc ?? selectedAccount?.batterySoc ?? fleetSoc;
-    const invEff = selectedInverter?.efficiencyPct;
-    return computeAnalyticsSummary(isolatedHourlyData, effectiveCapacityKw, hasBattery, {
-      batterySoc: liveSoc,
-      inverterEfficiencyPct: invEff,
-      liveSolarPowerKw: effectiveLiveSolar,
-      dailyYieldKwh: effectiveDailyYield,
-    });
-  }, [isolatedHourlyData, effectiveCapacityKw, hasBattery, isFleetView, accounts, selectedPlant, selectedAccount, selectedInverter, effectiveLiveSolar, effectiveDailyYield]);
-
   const dailyPoints7D = useMemo<DailyAnalyticsPoint[]>(() => {
+    if (liveDailySeries && liveDailySeries.length > 0 && timeRange !== '30D') {
+      return liveDailySeries.slice(-7);
+    }
     return generateDailyAnalytics(
       7,
       effectiveCapacityKw,
       hasBattery,
       parseLocalIsoDate(dateSelection.selectedDate)
     );
-  }, [effectiveCapacityKw, hasBattery, dateSelection.selectedDate]);
+  }, [liveDailySeries, timeRange, effectiveCapacityKw, hasBattery, dateSelection.selectedDate]);
 
   const dailyPoints30D = useMemo<DailyAnalyticsPoint[]>(() => {
+    if (liveDailySeries && liveDailySeries.length > 0 && timeRange === '30D') {
+      return liveDailySeries;
+    }
     return generateDailyAnalytics(
       30,
       effectiveCapacityKw,
       hasBattery,
       parseLocalIsoDate(dateSelection.selectedDate)
     );
-  }, [effectiveCapacityKw, hasBattery, dateSelection.selectedDate]);
+  }, [liveDailySeries, timeRange, effectiveCapacityKw, hasBattery, dateSelection.selectedDate]);
 
   const monthlyPoints12M = useMemo<MonthlyAnalyticsPoint[]>(() => {
+    if (liveMonthlySeries && liveMonthlySeries.length > 0) {
+      return liveMonthlySeries;
+    }
     return generateMonthlyAnalytics(effectiveCapacityKw);
-  }, [effectiveCapacityKw]);
+  }, [liveMonthlySeries, effectiveCapacityKw]);
+
+  // Calculate high-level KPIs and multi-period datasets
+  const analyticsSummary = useMemo<AnalyticsSummary>(() => {
+    const fleetSoc =
+      isFleetView && accounts.length > 0
+        ? accounts.reduce((s, a) => s + (a.batterySoc || 0), 0) / accounts.length
+        : undefined;
+    const liveSoc = isViewingToday
+      ? (selectedPlant?.batterySoc ?? selectedAccount?.batterySoc ?? fleetSoc)
+      : undefined;
+    const invEff = isViewingToday ? selectedInverter?.efficiencyPct : undefined;
+
+    const baseSummary = computeAnalyticsSummary(isolatedHourlyData, effectiveCapacityKw, hasBattery, {
+      batterySoc: liveSoc,
+      inverterEfficiencyPct: invEff,
+      liveSolarPowerKw: isViewingToday ? effectiveLiveSolar : undefined,
+      dailyYieldKwh: isViewingToday ? effectiveDailyYield : liveDailySummary?.solarYieldKwh,
+      dailyLoadKwh: !isViewingToday ? liveDailySummary?.loadDemandKwh : undefined,
+      dailyExportKwh: !isViewingToday ? liveDailySummary?.gridExportKwh : undefined,
+      dailyImportKwh: !isViewingToday ? liveDailySummary?.gridImportKwh : undefined,
+      allowZeroYield: historyIsLive,
+    });
+
+    if (timeRange === '7D' || timeRange === '30D') {
+      const series = timeRange === '30D' ? dailyPoints30D : dailyPoints7D;
+      if (series.length > 0) {
+        const totalSolar = Number(series.reduce((s, d) => s + d.solarYieldKwh, 0).toFixed(1));
+        const totalLoad = Number(series.reduce((s, d) => s + d.loadDemandKwh, 0).toFixed(1));
+        const totalExport = Number(series.reduce((s, d) => s + d.gridExportKwh, 0).toFixed(1));
+        const totalImport = Number(series.reduce((s, d) => s + d.gridImportKwh, 0).toFixed(1));
+        const batCharge = Number(series.reduce((s, d) => s + d.batteryStoredKwh, 0).toFixed(1));
+        const batDischarge = Number(series.reduce((s, d) => s + d.batteryDischargedKwh, 0).toFixed(1));
+        const selfConsKwh = Math.max(0, totalSolar - totalExport - (hasBattery ? batCharge : 0)) + (hasBattery ? batDischarge : 0);
+        const activeDays = series.filter((d) => d.performanceRatioPct > 0);
+        const avgPr = activeDays.length > 0
+          ? Number((activeDays.reduce((s, d) => s + d.performanceRatioPct, 0) / activeDays.length).toFixed(1))
+          : 0;
+        const co2 = Number((totalSolar * 0.83).toFixed(1));
+        return {
+          ...baseSummary,
+          totalSolarYieldKwh: totalSolar,
+          totalLoadDemandKwh: totalLoad,
+          totalSelfConsumedKwh: Number(selfConsKwh.toFixed(1)),
+          selfConsumptionPct: totalSolar > 0 ? Number(Math.min(100, (selfConsKwh / totalSolar) * 100).toFixed(1)) : 0,
+          selfSufficiencyPct: totalLoad > 0 ? Number(Math.min(100, (selfConsKwh / totalLoad) * 100).toFixed(1)) : 0,
+          totalGridExportKwh: totalExport,
+          totalGridImportKwh: totalImport,
+          netGridBalanceKwh: Number((totalExport - totalImport).toFixed(1)),
+          totalBatCharge: hasBattery ? batCharge : 0,
+          totalBatDischarge: hasBattery ? batDischarge : 0,
+          performanceRatioPct: avgPr,
+          specificYieldKwhKwp: effectiveCapacityKw > 0 ? Number((totalSolar / effectiveCapacityKw).toFixed(2)) : 0,
+          co2AvoidedKg: co2,
+          treesEquivalent: Math.round(co2 / 20),
+          coalAvoidedKg: Number((totalSolar * 0.4).toFixed(1)),
+        };
+      }
+    }
+
+    if (timeRange === '12M' && monthlyPoints12M.length > 0) {
+      const totalSolar = Number((monthlyPoints12M.reduce((s, m) => s + m.solarYieldMwh, 0) * 1000).toFixed(1));
+      const totalLoad = Number((monthlyPoints12M.reduce((s, m) => s + m.loadDemandMwh, 0) * 1000).toFixed(1));
+      const totalExport = Number((monthlyPoints12M.reduce((s, m) => s + m.gridExportMwh, 0) * 1000).toFixed(1));
+      const totalImport = Number((monthlyPoints12M.reduce((s, m) => s + m.gridImportMwh, 0) * 1000).toFixed(1));
+      const selfConsKwh = Math.max(0, totalSolar - totalExport);
+      const activeMonths = monthlyPoints12M.filter((m) => m.performanceRatioPct > 0);
+      const avgPr = activeMonths.length > 0
+        ? Number((activeMonths.reduce((s, m) => s + m.performanceRatioPct, 0) / activeMonths.length).toFixed(1))
+        : 0;
+      const co2 = Number((totalSolar * 0.83).toFixed(1));
+      return {
+        ...baseSummary,
+        totalSolarYieldKwh: totalSolar,
+        totalLoadDemandKwh: totalLoad,
+        totalSelfConsumedKwh: Number(selfConsKwh.toFixed(1)),
+        selfConsumptionPct: totalSolar > 0 ? Number(Math.min(100, (selfConsKwh / totalSolar) * 100).toFixed(1)) : 0,
+        selfSufficiencyPct: totalLoad > 0 ? Number(Math.min(100, (selfConsKwh / totalLoad) * 100).toFixed(1)) : 0,
+        totalGridExportKwh: totalExport,
+        totalGridImportKwh: totalImport,
+        netGridBalanceKwh: Number((totalExport - totalImport).toFixed(1)),
+        performanceRatioPct: avgPr,
+        specificYieldKwhKwp: effectiveCapacityKw > 0 ? Number((totalSolar / effectiveCapacityKw).toFixed(2)) : 0,
+        co2AvoidedKg: co2,
+        treesEquivalent: Math.round(co2 / 20),
+        coalAvoidedKg: Number((totalSolar * 0.4).toFixed(1)),
+      };
+    }
+
+    return baseSummary;
+  }, [
+    isolatedHourlyData,
+    effectiveCapacityKw,
+    hasBattery,
+    isFleetView,
+    accounts,
+    selectedPlant,
+    selectedAccount,
+    selectedInverter,
+    effectiveLiveSolar,
+    effectiveDailyYield,
+    isViewingToday,
+    liveDailySummary,
+    historyIsLive,
+    timeRange,
+    dailyPoints7D,
+    dailyPoints30D,
+    monthlyPoints12M,
+  ]);
 
   const batteryCurveData = useMemo<BatteryTelemetryPoint[]>(() => {
     return generateBatteryHourlyTelemetry(isolatedHourlyData, hasBattery || previewEssModel);
@@ -723,7 +958,7 @@ export default function AnalyticsDashboardPage() {
     const liveDemand = effectiveLiveDemand;
 
     return raw.map((pt) => {
-      const parts = pt.hour.split(':');
+      const parts = (pt.hour || '00:00').split(':');
       const h = parseInt(parts[0], 10) || 0;
       const m = parseInt(parts[1], 10) || 0;
       const hDec = h + m / 60;
@@ -840,31 +1075,6 @@ export default function AnalyticsDashboardPage() {
 
   return (
     <div className="relative flex flex-col gap-6 w-full max-w-[1700px] mx-auto pb-16">
-      {/* Full-Screen Synchronization Loading Overlay */}
-      {showOverlay && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md transition-all duration-300">
-          <div className="flex flex-col items-center gap-4 p-8 rounded-2xl bg-card/90 border border-border/80 shadow-2xl max-w-md w-full mx-4 text-center">
-            <div className="relative">
-              <div className="w-14 h-14 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-              <div className="absolute inset-0 flex items-center justify-center text-primary">
-                <BarChart3 className="w-6 h-6 animate-pulse" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <h3 className="text-lg font-semibold text-foreground">Synchronizing Analytics Data</h3>
-              <p className="text-xs text-muted-foreground font-mono">
-                {switchingPlantName
-                  ? `Loading station profile for: ${switchingPlantName}...`
-                  : fetchingStage || 'Aggregating MPPT channels, battery cycles & grid exchange...'}
-              </p>
-            </div>
-            <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
-              <div className="bg-primary h-full w-2/3 animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-primary/40 via-primary to-primary/40" />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Top Header Banner */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-border/50">
         <div>
@@ -1034,7 +1244,9 @@ export default function AnalyticsDashboardPage() {
             </div>
             <div>
               <div className="text-lg sm:text-xl font-bold font-mono text-amber-500 tracking-tight leading-none">
-                {timeRange === '12M'
+                {isTargetPending ? (
+                  <span className="text-muted-foreground/50">--</span>
+                ) : timeRange === '12M'
                   ? `${(analyticsSummary.totalSolarYieldKwh / 1000).toFixed(2)} MWh`
                   : `${analyticsSummary.totalSolarYieldKwh.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh`}
               </div>
@@ -1091,7 +1303,9 @@ export default function AnalyticsDashboardPage() {
             </div>
             <div>
               <div className="text-lg sm:text-xl font-bold font-mono text-cyan-400 tracking-tight leading-none">
-                {hasBattery ? (
+                {isTargetPending ? (
+                  <span className="text-muted-foreground/50">--</span>
+                ) : hasBattery ? (
                   <>
                     {analyticsSummary.currentSocPct.toFixed(1)}% <span className="text-[10px] text-muted-foreground font-normal">SOC</span>
                   </>
@@ -1144,7 +1358,13 @@ export default function AnalyticsDashboardPage() {
             </div>
             <div>
               <div className="text-lg sm:text-xl font-bold font-mono text-purple-400 tracking-tight leading-none">
-                {analyticsSummary.netGridBalanceKwh >= 0 ? `+${analyticsSummary.netGridBalanceKwh.toFixed(1)}` : analyticsSummary.netGridBalanceKwh.toFixed(1)} <span className="text-[10px] text-muted-foreground font-normal">kWh</span>
+                {isTargetPending ? (
+                  <span className="text-muted-foreground/50">--</span>
+                ) : (
+                  <>
+                    {analyticsSummary.netGridBalanceKwh >= 0 ? `+${analyticsSummary.netGridBalanceKwh.toFixed(1)}` : analyticsSummary.netGridBalanceKwh.toFixed(1)} <span className="text-[10px] text-muted-foreground font-normal">kWh</span>
+                  </>
+                )}
               </div>
             </div>
           </HoverInfo>
@@ -1189,7 +1409,7 @@ export default function AnalyticsDashboardPage() {
             </div>
             <div>
               <div className="text-lg sm:text-xl font-bold font-mono text-blue-400 tracking-tight leading-none">
-                {analyticsSummary.performanceRatioPct.toFixed(1)}%
+                {isTargetPending ? <span className="text-muted-foreground/50">--</span> : `${analyticsSummary.performanceRatioPct.toFixed(1)}%`}
               </div>
             </div>
           </HoverInfo>
@@ -1236,7 +1456,7 @@ export default function AnalyticsDashboardPage() {
             </div>
             <div>
               <div className="text-lg sm:text-xl font-bold font-mono text-emerald-400 tracking-tight leading-none">
-                {analyticsSummary.inverterEfficiencyPct.toFixed(1)}%
+                {isTargetPending ? <span className="text-muted-foreground/50">--</span> : `${analyticsSummary.inverterEfficiencyPct.toFixed(1)}%`}
               </div>
             </div>
           </HoverInfo>
@@ -1279,7 +1499,7 @@ export default function AnalyticsDashboardPage() {
             </div>
             <div>
               <div className="text-lg sm:text-xl font-bold font-mono text-amber-500 tracking-tight leading-none">
-                {analyticsSummary.pvModuleEfficiencyPct.toFixed(1)}%
+                {isTargetPending ? <span className="text-muted-foreground/50">--</span> : `${analyticsSummary.pvModuleEfficiencyPct.toFixed(1)}%`}
               </div>
             </div>
           </HoverInfo>
@@ -1289,7 +1509,7 @@ export default function AnalyticsDashboardPage() {
       {/* Main Analytics Charts Section */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
         {/* Main High-Resolution Generation Profile Chart (8 Cols) */}
-        <Card className="xl:col-span-8 border-border/70 shadow-sm flex flex-col justify-between min-w-0 overflow-hidden">
+        <Card className="xl:col-span-8 border-border/70 shadow-sm flex flex-col justify-between min-w-0 overflow-hidden relative">
           <CardHeader className="pb-3 border-b border-border/40">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
               <div>
@@ -1376,7 +1596,7 @@ export default function AnalyticsDashboardPage() {
                   <span className="flex items-center gap-1.5 cursor-help">
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
                     <span className="text-muted-foreground">
-                      {selectedInverter ? 'Inverter Solar (kW)' : 'Solar Yield (kW)'}
+                      {selectedInverter ? 'Inverter Solar' : 'Solar Yield'} ({timeRange === '12M' ? 'MWh' : timeRange === '7D' || timeRange === '30D' ? 'kWh' : 'kW'})
                     </span>
                   </span>
                 </HoverInfo>
@@ -1386,7 +1606,7 @@ export default function AnalyticsDashboardPage() {
                 >
                   <span className="flex items-center gap-1.5 cursor-help">
                     <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-                    <span className="text-muted-foreground">Load Demand (kW)</span>
+                    <span className="text-muted-foreground">Load Demand ({timeRange === '12M' ? 'MWh' : timeRange === '7D' || timeRange === '30D' ? 'kWh' : 'kW'})</span>
                   </span>
                 </HoverInfo>
                 <HoverInfo
@@ -1395,7 +1615,7 @@ export default function AnalyticsDashboardPage() {
                 >
                   <span className="flex items-center gap-1.5 cursor-help">
                     <span className="w-2.5 h-2.5 rounded-full bg-cyan-400" />
-                    <span className="text-muted-foreground">Battery ESS (kW)</span>
+                    <span className="text-muted-foreground">Battery ESS ({timeRange === '12M' ? 'MWh' : timeRange === '7D' || timeRange === '30D' ? 'kWh' : 'kW'})</span>
                   </span>
                 </HoverInfo>
                 <HoverInfo
@@ -1404,140 +1624,361 @@ export default function AnalyticsDashboardPage() {
                 >
                   <span className="flex items-center gap-1.5 cursor-help">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    <span className="text-muted-foreground">Grid Net (kW)</span>
+                    <span className="text-muted-foreground">
+                      {timeRange === 'TODAY' ? 'Grid Net (kW)' : `Grid Export (${timeRange === '12M' ? 'MWh' : 'kWh'})`}
+                    </span>
                   </span>
                 </HoverInfo>
               </div>
             </div>
           </CardHeader>
 
-          <CardContent className="pt-4 pb-2">
-            <div className="h-[340px] sm:h-[380px] w-full min-w-0">
+          <CardContent className="pt-4 pb-2 relative">
+            {isTargetPending && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/40 backdrop-blur-[2px] rounded-b-xl transition-all">
+                <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-lg bg-card/95 border border-border/80 shadow-md">
+                  <div className="w-4 h-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                  <span className="text-xs font-medium text-foreground">
+                    {switchingPlantName
+                      ? `Loading ${switchingPlantName}...`
+                      : `Loading telemetry for ${dateSelection.preset === 'TODAY' ? 'today' : formatHumanDate(dateSelection.selectedDate)}...`}
+                  </span>
+                </div>
+              </div>
+            )}
+            <div className={`h-[340px] sm:h-[380px] w-full min-w-0 transition-opacity duration-200 ${isTargetPending ? 'opacity-40 pointer-events-none' : ''}`}>
               <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 850, height: 380 }}>
-                <AreaChart data={diurnalChartData} margin={{ top: 24, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorSolar" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={COLORS.solar} stopOpacity={0.8} />
-                      <stop offset="95%" stopColor={COLORS.solar} stopOpacity={0.0} />
-                    </linearGradient>
-                    <linearGradient id="colorLoad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={COLORS.load} stopOpacity={0.5} />
-                      <stop offset="95%" stopColor={COLORS.load} stopOpacity={0.0} />
-                    </linearGradient>
-                    <linearGradient id="colorBat" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={COLORS.battery} stopOpacity={0.6} />
-                      <stop offset="95%" stopColor={COLORS.battery} stopOpacity={0.0} />
-                    </linearGradient>
-                    <linearGradient id="colorGrid" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={COLORS.gridExport} stopOpacity={0.6} />
-                      <stop offset="95%" stopColor={COLORS.gridExport} stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border) / 0.4)" />
-                  <XAxis
-                    dataKey="hour"
-                    tickLine={false}
-                    axisLine={{ stroke: 'hsl(var(--border) / 0.6)' }}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                    interval={24}
-                  />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={{ stroke: 'hsl(var(--border) / 0.6)' }}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                    unit=" kW"
-                  />
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (!active || !payload?.length) return null;
-                      return (
-                        <div className="rounded-xl border border-border/80 bg-popover/95 p-3 text-xs shadow-xl backdrop-blur-md min-w-[190px]">
-                          <div className="font-semibold text-foreground border-b border-border/60 pb-1.5 mb-2 flex items-center justify-between font-mono">
-                            <span>Interval: {label}</span>
-                            <span className="text-[10px] text-amber-500 font-bold">5-min</span>
+                {timeRange === '12M' ? (
+                  <AreaChart key="area-12m" data={monthlyPoints12M} margin={{ top: 24, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorSolar12M" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.solar} stopOpacity={0.8} />
+                        <stop offset="95%" stopColor={COLORS.solar} stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="colorLoad12M" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.load} stopOpacity={0.5} />
+                        <stop offset="95%" stopColor={COLORS.load} stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="colorGrid12M" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.gridExport} stopOpacity={0.6} />
+                        <stop offset="95%" stopColor={COLORS.gridExport} stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border) / 0.4)" />
+                    <XAxis
+                      dataKey="month"
+                      tickLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border) / 0.6)' }}
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border) / 0.6)' }}
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                      unit=" MWh"
+                    />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
+                        return (
+                          <div className="rounded-xl border border-border/80 bg-popover/95 p-3 text-xs shadow-xl backdrop-blur-md min-w-[190px]">
+                            <div className="font-semibold text-foreground border-b border-border/60 pb-1.5 mb-2 flex items-center justify-between font-mono">
+                              <span>{label}</span>
+                              <span className="text-[10px] text-amber-500 font-bold">Monthly</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {payload.map((entry: any) => (
+                                <div key={entry.name} className="flex items-center justify-between">
+                                  <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                    {entry.name}:
+                                  </span>
+                                  <span className="font-mono font-bold text-foreground">
+                                    {entry.value !== null && entry.value !== undefined ? `${entry.value} MWh` : '—'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                          <div className="space-y-1.5">
-                            {payload.map((entry: any) => (
-                              <div key={entry.name} className="flex items-center justify-between">
-                                <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
-                                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                                  {entry.name}:
-                                </span>
-                                <span className="font-mono font-bold text-foreground">
-                                  {entry.value !== null && entry.value !== undefined ? `${entry.value} kW` : '—'}
-                                </span>
-                              </div>
-                            ))}
+                        );
+                      }}
+                    />
+                    {(streamFilter === 'ALL' || streamFilter === 'SOLAR_LOAD') && (
+                      <Area
+                        type="monotone"
+                        dataKey="solarYieldMwh"
+                        name={selectedInverter ? `Inverter Solar (${selectedInverter.deviceSn})` : 'Solar Generation'}
+                        stroke={COLORS.solar}
+                        strokeWidth={2.5}
+                        fillOpacity={1}
+                        fill="url(#colorSolar12M)"
+                        isAnimationActive={false}
+                      />
+                    )}
+                    {(streamFilter === 'ALL' || streamFilter === 'SOLAR_LOAD') && (
+                      <Area
+                        type="monotone"
+                        dataKey="loadDemandMwh"
+                        name="Facility Demand"
+                        stroke={COLORS.load}
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorLoad12M)"
+                        isAnimationActive={false}
+                      />
+                    )}
+                    {(streamFilter === 'ALL' || streamFilter === 'GRID') && (
+                      <Area
+                        type="monotone"
+                        dataKey="gridExportMwh"
+                        name="Grid Export"
+                        stroke={COLORS.gridExport}
+                        strokeWidth={1.8}
+                        fillOpacity={1}
+                        fill="url(#colorGrid12M)"
+                        isAnimationActive={false}
+                      />
+                    )}
+                  </AreaChart>
+                ) : timeRange === '7D' || timeRange === '30D' ? (
+                  <AreaChart
+                    key={`area-${timeRange}`}
+                    data={timeRange === '30D' ? dailyPoints30D : dailyPoints7D}
+                    margin={{ top: 24, right: 10, left: -20, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="colorSolarDay" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.solar} stopOpacity={0.8} />
+                        <stop offset="95%" stopColor={COLORS.solar} stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="colorLoadDay" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.load} stopOpacity={0.5} />
+                        <stop offset="95%" stopColor={COLORS.load} stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="colorBatDay" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.battery} stopOpacity={0.6} />
+                        <stop offset="95%" stopColor={COLORS.battery} stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="colorGridDay" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.gridExport} stopOpacity={0.6} />
+                        <stop offset="95%" stopColor={COLORS.gridExport} stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border) / 0.4)" />
+                    <XAxis
+                      dataKey="dayLabel"
+                      tickLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border) / 0.6)' }}
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                      interval={timeRange === '30D' ? 4 : 0}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border) / 0.6)' }}
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                      unit=" kWh"
+                    />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
+                        return (
+                          <div className="rounded-xl border border-border/80 bg-popover/95 p-3 text-xs shadow-xl backdrop-blur-md min-w-[190px]">
+                            <div className="font-semibold text-foreground border-b border-border/60 pb-1.5 mb-2 flex items-center justify-between font-mono">
+                              <span>{label}</span>
+                              <span className="text-[10px] text-amber-500 font-bold">Daily</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {payload.map((entry: any) => (
+                                <div key={entry.name} className="flex items-center justify-between">
+                                  <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                    {entry.name}:
+                                  </span>
+                                  <span className="font-mono font-bold text-foreground">
+                                    {entry.value !== null && entry.value !== undefined ? `${entry.value} kWh` : '—'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    }}
-                  />
-
-                  {/* Solar Curve */}
-                  {(streamFilter === 'ALL' || streamFilter === 'SOLAR_LOAD') && (
-                    <Area
-                      type="monotone"
-                      dataKey="solarYieldKw"
-                      name={selectedInverter ? `Inverter Solar (${selectedInverter.deviceSn})` : 'Solar Generation'}
-                      stroke={COLORS.solar}
-                      strokeWidth={2.5}
-                      fillOpacity={1}
-                      fill="url(#colorSolar)"
-                      isAnimationActive={false}
+                        );
+                      }}
                     />
-                  )}
+                    {(streamFilter === 'ALL' || streamFilter === 'SOLAR_LOAD') && (
+                      <Area
+                        type="monotone"
+                        dataKey="solarYieldKwh"
+                        name={selectedInverter ? `Inverter Solar (${selectedInverter.deviceSn})` : 'Solar Generation'}
+                        stroke={COLORS.solar}
+                        strokeWidth={2.5}
+                        fillOpacity={1}
+                        fill="url(#colorSolarDay)"
+                        isAnimationActive={false}
+                      />
+                    )}
+                    {(streamFilter === 'ALL' || streamFilter === 'SOLAR_LOAD') && (
+                      <Area
+                        type="monotone"
+                        dataKey="loadDemandKwh"
+                        name="Facility Demand"
+                        stroke={COLORS.load}
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorLoadDay)"
+                        isAnimationActive={false}
+                      />
+                    )}
+                    {(streamFilter === 'ALL' || streamFilter === 'BATTERY') && (
+                      <Area
+                        type="monotone"
+                        dataKey="batteryStoredKwh"
+                        name="Battery Stored"
+                        stroke={COLORS.battery}
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorBatDay)"
+                        isAnimationActive={false}
+                      />
+                    )}
+                    {(streamFilter === 'ALL' || streamFilter === 'GRID') && (
+                      <Area
+                        type="monotone"
+                        dataKey="gridExportKwh"
+                        name="Grid Export"
+                        stroke={COLORS.gridExport}
+                        strokeWidth={1.8}
+                        fillOpacity={1}
+                        fill="url(#colorGridDay)"
+                        isAnimationActive={false}
+                      />
+                    )}
+                  </AreaChart>
+                ) : (
+                  <AreaChart key="area-diurnal" data={diurnalChartData} margin={{ top: 24, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorSolar" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.solar} stopOpacity={0.8} />
+                        <stop offset="95%" stopColor={COLORS.solar} stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="colorLoad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.load} stopOpacity={0.5} />
+                        <stop offset="95%" stopColor={COLORS.load} stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="colorBat" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.battery} stopOpacity={0.6} />
+                        <stop offset="95%" stopColor={COLORS.battery} stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="colorGrid" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.gridExport} stopOpacity={0.6} />
+                        <stop offset="95%" stopColor={COLORS.gridExport} stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
 
-                  {/* Industrial Load Curve */}
-                  {(streamFilter === 'ALL' || streamFilter === 'SOLAR_LOAD') && (
-                    <Area
-                      type="monotone"
-                      dataKey="loadDemandKw"
-                      name="Facility Demand"
-                      stroke={COLORS.load}
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#colorLoad)"
-                      isAnimationActive={false}
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border) / 0.4)" />
+                    <XAxis
+                      dataKey="hour"
+                      tickLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border) / 0.6)' }}
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                      interval={24}
                     />
-                  )}
+                    <YAxis
+                      tickLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border) / 0.6)' }}
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                      unit=" kW"
+                    />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
+                        return (
+                          <div className="rounded-xl border border-border/80 bg-popover/95 p-3 text-xs shadow-xl backdrop-blur-md min-w-[190px]">
+                            <div className="font-semibold text-foreground border-b border-border/60 pb-1.5 mb-2 flex items-center justify-between font-mono">
+                              <span>Interval: {label}</span>
+                              <span className="text-[10px] text-amber-500 font-bold">5-min</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {payload.map((entry: any) => (
+                                <div key={entry.name} className="flex items-center justify-between">
+                                  <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                    {entry.name}:
+                                  </span>
+                                  <span className="font-mono font-bold text-foreground">
+                                    {entry.value !== null && entry.value !== undefined ? `${entry.value} kW` : '—'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
 
-                  {/* Battery Flow (0 kW line when pure grid-tied, active when battery is attached) */}
-                  {(streamFilter === 'ALL' || streamFilter === 'BATTERY') && (
-                    <Area
-                      type="monotone"
-                      dataKey="batteryFlowKw"
-                      name="Battery Flow (+Chg/-Dchg)"
-                      stroke={COLORS.battery}
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#colorBat)"
-                      isAnimationActive={false}
-                    />
-                  )}
+                    {/* Solar Curve */}
+                    {(streamFilter === 'ALL' || streamFilter === 'SOLAR_LOAD') && (
+                      <Area
+                        type="monotone"
+                        dataKey="solarYieldKw"
+                        name={selectedInverter ? `Inverter Solar (${selectedInverter.deviceSn})` : 'Solar Generation'}
+                        stroke={COLORS.solar}
+                        strokeWidth={2.5}
+                        fillOpacity={1}
+                        fill="url(#colorSolar)"
+                        isAnimationActive={false}
+                      />
+                    )}
 
-                  {/* Net Grid Flow */}
-                  {(streamFilter === 'ALL' || streamFilter === 'GRID') && (
-                    <Area
-                      type="monotone"
-                      dataKey="gridFlowKw"
-                      name="Grid Net (+Exp/-Imp)"
-                      stroke={COLORS.gridExport}
-                      strokeWidth={1.8}
-                      fillOpacity={1}
-                      fill="url(#colorGrid)"
-                      isAnimationActive={false}
-                    />
-                  )}
-                </AreaChart>
+                    {/* Industrial Load Curve */}
+                    {(streamFilter === 'ALL' || streamFilter === 'SOLAR_LOAD') && (
+                      <Area
+                        type="monotone"
+                        dataKey="loadDemandKw"
+                        name="Facility Demand"
+                        stroke={COLORS.load}
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorLoad)"
+                        isAnimationActive={false}
+                      />
+                    )}
+
+                    {/* Battery Flow (0 kW line when pure grid-tied, active when battery is attached) */}
+                    {(streamFilter === 'ALL' || streamFilter === 'BATTERY') && (
+                      <Area
+                        type="monotone"
+                        dataKey="batteryFlowKw"
+                        name="Battery Flow (+Chg/-Dchg)"
+                        stroke={COLORS.battery}
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorBat)"
+                        isAnimationActive={false}
+                      />
+                    )}
+
+                    {/* Net Grid Flow */}
+                    {(streamFilter === 'ALL' || streamFilter === 'GRID') && (
+                      <Area
+                        type="monotone"
+                        dataKey="gridFlowKw"
+                        name="Grid Net (+Exp/-Imp)"
+                        stroke={COLORS.gridExport}
+                        strokeWidth={1.8}
+                        fillOpacity={1}
+                        fill="url(#colorGrid)"
+                        isAnimationActive={false}
+                      />
+                    )}
+                  </AreaChart>
+                )}
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
         {/* Energy Distribution & Self-Consumption Sankey/Donut Card (4 Cols) */}
-        <Card className="xl:col-span-4 border-border/70 shadow-sm flex flex-col justify-between min-w-0 overflow-hidden">
+        <Card className="xl:col-span-4 border-border/70 shadow-sm flex flex-col justify-between min-w-0 overflow-hidden relative">
           <CardHeader className="pb-2 border-b border-border/40">
             <HoverInfo
               title="Energy Partition & Autarky"
@@ -1545,13 +1986,17 @@ export default function AnalyticsDashboardPage() {
               showIcon
             >
               <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-help">
-                <PieChart className="w-5 h-5 text-emerald-500" />
+                <PieChartIcon className="w-5 h-5 text-emerald-500" />
                 Energy Distribution & Autarky
               </CardTitle>
             </HoverInfo>
           </CardHeader>
 
-          <CardContent className="pt-4 space-y-4">
+          <CardContent className="pt-4 space-y-4 relative">
+            {isTargetPending && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/40 backdrop-blur-[2px] transition-all rounded-b-xl" />
+            )}
+            <div className={`space-y-4 transition-opacity duration-200 ${isTargetPending ? 'opacity-40 pointer-events-none' : ''}`}>
             {/* Donut Chart */}
             <div className="h-[210px] w-full min-w-0 relative flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 280, height: 210 }}>
@@ -1679,6 +2124,7 @@ export default function AnalyticsDashboardPage() {
                 </div>
               );
             })()}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -2092,11 +2538,14 @@ export default function AnalyticsDashboardPage() {
                                 {grid !== null ? `${grid > 0 ? `+${grid}` : grid} kW` : '—'}
                               </td>
                               <td className="px-4 py-2 text-muted-foreground">
-                                {row.hourDecimal >= activeTariff.peakStartHour && row.hourDecimal <= activeTariff.peakEndHour ? (
-                                  <span className="text-purple-400 font-semibold">₱{activeTariff.peakRate.toFixed(2)}/kWh (Peak)</span>
-                                ) : (
-                                  <span>₱{activeTariff.offPeakRate.toFixed(2)}/kWh (Off-Peak)</span>
-                                )}
+                                {(() => {
+                                  const rowHour = row.hourDecimal ?? (parseInt((row.hour || '00:00').split(':')[0], 10) || 0);
+                                  return rowHour >= activeTariff.peakStartHour && rowHour <= activeTariff.peakEndHour ? (
+                                    <span className="text-purple-400 font-semibold">₱{activeTariff.peakRate.toFixed(2)}/kWh (Peak)</span>
+                                  ) : (
+                                    <span>₱{activeTariff.offPeakRate.toFixed(2)}/kWh (Off-Peak)</span>
+                                  );
+                                })()}
                               </td>
                               <td className="px-4 py-2">
                                 {row.isElapsed ? (

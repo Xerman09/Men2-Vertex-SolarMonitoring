@@ -14,11 +14,177 @@ import {
   getMockHourlyEnergyPoints,
   getMockApiHealth,
 } from './mock-telemetry';
+import type { DailyAnalyticsPoint, MonthlyAnalyticsPoint } from './analytics-data';
 import { sanitizeDeyeBaseUrl } from './url-validator';
+import { fileHistoryCache } from './file-history-cache';
 import { env } from './env';
 import { createLogger } from './logger';
 
 const log = createLogger('DeyeClient');
+
+const MANILA_TZ = 'Asia/Manila';
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+export interface LiveDayHistoryResult {
+  points: HourlyEnergyPoint[];
+  recordedCount: number;
+  source: 'device' | 'station';
+  isLive: boolean;
+  appliedRatio?: number;
+}
+
+export function getManilaDateParts(tsSeconds?: number): {
+  dateStr: string;
+  monthStr: string;
+  hour: number;
+  minute: number;
+  totalMins: number;
+} {
+  const d = tsSeconds !== undefined ? new Date(tsSeconds * 1000) : new Date();
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: MANILA_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const parts = fmt.formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || '00';
+  const year = get('year');
+  const month = get('month');
+  const day = get('day');
+  const hour = (parseInt(get('hour'), 10) || 0) % 24;
+  const minute = parseInt(get('minute'), 10) || 0;
+  return {
+    dateStr: `${year}-${month}-${day}`,
+    monthStr: `${year}-${month}`,
+    hour,
+    minute,
+    totalMins: hour * 60 + minute,
+  };
+}
+
+export function shiftIsoDate(isoDate: string, deltaDays: number): string {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const dt = new Date(Date.UTC(y || 2026, (m || 1) - 1, (d || 1) + deltaDays));
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getUTCDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+export function shiftIsoMonth(isoMonth: string, deltaMonths: number): string {
+  const [y, m] = isoMonth.split('-').map(Number);
+  const dt = new Date(Date.UTC(y || 2026, (m || 1) - 1 + deltaMonths, 1));
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  return `${yy}-${mm}`;
+}
+
+export function mergeHourlySeries(seriesList: HourlyEnergyPoint[][]): HourlyEnergyPoint[] {
+  if (seriesList.length === 0) return [];
+  if (seriesList.length === 1) return seriesList[0];
+  const baseLen = seriesList[0].length;
+  const merged: HourlyEnergyPoint[] = [];
+
+  for (let i = 0; i < baseLen; i++) {
+    const ref = seriesList[0][i];
+    let anyElapsed = false;
+    let solarSum = 0;
+    let loadSum = 0;
+    let batSum = 0;
+    let gridSum = 0;
+    let hasValue = false;
+
+    for (const series of seriesList) {
+      const pt = series[i];
+      if (!pt) continue;
+      if (pt.isElapsed) anyElapsed = true;
+      if (pt.solarYieldKw !== null && pt.solarYieldKw !== undefined) {
+        solarSum += pt.solarYieldKw;
+        hasValue = true;
+      }
+      if (pt.loadDemandKw !== null && pt.loadDemandKw !== undefined) {
+        loadSum += pt.loadDemandKw;
+        hasValue = true;
+      }
+      if (pt.batteryFlowKw !== null && pt.batteryFlowKw !== undefined) {
+        batSum += pt.batteryFlowKw;
+      }
+      if (pt.gridFlowKw !== null && pt.gridFlowKw !== undefined) {
+        gridSum += pt.gridFlowKw;
+      }
+    }
+
+    if (!anyElapsed && !hasValue) {
+      merged.push({ ...ref });
+    } else {
+      const gf = Number(gridSum.toFixed(2));
+      merged.push({
+        ...ref,
+        solarYieldKw: Number(solarSum.toFixed(2)),
+        loadDemandKw: Number(loadSum.toFixed(2)),
+        batteryFlowKw: Number(batSum.toFixed(2)),
+        gridFlowKw: gf,
+        gridExportKw: Number(Math.max(0, gf).toFixed(2)),
+        isElapsed: true,
+      });
+    }
+  }
+  return merged;
+}
+
+export function mergeDailySeries(lists: DailyAnalyticsPoint[][]): DailyAnalyticsPoint[] {
+  if (lists.length === 0) return [];
+  if (lists.length === 1) return lists[0];
+  const byDate = new Map<string, DailyAnalyticsPoint>();
+  for (const list of lists) {
+    for (const item of list) {
+      const existing = byDate.get(item.date);
+      if (!existing) {
+        byDate.set(item.date, { ...item });
+      } else {
+        existing.solarYieldKwh = Number((existing.solarYieldKwh + item.solarYieldKwh).toFixed(1));
+        existing.loadDemandKwh = Number((existing.loadDemandKwh + item.loadDemandKwh).toFixed(1));
+        existing.selfConsumptionKwh = Number((existing.selfConsumptionKwh + item.selfConsumptionKwh).toFixed(1));
+        existing.batteryStoredKwh = Number((existing.batteryStoredKwh + item.batteryStoredKwh).toFixed(1));
+        existing.batteryDischargedKwh = Number((existing.batteryDischargedKwh + item.batteryDischargedKwh).toFixed(1));
+        existing.gridExportKwh = Number((existing.gridExportKwh + item.gridExportKwh).toFixed(1));
+        existing.gridImportKwh = Number((existing.gridImportKwh + item.gridImportKwh).toFixed(1));
+        existing.peakSolarKw = Number((existing.peakSolarKw + item.peakSolarKw).toFixed(1));
+        existing.co2AvoidedKg = Number((existing.co2AvoidedKg + item.co2AvoidedKg).toFixed(1));
+      }
+    }
+  }
+  return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function mergeMonthlySeries(lists: MonthlyAnalyticsPoint[][]): MonthlyAnalyticsPoint[] {
+  if (lists.length === 0) return [];
+  if (lists.length === 1) return lists[0];
+  const byMonth = new Map<string, MonthlyAnalyticsPoint>();
+  const order: string[] = [];
+  for (const list of lists) {
+    for (const item of list) {
+      const existing = byMonth.get(item.month);
+      if (!existing) {
+        byMonth.set(item.month, { ...item });
+        order.push(item.month);
+      } else {
+        existing.solarYieldMwh = Number((existing.solarYieldMwh + item.solarYieldMwh).toFixed(2));
+        existing.loadDemandMwh = Number((existing.loadDemandMwh + item.loadDemandMwh).toFixed(2));
+        existing.gridExportMwh = Number((existing.gridExportMwh + item.gridExportMwh).toFixed(2));
+        existing.gridImportMwh = Number((existing.gridImportMwh + item.gridImportMwh).toFixed(2));
+        existing.co2AvoidedTons = Number((existing.co2AvoidedTons + item.co2AvoidedTons).toFixed(2));
+        const consRate = existing.solarYieldMwh > 0 ? Math.min(100, ((existing.solarYieldMwh - existing.gridExportMwh) / existing.solarYieldMwh) * 100) : 0;
+        existing.selfConsumptionPct = Number(Math.max(0, consRate).toFixed(1));
+      }
+    }
+  }
+  return order.map((m) => byMonth.get(m)!);
+}
 
 interface DeyeTokenCache {
   token: string;
@@ -189,6 +355,12 @@ export class DeyeCloudClient {
   private cachedStationDetails: Map<string, { name: string; installedCapacityKw: number; connectionStatus: string; timestamp: number }> = new Map();
   private cachedBatchDevices: { result: Map<string, Map<string, string>>; timestamp: number } | null = null;
   private inFlightBatchDevices: Promise<Map<string, Map<string, string>>> | null = null;
+  private cachedStationHistoryDay: Map<string, { points: HourlyEnergyPoint[]; recordedCount: number; timestamp: number }> = new Map();
+  private inFlightStationHistoryDay: Map<string, Promise<{ points: HourlyEnergyPoint[]; recordedCount: number } | null>> = new Map();
+  private cachedDeviceMeasurePoints: Map<string, string[]> = new Map();
+  private cachedDeviceHistoryDay: Map<string, { points: HourlyEnergyPoint[]; recordedCount: number; timestamp: number }> = new Map();
+  private cachedStationHistoryPeriod: Map<string, { items: Record<string, unknown>[]; timestamp: number }> = new Map();
+  private inFlightStationHistoryPeriod: Map<string, Promise<Record<string, unknown>[] | null>> = new Map();
 
   public directusId?: string;
   public accountEmail?: string;
@@ -560,9 +732,9 @@ export class DeyeCloudClient {
         hasKnownPlantMetadata
           ? Promise.resolve(null)
           : this.fetchWithAuth('/v1.0/station/detail', {
-              method: 'POST',
-              body: JSON.stringify({ stationId: numStationId }),
-            }),
+            method: 'POST',
+            body: JSON.stringify({ stationId: numStationId }),
+          }),
       ]);
 
       let stationName = cachedDetail?.name || matchingPlant?.stationName || `${this.accountName} Plant`;
@@ -1143,6 +1315,672 @@ export class DeyeCloudClient {
         gridExportKw: p.gridExportKw === null ? null : Number(Math.max(0, gridFlow).toFixed(2)),
       };
     });
+  }
+
+  private buildDaySlotsFromMap(
+    stepMinutes: number,
+    slotMap: Map<number, { solarSum: number; loadSum: number; batSum: number; gridSum: number; count: number }>,
+    dateStr: string
+  ): HourlyEnergyPoint[] {
+    const manilaNow = getManilaDateParts();
+    const isTargetToday = dateStr === manilaNow.dateStr;
+    const isTargetFuture = dateStr > manilaNow.dateStr;
+
+    let maxRecordedMins = -1;
+    for (const slotIdx of slotMap.keys()) {
+      const m = slotIdx * stepMinutes;
+      if (m > maxRecordedMins) maxRecordedMins = m;
+    }
+    const cutoffMins = isTargetFuture
+      ? -1
+      : isTargetToday
+        ? Math.max(manilaNow.totalMins, maxRecordedMins)
+        : 24 * 60;
+
+    const totalSteps = Math.floor((24 * 60) / stepMinutes);
+    const points: HourlyEnergyPoint[] = [];
+
+    for (let i = 0; i < totalSteps; i++) {
+      const totalMins = i * stepMinutes;
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      const hourLabel = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      const hourDecimal = Number((h + m / 60).toFixed(4));
+      const tariff = h >= 14 && h <= 20 ? 0.36 : 0.14;
+
+      if (totalMins > cutoffMins) {
+        points.push({
+          hour: hourLabel,
+          hourDecimal,
+          solarYieldKw: null,
+          loadDemandKw: null,
+          batteryFlowKw: null,
+          gridFlowKw: null,
+          gridExportKw: null,
+          tariffRateUsd: tariff,
+          isElapsed: false,
+        });
+        continue;
+      }
+
+      const acc = slotMap.get(i);
+      if (!acc || acc.count === 0) {
+        points.push({
+          hour: hourLabel,
+          hourDecimal,
+          solarYieldKw: 0,
+          loadDemandKw: 0,
+          batteryFlowKw: 0,
+          gridFlowKw: 0,
+          gridExportKw: 0,
+          tariffRateUsd: tariff,
+          isElapsed: true,
+        });
+      } else {
+        const solar = Math.max(0, Number((acc.solarSum / acc.count).toFixed(2)));
+        const load = Math.max(0, Number((acc.loadSum / acc.count).toFixed(2)));
+        const bat = Number((acc.batSum / acc.count).toFixed(2));
+        const grid = Number((acc.gridSum / acc.count).toFixed(2));
+        points.push({
+          hour: hourLabel,
+          hourDecimal,
+          solarYieldKw: solar,
+          loadDemandKw: load,
+          batteryFlowKw: bat,
+          gridFlowKw: grid,
+          gridExportKw: Number(Math.max(0, grid).toFixed(2)),
+          tariffRateUsd: tariff,
+          isElapsed: true,
+        });
+      }
+    }
+
+    return points;
+  }
+
+  public async fetchLiveStationDayHistory(
+    stationId: string,
+    dateStr: string,
+    stepMinutes: number = 5
+  ): Promise<{ points: HourlyEnergyPoint[]; recordedCount: number } | null> {
+    if (!this.hasCredentials() || !stationId) return null;
+    const manilaNow = getManilaDateParts();
+    const isToday = dateStr >= manilaNow.dateStr;
+    const cacheKey = `${stationId}:${dateStr}:${stepMinutes}`;
+    const now = Date.now();
+
+    if (!isToday) {
+      const persisted = fileHistoryCache.get<{ points: HourlyEnergyPoint[]; recordedCount: number }>(cacheKey);
+      if (persisted && Array.isArray(persisted.points) && persisted.recordedCount > 0) {
+        return persisted;
+      }
+    }
+
+    const cached = this.cachedStationHistoryDay.get(cacheKey);
+    if (cached) {
+      const ttl = isToday ? 60_000 : cached.recordedCount > 0 ? 3_600_000 : 300_000;
+      if (now - cached.timestamp < ttl) {
+        return { points: cached.points, recordedCount: cached.recordedCount };
+      }
+    }
+
+    const inFlight = this.inFlightStationHistoryDay.get(cacheKey);
+    if (inFlight) return inFlight;
+
+    const promise = (async () => {
+      try {
+        const numStationId = parseInt(stationId, 10) || stationId;
+        const res = await this.fetchWithAuth('/v1.0/station/history', {
+          method: 'POST',
+          body: JSON.stringify({
+            stationId: numStationId,
+            startAt: dateStr,
+            endAt: dateStr,
+            granularity: 1,
+          }),
+        });
+        if (!res || !res.ok) return null;
+        const body = (await res.json()) as {
+          code?: string;
+          success?: boolean;
+          stationDataItems?: Record<string, unknown>[];
+        };
+        if (body.code !== '1000000' && body.success !== true) return null;
+
+        const items = Array.isArray(body.stationDataItems) ? body.stationDataItems : [];
+        const slotMap = new Map<
+          number,
+          { solarSum: number; loadSum: number; batSum: number; gridSum: number; count: number }
+        >();
+
+        for (const item of items) {
+          const ts = Number(item.timeStamp);
+          if (!Number.isFinite(ts) || ts <= 0) continue;
+          const parts = getManilaDateParts(ts);
+          if (parts.dateStr !== dateStr) continue;
+
+          const slotIdx = Math.min(
+            Math.floor((24 * 60) / stepMinutes) - 1,
+            Math.floor(parts.totalMins / stepMinutes)
+          );
+          const genW = item.generationPower != null ? Number(item.generationPower) : 0;
+          const consW = item.consumptionPower != null ? Number(item.consumptionPower) : 0;
+          const rawGrid =
+            item.wirePower != null
+              ? Number(item.wirePower)
+              : item.gridPower != null
+                ? Number(item.gridPower)
+                : item.purchasePower != null
+                  ? Number(item.purchasePower)
+                  : genW - consW;
+          const rawBat =
+            item.batteryPower != null
+              ? Number(item.batteryPower)
+              : item.chargePower != null || item.dischargePower != null
+                ? Number(item.chargePower ?? 0) - Number(item.dischargePower ?? 0)
+                : 0;
+
+          const cur = slotMap.get(slotIdx) || { solarSum: 0, loadSum: 0, batSum: 0, gridSum: 0, count: 0 };
+          cur.solarSum += Number.isFinite(genW) ? genW / 1000 : 0;
+          cur.loadSum += Number.isFinite(consW) ? consW / 1000 : 0;
+          cur.batSum += Number.isFinite(rawBat) ? rawBat / 1000 : 0;
+          cur.gridSum += Number.isFinite(rawGrid) ? rawGrid / 1000 : 0;
+          cur.count += 1;
+          slotMap.set(slotIdx, cur);
+        }
+
+        const points = this.buildDaySlotsFromMap(stepMinutes, slotMap, dateStr);
+        const result = { points, recordedCount: items.length };
+        this.cachedStationHistoryDay.set(cacheKey, { ...result, timestamp: Date.now() });
+        if (!isToday && result.recordedCount > 0) {
+          fileHistoryCache.set(cacheKey, result, { immutable: true });
+        }
+        return result;
+      } catch (err) {
+        log.warn('Live station day history fetch failed', { accountName: this.accountName, stationId, dateStr }, err);
+        return null;
+      } finally {
+        this.inFlightStationHistoryDay.delete(cacheKey);
+      }
+    })();
+
+    this.inFlightStationHistoryDay.set(cacheKey, promise);
+    return promise;
+  }
+
+  public async fetchLiveDeviceDayHistory(
+    deviceSn: string,
+    dateStr: string,
+    stepMinutes: number = 5
+  ): Promise<{ points: HourlyEnergyPoint[]; recordedCount: number } | null> {
+    if (!this.hasCredentials() || !deviceSn) return null;
+    const manilaNow = getManilaDateParts();
+    const isToday = dateStr >= manilaNow.dateStr;
+    const cacheKey = `${deviceSn}:${dateStr}:${stepMinutes}`;
+    const now = Date.now();
+
+    if (!isToday) {
+      const persisted = fileHistoryCache.get<{ points: HourlyEnergyPoint[]; recordedCount: number }>(cacheKey);
+      if (persisted && Array.isArray(persisted.points) && persisted.recordedCount > 0) {
+        return persisted;
+      }
+    }
+
+    const cached = this.cachedDeviceHistoryDay.get(cacheKey);
+    if (cached) {
+      const ttl = isToday ? 60_000 : cached.recordedCount > 0 ? 3_600_000 : 300_000;
+      if (now - cached.timestamp < ttl) {
+        return { points: cached.points, recordedCount: cached.recordedCount };
+      }
+    }
+
+    try {
+      let availablePoints = this.cachedDeviceMeasurePoints.get(deviceSn);
+      if (!availablePoints) {
+        const mpRes = await this.fetchWithAuth('/v1.0/device/measurePoints', {
+          method: 'POST',
+          body: JSON.stringify({ deviceSn }),
+        });
+        if (!mpRes || !mpRes.ok) return null;
+        const mpBody = (await mpRes.json()) as { code?: string; success?: boolean; measurePoints?: string[] };
+        if (mpBody.code !== '1000000' && mpBody.success !== true) return null;
+        availablePoints = Array.isArray(mpBody.measurePoints) ? mpBody.measurePoints : [];
+        this.cachedDeviceMeasurePoints.set(deviceSn, availablePoints);
+      }
+
+      const pvKey = [
+        'TotalActiveACOutputPower',
+        'TotalActiveOutputPower',
+        'ActivePower',
+        'TotalOutputPower',
+        'TotalDCInputPower',
+        'TotalSolarPower',
+      ].find((k) => availablePoints!.includes(k));
+      if (!pvKey) return null;
+
+      const loadKey = ['TotalConsumptionPower', 'ConsumptionPower', 'LoadPower', 'TotalLoadPower'].find((k) =>
+        availablePoints!.includes(k)
+      );
+      const gridKey = ['TotalGridPower', 'GridPower', 'WirePower'].find((k) => availablePoints!.includes(k));
+      const measurePoints = [pvKey, loadKey, gridKey].filter((k): k is string => Boolean(k));
+
+      const res = await this.fetchWithAuth('/v1.0/device/history', {
+        method: 'POST',
+        body: JSON.stringify({
+          deviceSn,
+          startAt: dateStr,
+          endAt: dateStr,
+          granularity: 1,
+          measurePoints,
+        }),
+      });
+      if (!res || !res.ok) return null;
+
+      const body = (await res.json()) as {
+        code?: string;
+        success?: boolean;
+        dataList?: Array<{
+          time?: string | number;
+          itemList?: Array<{ key?: string; value?: string | number; unit?: string }>;
+        }>;
+      };
+      if (body.code !== '1000000' && body.success !== true) return null;
+
+      const list = Array.isArray(body.dataList) ? body.dataList : [];
+      const slotMap = new Map<
+        number,
+        { solarSum: number; loadSum: number; batSum: number; gridSum: number; count: number }
+      >();
+
+      for (const row of list) {
+        const ts = Number(row.time);
+        if (!Number.isFinite(ts) || ts <= 0) continue;
+        const parts = getManilaDateParts(ts);
+        if (parts.dateStr !== dateStr) continue;
+
+        const slotIdx = Math.min(
+          Math.floor((24 * 60) / stepMinutes) - 1,
+          Math.floor(parts.totalMins / stepMinutes)
+        );
+        let solarKw = 0;
+        let loadKw = 0;
+        let gridKw: number | null = null;
+
+        for (const item of row.itemList || []) {
+          const val = parseFloat(String(item.value ?? '0'));
+          if (!Number.isFinite(val)) continue;
+          const isKw = String(item.unit || 'W').toLowerCase() === 'kw';
+          const kw = isKw ? val : val / 1000;
+          if (item.key === pvKey) solarKw = kw;
+          else if (item.key === loadKey) loadKw = kw;
+          else if (item.key === gridKey) gridKw = kw;
+        }
+
+        const cur = slotMap.get(slotIdx) || { solarSum: 0, loadSum: 0, batSum: 0, gridSum: 0, count: 0 };
+        cur.solarSum += solarKw;
+        cur.loadSum += loadKw;
+        cur.gridSum += gridKw !== null ? gridKw : solarKw - loadKw;
+        cur.count += 1;
+        slotMap.set(slotIdx, cur);
+      }
+
+      const points = this.buildDaySlotsFromMap(stepMinutes, slotMap, dateStr);
+      const result = { points, recordedCount: list.length };
+      this.cachedDeviceHistoryDay.set(cacheKey, { ...result, timestamp: Date.now() });
+      if (!isToday && result.recordedCount > 0) {
+        fileHistoryCache.set(cacheKey, result, { immutable: true });
+      }
+      return result;
+    } catch (err) {
+      log.warn('Live device day history fetch failed', { accountName: this.accountName, deviceSn, dateStr }, err);
+      return null;
+    }
+  }
+
+  public async fetchLiveStationHistoryGranularity(
+    stationId: string,
+    granularity: 2 | 3,
+    startAt: string,
+    endAt: string
+  ): Promise<Record<string, unknown>[] | null> {
+    if (!this.hasCredentials() || !stationId) return null;
+    const manilaNow = getManilaDateParts();
+    const includesCurrent = granularity === 3 ? endAt >= manilaNow.monthStr : endAt >= manilaNow.dateStr;
+    const cacheKey = `${stationId}:g${granularity}:${startAt}:${endAt}`;
+    const now = Date.now();
+
+    if (!includesCurrent) {
+      const persisted = fileHistoryCache.get<Record<string, unknown>[]>(cacheKey);
+      if (persisted && Array.isArray(persisted) && persisted.length > 0) {
+        return persisted;
+      }
+    }
+
+    const cached = this.cachedStationHistoryPeriod.get(cacheKey);
+    if (cached) {
+      const ttl = includesCurrent ? 180_000 : 3_600_000;
+      if (now - cached.timestamp < ttl) return cached.items;
+    }
+
+    const inFlight = this.inFlightStationHistoryPeriod.get(cacheKey);
+    if (inFlight) return inFlight;
+
+    const promise = (async () => {
+      try {
+        const numStationId = parseInt(stationId, 10) || stationId;
+        const res = await this.fetchWithAuth('/v1.0/station/history', {
+          method: 'POST',
+          body: JSON.stringify({
+            stationId: numStationId,
+            startAt,
+            endAt,
+            granularity,
+          }),
+        });
+        if (!res || !res.ok) return null;
+        const body = (await res.json()) as {
+          code?: string;
+          success?: boolean;
+          stationDataItems?: Record<string, unknown>[];
+        };
+        if (body.code !== '1000000' && body.success !== true) return null;
+        const items = Array.isArray(body.stationDataItems) ? body.stationDataItems : [];
+        this.cachedStationHistoryPeriod.set(cacheKey, { items, timestamp: Date.now() });
+        if (!includesCurrent && items.length > 0) {
+          fileHistoryCache.set(cacheKey, items, { immutable: true });
+        }
+        return items;
+      } catch (err) {
+        log.warn('Station history granularity fetch failed', { accountName: this.accountName, stationId, granularity }, err);
+        return null;
+      } finally {
+        this.inFlightStationHistoryPeriod.delete(cacheKey);
+      }
+    })();
+
+    this.inFlightStationHistoryPeriod.set(cacheKey, promise);
+    return promise;
+  }
+
+  private async ensureTargetStationIds(stationId?: string): Promise<string[]> {
+    if (stationId && stationId !== 'ALL') {
+      return [stationId];
+    }
+    if (this.plants.length === 0 && this.hasCredentials()) {
+      const discovered = await this.discoverPlantsAndDevices();
+      if (discovered.plants.length > 0) {
+        this.plants = discovered.plants;
+      }
+    }
+    const ids = Array.from(new Set(this.plants.map((p) => String(p.stationId)).filter(Boolean)));
+    if (ids.length > 0) return ids;
+    return this.defaultStationId ? [this.defaultStationId] : [];
+  }
+
+  public async getLiveDayHistory(opts: {
+    stationId?: string;
+    deviceSn?: string;
+    date?: string;
+    stepMinutes?: number;
+  }): Promise<LiveDayHistoryResult | null> {
+    if (!this.hasCredentials()) return null;
+    const dateStr = opts.date || getManilaDateParts().dateStr;
+    const stepMinutes = opts.stepMinutes ?? 5;
+
+    if (opts.deviceSn && opts.deviceSn !== 'ALL') {
+      const devRes = await this.fetchLiveDeviceDayHistory(opts.deviceSn, dateStr, stepMinutes);
+      if (devRes && devRes.recordedCount > 0) {
+        return {
+          points: devRes.points,
+          recordedCount: devRes.recordedCount,
+          source: 'device',
+          isLive: true,
+          appliedRatio: 1,
+        };
+      }
+      if (this.plants.length === 0) {
+        const discovered = await this.discoverPlantsAndDevices();
+        if (discovered.plants.length > 0) this.plants = discovered.plants;
+      }
+      const shareInfo = getInverterShareInfo(this.plants, opts.deviceSn);
+      if (shareInfo) {
+        const stRes = await this.fetchLiveStationDayHistory(String(shareInfo.plant.stationId), dateStr, stepMinutes);
+        if (stRes) {
+          const factor = shareInfo.ratio;
+          const scaled = stRes.points.map((p) => {
+            if (p.solarYieldKw === null) return p;
+            const solar = Number((p.solarYieldKw * factor).toFixed(2));
+            const load = Number(((p.loadDemandKw ?? 0) * factor).toFixed(2));
+            const bat = Number(((p.batteryFlowKw ?? 0) * factor).toFixed(2));
+            const grid = Number(((p.gridFlowKw ?? solar - load) * factor).toFixed(2));
+            return {
+              ...p,
+              solarYieldKw: solar,
+              loadDemandKw: load,
+              batteryFlowKw: bat,
+              gridFlowKw: grid,
+              gridExportKw: Number(Math.max(0, grid).toFixed(2)),
+            };
+          });
+          return {
+            points: scaled,
+            recordedCount: stRes.recordedCount,
+            source: 'station',
+            isLive: true,
+            appliedRatio: Number(factor.toFixed(4)),
+          };
+        }
+      }
+      return null;
+    }
+
+    const stationIds = await this.ensureTargetStationIds(opts.stationId);
+    if (stationIds.length === 0) return null;
+
+    const results = await Promise.all(
+      stationIds.map((id) => this.fetchLiveStationDayHistory(id, dateStr, stepMinutes))
+    );
+    const valid = results.filter((r): r is { points: HourlyEnergyPoint[]; recordedCount: number } => r !== null);
+    if (valid.length === 0) return null;
+
+    return {
+      points: mergeHourlySeries(valid.map((v) => v.points)),
+      recordedCount: valid.reduce((sum, v) => sum + v.recordedCount, 0),
+      source: 'station',
+      isLive: true,
+    };
+  }
+
+  public async getLiveDailyHistory(opts: {
+    stationId?: string;
+    startDate: string;
+    endDate: string;
+    deviceSn?: string;
+  }): Promise<{ items: DailyAnalyticsPoint[]; isLive: boolean } | null> {
+    if (!this.hasCredentials()) return null;
+
+    let ratio = 1;
+    let targetStations: string[];
+    if (opts.deviceSn && opts.deviceSn !== 'ALL') {
+      const shareInfo = getInverterShareInfo(this.plants, opts.deviceSn);
+      if (shareInfo) {
+        targetStations = [String(shareInfo.plant.stationId)];
+        ratio = shareInfo.ratio;
+      } else {
+        targetStations = await this.ensureTargetStationIds(opts.stationId);
+      }
+    } else {
+      targetStations = await this.ensureTargetStationIds(opts.stationId);
+    }
+
+    if (targetStations.length === 0) return null;
+    const endExclusive = shiftIsoDate(opts.endDate, 1);
+
+    const perStationResponses = await Promise.all(
+      targetStations.map(async (sid) => ({
+        stationId: sid,
+        items: await this.fetchLiveStationHistoryGranularity(sid, 2, opts.startDate, endExclusive),
+      }))
+    );
+
+    const validResponses = perStationResponses.filter((r) => r.items !== null);
+    if (validResponses.length === 0) return null;
+
+    const capacitySum = targetStations.reduce((s, sid) => {
+      const plant = this.plants.find((p) => String(p.stationId) === sid);
+      return s + (plant?.installedCapacityKw || 0);
+    }, 0) * ratio;
+    const safeCapacity = capacitySum > 0 ? capacitySum : 100;
+
+    const byDate = new Map<
+      string,
+      { solar: number; load: number; exportKwh: number; importKwh: number; charge: number; discharge: number }
+    >();
+
+    for (const { items } of validResponses) {
+      for (const item of items || []) {
+        const y = Number(item.year);
+        const m = Number(item.month);
+        const d = Number(item.day);
+        if (!y || !m || !d) continue;
+        const dateKey = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        if (dateKey < opts.startDate || dateKey > opts.endDate) continue;
+
+        const cur = byDate.get(dateKey) || { solar: 0, load: 0, exportKwh: 0, importKwh: 0, charge: 0, discharge: 0 };
+        cur.solar += Number(item.generationValue ?? 0) * ratio;
+        cur.load += Number(item.consumptionValue ?? 0) * ratio;
+        cur.exportKwh += Number(item.gridValue ?? 0) * ratio;
+        cur.importKwh += Number(item.purchaseValue ?? 0) * ratio;
+        cur.charge += Number(item.chargeValue ?? 0) * ratio;
+        cur.discharge += Number(item.dischargeValue ?? 0) * ratio;
+        byDate.set(dateKey, cur);
+      }
+    }
+
+    // Build contiguous sorted days from startDate through endDate
+    const points: DailyAnalyticsPoint[] = [];
+    let cursor = opts.startDate;
+    let guard = 0;
+    while (cursor <= opts.endDate && guard < 90) {
+      guard++;
+      const [yy, mm, dd] = cursor.split('-').map(Number);
+      const dt = new Date(yy, (mm || 1) - 1, dd || 1);
+      const dayLabel = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+      const rec = byDate.get(cursor) || { solar: 0, load: 0, exportKwh: 0, importKwh: 0, charge: 0, discharge: 0 };
+      const selfCons = Math.max(0, rec.solar - rec.exportKwh - rec.charge);
+      const specYield = safeCapacity > 0 ? Number((rec.solar / safeCapacity).toFixed(2)) : 0;
+      const pr = rec.solar > 0 ? Number(Math.min(95, Math.max(40, (specYield / 5.0) * 100)).toFixed(1)) : 0;
+
+      points.push({
+        date: cursor,
+        dayLabel,
+        solarYieldKwh: Number(rec.solar.toFixed(1)),
+        loadDemandKwh: Number(rec.load.toFixed(1)),
+        selfConsumptionKwh: Number(selfCons.toFixed(1)),
+        batteryStoredKwh: Number(rec.charge.toFixed(1)),
+        batteryDischargedKwh: Number(rec.discharge.toFixed(1)),
+        gridExportKwh: Number(rec.exportKwh.toFixed(1)),
+        gridImportKwh: Number(rec.importKwh.toFixed(1)),
+        peakSolarKw: Number((safeCapacity * Math.min(1, specYield / 5.2)).toFixed(1)),
+        performanceRatioPct: pr,
+        specificYieldKwhKwp: specYield,
+        savingsUsd: Number((selfCons * 0.25 + rec.exportKwh * 0.12).toFixed(2)),
+        co2AvoidedKg: Number((rec.solar * 0.83).toFixed(1)),
+      });
+      cursor = shiftIsoDate(cursor, 1);
+    }
+
+    return { items: points, isLive: true };
+  }
+
+  public async getLiveMonthlyHistory(opts: {
+    stationId?: string;
+    startMonth: string;
+    endMonth: string;
+    deviceSn?: string;
+  }): Promise<{ items: MonthlyAnalyticsPoint[]; isLive: boolean } | null> {
+    if (!this.hasCredentials()) return null;
+
+    let ratio = 1;
+    let targetStations: string[];
+    if (opts.deviceSn && opts.deviceSn !== 'ALL') {
+      const shareInfo = getInverterShareInfo(this.plants, opts.deviceSn);
+      if (shareInfo) {
+        targetStations = [String(shareInfo.plant.stationId)];
+        ratio = shareInfo.ratio;
+      } else {
+        targetStations = await this.ensureTargetStationIds(opts.stationId);
+      }
+    } else {
+      targetStations = await this.ensureTargetStationIds(opts.stationId);
+    }
+
+    if (targetStations.length === 0) return null;
+
+    const perStationResponses = await Promise.all(
+      targetStations.map((sid) =>
+        this.fetchLiveStationHistoryGranularity(sid, 3, opts.startMonth, opts.endMonth)
+      )
+    );
+    const validResponses = perStationResponses.filter((r): r is Record<string, unknown>[] => r !== null);
+    if (validResponses.length === 0) return null;
+
+    const capacitySum = targetStations.reduce((s, sid) => {
+      const plant = this.plants.find((p) => String(p.stationId) === sid);
+      return s + (plant?.installedCapacityKw || 0);
+    }, 0) * ratio;
+    const safeCapacity = capacitySum > 0 ? capacitySum : 100;
+
+    const byMonth = new Map<string, { solarKwh: number; loadKwh: number; exportKwh: number; importKwh: number }>();
+
+    for (const items of validResponses) {
+      for (const item of items) {
+        const y = Number(item.year);
+        const m = Number(item.month);
+        if (!y || !m) continue;
+        const mKey = `${y}-${String(m).padStart(2, '0')}`;
+        if (mKey < opts.startMonth || mKey > opts.endMonth) continue;
+
+        const cur = byMonth.get(mKey) || { solarKwh: 0, loadKwh: 0, exportKwh: 0, importKwh: 0 };
+        cur.solarKwh += Number(item.generationValue ?? 0) * ratio;
+        cur.loadKwh += Number(item.consumptionValue ?? 0) * ratio;
+        cur.exportKwh += Number(item.gridValue ?? 0) * ratio;
+        cur.importKwh += Number(item.purchaseValue ?? 0) * ratio;
+        byMonth.set(mKey, cur);
+      }
+    }
+
+    const points: MonthlyAnalyticsPoint[] = [];
+    let cursor = opts.startMonth;
+    let guard = 0;
+    while (cursor <= opts.endMonth && guard < 24) {
+      guard++;
+      const [yy, mm] = cursor.split('-').map(Number);
+      const mName = MONTH_NAMES[(mm || 1) - 1] || cursor;
+      const label = `${mName} ${String(yy).slice(2)}`;
+      const rec = byMonth.get(cursor) || { solarKwh: 0, loadKwh: 0, exportKwh: 0, importKwh: 0 };
+      const yieldMwh = Number((rec.solarKwh / 1000).toFixed(2));
+      const loadMwh = Number((rec.loadKwh / 1000).toFixed(2));
+      const exportMwh = Number((rec.exportKwh / 1000).toFixed(2));
+      const importMwh = Number((rec.importKwh / 1000).toFixed(2));
+      const selfConsPct = rec.solarKwh > 0 ? Number(Math.max(0, Math.min(100, ((rec.solarKwh - rec.exportKwh) / rec.solarKwh) * 100)).toFixed(1)) : 0;
+
+      points.push({
+        month: label,
+        solarYieldMwh: yieldMwh,
+        loadDemandMwh: loadMwh,
+        gridExportMwh: exportMwh,
+        gridImportMwh: importMwh,
+        selfConsumptionPct: selfConsPct,
+        performanceRatioPct: rec.solarKwh > 0 ? 82.0 : 0,
+        specificYieldKwhKwp: safeCapacity > 0 ? Number((rec.solarKwh / safeCapacity).toFixed(1)) : 0,
+        savingsUsd: Number((rec.solarKwh * 0.24).toFixed(0)),
+        co2AvoidedTons: Number((yieldMwh * 0.83).toFixed(2)),
+      });
+      cursor = shiftIsoMonth(cursor, 1);
+    }
+
+    return { items: points, isLive: true };
   }
 }
 

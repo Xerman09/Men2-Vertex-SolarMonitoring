@@ -118,7 +118,7 @@ export default function FleetMonitoringPage() {
       try {
         const now = new Date();
         const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        const res = await fetch(`/api/deye/history?range=TODAY&step=5&date=${todayStr}`);
+        const res = await fetch(`/api/deye/history?range=TODAY&step=5&part=day&date=${todayStr}`);
         if (res.ok && active) {
           const json = await res.json();
           if (json.data && Array.isArray(json.data) && json.data.length > 0) {

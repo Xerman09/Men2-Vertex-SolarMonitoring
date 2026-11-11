@@ -15,6 +15,10 @@ export interface TrigonometricHistoryGraphProps {
   installedCapacityKw?: number;
   compact?: boolean;
   loading?: boolean;
+  accountId?: string;
+  stationId?: string;
+  deviceSn?: string;
+  date?: string;
 }
 
 export function TrigonometricHistoryGraph({
@@ -22,10 +26,18 @@ export function TrigonometricHistoryGraph({
   installedCapacityKw = 120,
   compact = false,
   loading = false,
+  accountId,
+  stationId,
+  deviceSn,
+  date,
 }: TrigonometricHistoryGraphProps) {
   const graph = useTrigonometricGraph({
     data,
     installedCapacityKw,
+    accountId,
+    stationId,
+    deviceSn,
+    date,
   });
 
   const [isNavCollapsed, setIsNavCollapsed] = useState<boolean>(compact);

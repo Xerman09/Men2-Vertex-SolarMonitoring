@@ -78,6 +78,7 @@ export interface InverterAlarm {
 
 export interface HourlyEnergyPoint {
   hour: string; // e.g. "06:00"
+  hourDecimal?: number; // e.g. 6.0
   solarYieldKw: number | null;
   loadDemandKw: number | null;
   batteryFlowKw: number | null; // positive charging, negative discharging

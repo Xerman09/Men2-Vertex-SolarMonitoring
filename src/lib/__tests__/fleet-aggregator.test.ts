@@ -158,6 +158,24 @@ describe('FleetAggregator Unit Suite', () => {
       enabled: true,
     };
     const client = new DeyeCloudClient(dbAccount);
+    vi.spyOn(client, 'getStationSummary').mockResolvedValue({
+      data: {
+        stationId: 'st-01',
+        name: 'North Station',
+        capacityKw: 120,
+        liveSolarPowerKw: 85.5,
+        dailyYieldKwh: 450.2,
+        totalYieldMwh: 12.4,
+        batterySoc: 92,
+        batteryPowerKw: 15.0,
+        gridPowerKw: -30.0,
+        loadPowerKw: 40.5,
+        status: 'ONLINE',
+        lastUpdated: new Date().toISOString(),
+      },
+      isLive: true,
+      stationDetected: true,
+    });
 
     // Match by directusId alias ('directus-1')
     const summaryByDirectusId = await aggregator.aggregateFleet([client], [dbAccount], ['directus-1']);

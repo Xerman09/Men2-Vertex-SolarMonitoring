@@ -83,7 +83,7 @@ export function PowerFlowChart({
             <div className="text-[11px] space-y-1 min-w-[160px]">
               <p className="text-muted-foreground">Instantaneous photovoltaic DC to AC generation sampled across current 5-minute interval.</p>
               <div className="pt-1 border-t border-border/50 text-yellow-400 font-mono font-medium">
-                Peak: {peakPv.toFixed(1)} kW
+                Peak: {peakPv != null && Number.isFinite(peakPv) ? peakPv.toFixed(1) : '0.0'} kW
               </div>
             </div>
           }
@@ -91,13 +91,13 @@ export function PowerFlowChart({
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-yellow-500/30">
             <div className="flex items-center justify-between">
               <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono">
-                PV Power ({currentLivePoint.hour})
+                PV Power ({currentLivePoint?.hour ?? '--:--'})
               </span>
               <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 motion-safe:animate-ping" />
             </div>
             <div className="flex items-baseline gap-1 mt-0.5">
               <span className="text-sm sm:text-base font-bold font-mono text-yellow-500">
-                {currentLivePoint.solarYieldKw !== null ? currentLivePoint.solarYieldKw.toFixed(2) : '0.00'}
+                {currentLivePoint?.solarYieldKw != null && Number.isFinite(currentLivePoint.solarYieldKw) ? currentLivePoint.solarYieldKw.toFixed(2) : '0.00'}
               </span>
               <span className="text-[9px] text-muted-foreground font-mono">kW</span>
             </div>
@@ -107,12 +107,12 @@ export function PowerFlowChart({
         {/* Consumption */}
         <HoverInfo
           className="block w-full cursor-help"
-          title={`Facility Load (${currentLivePoint.hour})`}
+          title={`Facility Load (${currentLivePoint?.hour ?? '--:--'})`}
           content={
             <div className="text-[11px] space-y-1 min-w-[160px]">
               <p className="text-muted-foreground">Aggregated electrical consumption demands across on-site circuits and equipment.</p>
               <div className="pt-1 border-t border-border/50 text-purple-400 font-mono font-medium">
-                Peak: {peakLoad.toFixed(1)} kW
+                Peak: {peakLoad != null && Number.isFinite(peakLoad) ? peakLoad.toFixed(1) : '0.0'} kW
               </div>
             </div>
           }
@@ -120,13 +120,13 @@ export function PowerFlowChart({
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-purple-500/30">
             <div className="flex items-center justify-between">
               <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono">
-                Load ({currentLivePoint.hour})
+                Load ({currentLivePoint?.hour ?? '--:--'})
               </span>
               <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
             </div>
             <div className="flex items-baseline gap-1 mt-0.5">
               <span className="text-sm sm:text-base font-bold font-mono text-purple-400">
-                {currentLivePoint.loadDemandKw !== null ? currentLivePoint.loadDemandKw.toFixed(2) : '0.00'}
+                {currentLivePoint?.loadDemandKw != null && Number.isFinite(currentLivePoint.loadDemandKw) ? currentLivePoint.loadDemandKw.toFixed(2) : '0.00'}
               </span>
               <span className="text-[9px] text-muted-foreground font-mono">kW</span>
             </div>
@@ -136,7 +136,7 @@ export function PowerFlowChart({
         {/* Grid Power */}
         <HoverInfo
           className="block w-full cursor-help"
-          title={`Grid Exchange (${currentLivePoint.hour})`}
+          title={`Grid Exchange (${currentLivePoint?.hour ?? '--:--'})`}
           content={
             <div className="text-[11px] space-y-1.5 min-w-[200px]">
               <p className="text-muted-foreground">Net power flow through bidirectional utility meter.</p>
@@ -145,7 +145,7 @@ export function PowerFlowChart({
                 <div className="text-rose-400 font-medium">Negative (−): Utility Grid Import</div>
               </div>
               <div className="pt-1 border-t border-border/50 text-emerald-400 font-mono font-medium">
-                Direction: {(currentLivePoint.gridExportKw ?? 0) >= 0 ? 'Surplus Export (+)' : 'Grid Import (−)'}
+                Direction: {(currentLivePoint?.gridExportKw ?? 0) >= 0 ? 'Surplus Export (+)' : 'Grid Import (−)'}
               </div>
             </div>
           }
@@ -153,13 +153,13 @@ export function PowerFlowChart({
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-emerald-500/30">
             <div className="flex items-center justify-between">
               <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono">
-                Grid Flow ({currentLivePoint.hour})
+                Grid Flow ({currentLivePoint?.hour ?? '--:--'})
               </span>
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             </div>
             <div className="flex items-baseline gap-1 mt-0.5">
               <span className="text-sm sm:text-base font-bold font-mono text-emerald-500">
-                {currentLivePoint.gridExportKw !== null
+                {currentLivePoint?.gridExportKw != null && Number.isFinite(currentLivePoint.gridExportKw)
                   ? `${currentLivePoint.gridExportKw > 0 ? '+' : ''}${currentLivePoint.gridExportKw.toFixed(2)}`
                   : '0.00'}
               </span>
@@ -171,7 +171,7 @@ export function PowerFlowChart({
         {/* Battery Flow */}
         <HoverInfo
           className="block w-full cursor-help"
-          title={`Battery ESS Flow (${currentLivePoint.hour})`}
+          title={`Battery ESS Flow (${currentLivePoint?.hour ?? '--:--'})`}
           content={
             <div className="text-[11px] space-y-1.5 min-w-[200px]">
               <p className="text-muted-foreground">Active charge or discharge rate across connected energy storage battery banks.</p>
@@ -180,7 +180,7 @@ export function PowerFlowChart({
                 <div className="text-amber-400 font-medium">Negative (−): Discharging to Load</div>
               </div>
               <div className="pt-1 border-t border-border/50 text-cyan-400 font-mono font-medium">
-                State: {(currentLivePoint.batteryFlowKw ?? 0) >= 0 ? 'Charging (+)' : 'Discharging (−)'}
+                State: {(currentLivePoint?.batteryFlowKw ?? 0) >= 0 ? 'Charging (+)' : 'Discharging (−)'}
               </div>
             </div>
           }
@@ -188,13 +188,13 @@ export function PowerFlowChart({
           <div className="p-2 sm:p-2.5 rounded-lg bg-card border border-cyan-500/30">
             <div className="flex items-center justify-between">
               <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono">
-                Battery ({currentLivePoint.hour})
+                Battery ({currentLivePoint?.hour ?? '--:--'})
               </span>
               <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
             </div>
             <div className="flex items-baseline gap-1 mt-0.5">
               <span className="text-sm sm:text-base font-bold font-mono text-cyan-500">
-                {currentLivePoint.batteryFlowKw !== null
+                {currentLivePoint?.batteryFlowKw != null && Number.isFinite(currentLivePoint.batteryFlowKw)
                   ? `${currentLivePoint.batteryFlowKw > 0 ? '+' : ''}${currentLivePoint.batteryFlowKw.toFixed(2)}`
                   : '0.00'}
               </span>
@@ -344,7 +344,7 @@ export function PowerFlowChart({
         <div className="flex-1 min-w-0 h-full">
           {/* Combined View */}
           {powerSubView === 'combined' && (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
                   <linearGradient id="pvYellowGrad" x1="0" y1="0" x2="0" y2="1">
@@ -441,7 +441,7 @@ export function PowerFlowChart({
 
           {/* Individual PV Power */}
           {powerSubView === 'pv' && (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
                   <linearGradient id="soloPvGrad" x1="0" y1="0" x2="0" y2="1">
@@ -479,7 +479,7 @@ export function PowerFlowChart({
 
           {/* Individual Consumption */}
           {powerSubView === 'consumption' && (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
                   <linearGradient id="soloLoadGrad" x1="0" y1="0" x2="0" y2="1">
@@ -517,7 +517,7 @@ export function PowerFlowChart({
 
           {/* Individual Grid Power */}
           {powerSubView === 'grid' && (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
                   <linearGradient id="soloGridGrad" x1="0" y1="0" x2="0" y2="1">
@@ -556,7 +556,7 @@ export function PowerFlowChart({
 
           {/* Individual Battery ESS Power */}
           {powerSubView === 'battery' && (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={powerSeriesData} margin={{ top: 20, right: 14, left: -16, bottom: 0 }}>
                 <defs>
                   <linearGradient id="soloBatteryGrad" x1="0" y1="0" x2="0" y2="1">
