@@ -102,3 +102,4 @@ export function useScopedHistory(scope: HistoryScope): ScopedHistoryState {
 
   return state;
 }
+

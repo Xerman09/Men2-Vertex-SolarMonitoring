@@ -29,3 +29,4 @@ export function getManilaNowParts(now: Date = new Date()): { dateStr: string; ho
 export function getManilaToday(now: Date = new Date()): string {
   return getManilaNowParts(now).dateStr;
 }
+

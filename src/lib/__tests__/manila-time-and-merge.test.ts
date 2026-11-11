@@ -38,3 +38,4 @@ describe('mergeDailySeries peak handling', () => {
     expect(merged[0].peakSolarKw).toBe(60);
   });
 });
+
