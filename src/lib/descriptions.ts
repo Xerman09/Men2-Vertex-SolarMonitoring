@@ -12,7 +12,7 @@ export const TELEMETRY_DESCRIPTIONS = {
     peakPower:
       'The highest instantaneous power output (kW) recorded during peak midday solar irradiance.',
     loadDemand:
-      'Total industrial electrical consumption drawn by machinery, HVAC, motors, and operational facility equipment.',
+      'Total industrial electrical consumption drawn by facility equipment. Note: Reads 0 kW on pure grid-tied stations where no external CT clamp or smart consumption meter is installed.',
     operatingMode:
       'Operating configuration: Grid-Tied solar PV directly serving facility demand and feeding surplus to utility grid.',
     gridExchange:
