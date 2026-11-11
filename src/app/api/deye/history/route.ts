@@ -301,16 +301,30 @@ export const GET = withGate(
           if (validDays.length > 0) {
             const mergedPoints = mergeHourlySeries(validDays.map((v) => v.points));
             const totalRecorded = validDays.reduce((s, v) => s + v.recordedCount, 0);
+            // Exact combined peak for the day comes from the merged intraday series, not the
+            // sum/max of per-station peaks.
+            let dailySummary = periodData.dailySummary;
+            if (dailySummary) {
+              const exactPeak = mergedPoints.reduce(
+                (mx, p) => (typeof p.solarYieldKw === 'number' && p.solarYieldKw > mx ? p.solarYieldKw : mx),
+                0
+              );
+              if (exactPeak > 0) {
+                dailySummary = { ...dailySummary, peakSolarKw: Number(exactPeak.toFixed(1)) };
+              }
+            }
             return NextResponse.json({
               data: mergedPoints,
               isLive: true,
               isModelSimulated: false,
               recordedCount: totalRecorded,
+              // Fleet coverage: how many DeyeCloud accounts answered vs. were queried.
+              coverage: { responded: validDays.length, expected: liveClients.length },
               range,
               stepMinutes: step,
               date: dateStr,
               stationId: normalizedStationId,
-              dailySummary: periodData.dailySummary,
+              dailySummary,
               dailySeries: periodData.dailySeries,
               monthlySeries: periodData.monthlySeries,
               notice:

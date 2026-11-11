@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { getManilaToday, getManilaNowParts } from '@/lib/manila-time';
 import {
   BarChart3,
   TrendingUp,
@@ -63,8 +64,6 @@ import { HoverInfo } from '@/components/ui/tooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { HourlyEnergyPoint, InverterConfig } from '@/lib/types';
 import {
-  generateDailyAnalytics,
-  generateMonthlyAnalytics,
   generateBatteryHourlyTelemetry,
   computeAnalyticsSummary,
   DailyAnalyticsPoint,
@@ -74,14 +73,12 @@ import {
 } from '@/lib/analytics-data';
 import { createLogger } from '@/lib/logger';
 import { telemetryCache, inverterCacheKey } from '@/lib/telemetry-cache';
-import { getMockHourlyEnergyPoints } from '@/lib/mock-telemetry';
 import {
   AnalyticsDatePicker,
   AnalyticsDatePickerValue,
   DatePreset,
   toLocalIsoDate,
   formatHumanDate,
-  parseLocalIsoDate,
   shiftDays,
 } from '@/components/analytics/AnalyticsDatePicker';
 
@@ -175,7 +172,7 @@ export default function AnalyticsDashboardPage() {
   // Active temporal configurations
   const [dateSelection, setDateSelection] = useState<AnalyticsDatePickerValue>(() => ({
     preset: 'TODAY',
-    selectedDate: toLocalIsoDate(new Date()),
+    selectedDate: getManilaToday(),
   }));
 
   const timeRange: TimeRange = useMemo(() => {
@@ -186,7 +183,7 @@ export default function AnalyticsDashboardPage() {
   }, [dateSelection.preset]);
 
   const isViewingToday = useMemo(() => {
-    return dateSelection.preset === 'TODAY' && dateSelection.selectedDate === toLocalIsoDate(new Date());
+    return dateSelection.preset === 'TODAY' && dateSelection.selectedDate === getManilaToday();
   }, [dateSelection]);
 
   const [streamFilter, setStreamFilter] = useState<StreamFilter>('ALL');
@@ -229,6 +226,10 @@ export default function AnalyticsDashboardPage() {
   // Backend-preferred scale factor for the currently displayed SN series.
   // Set from history route `appliedRatio` when present; null = fleet/ALL (unscaled).
   const [serverScale, setServerScale] = useState<{ sn: string; ratio: number } | null>(null);
+  // True when DeyeCloud returned no real telemetry for the active scope (nothing is simulated).
+  const [noLiveData, setNoLiveData] = useState<boolean>(false);
+  // Fleet coverage reported by the history API: accounts that answered vs. were queried.
+  const [liveCoverage, setLiveCoverage] = useState<{ responded: number; expected: number } | null>(null);
 
   // Instantly apply cached analytics telemetry on plant/range/SN switch (0ms instant switch)
   useEffect(() => {
@@ -239,8 +240,11 @@ export default function AnalyticsDashboardPage() {
       dailySummary?: DailyAnalyticsPoint | null;
       dailySeries?: DailyAnalyticsPoint[] | null;
       monthlySeries?: MonthlyAnalyticsPoint[] | null;
+      coverage?: { responded: number; expected: number } | null;
     }>(`analytics:v2:${currentTargetKey}`);
-    if (cached && Array.isArray(cached.points) && cached.points.length > 0) {
+    if (cached && cached.isLive && Array.isArray(cached.points) && cached.points.length > 0) {
+      setNoLiveData(false);
+      setLiveCoverage(cached.coverage ?? null);
       setHourlyData(cached.points);
       setHistoryIsLive(Boolean(cached.isLive));
       setLiveDailySummary(cached.dailySummary ?? null);
@@ -489,7 +493,7 @@ export default function AnalyticsDashboardPage() {
   const scheduleIdlePrefetch = useCallback(
     (currentDate: string, currentPreset: DatePreset) => {
       const runPrefetch = async () => {
-        const today = toLocalIsoDate(new Date());
+        const today = getManilaToday();
         const targets: Array<{ preset: DatePreset; date: string; range: string }> = [];
 
         if (currentPreset === 'TODAY') {
@@ -545,7 +549,7 @@ export default function AnalyticsDashboardPage() {
                 dailySeries?: DailyAnalyticsPoint[] | null;
                 monthlySeries?: MonthlyAnalyticsPoint[] | null;
               };
-              if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+              if (json.isLive && json.data && Array.isArray(json.data) && json.data.length > 0) {
                 telemetryCache.set(cacheKey, {
                   points: json.data as HourlyEnergyPoint[],
                   isLive: Boolean(json.isLive),
@@ -645,17 +649,22 @@ export default function AnalyticsDashboardPage() {
             dailySummary?: DailyAnalyticsPoint | null;
             dailySeries?: DailyAnalyticsPoint[] | null;
             monthlySeries?: MonthlyAnalyticsPoint[] | null;
+            coverage?: { responded: number; expected: number } | null;
           };
           if (controller.signal.aborted) return;
-          if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+          // Only real DeyeCloud telemetry is plotted; simulated fallback payloads are rejected.
+          if (json.isLive && json.data && Array.isArray(json.data) && json.data.length > 0) {
             const payloadToCache = {
               points: json.data as HourlyEnergyPoint[],
               isLive: Boolean(json.isLive),
               dailySummary: json.dailySummary ?? null,
               dailySeries: Array.isArray(json.dailySeries) ? json.dailySeries : null,
               monthlySeries: Array.isArray(json.monthlySeries) ? json.monthlySeries : null,
+              coverage: json.coverage ?? null,
             };
             telemetryCache.set(`analytics:v2:${targetKeyAtStart}`, payloadToCache);
+            setNoLiveData(false);
+            setLiveCoverage(payloadToCache.coverage);
             const backendRatio =
               typeof json.appliedRatio === 'number' && Number.isFinite(json.appliedRatio)
                 ? json.appliedRatio
@@ -682,9 +691,10 @@ export default function AnalyticsDashboardPage() {
           }
         }
 
-        // Resilient fallback: ensure chart points are always present even if API response is empty/offline
-        const fallback = getMockHourlyEnergyPoints(apiRange, undefined, 5, dateVal.selectedDate);
-        setHourlyData(fallback);
+        // No live telemetry for this scope: show an empty chart, never simulated data.
+        setNoLiveData(true);
+        setLiveCoverage(null);
+        setHourlyData(createInitial24hDiurnalSlots());
         setHistoryIsLive(false);
         setLiveDailySummary(null);
         setLiveDailySeries(null);
@@ -699,8 +709,9 @@ export default function AnalyticsDashboardPage() {
         if ((err as Error)?.name !== 'AbortError') {
           log.error('Failed to load telemetry history for analytics', err);
         }
-        const fallback = getMockHourlyEnergyPoints(apiRange, undefined, 5, dateVal.selectedDate);
-        setHourlyData(fallback);
+        setNoLiveData(true);
+        setLiveCoverage(null);
+        setHourlyData(createInitial24hDiurnalSlots());
         setHistoryIsLive(false);
         setLiveDailySummary(null);
         setLiveDailySeries(null);
@@ -869,32 +880,22 @@ export default function AnalyticsDashboardPage() {
     if (liveDailySeries && liveDailySeries.length > 0 && timeRange !== '30D') {
       return liveDailySeries.slice(-7);
     }
-    return generateDailyAnalytics(
-      7,
-      effectiveCapacityKw,
-      hasBattery,
-      parseLocalIsoDate(dateSelection.selectedDate)
-    );
-  }, [liveDailySeries, timeRange, effectiveCapacityKw, hasBattery, dateSelection.selectedDate]);
+    return [];
+  }, [liveDailySeries, timeRange]);
 
   const dailyPoints30D = useMemo<DailyAnalyticsPoint[]>(() => {
     if (liveDailySeries && liveDailySeries.length > 0 && timeRange === '30D') {
       return liveDailySeries;
     }
-    return generateDailyAnalytics(
-      30,
-      effectiveCapacityKw,
-      hasBattery,
-      parseLocalIsoDate(dateSelection.selectedDate)
-    );
-  }, [liveDailySeries, timeRange, effectiveCapacityKw, hasBattery, dateSelection.selectedDate]);
+    return [];
+  }, [liveDailySeries, timeRange]);
 
   const monthlyPoints12M = useMemo<MonthlyAnalyticsPoint[]>(() => {
     if (liveMonthlySeries && liveMonthlySeries.length > 0) {
       return liveMonthlySeries;
     }
-    return generateMonthlyAnalytics(effectiveCapacityKw);
-  }, [liveMonthlySeries, effectiveCapacityKw]);
+    return [];
+  }, [liveMonthlySeries]);
 
   // Calculate high-level KPIs and multi-period datasets
   const analyticsSummary = useMemo<AnalyticsSummary>(() => {
@@ -1011,7 +1012,7 @@ export default function AnalyticsDashboardPage() {
   // Today 24h diurnal curve with modeled clear-sky curve
   const diurnalChartData = useMemo(() => {
     const raw = isolatedHourlyData.length > 0 ? isolatedHourlyData : [];
-    const nowHour = new Date().getHours() + new Date().getMinutes() / 60;
+    const nowHour = getManilaNowParts().hourFloat;
     const liveSolar = effectiveLiveSolar;
     const liveDemand = effectiveLiveDemand;
 
@@ -1225,6 +1226,14 @@ export default function AnalyticsDashboardPage() {
                     <X className="w-3 h-3" />
                     <span>Clear Isolation</span>
                   </button>
+                </div>
+              )}
+
+              {(noLiveData || (liveCoverage && liveCoverage.responded < liveCoverage.expected)) && (
+                <div className="mt-2.5 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-mono">
+                  {noLiveData
+                    ? 'No live DeyeCloud telemetry for this selection'
+                    : `Partial fleet data: ${liveCoverage?.responded}/${liveCoverage?.expected} accounts reporting`}
                 </div>
               )}
             </div>

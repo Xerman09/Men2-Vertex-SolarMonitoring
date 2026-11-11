@@ -153,7 +153,10 @@ export function mergeDailySeries(lists: DailyAnalyticsPoint[][]): DailyAnalytics
         existing.batteryDischargedKwh = Number((existing.batteryDischargedKwh + item.batteryDischargedKwh).toFixed(1));
         existing.gridExportKwh = Number((existing.gridExportKwh + item.gridExportKwh).toFixed(1));
         existing.gridImportKwh = Number((existing.gridImportKwh + item.gridImportKwh).toFixed(1));
-        existing.peakSolarKw = Number((existing.peakSolarKw + item.peakSolarKw).toFixed(1));
+        // Per-station peaks happen at different times: summing them overstates the combined
+        // peak, so keep the largest as a conservative lower bound (exact peak is derived
+        // from the merged intraday series where available).
+        existing.peakSolarKw = Number(Math.max(existing.peakSolarKw, item.peakSolarKw).toFixed(1));
         existing.co2AvoidedKg = Number((existing.co2AvoidedKg + item.co2AvoidedKg).toFixed(1));
       }
     }

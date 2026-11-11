@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { getManilaToday } from '@/lib/manila-time';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -73,7 +74,7 @@ export function AnalyticsDatePicker({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Derived today reference
-  const todayIso = useMemo(() => toLocalIsoDate(new Date()), []);
+  const todayIso = useMemo(() => getManilaToday(), []);
   const isSelectedToday = value.selectedDate === todayIso && value.preset === 'TODAY';
   const isSelectedFuture = value.selectedDate > todayIso;
 
@@ -118,8 +119,7 @@ export function AnalyticsDatePicker({
   // Quick Preset Actions
   const applyPreset = useCallback(
     (preset: DatePreset) => {
-      const now = new Date();
-      const today = toLocalIsoDate(now);
+      const today = getManilaToday();
 
       if (preset === 'TODAY') {
         onChange({
@@ -149,7 +149,7 @@ export function AnalyticsDatePicker({
           endDate: today,
         });
       } else if (preset === 'THIS_MONTH') {
-        const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+        const start = `${today.slice(0, 7)}-01`;
         onChange({
           preset: 'THIS_MONTH',
           selectedDate: today,
@@ -157,8 +157,8 @@ export function AnalyticsDatePicker({
           endDate: today,
         });
       } else if (preset === '12M') {
-        const startYear = now.getFullYear() - 1;
-        const start = `${startYear}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+        const startYear = parseInt(today.slice(0, 4), 10) - 1;
+        const start = `${startYear}-${today.slice(5, 7)}-01`;
         onChange({
           preset: '12M',
           selectedDate: today,

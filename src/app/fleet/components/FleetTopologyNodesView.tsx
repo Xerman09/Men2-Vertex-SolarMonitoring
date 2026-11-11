@@ -77,13 +77,6 @@ export interface FleetTopologyAccount {
 
 interface FleetTopologyNodesViewProps {
   accounts: FleetTopologyAccount[];
-  telemetryHistory?: Array<{
-    hour?: string;
-    solarYieldKw?: number | null;
-    loadDemandKw?: number | null;
-    gridFlowKw?: number | null;
-    isElapsed?: boolean;
-  }> | null;
   onNavigateToDevice: (
     accountId: string,
     stationId: string,
@@ -118,7 +111,6 @@ const INVERTER_HEIGHT = 145;
 
 export function FleetTopologyNodesView({
   accounts,
-  telemetryHistory,
   onNavigateToDevice,
   copiedSn,
   onCopySn,
@@ -1275,7 +1267,7 @@ export function FleetTopologyNodesView({
                     dailyYieldKwh={selectedNode.data.dailyYieldKwh}
                     demandKw={selectedNode.data.demandKw}
                     gridPowerKw={selectedNode.data.gridPowerKw}
-                    historyPoints={telemetryHistory ?? undefined}
+                    scope={{ accountId: selectedNode.data.account.id }}
                     height={120}
                     className="w-full"
                     showLabels={true}
@@ -1321,7 +1313,7 @@ export function FleetTopologyNodesView({
                     dailyYieldKwh={selectedNode.data.dailyYieldKwh}
                     demandKw={selectedNode.data.demandKw}
                     gridPowerKw={selectedNode.data.gridPowerKw}
-                    historyPoints={telemetryHistory ?? undefined}
+                    scope={{ accountId: selectedNode.accountId, stationId: String(selectedNode.data.plant.stationId) }}
                     height={120}
                     className="w-full"
                     showLabels={true}

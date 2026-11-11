@@ -99,43 +99,6 @@ export default function FleetMonitoringPage() {
   // Copy feedback state
   const [copiedSn, setCopiedSn] = useState<string | null>(null);
 
-  // Real 5-minute interval historical telemetry (from /api/deye/history) matching Analytics Dashboard
-  const [telemetryHistory, setTelemetryHistory] = useState<Array<{
-    hour?: string;
-    solarYieldKw?: number | null;
-    loadDemandKw?: number | null;
-    gridFlowKw?: number | null;
-    isElapsed?: boolean;
-  }> | null>(() => {
-    return typeof window !== 'undefined'
-      ? telemetryCache.get('analytics:TODAY:ALL', 60000, true)
-      : null;
-  });
-
-  useEffect(() => {
-    let active = true;
-    async function loadTelemetryHistory() {
-      try {
-        const now = new Date();
-        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        const res = await fetch(`/api/deye/history?range=TODAY&step=5&part=day&date=${todayStr}`);
-        if (res.ok && active) {
-          const json = await res.json();
-          if (json.data && Array.isArray(json.data) && json.data.length > 0) {
-            telemetryCache.set('analytics:TODAY:ALL', json.data);
-            setTelemetryHistory(json.data);
-          }
-        }
-      } catch {
-        // Fallback to diurnal model
-      }
-    }
-    loadTelemetryHistory();
-    return () => {
-      active = false;
-    };
-  }, []);
-
   const fetchFleet = useCallback(async (isManual: boolean = false) => {
     // If not manual refresh and cache is fresh (< 30s), reuse cached data without hitting API
     if (!isManual && telemetryCache.isFresh(FLEET_CACHE_KEY, 30000)) {
@@ -866,7 +829,7 @@ export default function FleetMonitoringPage() {
                         demandKw={accGroup.demandKw}
                         gridPowerKw={accGroup.gridPowerKw}
                         utilizationPct={accUtilization}
-                        historyPoints={telemetryHistory ?? undefined}
+                        scope={{ accountId: accGroup.account.id }}
                         className="h-full flex-1 w-full"
                         showLabels={true}
                       />
@@ -918,7 +881,7 @@ export default function FleetMonitoringPage() {
                       demandKw={accGroup.demandKw}
                       gridPowerKw={accGroup.gridPowerKw}
                       utilizationPct={accUtilization}
-                      historyPoints={telemetryHistory ?? undefined}
+                      scope={{ accountId: accGroup.account.id }}
                       className="h-full flex-1 w-full"
                       showLabels={true}
                     />
@@ -1111,7 +1074,7 @@ export default function FleetMonitoringPage() {
                                   demandKw={pGroup.demandKw}
                                   gridPowerKw={pGroup.gridPowerKw}
                                   utilizationPct={plantUtil}
-                                  historyPoints={telemetryHistory ?? undefined}
+                                  scope={{ accountId: accGroup.account.id, stationId: String(pGroup.plant.stationId) }}
                                   height={85}
                                   className="w-full"
                                   showLabels={false}
@@ -1171,7 +1134,7 @@ export default function FleetMonitoringPage() {
                             demandKw={activePlant.demandKw}
                             gridPowerKw={activePlant.gridPowerKw}
                             utilizationPct={activePlant.capacityKw > 0 ? Math.min(100, (activePlant.livePowerKw / activePlant.capacityKw) * 100) : 0}
-                            historyPoints={telemetryHistory ?? undefined}
+                            scope={{ accountId: accGroup.account.id, stationId: String(activePlant.plant.stationId) }}
                             height={135}
                             className="w-full"
                             showLabels={true}
@@ -1254,7 +1217,7 @@ export default function FleetMonitoringPage() {
                                       demandKw={op.demandKw}
                                       gridPowerKw={op.gridPowerKw}
                                       utilizationPct={opUtil}
-                                      historyPoints={telemetryHistory ?? undefined}
+                                      scope={{ accountId: accGroup.account.id, stationId: String(op.plant.stationId) }}
                                       height={75}
                                       className="w-full"
                                       showLabels={false}

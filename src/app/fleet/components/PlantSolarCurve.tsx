@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useState, useMemo, useId, useCallback } from 'react';
+import React, { useState, useMemo, useId, useCallback, useEffect } from 'react';
 import { HoverInfo } from '@/components/ui/tooltip';
 import { Clock } from 'lucide-react';
+import { getManilaNowParts } from '@/lib/manila-time';
+import { useScopedHistory, type HistoryScope } from './useScopedHistory';
 
 // Exact Color Palette from Analytics Dashboard (src/app/analytics/page.tsx)
 const COLOR_SOLAR = '#f59e0b'; // Amber-500 / Solar Gold
@@ -54,13 +56,11 @@ interface PlantSolarCurveProps {
   height?: number | string;
   className?: string;
   showLabels?: boolean;
-  historyPoints?: Array<{
-    hour?: string;
-    solarYieldKw?: number | null;
-    loadDemandKw?: number | null;
-    gridFlowKw?: number | null;
-    isElapsed?: boolean;
-  }>;
+  /**
+   * Telemetry scope. Omit both ids for the whole fleet; set accountId for one account;
+   * set accountId + stationId for one plant. The curve fetches its own scoped history.
+   */
+  scope: HistoryScope;
 }
 
 interface HoverData {
@@ -86,9 +86,10 @@ export function PlantSolarCurve({
   height,
   className = '',
   showLabels = true,
-  historyPoints,
+  scope,
 }: PlantSolarCurveProps) {
   const [hoveredPoint, setHoveredPoint] = useState<HoverData | null>(null);
+  const { status: historyStatus, points: historyPoints } = useScopedHistory(scope);
 
   const rawId = useId();
   const gradId = `analyticsDiurnalGrad-${rawId.replace(/:/g, '')}`;
@@ -97,14 +98,15 @@ export function PlantSolarCurve({
   const safeLivePowerKw = Number.isFinite(livePowerKw) && livePowerKw >= 0 ? livePowerKw : 0;
   const safeDailyYieldKwh = Number.isFinite(dailyYieldKwh) && dailyYieldKwh >= 0 ? dailyYieldKwh : 0;
 
-  const nowHour = useMemo(() => {
-    return new Date().getHours() + new Date().getMinutes() / 60;
+  // "Now" follows Asia/Manila time (same zone as the history API) and ticks every minute.
+  const [nowHour, setNowHour] = useState<number>(() => getManilaNowParts().hourFloat);
+  useEffect(() => {
+    const timer = setInterval(() => setNowHour(getManilaNowParts().hourFloat), 60_000);
+    return () => clearInterval(timer);
   }, []);
 
-  const baselineLoad = safeCapacityKw * 0.35;
-  const dayFactor = nowHour >= 8 && nowHour <= 17 ? 1.25 : 0.85;
-  const computedDemand = parseFloat((baselineLoad * dayFactor).toFixed(1));
-  const currentDemand = demandKw !== undefined && Number.isFinite(demandKw) && demandKw > 0 ? demandKw : computedDemand;
+  // No invented values: demand/grid come from telemetry, or are zero when none is reported.
+  const currentDemand = demandKw !== undefined && Number.isFinite(demandKw) && demandKw > 0 ? demandKw : 0;
   const currentGridNet = gridPowerKw !== undefined && Number.isFinite(gridPowerKw) && gridPowerKw !== 0
     ? gridPowerKw
     : parseFloat((safeLivePowerKw - currentDemand).toFixed(1));
@@ -112,120 +114,34 @@ export function PlantSolarCurve({
     ? utilizationPct
     : (safeCapacityKw > 0 ? Math.min(100, Math.max(0, (safeLivePowerKw / safeCapacityKw) * 100)) : 0);
 
-  const peakEstimate = useMemo(() => {
-    return Math.max(safeLivePowerKw * 1.15, safeCapacityKw * 0.78, 10);
-  }, [safeLivePowerKw, safeCapacityKw]);
-
-  // Baseline synthetic history in /api/deye/history is calibrated to a 120 kWp reference system.
-  // Standardize scaling ratio to capacityKw / 120, exactly matching Analytics Dashboard scopeScaleFactor.
-  const historyScaleRatio = useMemo(() => {
-    if (!historyPoints || historyPoints.length === 0 || !safeCapacityKw || safeCapacityKw <= 0) return 1;
-    let maxHistorySolar = 0;
-    for (const pt of historyPoints) {
-      if (pt.solarYieldKw && Number.isFinite(pt.solarYieldKw) && pt.solarYieldKw > maxHistorySolar) {
-        maxHistorySolar = pt.solarYieldKw;
-      }
-    }
-    // If points are already isolated/scaled to this station capacity (within 2%), do not re-scale
-    if (maxHistorySolar > 0 && Math.abs(maxHistorySolar - safeCapacityKw * (119.5 / 120)) < 1.0) {
-      return 1;
-    }
-    return safeCapacityKw / 120;
-  }, [historyPoints, safeCapacityKw]);
-
-  // Generate diurnal points or map actual 5-minute continuous telemetry points from history
+  // Real 5-minute telemetry for exactly this scope (already in actual kW, never re-scaled).
   const points = useMemo(() => {
-    if (historyPoints && historyPoints.length > 0) {
-      return historyPoints.map((pt) => {
-        const parts = String(pt.hour || '00:00').split(':');
-        const h = parseInt(parts[0], 10) || 0;
-        const m = parseInt(parts[1], 10) || 0;
-        const hourFloat = h + m / 60;
-        const isFuture = hourFloat > nowHour;
-        const rawSolar = (pt.solarYieldKw !== null && pt.solarYieldKw !== undefined && Number.isFinite(pt.solarYieldKw) ? pt.solarYieldKw : 0) * historyScaleRatio;
-        const rawLoad = (pt.loadDemandKw !== null && pt.loadDemandKw !== undefined && Number.isFinite(pt.loadDemandKw) ? pt.loadDemandKw : baselineLoad) * historyScaleRatio;
+    return historyPoints.map((pt) => {
+      const parts = String(pt.hour || '00:00').split(':');
+      const h = parseInt(parts[0], 10) || 0;
+      const m = parseInt(parts[1], 10) || 0;
+      const hourFloat = h + m / 60;
+      const isFuture = hourFloat > nowHour;
+      const num = (v: number | null | undefined) => (v !== null && v !== undefined && Number.isFinite(v) ? v : 0);
+      const solar = num(pt.solarYieldKw);
+      const load = num(pt.loadDemandKw);
+      const grid =
+        pt.gridFlowKw !== null && pt.gridFlowKw !== undefined && Number.isFinite(pt.gridFlowKw)
+          ? pt.gridFlowKw
+          : solar - load;
 
-        // Smoothly blend latest elapsed telemetry towards live readings near current moment (within 30m)
-        let solar = rawSolar;
-        if (!isFuture && safeLivePowerKw > 0 && Math.abs(hourFloat - nowHour) <= 0.5) {
-          const weight = 1 - Math.abs(hourFloat - nowHour) / 0.5;
-          solar = rawSolar * (1 - weight) + safeLivePowerKw * weight;
-        }
-
-        let load = rawLoad;
-        if (!isFuture && demandKw !== undefined && demandKw > 0 && Math.abs(hourFloat - nowHour) <= 0.5) {
-          const weight = 1 - Math.abs(hourFloat - nowHour) / 0.5;
-          load = rawLoad * (1 - weight) + currentDemand * weight;
-        }
-
-        const rawGrid = pt.gridFlowKw !== null && pt.gridFlowKw !== undefined && Number.isFinite(pt.gridFlowKw) && safeLivePowerKw === 0
-          ? pt.gridFlowKw * historyScaleRatio
-          : (solar - load);
-
-        return {
-          hour: hourFloat,
-          label: pt.hour || `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
-          solar: parseFloat(Math.max(0, Number.isFinite(solar) ? solar : 0).toFixed(2)),
-          load: parseFloat(Math.max(0, Number.isFinite(load) ? load : 0).toFixed(2)),
-          gridNet: parseFloat((Number.isFinite(rawGrid) ? rawGrid : 0).toFixed(2)),
-          isNow: Math.abs(hourFloat - nowHour) <= 0.05,
-          isFuture,
-        };
-      });
-    }
-
-    const data: Array<{
-      hour: number;
-      label: string;
-      solar: number;
-      load: number;
-      gridNet: number;
-      isNow: boolean;
-      isFuture: boolean;
-    }> = [];
-
-    for (let h = 0; h < 24; h++) {
-      let solar = 0;
-      let load = 0;
-      const isFuture = h > nowHour;
-
-      if (!isFuture) {
-        if (h >= 5.5 && h <= 18.5) {
-          const norm = (h - 5.5) / 13;
-          const rad = norm * Math.PI;
-          const curveFactor = Math.pow(Math.max(0, Math.sin(rad)), 1.25);
-          solar = peakEstimate * curveFactor;
-
-          if (Math.abs(h - nowHour) <= 1.5 && safeLivePowerKw > 0) {
-            const weight = 1 - Math.abs(h - nowHour) / 1.5;
-            solar = solar * (1 - weight) + safeLivePowerKw * weight;
-          }
-        }
-
-        const df = h >= 8 && h <= 17 ? 1.25 : 0.85;
-        load = baselineLoad * df;
-
-        if (Math.abs(h - nowHour) <= 1.5 && currentDemand > 0) {
-          const weight = 1 - Math.abs(h - nowHour) / 1.5;
-          load = load * (1 - weight) + currentDemand * weight;
-        }
-      }
-
-      const s = parseFloat(Math.max(0, Number.isFinite(solar) ? solar : 0).toFixed(2));
-      const l = parseFloat(Math.max(0, Number.isFinite(load) ? load : 0).toFixed(2));
-      data.push({
-        hour: h,
-        label: `${String(h).padStart(2, '0')}:00`,
-        solar: s,
-        load: l,
-        gridNet: parseFloat((s - l).toFixed(2)),
-        isNow: Math.floor(nowHour) === h,
+      return {
+        hour: hourFloat,
+        label: pt.hour || `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+        solar: parseFloat(Math.max(0, solar).toFixed(2)),
+        load: parseFloat(Math.max(0, load).toFixed(2)),
+        gridNet: parseFloat(grid.toFixed(2)),
+        isNow: Math.abs(hourFloat - nowHour) <= 0.05,
         isFuture,
-      });
-    }
+      };
+    });
+  }, [historyPoints, nowHour]);
 
-    return data;
-  }, [historyPoints, historyScaleRatio, nowHour, baselineLoad, peakEstimate, safeLivePowerKw, currentDemand, demandKw]);
 
   // SVG dimensions: bigger graph drawing area
   const width = 280;
@@ -636,6 +552,12 @@ export function PlantSolarCurve({
                 </g>
               )}
             </svg>
+
+            {historyStatus !== 'ready' && (
+              <div className="pointer-events-none absolute inset-x-0 top-0 bottom-5 flex items-center justify-center text-[9px] font-mono text-muted-foreground/80">
+                {historyStatus === 'loading' ? 'Loading telemetry…' : 'No live telemetry'}
+              </div>
+            )}
 
             {/* Floating Glassmorphic Tooltip matching Analytics Recharts Tooltip */}
             {hoveredPoint && (
