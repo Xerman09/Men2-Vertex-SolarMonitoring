@@ -35,13 +35,15 @@ A primary recurring pattern in user reviews and refactor commits is **aggressive
   - **When to use badges**: Badges are strictly reserved for actionable operational states, critical errors, faults, or genuine device health alerts (e.g., `Offline`, `Fault`, `Warning`).
   - *Git history reference*: `refactor(tariff): remove redundant badge pills` (`940b3b5`) and `remove (VOS) badge from sidebar branding` (`9a83ec9`).
 
-### C. Zero "AI Slop" & No Fake/Synthetic Controls
-* **Rule**: Never introduce speculative interactive controls, synthetic/simulated charts, or dummy toggle features that do not connect to real DeyeCloud hardware telemetry.
+### C. Zero "AI Slop" & Strict Removal of All Simulated/Fake Data
+* **Rule**: Never introduce speculative interactive controls, synthetic/simulated charts, mock data fallbacks, or dummy toggle features. All displayed charts, curves, and KPIs must represent 100% authentic DeyeCloud hardware telemetry.
 * **Guidelines**:
-  - Eliminate fake switches (e.g. simulated force-charge or export limiter toggles without confirmed hardware support).
-  - Do not add theoretical or synthetic mathematical views (e.g. harmonic Fourier/polar charts or simulated trigonometric overlays) unless backed by real inverter telemetry and explicitly requested.
-  - Focus exclusively on real, verified inverter telemetry and tangible solar KPIs.
-  - *Git history reference*: `refactor(energy-flow): clean up AI slop, fake controls, and tooltip overload` (`39780d6`), `refactor(analytics): remove synthetic math tabs and fake simulation charts` (`f764078`), and `feat(navigation): remove trigonometric analytics tab` (`04d7a76`).
+  - **Eliminate fake controls**: Remove switches or toggles that lack verified hardware support (e.g. simulated force-charge or export limiter toggles).
+  - **Eliminate synthetic data & fallback generators**: Never inject mock/simulated telemetry points (e.g., `getMockHourlyEnergyPoints`, `generateDailyAnalytics`, clear-sky sine curves, or hardcoded facility baseline demand like `capacityKw * 0.35`) to fill in missing, offline, or dark hours.
+  - **Zero / Empty states over fake curves**: If real DeyeCloud telemetry is unavailable, empty, or offline for a requested date or scope, present a clean, honest empty state (e.g., "No live DeyeCloud telemetry for this selection") rather than generating artificial data.
+  - **No fake scope scaling**: Never take fleet-wide telemetry and artificially scale it down by `capacityKw / 120` to pretend it is an individual plant's or inverter's curve. Every scope must strictly show its own genuine hardware readings.
+  - **Focus on verified telemetry**: Focus exclusively on real, verified inverter telemetry and tangible solar KPIs.
+  - *Git history reference*: `refactor(energy-flow): clean up AI slop, fake controls, and tooltip overload` (`39780d6`), `refactor(analytics): remove synthetic math tabs and fake simulation charts` (`f764078`), `feat(navigation): remove trigonometric analytics tab` (`04d7a76`), and `fix(analytics,fleet): plot only real scoped telemetry, drop synthetic fallbacks` (`a962204`).
 
 ### D. Direct Interaction & Clean Container Hierarchy
 * **Rule**: Prefer making containers directly clickable rather than adding redundant buttons or nested action bars.
@@ -79,6 +81,7 @@ Before concluding any UI/UX task, verify against this checklist:
 | **No Pill Clutter** | Are there redundant `<Badge>` pills (`Auto`, `Custom`, rates, or branding tags)? Remove them. |
 | **Clean Headers** | Is the modal or card header minimal (Icon + Title + Close)? No extra badges or pills in the header. |
 | **No Fake Controls** | Do all buttons, toggles, and data points connect to real API state and hardware telemetry? |
+| **No Fake / Simulated Data** | Are all curves, intervals, and metrics backed 100% by real DeyeCloud hardware telemetry? Zero synthetic math curves, fake baseline load formulas, or mock fallback points. |
 | **Clickable Cards** | Are whole cards directly interactive rather than requiring tiny separate "Expand" buttons? |
 | **Consistent Sizing** | Are adjacent KPI cards or node boxes uniform in width and height? |
 | **Proper Currency** | Are financial figures formatted with `₱` (PHP)? |
@@ -95,6 +98,7 @@ Before concluding any UI/UX task, verify against this checklist:
 3. **Multi-Tenancy & Scoping**: Account and station telemetry must always respect selected account isolation, plant IDs, and device serial numbers (`inverter-isolation.ts`, `station-aggregate-sn-filter.ts`).
 4. **Resilient Polling**: Use `usePolling` with proper jitter, exponential backoff, and tab visibility detection. Deduplicate concurrent requests via in-flight references.
 5. **No `any` or loose console logging**: Always use structured logging via `createLogger('<ModuleName>')` (`src/lib/logger.ts`).
+6. **Strict Ban on Simulated / Fake Telemetry**: Never synthesize, mock, or fabricate hardware telemetry data when DeyeCloud returns 0 frames, times out, or is offline. Do not use synthetic sine curves, mock historical generation generators (`getMockHourlyEnergyPoints`, `generateDailyAnalytics`), or heuristic multipliers (e.g. fake load = 35% of capacity). Display clean, transparent zero/empty states (e.g., "No live DeyeCloud telemetry for this selection"). Real telemetry integrity is paramount.
 
 ---
 
