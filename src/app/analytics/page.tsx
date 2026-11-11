@@ -208,12 +208,17 @@ export default function AnalyticsDashboardPage() {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
 
+  const effectiveStationId = isFleetView ? 'ALL' : selectedStationId;
+  const effectiveInverterSn = isFleetView || !selectedInverterSn || selectedInverterSn === 'ALL'
+    ? 'ALL'
+    : String(selectedInverterSn).trim();
+
   // Strict loading synchronization tracking with date + inverter isolation.
   // Cache key shape: analytics:<FLEET|account>:<station>:<sn>:<preset>:<date>
   const currentTargetKey = inverterCacheKey(
     isFleetView ? 'FLEET' : selectedAccountId,
-    selectedStationId,
-    selectedInverterSn,
+    effectiveStationId,
+    effectiveInverterSn,
     `${dateSelection.preset}:${dateSelection.selectedDate}`
   );
   const [displayedTargetKey, setDisplayedTargetKey] = useState<string>('');
@@ -249,15 +254,15 @@ export default function AnalyticsDashboardPage() {
       setFetchingDeye(false, null);
       // Cached SN series was already backend-scaled at fetch time: mark it so
       // the local fallback ratio is not re-applied on a cache hit. ALL stays unscaled.
-      if (selectedInverterSn && selectedInverterSn !== 'ALL') {
+      if (!isFleetView && effectiveInverterSn !== 'ALL') {
         setServerScale((prev) =>
-          prev && prev.sn === selectedInverterSn ? prev : { sn: selectedInverterSn, ratio: -1 }
+          prev && prev.sn === effectiveInverterSn ? prev : { sn: effectiveInverterSn, ratio: -1 }
         );
       } else {
         setServerScale(null);
       }
     }
-  }, [currentTargetKey, selectedInverterSn, setIsPlantSwitching, setFetchingDeye]);
+  }, [isFleetView, currentTargetKey, effectiveInverterSn, setIsPlantSwitching, setFetchingDeye]);
 
   // Safety watchdog to prevent indefinite plant switching state
   useEffect(() => {
@@ -338,7 +343,7 @@ export default function AnalyticsDashboardPage() {
               dailyYieldKwh: plant.dailyYieldKwh ? plant.dailyYieldKwh / invDevices.length : undefined,
             });
           });
-        } else if (acc.inverters && acc.inverters.length > 0 && (selectedStationId === 'ALL' || String(plant.stationId) === String(selectedStationId))) {
+        } else if (acc.inverters && acc.inverters.length > 0 && (isFleetView || selectedStationId === 'ALL' || String(plant.stationId) === String(selectedStationId))) {
           acc.inverters.forEach((inv: InverterConfig) => {
             list.push({
               deviceSn: inv.sn,
@@ -363,7 +368,7 @@ export default function AnalyticsDashboardPage() {
 
   // Selected Inverter Node
   const selectedInverter = useMemo<InverterNode | null>(() => {
-    if (!selectedInverterSn || selectedInverterSn === 'ALL') return null;
+    if (isFleetView || !selectedInverterSn || selectedInverterSn === 'ALL') return null;
     const directMatch = availableInverters.find(
       (inv) => String(inv.deviceSn).trim() === String(selectedInverterSn).trim()
     );
@@ -407,7 +412,7 @@ export default function AnalyticsDashboardPage() {
       }
     }
     return null;
-  }, [availableInverters, selectedInverterSn, accounts]);
+  }, [isFleetView, availableInverters, selectedInverterSn, accounts]);
 
 
 
@@ -442,21 +447,24 @@ export default function AnalyticsDashboardPage() {
 
   // Active Title reflecting isolation
   const activeDashboardTitle = useMemo(() => {
-    if (selectedInverter) {
-      return `Isolated: Inverter ${selectedInverter.model} (${selectedInverter.deviceSn})`;
-    }
     if (isFleetView) {
       const plantCount = accounts.reduce((acc, a) => acc + (a.plants?.length || 0), 0);
       return `Enterprise Fleet Aggregate (${plantCount} Stations · ${baseCapacityKw} kWp)`;
+    }
+    if (selectedInverter) {
+      return `Isolated: Inverter ${selectedInverter.model} (${selectedInverter.deviceSn})`;
     }
     if (selectedPlant) {
       return `${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp)`;
     }
     return selectedAccount?.name || 'Commercial Solar Array';
-  }, [selectedInverter, isFleetView, accounts, baseCapacityKw, selectedPlant, selectedAccount]);
+  }, [isFleetView, accounts, baseCapacityKw, selectedInverter, selectedPlant, selectedAccount]);
 
   // Selected Target Title matching the top panel fleet dropdown selection
   const selectedScopeTitle = useMemo(() => {
+    if (isFleetView) {
+      return `Global Fleet Aggregate (${totalAccounts} Accounts)`;
+    }
     if (selectedInverter) {
       return `Inverter ${selectedInverter.model || selectedInverter.deviceSn} (${selectedInverter.deviceSn})`;
     }
@@ -468,11 +476,8 @@ export default function AnalyticsDashboardPage() {
         ? `${selectedAccount.name} (${selectedAccount.plants.length} Plants)`
         : selectedAccount.name;
     }
-    if (isFleetView) {
-      return `Global Fleet Aggregate (${totalAccounts} Accounts)`;
-    }
     return 'Commercial Solar Array';
-  }, [selectedInverter, selectedPlant, selectedAccount, isFleetView, totalAccounts]);
+  }, [isFleetView, totalAccounts, selectedInverter, selectedPlant, selectedAccount]);
 
   // Inverter scaling ratio for solar yield curves
   const inverterPowerRatio = useMemo(() => {
@@ -504,19 +509,24 @@ export default function AnalyticsDashboardPage() {
           );
         }
 
-        const sn = selectedInverterSn && selectedInverterSn !== 'ALL' ? String(selectedInverterSn).trim() : 'ALL';
+        const effStation = isFleetView ? 'ALL' : selectedStationId;
+        const sn = isFleetView || !selectedInverterSn || selectedInverterSn === 'ALL'
+          ? 'ALL'
+          : String(selectedInverterSn).trim();
         const accountParam =
           !isFleetView && selectedAccountId && selectedAccountId !== 'ALL'
             ? `&accountId=${encodeURIComponent(selectedAccountId)}`
             : '';
         const stationParam =
-          selectedStationId !== 'ALL' ? `&station_id=${encodeURIComponent(selectedStationId)}` : '';
-        const snParam = sn !== 'ALL' ? `&device_sn=${encodeURIComponent(sn)}` : '';
+          !isFleetView && effStation !== 'ALL'
+            ? `&station_id=${encodeURIComponent(effStation)}`
+            : '';
+        const snParam = !isFleetView && sn !== 'ALL' ? `&device_sn=${encodeURIComponent(sn)}` : '';
 
         for (const target of targets) {
           const cacheKey = `analytics:v2:${inverterCacheKey(
             isFleetView ? 'FLEET' : selectedAccountId,
-            selectedStationId,
+            effStation,
             sn,
             `${target.preset}:${target.date}`
           )}`;
@@ -571,10 +581,13 @@ export default function AnalyticsDashboardPage() {
       dateVal: AnalyticsDatePickerValue = dateSelection,
       forceReload: boolean = false
     ) => {
-      const snAtStart = selectedInverterSn && selectedInverterSn !== 'ALL' ? String(selectedInverterSn).trim() : 'ALL';
+      const snAtStart = isFleetView || !selectedInverterSn || selectedInverterSn === 'ALL'
+        ? 'ALL'
+        : String(selectedInverterSn).trim();
+      const stationAtStart = isFleetView ? 'ALL' : selectedStationId;
       const targetKeyAtStart = inverterCacheKey(
         isFleetView ? 'FLEET' : selectedAccountId,
-        selectedStationId,
+        stationAtStart,
         snAtStart,
         `${dateVal.preset}:${dateVal.selectedDate}`
       );
@@ -606,12 +619,16 @@ export default function AnalyticsDashboardPage() {
             ? `&accountId=${encodeURIComponent(selectedAccountId)}`
             : '';
         const stationParam =
-          selectedStationId !== 'ALL' ? `&station_id=${encodeURIComponent(selectedStationId)}` : '';
+          !isFleetView && stationAtStart !== 'ALL'
+            ? `&station_id=${encodeURIComponent(stationAtStart)}`
+            : '';
         const dateParam = `&date=${encodeURIComponent(dateVal.selectedDate)}`;
         const startDateParam = dateVal.startDate ? `&startDate=${encodeURIComponent(dateVal.startDate)}` : '';
         const endDateParam = dateVal.endDate ? `&endDate=${encodeURIComponent(dateVal.endDate)}` : '';
         const deviceSnParam =
-          snAtStart !== 'ALL' ? `&device_sn=${encodeURIComponent(snAtStart)}` : '';
+          !isFleetView && snAtStart !== 'ALL'
+            ? `&device_sn=${encodeURIComponent(snAtStart)}`
+            : '';
         const res = await fetch(
           `/api/deye/history?range=${apiRange}&step=5${dateParam}${startDateParam}${endDateParam}${accountParam}${stationParam}${deviceSnParam}`,
           {
@@ -720,17 +737,17 @@ export default function AnalyticsDashboardPage() {
     if (historyIsLive) {
       return 1.0;
     }
-    if (selectedInverter && serverScale && serverScale.sn === selectedInverterSn) {
+    if (!isFleetView && selectedInverter && serverScale && serverScale.sn === effectiveInverterSn) {
       return 1.0;
     }
-    if (selectedInverter) {
+    if (!isFleetView && selectedInverter) {
       return inverterPowerRatio;
     }
     if (effectiveCapacityKw && effectiveCapacityKw > 0) {
       return Number((effectiveCapacityKw / 120).toFixed(4));
     }
     return 1.0;
-  }, [historyIsLive, selectedInverter, serverScale, selectedInverterSn, inverterPowerRatio, effectiveCapacityKw]);
+  }, [historyIsLive, isFleetView, selectedInverter, serverScale, effectiveInverterSn, inverterPowerRatio, effectiveCapacityKw]);
 
   const isolatedHourlyData = useMemo(() => {
     if (scopeScaleFactor === 1.0) return hourlyData;
@@ -771,6 +788,17 @@ export default function AnalyticsDashboardPage() {
 
   // Live telemetry aggregators for the current scope (Plant, Inverter, Account, or Fleet summing all stations)
   const effectiveLiveSolar = useMemo(() => {
+    if (isFleetView) {
+      if (accounts.length > 0) {
+        let total = 0;
+        for (const acc of accounts) {
+          const plantSum = acc.plants?.reduce((s, p) => s + (p.liveSolarPowerKw || 0), 0) || 0;
+          total += plantSum > 0 ? plantSum : (acc.liveSolarPowerKw || 0);
+        }
+        return total;
+      }
+      return undefined;
+    }
     if (selectedInverter) return selectedInverter.liveSolarPowerKw;
     if (selectedPlant) return selectedPlant.liveSolarPowerKw;
     if (selectedAccount) {
@@ -780,18 +808,28 @@ export default function AnalyticsDashboardPage() {
       }
       return selectedAccount.liveSolarPowerKw;
     }
-    if (isFleetView && accounts.length > 0) {
-      let total = 0;
-      for (const acc of accounts) {
-        const plantSum = acc.plants?.reduce((s, p) => s + (p.liveSolarPowerKw || 0), 0) || 0;
-        total += plantSum > 0 ? plantSum : (acc.liveSolarPowerKw || 0);
-      }
-      return total;
-    }
     return undefined;
-  }, [selectedInverter, selectedPlant, selectedAccount, isFleetView, accounts]);
+  }, [isFleetView, accounts, selectedInverter, selectedPlant, selectedAccount]);
 
   const effectiveLiveDemand = useMemo(() => {
+    if (isFleetView) {
+      if (accounts.length > 0) {
+        let total = 0;
+        let anyDefined = false;
+        for (const acc of accounts) {
+          const plantSum = acc.plants?.reduce((s, p) => s + (p.consumptionPowerKw || 0), 0) || 0;
+          if (plantSum > 0) {
+            total += plantSum;
+            anyDefined = true;
+          } else if (typeof acc.consumptionPowerKw === 'number') {
+            total += acc.consumptionPowerKw;
+            anyDefined = true;
+          }
+        }
+        return anyDefined ? total : undefined;
+      }
+      return undefined;
+    }
     if (selectedPlant) return selectedPlant.consumptionPowerKw;
     if (selectedAccount) {
       if (selectedAccount.plants && selectedAccount.plants.length > 0) {
@@ -800,25 +838,21 @@ export default function AnalyticsDashboardPage() {
       }
       return selectedAccount.consumptionPowerKw;
     }
-    if (isFleetView && accounts.length > 0) {
-      let total = 0;
-      let anyDefined = false;
-      for (const acc of accounts) {
-        const plantSum = acc.plants?.reduce((s, p) => s + (p.consumptionPowerKw || 0), 0) || 0;
-        if (plantSum > 0) {
-          total += plantSum;
-          anyDefined = true;
-        } else if (typeof acc.consumptionPowerKw === 'number') {
-          total += acc.consumptionPowerKw;
-          anyDefined = true;
-        }
-      }
-      return anyDefined ? total : undefined;
-    }
     return undefined;
-  }, [selectedPlant, selectedAccount, isFleetView, accounts]);
+  }, [isFleetView, accounts, selectedPlant, selectedAccount]);
 
   const effectiveDailyYield = useMemo(() => {
+    if (isFleetView) {
+      if (accounts.length > 0) {
+        let total = 0;
+        for (const acc of accounts) {
+          const plantSum = acc.plants?.reduce((s, p) => s + (p.dailyYieldKwh || 0), 0) || 0;
+          total += plantSum > 0 ? plantSum : (acc.dailyYieldKwh || 0);
+        }
+        return total;
+      }
+      return undefined;
+    }
     if (selectedInverter) return selectedInverter.dailyYieldKwh;
     if (selectedPlant) return selectedPlant.dailyYieldKwh;
     if (selectedAccount) {
@@ -828,16 +862,8 @@ export default function AnalyticsDashboardPage() {
       }
       return selectedAccount.dailyYieldKwh;
     }
-    if (isFleetView && accounts.length > 0) {
-      let total = 0;
-      for (const acc of accounts) {
-        const plantSum = acc.plants?.reduce((s, p) => s + (p.dailyYieldKwh || 0), 0) || 0;
-        total += plantSum > 0 ? plantSum : (acc.dailyYieldKwh || 0);
-      }
-      return total;
-    }
     return undefined;
-  }, [selectedInverter, selectedPlant, selectedAccount, isFleetView, accounts]);
+  }, [isFleetView, accounts, selectedInverter, selectedPlant, selectedAccount]);
 
   const dailyPoints7D = useMemo<DailyAnalyticsPoint[]>(() => {
     if (liveDailySeries && liveDailySeries.length > 0 && timeRange !== '30D') {
@@ -877,7 +903,7 @@ export default function AnalyticsDashboardPage() {
         ? accounts.reduce((s, a) => s + (a.batterySoc || 0), 0) / accounts.length
         : undefined;
     const liveSoc = isViewingToday
-      ? (selectedPlant?.batterySoc ?? selectedAccount?.batterySoc ?? fleetSoc)
+      ? (isFleetView ? fleetSoc : (selectedPlant?.batterySoc ?? selectedAccount?.batterySoc))
       : undefined;
     const invEff = isViewingToday ? selectedInverter?.efficiencyPct : undefined;
 
@@ -1039,7 +1065,7 @@ export default function AnalyticsDashboardPage() {
         isElapsed: !isFuture,
       };
     });
-  }, [isolatedHourlyData, effectiveCapacityKw, hasBattery, isViewingToday, selectedPlant, selectedAccount, selectedInverter, effectiveLiveSolar, effectiveLiveDemand]);
+  }, [isolatedHourlyData, effectiveCapacityKw, hasBattery, isViewingToday, isFleetView, selectedPlant, selectedAccount, selectedInverter, effectiveLiveSolar, effectiveLiveDemand]);
 
   // Pie chart energy distribution data
   const energyDistributionData = useMemo(() => {
@@ -1060,8 +1086,16 @@ export default function AnalyticsDashboardPage() {
 
   // Plant switcher handler
   const handleSelectPlant = (stationId: string, accountId?: string) => {
-    if (isFleetView && accountId && accountId !== selectedAccountId) {
-      selectAccountAndPlant(accountId, stationId);
+    if (stationId === 'ALL') {
+      selectAccountAndPlant('ALL', 'ALL');
+      setSelectedInverterSn('ALL');
+      return;
+    }
+    const targetAccId =
+      accountId ||
+      accounts.find((a) => a.plants?.some((p) => String(p.stationId) === String(stationId)))?.id;
+    if (targetAccId) {
+      selectAccountAndPlant(targetAccId, stationId);
     } else {
       setSelectedStationId(stationId);
     }
@@ -1162,7 +1196,7 @@ export default function AnalyticsDashboardPage() {
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-headline cursor-help">
                     Enterprise Analytics Dashboard
                   </h1>
-                  {selectedInverterSn && selectedInverterSn !== 'ALL' && (
+                  {!isFleetView && selectedInverterSn && selectedInverterSn !== 'ALL' && (
                     <Badge className="bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 text-[11px] font-mono px-2 py-0.5 gap-1 shadow-xs animate-in fade-in-50">
                       <Cpu className="w-3 h-3 text-cyan-400" />
                       Inverter Isolated
@@ -1172,7 +1206,7 @@ export default function AnalyticsDashboardPage() {
               </HoverInfo>
 
               {/* Active Inverter Isolation Banner */}
-              {selectedInverterSn && selectedInverterSn !== 'ALL' && (
+              {!isFleetView && selectedInverterSn && selectedInverterSn !== 'ALL' && (
                 <div className="mt-2.5 flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs shadow-xs animate-in fade-in-50">
                   <Cpu className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                   <span className="font-semibold text-cyan-300">Active Inverter Isolation:</span>

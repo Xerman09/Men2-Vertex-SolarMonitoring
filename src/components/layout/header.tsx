@@ -63,6 +63,7 @@ export function Header({
     selectedPlant,
     selectAccountAndPlant,
     selectedInverterSn,
+    setSelectedInverterSn,
     isFleetView,
     totalAccounts,
     liveAccountsCount,
@@ -327,7 +328,8 @@ export function Header({
                   <div className="shrink-0 mb-1">
                     <button
                       onClick={() => {
-                        setSelectedAccountId('ALL');
+                        selectAccountAndPlant('ALL', 'ALL');
+                        setSelectedInverterSn('ALL');
                         setShowAccountDropdown(false);
                       }}
                       className={`w-full flex items-center justify-between p-2.5 rounded-xl transition-all cursor-pointer ${

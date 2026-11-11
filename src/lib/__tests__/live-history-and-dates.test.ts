@@ -171,6 +171,66 @@ describe('Date-distinct telemetry & live DeyeCloud history resolution', () => {
     expect(summary.performanceRatioPct).toBe(0);
   });
 
+  it('aggregates all stations when stationId is omitted for multi-plant fleet view', async () => {
+    const multiPlants: PlantInfo[] = [
+      {
+        stationId: '61825217',
+        stationName: 'Men 2 office',
+        installedCapacityKw: 100,
+        devices: [],
+      },
+      {
+        stationId: '62112170',
+        stationName: 'La Salette School',
+        installedCapacityKw: 100,
+        devices: [],
+      },
+    ];
+
+    const client = new DeyeCloudClient({
+      id: 'hanvin-live',
+      name: 'Hanvin Solar',
+      appId: 'valid-app-id',
+      appSecret: 'valid-secret-key',
+      email: 'ops@hanvin.local',
+      password: 'valid-password',
+      plants: multiPlants,
+    });
+    vi.spyOn(client, 'getAccessToken').mockResolvedValue('mock-token');
+
+    const noonOct8Ts = Math.floor(Date.parse('2026-10-08T04:00:00Z') / 1000);
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      const parsed = JSON.parse(String(init?.body || '{}'));
+      const isStation1 = parsed.stationId === 61825217 || parsed.stationId === '61825217';
+      return new Response(
+        JSON.stringify({
+          code: '1000000',
+          success: true,
+          stationDataItems: [
+            {
+              timeStamp: noonOct8Ts,
+              generationPower: isStation1 ? 30000 : 50000,
+              consumptionPower: isStation1 ? 10000 : 15000,
+              wirePower: isStation1 ? 20000 : 35000,
+              batteryPower: 0,
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    const fleetRes = await client.getLiveDayHistory({ date: '2026-10-08', stepMinutes: 5 });
+    expect(fleetRes?.isLive).toBe(true);
+
+    const noon = fleetRes?.points.find((p) => p.hour === '12:00');
+    // Sum of 30 kW + 50 kW = 80 kW
+    expect(noon?.solarYieldKw).toBe(80);
+    // Sum of 10 kW + 15 kW = 25 kW
+    expect(noon?.loadDemandKw).toBe(25);
+  });
+
   it('validates station_id, startDate, and endDate cleanly in historyQuerySchema', () => {
     expect(
       historyQuerySchema.safeParse({
