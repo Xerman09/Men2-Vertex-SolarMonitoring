@@ -3,6 +3,8 @@
 import React, { useState, useMemo, useId } from 'react';
 import { HoverInfo } from '@/components/ui/tooltip';
 import { Clock } from 'lucide-react';
+import { getManilaNowParts } from '@/lib/manila-time';
+import { useScopedHistory, type HistoryScope } from './useScopedHistory';
 
 // Exact Color Palette from Analytics Dashboard (src/app/analytics/page.tsx)
 const COLOR_SOLAR = '#f59e0b'; // Amber-500 / Solar Gold
@@ -45,6 +47,7 @@ interface InverterSolarCurveProps {
   isFault?: boolean;
   isStandby?: boolean;
   loadPct?: number;
+  scope?: HistoryScope;
 }
 
 export function InverterSolarCurve({
@@ -56,8 +59,10 @@ export function InverterSolarCurve({
   isFault = false,
   isStandby = false,
   loadPct,
+  scope,
 }: InverterSolarCurveProps) {
   const [hoveredPoint, setHoveredPoint] = useState<{ hour: number; power: number; x: number; y: number } | null>(null);
+  const { status: historyStatus, points: historyPoints } = useScopedHistory(scope || {});
   const rawId = useId();
   const gradId = `invSolarGrad-${rawId.replace(/:/g, '')}`;
 
@@ -69,45 +74,31 @@ export function InverterSolarCurve({
     ? loadPct
     : (safeRatedKw > 0 ? Math.min(100, (safeLiveSolarPowerKw / safeRatedKw) * 100) : 0);
 
-  const nowHour = useMemo(() => {
-    return new Date().getHours() + new Date().getMinutes() / 60;
-  }, []);
+  const nowHour = useMemo(() => getManilaNowParts().hourFloat, []);
 
-  // Generate 24 diurnal points (00:00 - 23:00) scaled to inverter rated capacity, strictly up to current time
+  // Real 5-minute historical telemetry points for this inverter
   const points = useMemo(() => {
-    const peakEstimate = Math.max(safeLiveSolarPowerKw * 1.15, (safeRatedKw || 50) * 0.78, 5);
+    if (!historyPoints || historyPoints.length === 0) return [];
+    return historyPoints.map((pt) => {
+      const parts = String(pt.hour || '00:00').split(':');
+      const h = parseInt(parts[0], 10) || 0;
+      const m = parseInt(parts[1], 10) || 0;
+      const hourFloat = h + m / 60;
+      const isFuture = hourFloat > nowHour;
+      const power =
+        pt.solarYieldKw !== null && pt.solarYieldKw !== undefined && Number.isFinite(pt.solarYieldKw)
+          ? Math.max(0, pt.solarYieldKw)
+          : 0;
 
-    const data: Array<{ hour: number; label: string; power: number; isNow: boolean; isFuture: boolean }> = [];
-
-    for (let h = 0; h < 24; h++) {
-      let power = 0;
-      const isFuture = h > nowHour;
-
-      if (!isFuture) {
-        if (h >= 5.5 && h <= 18.5) {
-          const norm = (h - 5.5) / 13;
-          const rad = norm * Math.PI;
-          const curveFactor = Math.pow(Math.max(0, Math.sin(rad)), 1.25);
-          power = peakEstimate * curveFactor;
-
-          if (Math.abs(h - nowHour) <= 1.5 && safeLiveSolarPowerKw > 0) {
-            const weight = 1 - Math.abs(h - nowHour) / 1.5;
-            power = power * (1 - weight) + safeLiveSolarPowerKw * weight;
-          }
-        }
-      }
-
-      data.push({
-        hour: h,
-        label: `${String(h).padStart(2, '0')}:00`,
-        power: parseFloat(Math.max(0, Number.isFinite(power) ? power : 0).toFixed(1)),
-        isNow: Math.floor(nowHour) === h,
+      return {
+        hour: hourFloat,
+        label: pt.hour || `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+        power: parseFloat(power.toFixed(2)),
+        isNow: Math.abs(hourFloat - nowHour) <= 0.05,
         isFuture,
-      });
-    }
-
-    return data;
-  }, [safeRatedKw, safeLiveSolarPowerKw, nowHour]);
+      };
+    });
+  }, [historyPoints, nowHour]);
 
   const width = 240;
   const svgHeight = 42;
@@ -131,43 +122,39 @@ export function InverterSolarCurve({
   }, [safeRatedKw, safeLiveSolarPowerKw, points]);
 
   const coords = useMemo(() => {
-    return points.map((p, idx) => {
-      const x = paddingX + (idx / Math.max(1, points.length - 1)) * plotWidth;
+    const list = points.length > 0 ? points : [
+      { hour: 0, label: '00:00', power: 0, isNow: false, isFuture: false },
+      { hour: Math.max(0.1, nowHour), label: 'Now', power: safeLiveSolarPowerKw, isNow: true, isFuture: false },
+    ];
+    return list.map((p) => {
+      const validHour = Number.isFinite(p.hour) ? Math.min(24, Math.max(0, p.hour)) : 0;
+      const x = paddingX + (validHour / 24) * plotWidth;
       const validPower = Number.isFinite(p.power) ? p.power : 0;
       const rawY = paddingY + plotHeight - (validPower / maxPower) * plotHeight;
       const y = Math.max(paddingY, Math.min(paddingY + plotHeight, Number.isFinite(rawY) ? rawY : paddingY + plotHeight));
       return { ...p, x, y };
     });
-  }, [points, maxPower, plotWidth, plotHeight, paddingX, paddingY]);
+  }, [points, maxPower, plotWidth, plotHeight, paddingX, paddingY, nowHour, safeLiveSolarPowerKw]);
 
   // Elapsed curve coordinates only up to current moment (no future values!)
   const elapsedCoords = useMemo(() => {
-    const elapsed = coords.filter((c) => c.hour <= Math.floor(nowHour));
-    const nowX = paddingX + (Math.min(23, nowHour) / 23) * plotWidth;
-    const rawNowY = paddingY + plotHeight - (safeLiveSolarPowerKw / maxPower) * plotHeight;
-    const nowY = Math.max(paddingY, Math.min(paddingY + plotHeight, Number.isFinite(rawNowY) ? rawNowY : paddingY + plotHeight));
-
-    const list = [...elapsed];
-    if (list.length === 0 || Math.abs(list[list.length - 1].x - nowX) > 2) {
-      list.push({
-        hour: nowHour,
-        label: `${String(Math.floor(nowHour)).padStart(2, '0')}:${String(Math.floor((nowHour % 1) * 60)).padStart(2, '0')}`,
-        power: safeLiveSolarPowerKw,
-        isNow: true,
-        isFuture: false,
-        x: nowX,
-        y: nowY,
-      });
-    } else {
-      list[list.length - 1] = {
-        ...list[list.length - 1],
-        power: safeLiveSolarPowerKw,
-        x: nowX,
-        y: nowY,
-      };
+    const elapsed = coords.filter((c) => c.hour <= nowHour);
+    if (elapsed.length === 0) {
+      const bottomY = paddingY + plotHeight;
+      return [
+        { hour: 0, label: '00:00', power: 0, isNow: false, isFuture: false, x: paddingX, y: bottomY },
+        { hour: nowHour, label: 'Now', power: safeLiveSolarPowerKw, isNow: true, isFuture: false, x: paddingX + (nowHour / 24) * plotWidth, y: bottomY },
+      ];
     }
-    return list;
-  }, [coords, nowHour, paddingX, plotWidth, paddingY, plotHeight, maxPower, safeLiveSolarPowerKw]);
+    if (elapsed.length === 1) {
+      const bottomY = paddingY + plotHeight;
+      return [
+        { hour: 0, label: '00:00', power: 0, isNow: false, isFuture: false, x: paddingX, y: bottomY },
+        elapsed[0],
+      ];
+    }
+    return elapsed;
+  }, [coords, nowHour, paddingX, plotWidth, paddingY, plotHeight, safeLiveSolarPowerKw]);
 
   const nowCoord = elapsedCoords.length > 0 ? elapsedCoords[elapsedCoords.length - 1] : null;
 
@@ -214,7 +201,7 @@ export function InverterSolarCurve({
         ) : (
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1">
-              <span className="size-1.5 rounded-full inline-block shrink-0 bg-amber-500 animate-pulse" />
+              <span className={`size-1.5 rounded-full inline-block shrink-0 ${safeLiveSolarPowerKw > 0 ? 'bg-amber-500 animate-pulse' : 'bg-muted-foreground/60'}`} />
               <span className="text-muted-foreground/80">Live:</span>
               <span className="font-bold text-amber-500">{(liveSolarPowerKw ?? 0).toFixed(1)} kW</span>
               {dailyYieldKwh !== undefined && dailyYieldKwh > 0 && (
@@ -223,6 +210,11 @@ export function InverterSolarCurve({
                 </span>
               )}
             </div>
+            {points.length === 0 && (
+              <span className="text-[7px] text-muted-foreground/60 font-mono">
+                {safeLiveSolarPowerKw === 0 ? 'Standby · No data' : 'No history frames'}
+              </span>
+            )}
           </div>
         )}
       </div>

@@ -1353,6 +1353,11 @@ export function FleetTopologyNodesView({
                     dailyYieldKwh={selectedNode.data.dailyYieldKwh}
                     height={75}
                     className="w-full"
+                    scope={{
+                      accountId: selectedNode.accountId,
+                      stationId: String(selectedNode.stationId),
+                      deviceSn: selectedNode.data.deviceSn,
+                    }}
                   />
                 </div>
 

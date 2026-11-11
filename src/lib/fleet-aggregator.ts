@@ -165,22 +165,30 @@ export class FleetAggregator {
           const plantSum = item.station.plantsSummary?.find(
             (ps) => String(ps.stationId) === String(plant.stationId)
           );
+          const plantIsOffline = plantSum?.status === 'OFFLINE' || (!plantSum && item.station.status === 'OFFLINE');
+          const nowSec = Math.floor(Date.now() / 1000);
 
           // Check whether any inverter in this plant reported live batch power/yield
           // so standby (0 kW) inverters are not double-counted with plant average power.
-          const plantHasBatchSolar = inverters.some((inv) => {
+          const plantHasBatchSolar = !plantIsOffline && inverters.some((inv) => {
             const d = item.batchData?.get(inv.deviceSn);
-            return d ? parseFloat(d.get('TotalActiveACOutputPower') || '0') > 0 : false;
+            if (!d) return false;
+            const collSec = parseFloat(d.get('__collectionTime') || '0');
+            const isStale = collSec > 0 && (nowSec - collSec > 86400 * 2);
+            return !isStale && parseFloat(d.get('TotalActiveACOutputPower') || '0') > 0;
           });
-          const plantHasBatchDaily = inverters.some((inv) => {
+          const plantHasBatchDaily = !plantIsOffline && inverters.some((inv) => {
             const d = item.batchData?.get(inv.deviceSn);
-            return d ? parseFloat(d.get('DailyActiveProduction') || '0') > 0 : false;
+            if (!d) return false;
+            const collSec = parseFloat(d.get('__collectionTime') || '0');
+            const isStale = collSec > 0 && (nowSec - collSec > 86400 * 2);
+            return !isStale && parseFloat(d.get('DailyActiveProduction') || '0') > 0;
           });
 
           let plantSolarKw = 0;
           let plantDailyKwh = 0;
 
-          if (inverters.length === 0 && plantSum) {
+          if (inverters.length === 0 && plantSum && !plantIsOffline) {
             plantSolarKw = plantSum.liveSolarPowerKw || 0;
             plantDailyKwh = plantSum.dailyYieldKwh || 0;
             accSolarKw += plantSolarKw;
@@ -201,10 +209,14 @@ export class FleetAggregator {
             const loggerStatus = matchingLogger?.status || 'ONLINE';
 
             const devData = item.batchData?.get(device.deviceSn);
-            const liveKw = devData
+            const collSec = parseFloat(devData?.get('__collectionTime') || '0');
+            const isDevStale = collSec > 0 && (nowSec - collSec > 86400 * 2);
+            const isDeviceOffline = plantIsOffline || isDevStale;
+
+            const liveKw = (!isDeviceOffline && devData)
               ? parseFloat((parseFloat(devData.get('TotalActiveACOutputPower') || '0') / 1000).toFixed(2))
               : 0;
-            const dailyKwh = devData
+            const dailyKwh = (!isDeviceOffline && devData)
               ? parseFloat(devData.get('DailyActiveProduction') || '0')
               : 0;
             const lifetimeKwh = devData
@@ -213,32 +225,38 @@ export class FleetAggregator {
             const ratedPowerW = devData
               ? parseFloat(devData.get('RatedPower') || '50000')
               : (device.ratedKw ? device.ratedKw * 1000 : 50000);
-            const consKw = devData
+            const consKw = (!isDeviceOffline && devData)
               ? parseFloat((parseFloat(devData.get('TotalConsumptionPower') || '0') / 1000).toFixed(2))
               : 0;
 
             // Use per-plant telemetry from plantsSummary only if this plant had no live inverter batch readings
-            const assignedLiveKw = plantHasBatchSolar
+            const assignedLiveKw = isDeviceOffline
+              ? 0
+              : plantHasBatchSolar
               ? liveKw
               : plantSum
               ? parseFloat(((plantSum.liveSolarPowerKw || 0) / (inverters.length || 1)).toFixed(2))
               : plants.length <= 1
               ? parseFloat(((item.station.liveSolarPowerKw || 0) / (inverters.length || 1)).toFixed(2))
               : 0;
-            const assignedDailyKwh = plantHasBatchDaily
+            const assignedDailyKwh = isDeviceOffline
+              ? 0
+              : plantHasBatchDaily
               ? dailyKwh
               : plantSum
               ? parseFloat(((plantSum.dailyYieldKwh || 0) / (inverters.length || 1)).toFixed(2))
               : plants.length <= 1
               ? parseFloat(((item.station.dailyYieldKwh || 0) / (inverters.length || 1)).toFixed(2))
               : 0;
-            const assignedGridKw = plantSum ? plantSum.gridPowerKw : item.station.gridPowerKw;
-            const assignedConsKw = consKw > 0
+            const assignedGridKw = isDeviceOffline ? 0 : (plantSum ? plantSum.gridPowerKw : item.station.gridPowerKw);
+            const assignedConsKw = isDeviceOffline
+              ? 0
+              : consKw > 0
               ? consKw
               : plantSum
               ? parseFloat(((plantSum.loadPowerKw || 0) / (inverters.length || 1)).toFixed(2))
               : 0;
-            const assignedBatterySoc = plantSum?.batterySoc ?? (item.station.batterySoc || 0);
+            const assignedBatterySoc = isDeviceOffline ? 0 : (plantSum?.batterySoc ?? (item.station.batterySoc || 0));
 
             plantSolarKw += assignedLiveKw;
             plantDailyKwh += assignedDailyKwh;
@@ -256,38 +274,53 @@ export class FleetAggregator {
               model: `SUN-${Math.round(ratedPowerW / 1000)}K-SG01HP3-EU-AM2`,
               ratedKw: Math.round(ratedPowerW / 1000),
               loggerSn: loggerSn,
-              loggerStatus: loggerStatus,
+              loggerStatus: isDeviceOffline ? 'OFFLINE' : loggerStatus,
               liveSolarPowerKw: assignedLiveKw,
               dailyYieldKwh: assignedDailyKwh,
               gridPowerKw: assignedGridKw,
               consumptionPowerKw: assignedConsKw,
               batterySoc: assignedBatterySoc,
               mode: 'PEAK SHAVING',
-              status: devData ? 'ONLINE' : (plantSum?.status === 'ONLINE' || device.status === 'ONLINE') ? 'ONLINE' : 'STANDBY',
-              isLive: item.isLive,
+              status: isDeviceOffline
+                ? 'OFFLINE'
+                : devData
+                ? 'ONLINE'
+                : (plantSum?.status === 'ONLINE' || device.status === 'ONLINE')
+                ? 'ONLINE'
+                : 'STANDBY',
+              isLive: isDeviceOffline ? false : item.isLive,
             });
           }
 
           // Synchronize plant-level live metrics so Account & Fleet views share identical plant telemetry
-          plant.liveSolarPowerKw = parseFloat(
-            (plantSolarKw > 0 ? plantSolarKw : (plantSum?.liveSolarPowerKw ?? plant.liveSolarPowerKw ?? 0)).toFixed(2)
-          );
-          plant.dailyYieldKwh = parseFloat(
-            (plantDailyKwh > 0 ? plantDailyKwh : (plantSum?.dailyYieldKwh ?? plant.dailyYieldKwh ?? 0)).toFixed(2)
-          );
+          plant.liveSolarPowerKw = plantIsOffline
+            ? 0
+            : parseFloat(
+                (plantSolarKw > 0 ? plantSolarKw : (plantSum?.liveSolarPowerKw ?? plant.liveSolarPowerKw ?? 0)).toFixed(2)
+              );
+          plant.dailyYieldKwh = plantIsOffline
+            ? 0
+            : parseFloat(
+                (plantDailyKwh > 0 ? plantDailyKwh : (plantSum?.dailyYieldKwh ?? plant.dailyYieldKwh ?? 0)).toFixed(2)
+              );
           if (plantSum) {
-            plant.consumptionPowerKw = plantSum.loadPowerKw;
-            plant.gridPowerKw = plantSum.gridPowerKw;
-            plant.batterySoc = plantSum.batterySoc;
+            plant.consumptionPowerKw = plantIsOffline ? 0 : plantSum.loadPowerKw;
+            plant.gridPowerKw = plantIsOffline ? 0 : plantSum.gridPowerKw;
+            plant.batterySoc = plantIsOffline ? 0 : plantSum.batterySoc;
             if (plantSum.capacityKw > 0) {
               plant.installedCapacityKw = plantSum.capacityKw;
             }
           }
         }
 
+        const allPlantsOffline = plants.length > 0 && plants.every((p) => {
+          const ps = item.station.plantsSummary?.find((s) => String(s.stationId) === String(p.stationId));
+          return ps ? ps.status === 'OFFLINE' : item.station.status === 'OFFLINE';
+        });
+
         // Use station solar kW and yield if individual inverters weren't in current plant batch
-        const finalSolarKw = accSolarKw > 0 ? accSolarKw : item.station.liveSolarPowerKw;
-        const finalDailyKwh = accDailyKwh > 0 ? accDailyKwh : item.station.dailyYieldKwh;
+        const finalSolarKw = allPlantsOffline ? 0 : (accSolarKw > 0 ? accSolarKw : item.station.liveSolarPowerKw);
+        const finalDailyKwh = allPlantsOffline ? 0 : (accDailyKwh > 0 ? accDailyKwh : item.station.dailyYieldKwh);
         const finalLifetimeMwh = accLifetimeMwh > 0 ? accLifetimeMwh : (item.station.totalYieldMwh || 0);
         totalSolarPowerKw += finalSolarKw;
         totalDailyYieldKwh += finalDailyKwh;
@@ -305,18 +338,18 @@ export class FleetAggregator {
           enabled: accConfig?.enabled,
           admin: accConfig?.admin,
           isDemo: Boolean(accConfig?.isDemo),
-          isLive: item.isLive,
+          isLive: allPlantsOffline ? false : item.isLive,
           stationCount: plants.length,
           deviceCount: invCount + logCount,
           inverterCount: invCount,
           loggerCount: logCount,
           liveSolarPowerKw: parseFloat(finalSolarKw.toFixed(2)),
           dailyYieldKwh: parseFloat(finalDailyKwh.toFixed(2)),
-          gridPowerKw: item.station.gridPowerKw,
-          consumptionPowerKw: item.station.loadPowerKw,
-          batterySoc: item.station.batterySoc,
+          gridPowerKw: allPlantsOffline ? 0 : item.station.gridPowerKw,
+          consumptionPowerKw: allPlantsOffline ? 0 : item.station.loadPowerKw,
+          batterySoc: allPlantsOffline ? 0 : item.station.batterySoc,
           capacityKw: parseFloat(accountCapacityKw.toFixed(1)),
-          status: item.isLive ? 'ONLINE' : 'OFFLINE',
+          status: allPlantsOffline ? 'OFFLINE' : (item.isLive ? 'ONLINE' : 'OFFLINE'),
           lastPingMs: item.health.pingMs,
           plants,
           autoDiscovered: accConfig?.autoDiscovered,

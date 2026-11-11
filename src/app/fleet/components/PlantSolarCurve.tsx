@@ -206,7 +206,22 @@ export function PlantSolarCurve({
 
     const list = [...elapsed];
     // Ensure final coordinate anchors precisely at the current moment
-    if (list.length === 0 || Math.abs(list[list.length - 1].x - nowX) > 1) {
+    if (list.length === 0) {
+      const bottomY = paddingY + plotHeight;
+      list.push({
+        hour: 0,
+        label: '00:00',
+        solar: 0,
+        load: 0,
+        gridNet: 0,
+        isNow: false,
+        isFuture: false,
+        x: paddingX,
+        solarY: bottomY,
+        loadY: bottomY,
+      });
+    }
+    if (Math.abs(list[list.length - 1].x - nowX) > 1) {
       list.push({
         hour: nowHour,
         label: `${String(Math.floor(nowHour)).padStart(2, '0')}:${String(Math.floor((nowHour % 1) * 60)).padStart(2, '0')}`,

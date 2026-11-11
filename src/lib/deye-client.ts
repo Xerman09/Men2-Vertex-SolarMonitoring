@@ -352,7 +352,7 @@ export class DeyeCloudClient {
   private tokenFetchPromise: Promise<string | null> | null = null;
   private cachedStationSummary: Map<string, { result: { data: StationSummary; isLive: boolean; stationDetected: boolean }; timestamp: number }> = new Map();
   private inFlightStationSummary: Map<string, Promise<{ data: StationSummary; isLive: boolean; stationDetected: boolean }>> = new Map();
-  private cachedStationDetails: Map<string, { name: string; installedCapacityKw: number; connectionStatus: string; timestamp: number }> = new Map();
+  private cachedStationDetails: Map<string, { name: string; installedCapacityKw: number; connectionStatus: string; lastUpdateTime?: number; timestamp: number }> = new Map();
   private cachedBatchDevices: { result: Map<string, Map<string, string>>; timestamp: number } | null = null;
   private inFlightBatchDevices: Promise<Map<string, Map<string, string>>> | null = null;
   private cachedStationHistoryDay: Map<string, { points: HourlyEnergyPoint[]; recordedCount: number; timestamp: number }> = new Map();
@@ -740,6 +740,7 @@ export class DeyeCloudClient {
       let stationName = cachedDetail?.name || matchingPlant?.stationName || `${this.accountName} Plant`;
       let installedCapacityKw = cachedDetail?.installedCapacityKw || matchingPlant?.installedCapacityKw || 0;
       let connectionStatus = cachedDetail?.connectionStatus || 'NORMAL';
+      let lastUpdateTime = cachedDetail?.lastUpdateTime || 0;
 
       if (detailRes && detailRes.ok) {
         const detailData = await detailRes.json();
@@ -755,10 +756,12 @@ export class DeyeCloudClient {
             matchingPlant.installedCapacityKw = installedCapacityKw;
           }
           connectionStatus = detailData.station.connectionStatus || 'NORMAL';
+          lastUpdateTime = detailData.station.lastUpdateTime ? Number(detailData.station.lastUpdateTime) : 0;
           this.cachedStationDetails.set(idKey, {
             name: stationName,
             installedCapacityKw,
             connectionStatus,
+            lastUpdateTime,
             timestamp: Date.now(),
           });
         }
@@ -767,10 +770,17 @@ export class DeyeCloudClient {
       if (latestRes && latestRes.ok) {
         const latestData = await latestRes.json();
         if (latestData.code === '1000000' || latestData.success === true) {
-          const genW = latestData.generationPower != null ? Number(latestData.generationPower) : 0;
-          const consW = latestData.consumptionPower != null ? Number(latestData.consumptionPower) : 0;
-          const wireW = latestData.wirePower != null ? Number(latestData.wirePower) : 0;
-          const batW = latestData.batteryPower != null ? Number(latestData.batteryPower) : 0;
+          // Detect offline stations: DeyeCloud OpenAPI freezes stale snapshots when equipment disconnects.
+          // /v1.0/station/latest provides lastUpdateTime directly. Telemetry older than 48 hours is stale/offline.
+          const effectiveLastUpdate = Number(latestData.lastUpdateTime || lastUpdateTime || 0);
+          const nowSec = Math.floor(Date.now() / 1000);
+          const isStale = effectiveLastUpdate > 0 && (nowSec - effectiveLastUpdate > 86400 * 2);
+          const isStationOffline = connectionStatus === 'ALL_OFFLINE' || connectionStatus === 'OFFLINE' || isStale;
+
+          const genW = isStationOffline ? 0 : (latestData.generationPower != null ? Number(latestData.generationPower) : 0);
+          const consW = isStationOffline ? 0 : (latestData.consumptionPower != null ? Number(latestData.consumptionPower) : 0);
+          const wireW = isStationOffline ? 0 : (latestData.wirePower != null ? Number(latestData.wirePower) : 0);
+          const batW = isStationOffline ? 0 : (latestData.batteryPower != null ? Number(latestData.batteryPower) : 0);
           const batSoc = latestData.batterySOC != null ? Number(latestData.batterySOC) : 0;
 
           const summary: StationSummary = {
@@ -784,11 +794,11 @@ export class DeyeCloudClient {
             batteryPowerKw: parseFloat((batW / 1000).toFixed(2)),
             gridPowerKw: parseFloat((wireW / 1000).toFixed(2)),
             loadPowerKw: parseFloat((consW / 1000).toFixed(2)),
-            status: connectionStatus === 'NORMAL' ? 'ONLINE' : 'ALARM',
+            status: isStationOffline ? 'OFFLINE' : (connectionStatus === 'NORMAL' ? 'ONLINE' : 'ALARM'),
             lastUpdated: new Date().toISOString(),
           };
 
-          const liveResult = { data: summary, isLive: true, stationDetected: true };
+          const liveResult = { data: summary, isLive: !isStationOffline, stationDetected: true };
           this.cachedStationSummary.set(idKey, { result: liveResult, timestamp: Date.now() });
           return liveResult;
         }
@@ -1010,6 +1020,9 @@ export class DeyeCloudClient {
           if (body.code === '1000000' && Array.isArray(body.deviceDataList)) {
             for (const item of body.deviceDataList) {
               const dataMap = new Map<string, string>();
+              if (item.collectionTime != null) {
+                dataMap.set('__collectionTime', String(item.collectionTime));
+              }
               if (Array.isArray(item.dataList)) {
                 for (const p of item.dataList) {
                   if (p.key) dataMap.set(p.key, String(p.value));
@@ -1077,56 +1090,62 @@ export class DeyeCloudClient {
     const dataMap = batch.get(sn);
 
     if (dataMap && dataMap.size > 0) {
-      const activeW = parseFloat(dataMap.get('TotalActiveACOutputPower') || '0');
-      const dailyKwh = parseFloat(dataMap.get('DailyActiveProduction') || '0');
+      const collTimeSec = parseFloat(dataMap.get('__collectionTime') || '0');
+      const nowSec = Math.floor(Date.now() / 1000);
+      const isDeviceStale = collTimeSec > 0 && (nowSec - collTimeSec > 86400 * 2);
+
+      const activeW = isDeviceStale ? 0 : parseFloat(dataMap.get('TotalActiveACOutputPower') || '0');
+      const dailyKwh = isDeviceStale ? 0 : parseFloat(dataMap.get('DailyActiveProduction') || '0');
       const totalKwh = parseFloat(dataMap.get('TotalActiveProduction') || '0');
       const ratedW = parseFloat(dataMap.get('RatedPower') || '50000');
-      const freqHz = parseFloat(dataMap.get('ACOutputFrequencyR') || '60.0');
+      const freqHz = isDeviceStale ? 0 : parseFloat(dataMap.get('ACOutputFrequencyR') || '60.0');
 
-      const mpptStrings = [
-        {
-          stringId: 'PV1 String',
-          voltageV: parseFloat(dataMap.get('DCVoltagePV1') || '0'),
-          currentA: parseFloat(dataMap.get('DCCurrentPV1') || '0'),
-          powerKw: parseFloat((parseFloat(dataMap.get('DCPowerPV1') || '0') / 1000).toFixed(2)),
-        },
-        {
-          stringId: 'PV2 String',
-          voltageV: parseFloat(dataMap.get('DCVoltagePV2') || '0'),
-          currentA: parseFloat(dataMap.get('DCCurrentPV2') || '0'),
-          powerKw: parseFloat((parseFloat(dataMap.get('DCPowerPV2') || '0') / 1000).toFixed(2)),
-        },
-        {
-          stringId: 'PV3 String',
-          voltageV: parseFloat(dataMap.get('DCVoltagePV3') || '0'),
-          currentA: parseFloat(dataMap.get('DCCurrentPV3') || '0'),
-          powerKw: parseFloat((parseFloat(dataMap.get('DCPowerPV3') || '0') / 1000).toFixed(2)),
-        },
-        {
-          stringId: 'PV4 String',
-          voltageV: parseFloat(dataMap.get('DCVoltagePV4') || '0'),
-          currentA: parseFloat(dataMap.get('DCCurrentPV4') || '0'),
-          powerKw: parseFloat((parseFloat(dataMap.get('DCPowerPV4') || '0') / 1000).toFixed(2)),
-        },
-      ].filter((s) => s.voltageV > 0 || s.powerKw > 0);
+      const mpptStrings = isDeviceStale
+        ? []
+        : [
+            {
+              stringId: 'PV1 String',
+              voltageV: parseFloat(dataMap.get('DCVoltagePV1') || '0'),
+              currentA: parseFloat(dataMap.get('DCCurrentPV1') || '0'),
+              powerKw: parseFloat((parseFloat(dataMap.get('DCPowerPV1') || '0') / 1000).toFixed(2)),
+            },
+            {
+              stringId: 'PV2 String',
+              voltageV: parseFloat(dataMap.get('DCVoltagePV2') || '0'),
+              currentA: parseFloat(dataMap.get('DCCurrentPV2') || '0'),
+              powerKw: parseFloat((parseFloat(dataMap.get('DCPowerPV2') || '0') / 1000).toFixed(2)),
+            },
+            {
+              stringId: 'PV3 String',
+              voltageV: parseFloat(dataMap.get('DCVoltagePV3') || '0'),
+              currentA: parseFloat(dataMap.get('DCCurrentPV3') || '0'),
+              powerKw: parseFloat((parseFloat(dataMap.get('DCPowerPV3') || '0') / 1000).toFixed(2)),
+            },
+            {
+              stringId: 'PV4 String',
+              voltageV: parseFloat(dataMap.get('DCVoltagePV4') || '0'),
+              currentA: parseFloat(dataMap.get('DCCurrentPV4') || '0'),
+              powerKw: parseFloat((parseFloat(dataMap.get('DCPowerPV4') || '0') / 1000).toFixed(2)),
+            },
+          ].filter((s) => s.voltageV > 0 || s.powerKw > 0);
 
       const phases = [
         {
           phase: 'L1' as const,
           voltageV: parseFloat(dataMap.get('ACVoltageRUA') || '0'),
-          currentA: parseFloat(dataMap.get('ACCurrentRUA') || '0'),
+          currentA: isDeviceStale ? 0 : parseFloat(dataMap.get('ACCurrentRUA') || '0'),
           frequencyHz: freqHz,
         },
         {
           phase: 'L2' as const,
           voltageV: parseFloat(dataMap.get('ACVoltageSVB') || '0'),
-          currentA: parseFloat(dataMap.get('ACCurrentSVB') || '0'),
+          currentA: isDeviceStale ? 0 : parseFloat(dataMap.get('ACCurrentSVB') || '0'),
           frequencyHz: freqHz,
         },
         {
           phase: 'L3' as const,
           voltageV: parseFloat(dataMap.get('ACVoltageTWC') || '0'),
-          currentA: parseFloat(dataMap.get('ACCurrentTWC') || '0'),
+          currentA: isDeviceStale ? 0 : parseFloat(dataMap.get('ACCurrentTWC') || '0'),
           frequencyHz: freqHz,
         },
       ];
@@ -1144,7 +1163,7 @@ export class DeyeCloudClient {
         deviceSn: sn,
         model: `SUN-${Math.round(ratedW / 1000)}K-SG01HP3-EU-AM2`,
         firmwareVersion: 'Deye Live Protocol',
-        connectionStatus: 'ONLINE',
+        connectionStatus: isDeviceStale ? 'STANDBY' : 'ONLINE',
         efficiencyPct: rawEfficiency ? parseFloat(rawEfficiency) : 98.4,
         heatsinkTempC: rawHeatsink ? parseFloat(rawHeatsink) : 45.0,
         ambientTempC: rawAmbient ? parseFloat(rawAmbient) : 30.0,
@@ -1163,7 +1182,7 @@ export class DeyeCloudClient {
         activeFaults: [],
       };
 
-      return { data: telemetry, isLive: true };
+      return { data: telemetry, isLive: !isDeviceStale };
     }
 
     return { data: emptyTelemetry, isLive: false };

@@ -1304,6 +1304,11 @@ export default function FleetMonitoringPage() {
                                     isStandby={isStandby}
                                     loadPct={loadPct}
                                     className="w-full"
+                                    scope={{
+                                      accountId: accGroup.account.id,
+                                      stationId: String(activePlant.plant.stationId),
+                                      deviceSn: inv.deviceSn,
+                                    }}
                                   />
                                 </div>
 

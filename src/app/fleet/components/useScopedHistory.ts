@@ -14,6 +14,7 @@ export interface ScopedHistoryPoint {
 export interface HistoryScope {
   accountId?: string;
   stationId?: string;
+  deviceSn?: string;
 }
 
 export interface ScopedHistoryState {
@@ -34,7 +35,7 @@ const cache = new Map<string, CacheEntry>();
 const inFlight = new Map<string, Promise<ScopedHistoryState>>();
 
 function scopeKey(scope: HistoryScope, date: string): string {
-  return `fleet-curve:v1:${scope.accountId || 'ALL'}:${scope.stationId || 'ALL'}:${date}`;
+  return `fleet-curve:v1:${scope.accountId || 'ALL'}:${scope.stationId || 'ALL'}:${scope.deviceSn || 'ALL'}:${date}`;
 }
 
 async function loadScopedHistory(scope: HistoryScope, date: string, force: boolean): Promise<ScopedHistoryState> {
@@ -50,6 +51,7 @@ async function loadScopedHistory(scope: HistoryScope, date: string, force: boole
       const qs = new URLSearchParams({ range: 'TODAY', step: '5', part: 'day', date });
       if (scope.accountId && scope.accountId !== 'ALL') qs.set('accountId', scope.accountId);
       if (scope.stationId && scope.stationId !== 'ALL') qs.set('station_id', scope.stationId);
+      if (scope.deviceSn && scope.deviceSn !== 'ALL') qs.set('device_sn', scope.deviceSn);
       const res = await fetch(`/api/deye/history?${qs.toString()}`);
       if (!res.ok) throw new Error(`history ${res.status}`);
       const json = (await res.json()) as { data?: ScopedHistoryPoint[]; isLive?: boolean };
