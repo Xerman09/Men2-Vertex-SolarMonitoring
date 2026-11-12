@@ -16,7 +16,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-06** | Yield Arbitrage | Hardcoded "without physical BESS storage" system mode string | `[x] Completed` |
 | **FIX-07** | Hardware Telemetry | Synthetic temperature additions (`heatsink + 6.6°C`, `ambient - 2°C`) | `[x] Completed` |
 | **FIX-08** | Hardware Telemetry | Hardcoded protection status strings ("ACTIVE & COMPLIANT", "0.0 mA", "0 DETECTED") | `[x] Completed` |
-| **FIX-09** | Deye Client | Hardcoded fallbacks (`98.4%` efficiency, `45°C` heatsink, `30°C` ambient, `0.99` PF, `1.5%` THD) | `[ ] Pending` |
+| **FIX-09** | Deye Client | Hardcoded fallbacks (`98.4%` efficiency, `45°C` heatsink, `30°C` ambient, `0.99` PF, `1.5%` THD) | `[x] Completed` |
 | **FIX-10** | Energy Flow | Equal-split inverter power distribution (`plantSolarKw / inverters.length`) in drawer | `[ ] Pending` |
 | **FIX-11** | Energy Flow | Proportional plant capacity scaling fallback when multi-plant summary is missing | `[ ] Pending` |
 | **FIX-12** | Energy Flow | Hardcoded fallback of `100 kW` for unrated inverters | `[ ] Pending` |
@@ -108,17 +108,10 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ---
 
-#### [ ] FIX-09: Synthetic Fallback Defaults in `deye-client.ts`
-* **File & Lines**: [`src/lib/deye-client.ts#L1167-L1170`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1167-L1170)
-* **Problem**: In `getInverterTelemetry`, when DeyeCloud does not return specific modbus registers, it injects optimistic static values:
-  ```typescript
-  efficiencyPct: rawEfficiency ? parseFloat(rawEfficiency) : 98.4,
-  heatsinkTempC: rawHeatsink ? parseFloat(rawHeatsink) : 45.0,
-  ambientTempC: rawAmbient ? parseFloat(rawAmbient) : 30.0,
-  powerFactor: rawPF ? parseFloat(rawPF) : 0.99,
-  thdPct: rawTHD ? parseFloat(rawTHD) : 1.5,
-  ```
-* **Proposed Fix**: Return `0` or `null` for unmeasured registers so the UI can honestly display `--` instead of fabricated operating conditions.
+#### [x] FIX-09: Synthetic Fallback Defaults in `deye-client.ts`
+* **File & Lines**: [`src/lib/deye-client.ts#L1168-L1172`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1168-L1172)
+* **Problem**: In `getInverterTelemetry`, when DeyeCloud did not return specific modbus registers, it injected optimistic static values (`98.4%` efficiency, `45.0°C` heatsink, `30.0°C` ambient, `0.99` power factor, and `1.5%` THD).
+* **Resolution**: Replaced optimistic static constants with `0`. When modbus registers are missing or unmeasured from hardware telemetry, unmeasured values default to `0` so the telemetry UI accurately renders honest `--` states instead of fabricated inverter operational conditions.
 
 ---
 
