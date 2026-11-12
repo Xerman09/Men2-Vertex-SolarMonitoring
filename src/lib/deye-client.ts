@@ -12,6 +12,7 @@ import {
   getMockHourlyEnergyPoints,
 } from './mock-telemetry';
 import type { DailyAnalyticsPoint, MonthlyAnalyticsPoint } from './analytics-data';
+import { PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH } from './tariff-rates';
 import { sanitizeDeyeBaseUrl } from './url-validator';
 import { fileHistoryCache } from './file-history-cache';
 import { env } from './env';
@@ -1904,7 +1905,7 @@ export class DeyeCloudClient {
         performanceRatioPct: pr,
         specificYieldKwhKwp: specYield,
         savingsUsd: Number((selfCons * 0.25 + rec.exportKwh * 0.12).toFixed(2)),
-        co2AvoidedKg: Number((rec.solar * 0.83).toFixed(1)),
+        co2AvoidedKg: Number((rec.solar * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH).toFixed(1)),
       });
       cursor = shiftIsoDate(cursor, 1);
     }
@@ -1994,7 +1995,7 @@ export class DeyeCloudClient {
         performanceRatioPct: rec.solarKwh > 0 ? 82.0 : 0,
         specificYieldKwhKwp: safeCapacity > 0 ? Number((rec.solarKwh / safeCapacity).toFixed(1)) : 0,
         savingsUsd: Number((rec.solarKwh * 0.24).toFixed(0)),
-        co2AvoidedTons: Number((yieldMwh * 0.83).toFixed(2)),
+        co2AvoidedTons: Number((yieldMwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH).toFixed(2)),
       });
       cursor = shiftIsoMonth(cursor, 1);
     }

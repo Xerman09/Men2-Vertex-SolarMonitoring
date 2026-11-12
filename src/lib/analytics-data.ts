@@ -1,4 +1,9 @@
 import { HourlyEnergyPoint } from './types';
+import {
+  PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH,
+  PHILIPPINES_GRID_EMISSION_FACTOR_TONS_PER_KWH,
+  KG_CO2_PER_TREE_ANNUAL,
+} from './tariff-rates';
 
 export interface DailyAnalyticsPoint {
   date: string;
@@ -119,7 +124,7 @@ export function generateDailyAnalytics(
     const pr = Number((81 + (seed % 6)).toFixed(1));
     const specYield = Number((baseSolar / safeCapacity).toFixed(2));
     const savings = Number((selfConsKwh * 0.32 + gridExport * 0.12).toFixed(2));
-    const co2 = Number((baseSolar * 0.83).toFixed(1));
+    const co2 = Number((baseSolar * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH).toFixed(1));
 
     points.push({
       date: dateStr,
@@ -165,7 +170,7 @@ export function generateMonthlyAnalytics(
     const pr = Number((82.5 + Math.sin(index) * 2.5).toFixed(1));
     const specYield = Number(((yieldMwh * 1000) / safeCapacity).toFixed(1));
     const savings = Number(((yieldMwh * 1000 * 0.24)).toFixed(0));
-    const co2Tons = Number((yieldMwh * 0.83).toFixed(2));
+    const co2Tons = Number((yieldMwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH).toFixed(2));
 
     return {
       month,
@@ -424,8 +429,8 @@ export function computeAnalyticsSummary(
 
   // Economic & Ecological impact
   const savings = Number((totalSelfConsumed * 0.34 + totalExport * 0.12).toFixed(2));
-  const co2 = Number((totalSolarYield * 0.83).toFixed(1));
-  const trees = Math.round(co2 / 20);
+  const co2 = Number((totalSolarYield * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH).toFixed(1));
+  const trees = Math.round(co2 / KG_CO2_PER_TREE_ANNUAL);
   const coal = Number((totalSolarYield * 0.40).toFixed(1));
 
   return {

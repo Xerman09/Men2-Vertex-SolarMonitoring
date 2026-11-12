@@ -74,6 +74,10 @@ import {
 import { createLogger } from '@/lib/logger';
 import { telemetryCache, inverterCacheKey } from '@/lib/telemetry-cache';
 import {
+  PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH,
+  KG_CO2_PER_TREE_ANNUAL,
+} from '@/lib/tariff-rates';
+import {
   AnalyticsDatePicker,
   AnalyticsDatePickerValue,
   DatePreset,
@@ -930,7 +934,7 @@ export default function AnalyticsDashboardPage() {
         const avgPr = activeDays.length > 0
           ? Number((activeDays.reduce((s, d) => s + d.performanceRatioPct, 0) / activeDays.length).toFixed(1))
           : 0;
-        const co2 = Number((totalSolar * 0.83).toFixed(1));
+        const co2 = Number((totalSolar * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH).toFixed(1));
         return {
           ...baseSummary,
           totalSolarYieldKwh: totalSolar,
@@ -946,7 +950,7 @@ export default function AnalyticsDashboardPage() {
           performanceRatioPct: avgPr,
           specificYieldKwhKwp: effectiveCapacityKw > 0 ? Number((totalSolar / effectiveCapacityKw).toFixed(2)) : 0,
           co2AvoidedKg: co2,
-          treesEquivalent: Math.round(co2 / 20),
+          treesEquivalent: Math.round(co2 / KG_CO2_PER_TREE_ANNUAL),
           coalAvoidedKg: Number((totalSolar * 0.4).toFixed(1)),
         };
       }
@@ -962,7 +966,7 @@ export default function AnalyticsDashboardPage() {
       const avgPr = activeMonths.length > 0
         ? Number((activeMonths.reduce((s, m) => s + m.performanceRatioPct, 0) / activeMonths.length).toFixed(1))
         : 0;
-      const co2 = Number((totalSolar * 0.83).toFixed(1));
+      const co2 = Number((totalSolar * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH).toFixed(1));
       return {
         ...baseSummary,
         totalSolarYieldKwh: totalSolar,
@@ -976,7 +980,7 @@ export default function AnalyticsDashboardPage() {
         performanceRatioPct: avgPr,
         specificYieldKwhKwp: effectiveCapacityKw > 0 ? Number((totalSolar / effectiveCapacityKw).toFixed(2)) : 0,
         co2AvoidedKg: co2,
-        treesEquivalent: Math.round(co2 / 20),
+        treesEquivalent: Math.round(co2 / KG_CO2_PER_TREE_ANNUAL),
         coalAvoidedKg: Number((totalSolar * 0.4).toFixed(1)),
       };
     }

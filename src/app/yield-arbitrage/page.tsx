@@ -47,6 +47,11 @@ import {
 import { getManilaToday } from '@/lib/manila-time';
 import { useAccount } from '@/lib/account-context';
 import { useTariff } from '@/lib/tariff-context';
+import {
+  PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH,
+  PHILIPPINES_GRID_EMISSION_FACTOR_TONS_PER_KWH,
+  KG_CO2_PER_TREE_ANNUAL,
+} from '@/lib/tariff-rates';
 import { useRole } from '@/lib/role-context';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -318,7 +323,7 @@ export default function YieldArbitragePage() {
         gridExportKwh: exportKwh,
         todaySavedPhp: totalSavingsPhp,
         monthlyProjectionPhp: avgDailySaved * 30,
-        co2Tons: yieldKwh * 0.0007,
+        co2Tons: yieldKwh * PHILIPPINES_GRID_EMISSION_FACTOR_TONS_PER_KWH,
       };
     }
 
@@ -344,7 +349,7 @@ export default function YieldArbitragePage() {
         gridExportKwh: exportKwh,
         todaySavedPhp: totalSavingsPhp,
         monthlyProjectionPhp: totalSavingsPhp / Math.max(1, periodMonthlySeries.length),
-        co2Tons: yieldKwh * 0.0007,
+        co2Tons: yieldKwh * PHILIPPINES_GRID_EMISSION_FACTOR_TONS_PER_KWH,
       };
     }
 
@@ -415,7 +420,7 @@ export default function YieldArbitragePage() {
       gridExportKwh: exportKwh,
       todaySavedPhp: totalSavingsPhp,
       monthlyProjectionPhp: monthlyProjection,
-      co2Tons: yieldKwh * 0.0007,
+      co2Tons: yieldKwh * PHILIPPINES_GRID_EMISSION_FACTOR_TONS_PER_KWH,
     };
   }, [timeRange, periodDailySeries, periodMonthlySeries, chartData, activeTariff, liveDailySummary]);
 
@@ -698,11 +703,11 @@ export default function YieldArbitragePage() {
             content={
               <div className="space-y-1.5 min-w-[200px] text-[11px]">
                 <p className="text-muted-foreground leading-snug">
-                  Estimated CO₂ emissions avoided based on regional electric grid offset factors (0.42 kg CO₂/kWh).
+                  Estimated CO₂ emissions avoided based on official Philippine DOE Luzon-Visayas grid factor ({PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH} kg CO₂/kWh).
                 </p>
                 <div className="pt-1.5 border-t border-border/50 text-emerald-400 font-mono font-medium">
                   {totals.co2Tons > 0
-                    ? `Equivalent to ${Math.round(totals.co2Tons * 25)} trees planted (EPA AVERT factor)`
+                    ? `Equivalent to ${Math.round((totals.co2Tons * 1000) / KG_CO2_PER_TREE_ANNUAL)} trees planted (EPA AVERT factor)`
                     : 'Calculated against local grid displacement emissions factor'}
                 </div>
               </div>

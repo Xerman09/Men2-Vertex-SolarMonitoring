@@ -10,7 +10,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | :--- | :--- | :--- | :--- |
 | **FIX-01** | Yield Arbitrage | Arbitrary `* 10` multiplier on Specific Yield shown as "Arbitrage ROI Score" | `[x] Completed` |
 | **FIX-02** | Yield Arbitrage | Hardcoded 38% peak savings ratio for multi-day periods (WEEK/MONTH/YEAR) | `[x] Completed` |
-| **FIX-03** | Multi-Module | Conflicting CO₂ emission factors (0.70 vs 0.42 vs 0.83 kg/kWh) | `[ ] Pending` |
+| **FIX-03** | Multi-Module | Conflicting CO₂ emission factors (0.70 vs 0.42 vs 0.83 kg/kWh) | `[x] Completed` |
 | **FIX-04** | Yield Arbitrage | Single-day 30x linear extrapolation for Projected Monthly Savings | `[ ] Pending` |
 | **FIX-05** | Yield Arbitrage | Hardcoded 120 kW fallback capacity when plant/account capacity is unset | `[ ] Pending` |
 | **FIX-06** | Yield Arbitrage | Hardcoded "without physical BESS storage" system mode string | `[ ] Pending` |
@@ -52,14 +52,15 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ---
 
-#### [ ] FIX-03: Conflicting CO₂ Emission Factors Across Modules
+#### [x] FIX-03: Conflicting CO₂ Emission Factors Across Modules
 * **File & Lines**:
-  * [`src/app/yield-arbitrage/page.tsx#L427`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L427): Uses `0.0007 tons/kWh` (**0.70 kg/kWh**).
-  * [`src/app/yield-arbitrage/page.tsx#L705`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L705): Tooltip text states **0.42 kg CO₂/kWh** (Philippine regional grid factor).
-  * [`src/app/analytics/page.tsx#L933`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/analytics/page.tsx#L933): Uses `0.83 kg CO₂/kWh`.
-  * [`src/lib/deye-client.ts#L1907`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1907): Uses `0.83 kg CO₂/kWh`.
-* **Problem**: Three conflicting emission factors exist across the platform, causing different pages to show widely diverging carbon offset figures for the identical kWh harvest.
-* **Proposed Fix**: Standardize platform-wide on the official Philippine Department of Energy (DOE) / ERC Grid Emission Factor (**0.7122 kg CO₂/kWh** or **0.42 kg CO₂/kWh** per Luzon-Visayas-Mindanao grid benchmark) and synchronize calculations and tooltip prose.
+  * [`src/lib/tariff-rates.ts#L201`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/tariff-rates.ts#L201): Central single source of truth definition.
+  * [`src/app/yield-arbitrage/page.tsx#L423`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L423), [`#L707`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L707)
+  * [`src/app/analytics/page.tsx#L941`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/analytics/page.tsx#L941), [`#L973`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/analytics/page.tsx#L973)
+  * [`src/lib/analytics-data.ts#L127`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/analytics-data.ts#L127), [`#L174`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/analytics-data.ts#L174), [`#L433`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/analytics-data.ts#L433)
+  * [`src/lib/deye-client.ts#L1908`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1908), [`#L1998`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1998)
+* **Problem**: Three conflicting emission factors existed across the platform (0.70 vs 0.42 vs 0.83 kg CO₂/kWh), causing carbon offset calculations to disagree across different dashboards for the identical kWh harvest.
+* **Resolution**: Standardized platform-wide on the official Philippine Department of Energy (DOE) Grid Emission Factor (GEF) for the Luzon-Visayas Grid (`0.7122 kg CO₂/kWh` / `0.0007122 tons CO₂/kWh`) exported as constants from `tariff-rates.ts`, and standardized tree absorption calculation on `20 kg CO₂/year/tree` (`KG_CO2_PER_TREE_ANNUAL`). Synchronized all calculation algorithms and tooltip prose.
 
 ---
 

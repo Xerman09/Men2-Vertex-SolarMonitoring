@@ -198,3 +198,12 @@ export function resolveActiveTariff(options: {
   };
 }
 
+/**
+ * Official Philippine Department of Energy (DOE) Grid Emission Factor (GEF)
+ * Standard Combined Margin for the Luzon-Visayas Grid: 0.7122 kg CO₂ / kWh (0.7122 tCO₂ / MWh)
+ */
+export const PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH = 0.7122;
+export const PHILIPPINES_GRID_EMISSION_FACTOR_TONS_PER_KWH = 0.0007122;
+export const KG_CO2_PER_TREE_ANNUAL = 20;
+
+
