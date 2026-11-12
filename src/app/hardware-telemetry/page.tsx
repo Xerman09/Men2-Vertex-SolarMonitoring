@@ -606,8 +606,8 @@ export default function HardwareTelemetryPage() {
             </div>
             <div className="flex justify-between py-1 border-t border-border/40">
               <span className="text-muted-foreground">Transformer Core</span>
-              <span className="font-mono font-bold text-foreground">
-                {telemetry?.heatsinkTempC ? `${(telemetry.heatsinkTempC + 6.6).toFixed(1)}°C` : '--'}
+              <span className="font-mono font-bold text-muted-foreground">
+                --
               </span>
             </div>
             <div className="flex justify-between py-1 border-t border-border/40">
@@ -639,8 +639,8 @@ export default function HardwareTelemetryPage() {
             </div>
             <div className="flex justify-between py-1 border-t border-border/40">
               <span className="text-muted-foreground">Battery Core Temp</span>
-              <span className="font-mono font-bold text-emerald-500">
-                {telemetry?.ambientTempC ? `${(telemetry.ambientTempC - 2).toFixed(1)}°C` : '--'}
+              <span className="font-mono font-bold text-muted-foreground">
+                --
               </span>
             </div>
           </div>

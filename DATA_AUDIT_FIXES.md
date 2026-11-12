@@ -14,7 +14,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-04** | Yield Arbitrage | Single-day 30x linear extrapolation for Projected Monthly Savings | `[x] Completed` |
 | **FIX-05** | Yield Arbitrage | Hardcoded 120 kW fallback capacity when plant/account capacity is unset | `[x] Completed` |
 | **FIX-06** | Yield Arbitrage | Hardcoded "without physical BESS storage" system mode string | `[x] Completed` |
-| **FIX-07** | Hardware Telemetry | Synthetic temperature additions (`heatsink + 6.6°C`, `ambient - 2°C`) | `[ ] Pending` |
+| **FIX-07** | Hardware Telemetry | Synthetic temperature additions (`heatsink + 6.6°C`, `ambient - 2°C`) | `[x] Completed` |
 | **FIX-08** | Hardware Telemetry | Hardcoded protection status strings ("ACTIVE & COMPLIANT", "0.0 mA", "0 DETECTED") | `[ ] Pending` |
 | **FIX-09** | Deye Client | Hardcoded fallbacks (`98.4%` efficiency, `45°C` heatsink, `30°C` ambient, `0.99` PF, `1.5%` THD) | `[ ] Pending` |
 | **FIX-10** | Energy Flow | Equal-split inverter power distribution (`plantSolarKw / inverters.length`) in drawer | `[ ] Pending` |
@@ -87,17 +87,10 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ### 2. Hardware Telemetry & Modbus Registers (`src/app/hardware-telemetry/page.tsx` & `src/lib/deye-client.ts`)
 
-#### [ ] FIX-07: Synthetic Temperature Calculations in Thermal Matrix
+#### [x] FIX-07: Synthetic Temperature Calculations in Thermal Matrix
 * **File & Lines**: [`src/app/hardware-telemetry/page.tsx#L610`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/hardware-telemetry/page.tsx#L610), [`#L643`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/hardware-telemetry/page.tsx#L643)
-* **Problem**: Fabricates temperatures for unmeasured components:
-  ```typescript
-  // Transformer Core:
-  telemetry?.heatsinkTempC ? `${(telemetry.heatsinkTempC + 6.6).toFixed(1)}°C` : '--'
-
-  // Battery Core Temp:
-  telemetry?.ambientTempC ? `${(telemetry.ambientTempC - 2).toFixed(1)}°C` : '--'
-  ```
-* **Proposed Fix**: Remove synthetic temperature math. Only display genuine sensor readings from Deye modbus registers; display `--` if a sensor is physically absent.
+* **Problem**: Fabricated temperatures for unmeasured components (`(heatsinkTempC + 6.6)°C` for Transformer Core, and `(ambientTempC - 2)°C` for Battery Core Temp).
+* **Resolution**: Removed all synthetic temperature math. Only genuine sensor readings directly mapped from Deye modbus registers (`heatsinkTempC` and `ambientTempC`) are displayed; unmeasured components without dedicated physical sensors (Transformer Core on transformerless string inverters, and Battery Core Temp when no battery ESS is connected) display `--`.
 
 ---
 
