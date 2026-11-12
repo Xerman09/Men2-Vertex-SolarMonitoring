@@ -12,7 +12,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-02** | Yield Arbitrage | Hardcoded 38% peak savings ratio for multi-day periods (WEEK/MONTH/YEAR) | `[x] Completed` |
 | **FIX-03** | Multi-Module | Conflicting CO₂ emission factors (0.70 vs 0.42 vs 0.83 kg/kWh) | `[x] Completed` |
 | **FIX-04** | Yield Arbitrage | Single-day 30x linear extrapolation for Projected Monthly Savings | `[x] Completed` |
-| **FIX-05** | Yield Arbitrage | Hardcoded 120 kW fallback capacity when plant/account capacity is unset | `[ ] Pending` |
+| **FIX-05** | Yield Arbitrage | Hardcoded 120 kW fallback capacity when plant/account capacity is unset | `[x] Completed` |
 | **FIX-06** | Yield Arbitrage | Hardcoded "without physical BESS storage" system mode string | `[ ] Pending` |
 | **FIX-07** | Hardware Telemetry | Synthetic temperature additions (`heatsink + 6.6°C`, `ambient - 2°C`) | `[ ] Pending` |
 | **FIX-08** | Hardware Telemetry | Hardcoded protection status strings ("ACTIVE & COMPLIANT", "0.0 mA", "0 DETECTED") | `[ ] Pending` |
@@ -71,10 +71,10 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ---
 
-#### [ ] FIX-05: Hardcoded 120 kW Fallback Capacity
-* **File & Lines**: [`src/app/yield-arbitrage/page.tsx#L136`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L136), [`#L140`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L140), [`#L148`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L148), [`#L150`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L150), [`#L432`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L432), [`#L619`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L619)
-* **Problem**: Multiple fallbacks default to `120 kW` when capacity is 0 or unset, distorting calculations for smaller commercial stations (such as Men 2 Office's 100 kW plant).
-* **Proposed Fix**: Ground all capacity resolutions in genuine account/plant configurations and never assume a 120 kW default.
+#### [x] FIX-05: Hardcoded 120 kW Fallback Capacity
+* **File & Lines**: [`src/app/yield-arbitrage/page.tsx#L139`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L139), [`#L162`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L162), [`#L435`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L435)
+* **Problem**: Multiple fallbacks defaulted to `120 kW` when plant or account capacity was 0 or unset, distorting Specific Yield calculations for stations with different ratings (such as Men 2 Office's 100 kW plant).
+* **Resolution**: Grounded all capacity resolutions strictly in genuine hardware configuration: inverters supply `ratedKw`, plants supply `installedCapacityKw` or the sum of their rated inverters, and accounts sum their real plants. Eliminated all `120` fallbacks and removed artificial `targetCapacityKw / 120` curve scaling; when capacity is unconfigured or zero, specific yield displays clean `--` instead of dividing by synthetic values.
 
 ---
 

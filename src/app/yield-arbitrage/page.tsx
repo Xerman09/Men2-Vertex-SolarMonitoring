@@ -137,12 +137,19 @@ export default function YieldArbitragePage() {
   }, [selectedInverter, selectedPlant, selectedAccount, isFleetView, totalAccounts]);
 
   const targetCapacityKw = React.useMemo(() => {
-    if (selectedInverter) return selectedInverter.ratedKw;
-    if (selectedPlant) return selectedPlant.installedCapacityKw || 120;
+    if (selectedInverter) return selectedInverter.ratedKw || 0;
+    if (selectedPlant) {
+      if (selectedPlant.installedCapacityKw && selectedPlant.installedCapacityKw > 0) {
+        return selectedPlant.installedCapacityKw;
+      }
+      return selectedPlant.devices
+        ?.filter((d) => d.deviceType === 'INVERTER')
+        .reduce((sum, inv) => sum + (inv.ratedKw || 0), 0) || 0;
+    }
     if (selectedAccount) {
       const plantSum = selectedAccount.plants?.reduce((sum, p) => sum + (p.installedCapacityKw || 0), 0) || 0;
       if (plantSum > 0) return plantSum;
-      return selectedAccount.capacityKw > 0 ? selectedAccount.capacityKw : 120;
+      return selectedAccount.capacityKw > 0 ? selectedAccount.capacityKw : 0;
     }
     if (isFleetView) {
       let cap = 0;
@@ -150,16 +157,14 @@ export default function YieldArbitragePage() {
         const plantSum = acc.plants?.reduce((sum, p) => sum + (p.installedCapacityKw || 0), 0) || 0;
         cap += plantSum > 0 ? plantSum : (acc.capacityKw || 0);
       });
-      return cap > 0 ? cap : 120;
+      return cap;
     }
-    return 120;
+    return 0;
   }, [selectedInverter, selectedPlant, selectedAccount, isFleetView, accounts]);
 
   const scaleRatio = React.useMemo(() => {
-    if (historyIsLive) return 1.0;
-    if (selectedInverterSn && selectedInverterSn !== 'ALL') return 1.0;
-    return targetCapacityKw > 0 ? targetCapacityKw / 120 : 1.0;
-  }, [historyIsLive, selectedInverterSn, targetCapacityKw]);
+    return 1.0;
+  }, []);
 
   const cacheKey = getHistoryCacheKey({
     accountId: isFleetView ? 'FLEET' : selectedAccountId,
@@ -429,7 +434,7 @@ export default function YieldArbitragePage() {
   }, [timeRange, periodDailySeries, periodMonthlySeries, chartData, activeTariff, liveDailySummary]);
 
   const historyRows = React.useMemo(() => {
-    const cap = targetCapacityKw && targetCapacityKw > 0 ? targetCapacityKw : 120;
+    const cap = targetCapacityKw > 0 ? targetCapacityKw : 0;
     const blendedRate = activeTariff.peakRate * 0.35 + activeTariff.offPeakRate * 0.65;
 
     if (timeRange === 'WEEK' || timeRange === 'MONTH') {
@@ -444,7 +449,7 @@ export default function YieldArbitragePage() {
           selfConsPct: pct,
           gridExportKwh: d.gridExportKwh,
           todaySavedPhp: saved,
-          specificYield: d.solarYieldKwh > 0 ? `${specYield} kWh/kWp` : '--',
+          specificYield: d.solarYieldKwh > 0 && cap > 0 ? `${specYield} kWh/kWp` : '--',
         };
       });
     }
@@ -462,7 +467,7 @@ export default function YieldArbitragePage() {
           selfConsPct: m.selfConsumptionPct,
           gridExportKwh: eKwh,
           todaySavedPhp: saved,
-          specificYield: yKwh > 0 ? `${specYield} kWh/kWp` : '--',
+          specificYield: yKwh > 0 && cap > 0 ? `${specYield} kWh/kWp` : '--',
         };
       });
     }
@@ -476,7 +481,7 @@ export default function YieldArbitragePage() {
         selfConsPct: totals.selfConsPct,
         gridExportKwh: totals.gridExportKwh,
         todaySavedPhp: totals.todaySavedPhp,
-        specificYield: totals.todayYieldKwh > 0 ? `${todaySpecYield} kWh/kWp` : '--',
+        specificYield: totals.todayYieldKwh > 0 && cap > 0 ? `${todaySpecYield} kWh/kWp` : '--',
       },
     ];
   }, [timeRange, periodDailySeries, periodMonthlySeries, chartData, totals, selectedScopeTitle, targetCapacityKw, activeTariff, selectedDate]);
