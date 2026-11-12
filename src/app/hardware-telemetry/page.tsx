@@ -649,20 +649,32 @@ export default function HardwareTelemetryPage() {
         <Card className="border-border/60 bg-card/80 p-5">
           <div className="flex items-center justify-between pb-3 mb-3 border-b border-border/50">
             <span className="text-xs font-bold text-foreground">Safety Alarms & Protection</span>
-            <CheckCircle2 size={16} className="text-emerald-500" />
+            {telemetry?.activeFaults && telemetry.activeFaults.length > 0 ? (
+              <AlertTriangle size={16} className="text-rose-500" />
+            ) : telemetry ? (
+              <CheckCircle2 size={16} className="text-emerald-500" />
+            ) : (
+              <CheckCircle2 size={16} className="text-muted-foreground/50" />
+            )}
           </div>
           <div className="space-y-2 text-xs">
             <div className="flex justify-between py-1">
               <span className="text-muted-foreground">Grid Anti-Islanding</span>
-              <span className="font-mono font-bold text-emerald-500">ACTIVE & COMPLIANT</span>
+              <span className={`font-mono font-bold ${!telemetry ? 'text-muted-foreground' : telemetry.connectionStatus === 'ONLINE' ? 'text-emerald-500' : 'text-amber-500'}`}>
+                {!telemetry ? '--' : telemetry.connectionStatus === 'ONLINE' ? 'SYNCHRONIZED' : telemetry.connectionStatus === 'STANDBY' ? 'STANDBY' : 'DISCONNECTED'}
+              </span>
             </div>
             <div className="flex justify-between py-1 border-t border-border/40">
               <span className="text-muted-foreground">GFCI Ground Fault</span>
-              <span className="font-mono font-bold text-emerald-500">0.0 mA (NORMAL)</span>
+              <span className={`font-mono font-bold ${!telemetry ? 'text-muted-foreground' : (telemetry.activeFaults?.some((f) => `${f.code} ${f.title} ${f.description}`.toLowerCase().includes('ground') || `${f.code} ${f.title} ${f.description}`.toLowerCase().includes('gfci') || `${f.code} ${f.title} ${f.description}`.toLowerCase().includes('insulation'))) ? 'text-rose-500' : 'text-emerald-500'}`}>
+                {!telemetry ? '--' : (telemetry.activeFaults?.some((f) => `${f.code} ${f.title} ${f.description}`.toLowerCase().includes('ground') || `${f.code} ${f.title} ${f.description}`.toLowerCase().includes('gfci') || `${f.code} ${f.title} ${f.description}`.toLowerCase().includes('insulation'))) ? 'FAULT DETECTED' : 'NORMAL'}
+              </span>
             </div>
             <div className="flex justify-between py-1 border-t border-border/40">
               <span className="text-muted-foreground">Active Fault Alarms</span>
-              <span className="font-mono font-bold text-emerald-500">0 DETECTED</span>
+              <span className={`font-mono font-bold ${!telemetry ? 'text-muted-foreground' : (telemetry.activeFaults?.length ?? 0) > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                {!telemetry ? '--' : (telemetry.activeFaults?.length ?? 0) > 0 ? `${telemetry.activeFaults.length} FAULT(S)` : '0 DETECTED'}
+              </span>
             </div>
           </div>
         </Card>

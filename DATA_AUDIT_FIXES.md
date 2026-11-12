@@ -15,7 +15,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-05** | Yield Arbitrage | Hardcoded 120 kW fallback capacity when plant/account capacity is unset | `[x] Completed` |
 | **FIX-06** | Yield Arbitrage | Hardcoded "without physical BESS storage" system mode string | `[x] Completed` |
 | **FIX-07** | Hardware Telemetry | Synthetic temperature additions (`heatsink + 6.6°C`, `ambient - 2°C`) | `[x] Completed` |
-| **FIX-08** | Hardware Telemetry | Hardcoded protection status strings ("ACTIVE & COMPLIANT", "0.0 mA", "0 DETECTED") | `[ ] Pending` |
+| **FIX-08** | Hardware Telemetry | Hardcoded protection status strings ("ACTIVE & COMPLIANT", "0.0 mA", "0 DETECTED") | `[x] Completed` |
 | **FIX-09** | Deye Client | Hardcoded fallbacks (`98.4%` efficiency, `45°C` heatsink, `30°C` ambient, `0.99` PF, `1.5%` THD) | `[ ] Pending` |
 | **FIX-10** | Energy Flow | Equal-split inverter power distribution (`plantSolarKw / inverters.length`) in drawer | `[ ] Pending` |
 | **FIX-11** | Energy Flow | Proportional plant capacity scaling fallback when multi-plant summary is missing | `[ ] Pending` |
@@ -94,14 +94,17 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ---
 
-#### [ ] FIX-08: Hardcoded Safety Alarms & Protection Status Strings
-* **File & Lines**: [`src/app/hardware-telemetry/page.tsx#L657-L665`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/hardware-telemetry/page.tsx#L657-L665)
-* **Problem**: Card displays static strings:
+#### [x] FIX-08: Hardcoded Safety Alarms & Protection Status Strings
+* **File & Lines**: [`src/app/hardware-telemetry/page.tsx#L650-L668`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/hardware-telemetry/page.tsx#L650-L668)
+* **Problem**: Card displayed static strings:
   * `Grid Anti-Islanding: ACTIVE & COMPLIANT`
   * `GFCI Ground Fault: 0.0 mA (NORMAL)`
   * `Active Fault Alarms: 0 DETECTED`
-  None of these connect to actual fault registers or alarms from DeyeCloud.
-* **Proposed Fix**: Wire these indicators to real `activeFaults` array and modbus protection flags from `InverterTelemetry`, or mark unmonitored sensors honestly.
+  None of these were wired to real modbus protection registers or the `activeFaults` array.
+* **Resolution**: Replaced static strings with dynamic status indicators directly wired to real inverter telemetry:
+  * `Grid Anti-Islanding` reflects `telemetry.gridRelayConnected` (`SYNCHRONIZED` vs `DISCONNECTED`), displaying `--` if unmonitored.
+  * `GFCI Ground Fault` inspects genuine ground and insulation fault alarms from `activeFaults` (`NORMAL` vs `FAULT DETECTED`), eliminating the fake `0.0 mA` fabrication.
+  * `Active Fault Alarms` reports the actual count of detected faults from `activeFaults.length` (`0 DETECTED` vs `${count} FAULT(S)`) with an amber/rose alarm icon.
 
 ---
 
