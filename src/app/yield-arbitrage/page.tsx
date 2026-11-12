@@ -304,7 +304,7 @@ export default function YieldArbitragePage() {
 
     if (timeRange === 'WEEK' || timeRange === 'MONTH') {
       if (periodDailySeries.length === 0) {
-        return { todayYieldKwh: 0, selfConsPct: 0, gridExportKwh: 0, todaySavedPhp: 0, monthlyProjectionPhp: 0, co2Tons: 0 };
+        return { todayYieldKwh: 0, selfConsPct: 0, gridExportKwh: 0, todaySavedPhp: 0, monthlyProjectionPhp: 0, projectionMode: '--', co2Tons: 0 };
       }
       let yieldKwh = 0;
       let exportKwh = 0;
@@ -323,13 +323,14 @@ export default function YieldArbitragePage() {
         gridExportKwh: exportKwh,
         todaySavedPhp: totalSavingsPhp,
         monthlyProjectionPhp: avgDailySaved * 30,
+        projectionMode: `${periodDailySeries.length}-Day Avg`,
         co2Tons: yieldKwh * PHILIPPINES_GRID_EMISSION_FACTOR_TONS_PER_KWH,
       };
     }
 
     if (timeRange === 'YEAR') {
       if (periodMonthlySeries.length === 0) {
-        return { todayYieldKwh: 0, selfConsPct: 0, gridExportKwh: 0, todaySavedPhp: 0, monthlyProjectionPhp: 0, co2Tons: 0 };
+        return { todayYieldKwh: 0, selfConsPct: 0, gridExportKwh: 0, todaySavedPhp: 0, monthlyProjectionPhp: 0, projectionMode: '--', co2Tons: 0 };
       }
       let yieldKwh = 0;
       let exportKwh = 0;
@@ -349,6 +350,7 @@ export default function YieldArbitragePage() {
         gridExportKwh: exportKwh,
         todaySavedPhp: totalSavingsPhp,
         monthlyProjectionPhp: totalSavingsPhp / Math.max(1, periodMonthlySeries.length),
+        projectionMode: 'Monthly Avg',
         co2Tons: yieldKwh * PHILIPPINES_GRID_EMISSION_FACTOR_TONS_PER_KWH,
       };
     }
@@ -360,6 +362,7 @@ export default function YieldArbitragePage() {
         gridExportKwh: 0,
         todaySavedPhp: 0,
         monthlyProjectionPhp: 0,
+        projectionMode: '--',
         co2Tons: 0,
       };
     }
@@ -420,6 +423,7 @@ export default function YieldArbitragePage() {
       gridExportKwh: exportKwh,
       todaySavedPhp: totalSavingsPhp,
       monthlyProjectionPhp: monthlyProjection,
+      projectionMode: '1-Day Extrap',
       co2Tons: yieldKwh * PHILIPPINES_GRID_EMISSION_FACTOR_TONS_PER_KWH,
     };
   }, [timeRange, periodDailySeries, periodMonthlySeries, chartData, activeTariff, liveDailySummary]);
@@ -627,11 +631,15 @@ export default function YieldArbitragePage() {
         <Card className="border-border/60 bg-card/80 shadow-xs hover:border-primary/40 transition-all">
           <HoverInfo
             className="block w-full h-full p-4 space-y-2 cursor-help"
-            title="Projected Monthly Savings"
+            title={timeRange === 'DAY' ? 'Single-Day Extrapolated Run-Rate' : 'Projected Monthly Savings'}
             content={
               <div className="space-y-1.5 min-w-[220px] text-[11px]">
                 <p className="text-muted-foreground leading-snug">
-                  Estimated 30-day cumulative bill reduction based on active solar harvest run-rate.
+                  {timeRange === 'DAY'
+                    ? 'Single-day run-rate extrapolated over 30 days based on selected date’s harvest. Actual monthly accrual varies with daily insolation and weather.'
+                    : timeRange === 'YEAR'
+                    ? 'Average monthly utility bill savings calculated across recorded months in the selected annual cycle.'
+                    : 'Estimated 30-day cumulative bill reduction projected from authentic multi-day average solar harvest.'}
                 </p>
                 <div className="pt-1.5 border-t border-border/50 text-primary font-mono font-medium">
                   {totals.monthlyProjectionPhp > 0
@@ -643,7 +651,7 @@ export default function YieldArbitragePage() {
           >
             <div className="flex items-center justify-between pb-1">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
-                Projected Monthly Savings
+                {timeRange === 'DAY' ? 'Extrapolated Monthly Run-Rate' : 'Projected Monthly Savings'}
               </span>
               <div className="p-1.5 rounded-lg bg-primary/10 text-primary border border-primary/20">
                 <Sparkles size={16} />
@@ -654,7 +662,7 @@ export default function YieldArbitragePage() {
                 {loading ? <span className="text-muted-foreground/50">--</span> : formatPeso(totals.monthlyProjectionPhp)}
               </span>
               <span className="text-xs font-mono font-bold text-primary">
-                {!loading && totals.monthlyProjectionPhp > 0 ? '30-Day Est' : '--'}
+                {!loading && totals.monthlyProjectionPhp > 0 ? totals.projectionMode : '--'}
               </span>
             </div>
           </HoverInfo>

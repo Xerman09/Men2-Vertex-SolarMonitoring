@@ -11,7 +11,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-01** | Yield Arbitrage | Arbitrary `* 10` multiplier on Specific Yield shown as "Arbitrage ROI Score" | `[x] Completed` |
 | **FIX-02** | Yield Arbitrage | Hardcoded 38% peak savings ratio for multi-day periods (WEEK/MONTH/YEAR) | `[x] Completed` |
 | **FIX-03** | Multi-Module | Conflicting CO₂ emission factors (0.70 vs 0.42 vs 0.83 kg/kWh) | `[x] Completed` |
-| **FIX-04** | Yield Arbitrage | Single-day 30x linear extrapolation for Projected Monthly Savings | `[ ] Pending` |
+| **FIX-04** | Yield Arbitrage | Single-day 30x linear extrapolation for Projected Monthly Savings | `[x] Completed` |
 | **FIX-05** | Yield Arbitrage | Hardcoded 120 kW fallback capacity when plant/account capacity is unset | `[ ] Pending` |
 | **FIX-06** | Yield Arbitrage | Hardcoded "without physical BESS storage" system mode string | `[ ] Pending` |
 | **FIX-07** | Hardware Telemetry | Synthetic temperature additions (`heatsink + 6.6°C`, `ambient - 2°C`) | `[ ] Pending` |
@@ -64,14 +64,10 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ---
 
-#### [ ] FIX-04: Single-Day 30x Linear Extrapolation for Projected Monthly Savings
-* **File & Lines**: [`src/app/yield-arbitrage/page.tsx#L418`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L418)
-* **Problem**: In `DAY` view:
-  ```typescript
-  const monthlyProjection = totalSavingsPhp * 30;
-  ```
-  Directly multiplies a single day's monetary savings by 30. A stormy day projects an artificially dismal monthly ledger, while a clear day projects an impossibly high one.
-* **Proposed Fix**: Use a 7-day or 30-day trailing rolling average when historical series is available, or clearly label the single-day calculation as "Single-Day Extrapolated Run-Rate".
+#### [x] FIX-04: Single-Day 30x Linear Extrapolation for Projected Monthly Savings
+* **File & Lines**: [`src/app/yield-arbitrage/page.tsx#L422`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L422), [`#L630`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L630)
+* **Problem**: In `DAY` view, single-day savings were directly multiplied by 30 and unconditionally displayed as "Projected Monthly Savings", giving users the impression that a single sunny or stormy day was a verified 30-day forecast.
+* **Resolution**: Re-labeled the card dynamically: in `DAY` mode it is titled `Extrapolated Monthly Run-Rate` with an explicit `1-Day Extrap` badge pill and detailed tooltip explaining single-day extrapolation variability; in `WEEK`, `MONTH`, and `YEAR` modes it dynamically badges authentic telemetry averages (`7-Day Avg`, `30-Day Avg`, `Monthly Avg`).
 
 ---
 
