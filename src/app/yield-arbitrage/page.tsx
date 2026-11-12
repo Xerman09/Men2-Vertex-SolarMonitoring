@@ -437,13 +437,14 @@ export default function YieldArbitragePage() {
         const selfCons = Math.max(0, d.solarYieldKwh - d.gridExportKwh);
         const saved = selfCons * blendedRate + d.gridExportKwh * activeTariff.exportCredit;
         const pct = d.solarYieldKwh > 0 ? Math.min(100, (selfCons / d.solarYieldKwh) * 100) : 0;
+        const specYield = cap > 0 ? (d.solarYieldKwh / cap).toFixed(2) : '0.00';
         return {
           date: `${d.date} (${d.dayLabel})`,
           yieldKwh: d.solarYieldKwh,
           selfConsPct: pct,
           gridExportKwh: d.gridExportKwh,
           todaySavedPhp: saved,
-          roiScore: d.solarYieldKwh > 0 ? `+${((d.solarYieldKwh / cap) * 10).toFixed(1)}%` : '--',
+          specificYield: d.solarYieldKwh > 0 ? `${specYield} kWh/kWp` : '--',
         };
       });
     }
@@ -454,18 +455,20 @@ export default function YieldArbitragePage() {
         const eKwh = m.gridExportMwh * 1000;
         const selfCons = Math.max(0, yKwh - eKwh);
         const saved = selfCons * blendedRate + eKwh * activeTariff.exportCredit;
+        const specYield = cap > 0 ? (yKwh / cap).toFixed(1) : '0.0';
         return {
           date: m.month,
           yieldKwh: yKwh,
           selfConsPct: m.selfConsumptionPct,
           gridExportKwh: eKwh,
           todaySavedPhp: saved,
-          roiScore: yKwh > 0 ? `+${((yKwh / (cap * 30)) * 10).toFixed(1)}%` : '--',
+          specificYield: yKwh > 0 ? `${specYield} kWh/kWp` : '--',
         };
       });
     }
 
     if (chartData.length === 0 || totals.todayYieldKwh === 0) return [];
+    const todaySpecYield = cap > 0 ? (totals.todayYieldKwh / cap).toFixed(2) : '0.00';
     return [
       {
         date: `${formatHumanDate(selectedDate)} · ${selectedScopeTitle}`,
@@ -473,7 +476,7 @@ export default function YieldArbitragePage() {
         selfConsPct: totals.selfConsPct,
         gridExportKwh: totals.gridExportKwh,
         todaySavedPhp: totals.todaySavedPhp,
-        roiScore: totals.todayYieldKwh > 0 ? `+${((totals.todayYieldKwh / cap) * 10).toFixed(1)}%` : '--',
+        specificYield: totals.todayYieldKwh > 0 ? `${todaySpecYield} kWh/kWp` : '--',
       },
     ];
   }, [timeRange, periodDailySeries, periodMonthlySeries, chartData, totals, selectedScopeTitle, targetCapacityKw, activeTariff, selectedDate]);
@@ -615,8 +618,10 @@ export default function YieldArbitragePage() {
               <span className="text-2xl font-black font-mono text-emerald-500">
                 {loading ? <span className="text-muted-foreground/50">--</span> : formatPeso(totals.todaySavedPhp)}
               </span>
-              <span className="text-xs font-mono font-bold text-emerald-500">
-                {!loading && totals.todaySavedPhp > 0 ? `+${((totals.todayYieldKwh / (targetCapacityKw || 120)) * 10).toFixed(1)}%` : '--'}
+              <span className="text-xs font-mono font-medium text-muted-foreground">
+                {!loading && totals.todayYieldKwh > 0 && targetCapacityKw > 0
+                  ? `${(totals.todayYieldKwh / targetCapacityKw).toFixed(2)} kWh/kWp`
+                  : '--'}
               </span>
             </div>
           </HoverInfo>
@@ -931,7 +936,7 @@ export default function YieldArbitragePage() {
                   <th>Self-Consumption</th>
                   <th>Grid Export</th>
                   <th>Avoided Cost (Savings)</th>
-                  <th className="text-right">Arbitrage ROI Score</th>
+                  <th className="text-right">Specific Yield</th>
                 </tr>
               </thead>
               <tbody>
@@ -954,8 +959,8 @@ export default function YieldArbitragePage() {
                         {formatPeso(row.todaySavedPhp)}
                       </td>
                       <td className="text-right">
-                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-xs font-mono font-bold">
-                          {row.roiScore}
+                        <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 text-xs font-mono font-bold">
+                          {row.specificYield}
                         </span>
                       </td>
                     </tr>

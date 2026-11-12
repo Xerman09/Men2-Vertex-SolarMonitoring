@@ -8,7 +8,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 | ID | Module / Area | Description | Status |
 | :--- | :--- | :--- | :--- |
-| **FIX-01** | Yield Arbitrage | Arbitrary `* 10` multiplier on Specific Yield shown as "Arbitrage ROI Score" | `[ ] Pending` |
+| **FIX-01** | Yield Arbitrage | Arbitrary `* 10` multiplier on Specific Yield shown as "Arbitrage ROI Score" | `[x] Completed` |
 | **FIX-02** | Yield Arbitrage | Hardcoded 38% peak savings ratio for multi-day periods (WEEK/MONTH/YEAR) | `[ ] Pending` |
 | **FIX-03** | Multi-Module | Conflicting CO₂ emission factors (0.70 vs 0.42 vs 0.83 kg/kWh) | `[ ] Pending` |
 | **FIX-04** | Yield Arbitrage | Single-day 30x linear extrapolation for Projected Monthly Savings | `[ ] Pending` |
@@ -34,14 +34,14 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ### 1. Yield Analytics & TOU Arbitrage (`src/app/yield-arbitrage/page.tsx`)
 
-#### [ ] FIX-01: Arbitrary `* 10` Multiplier on Specific Yield Presented as "Arbitrage ROI Score"
+#### [x] FIX-01: Arbitrary `* 10` Multiplier on Specific Yield Presented as "Arbitrage ROI Score"
 * **File & Lines**: [`src/app/yield-arbitrage/page.tsx#L446`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L446), [`#L463`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L463), [`#L476`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L476), [`#L619`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L619)
 * **Problem**: The daily and monthly table rows and top KPI card calculate:
   ```typescript
   roiScore: d.solarYieldKwh > 0 ? `+${((d.solarYieldKwh / cap) * 10).toFixed(1)}%` : '--'
   ```
-  Specific yield (kWh/kWp, e.g. 3.2 hours) is multiplied by an arbitrary factor of 10 and displayed with a `+` and `%` symbol (e.g. `+32.0%`) as an "Arbitrage ROI Score".
-* **Proposed Fix**: Replace this fabricated percentage with genuine specific yield `(kWh/kWp)` or real financial return percentage based on utility savings vs baseline.
+  Specific yield (kWh/kWp, e.g. 3.2 hours) was multiplied by an arbitrary factor of 10 and displayed with a `+` and `%` symbol (e.g. `+32.0%`) as an "Arbitrage ROI Score".
+* **Resolution**: Replaced the fabricated percentage with authentic Specific Yield (`kWh/kWp`), renamed the table column to `Specific Yield`, and wired the top KPI card to display genuine specific yield (`(todayYieldKwh / targetCapacityKw).toFixed(2) kWh/kWp`) without synthetic multipliers.
 
 ---
 
@@ -233,3 +233,4 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 * **File & Lines**: [`src/components/analytics/useTrigonometricGraph.ts#L120-L121`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/components/analytics/useTrigonometricGraph.ts#L120-L121), [`#L226-L228`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/components/analytics/useTrigonometricGraph.ts#L226-L228), [`#L268-L270`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/components/analytics/useTrigonometricGraph.ts#L268-L270)
 * **Problem**: Uses `new Date().getHours()` and `new Date().getMinutes()`, reading the user's browser local time instead of Philippine Standard Time (`Asia/Manila` / UTC+8).
 * **Proposed Fix**: Replace with `getManilaNowParts()` and `getManilaToday()` from `@/lib/manila-time`.
+
