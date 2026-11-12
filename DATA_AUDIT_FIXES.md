@@ -13,7 +13,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-03** | Multi-Module | Conflicting CO₂ emission factors (0.70 vs 0.42 vs 0.83 kg/kWh) | `[x] Completed` |
 | **FIX-04** | Yield Arbitrage | Single-day 30x linear extrapolation for Projected Monthly Savings | `[x] Completed` |
 | **FIX-05** | Yield Arbitrage | Hardcoded 120 kW fallback capacity when plant/account capacity is unset | `[x] Completed` |
-| **FIX-06** | Yield Arbitrage | Hardcoded "without physical BESS storage" system mode string | `[ ] Pending` |
+| **FIX-06** | Yield Arbitrage | Hardcoded "without physical BESS storage" system mode string | `[x] Completed` |
 | **FIX-07** | Hardware Telemetry | Synthetic temperature additions (`heatsink + 6.6°C`, `ambient - 2°C`) | `[ ] Pending` |
 | **FIX-08** | Hardware Telemetry | Hardcoded protection status strings ("ACTIVE & COMPLIANT", "0.0 mA", "0 DETECTED") | `[ ] Pending` |
 | **FIX-09** | Deye Client | Hardcoded fallbacks (`98.4%` efficiency, `45°C` heatsink, `30°C` ambient, `0.99` PF, `1.5%` THD) | `[ ] Pending` |
@@ -78,10 +78,10 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ---
 
-#### [ ] FIX-06: Hardcoded "Without Physical BESS Storage" System Mode String
-* **File & Lines**: [`src/app/yield-arbitrage/page.tsx#L673`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L673)
-* **Problem**: The tooltip description statically states "Grid-tied solar inverter synchronized without physical BESS storage", even if battery hardware is added to a plant.
-* **Proposed Fix**: Dynamically check `hasBattery` / battery telemetry to render whether BESS storage is active or grid-tied only.
+#### [x] FIX-06: Hardcoded "Without Physical BESS Storage" System Mode String
+* **File & Lines**: [`src/app/yield-arbitrage/page.tsx#L701`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L701)
+* **Problem**: The tooltip description statically stated "Grid-tied solar inverter synchronized without physical BESS storage", even when battery storage hardware was present in a plant or account.
+* **Resolution**: Added dynamic BESS detection via `hasBattery` matching the platform standard: if a battery device is registered on the plant or account, it displays `Hybrid BESS` mode and tooltip `Hybrid solar inverter with active BESS energy storage integration`; otherwise, it displays `Grid-Tied` mode with `Grid-tied solar inverter synchronized without physical BESS storage`.
 
 ---
 

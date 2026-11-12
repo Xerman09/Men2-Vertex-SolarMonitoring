@@ -162,6 +162,21 @@ export default function YieldArbitragePage() {
     return 0;
   }, [selectedInverter, selectedPlant, selectedAccount, isFleetView, accounts]);
 
+  const hasBattery = React.useMemo<boolean>(() => {
+    if (selectedPlant?.devices?.some((d) => d.deviceType === 'BATTERY')) return true;
+    if (selectedAccount) {
+      return Boolean(
+        selectedAccount.plants?.some((p) => p.devices?.some((d) => d.deviceType === 'BATTERY'))
+      );
+    }
+    if (isFleetView) {
+      return accounts.some((acc) =>
+        acc.plants?.some((p) => p.devices?.some((d) => d.deviceType === 'BATTERY'))
+      );
+    }
+    return false;
+  }, [selectedPlant, selectedAccount, isFleetView, accounts]);
+
   const scaleRatio = React.useMemo(() => {
     return 1.0;
   }, []);
@@ -684,7 +699,9 @@ export default function YieldArbitragePage() {
                   Active inverter grid-coupling status and battery energy storage system health.
                 </p>
                 <div className="pt-1.5 border-t border-border/50 text-cyan-400 font-mono font-medium">
-                  Grid-tied solar inverter synchronized without physical BESS storage
+                  {hasBattery
+                    ? 'Hybrid solar inverter with active BESS energy storage integration'
+                    : 'Grid-tied solar inverter synchronized without physical BESS storage'}
                 </div>
               </div>
             }
@@ -702,7 +719,7 @@ export default function YieldArbitragePage() {
                 {loading ? <span className="text-muted-foreground/50">--</span> : totals.todayYieldKwh > 0 ? 'Nominal' : '--'}
               </span>
               <span className="text-xs font-mono font-bold text-cyan-500">
-                {!loading && totals.todayYieldKwh > 0 ? 'Grid-Tied' : 'Standby'}
+                {!loading && totals.todayYieldKwh > 0 ? (hasBattery ? 'Hybrid BESS' : 'Grid-Tied') : 'Standby'}
               </span>
             </div>
           </HoverInfo>
