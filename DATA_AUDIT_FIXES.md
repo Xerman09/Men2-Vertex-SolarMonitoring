@@ -9,7 +9,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | ID | Module / Area | Description | Status |
 | :--- | :--- | :--- | :--- |
 | **FIX-01** | Yield Arbitrage | Arbitrary `* 10` multiplier on Specific Yield shown as "Arbitrage ROI Score" | `[x] Completed` |
-| **FIX-02** | Yield Arbitrage | Hardcoded 38% peak savings ratio for multi-day periods (WEEK/MONTH/YEAR) | `[ ] Pending` |
+| **FIX-02** | Yield Arbitrage | Hardcoded 38% peak savings ratio for multi-day periods (WEEK/MONTH/YEAR) | `[x] Completed` |
 | **FIX-03** | Multi-Module | Conflicting CO₂ emission factors (0.70 vs 0.42 vs 0.83 kg/kWh) | `[ ] Pending` |
 | **FIX-04** | Yield Arbitrage | Single-day 30x linear extrapolation for Projected Monthly Savings | `[ ] Pending` |
 | **FIX-05** | Yield Arbitrage | Hardcoded 120 kW fallback capacity when plant/account capacity is unset | `[ ] Pending` |
@@ -45,14 +45,10 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ---
 
-#### [ ] FIX-02: Hardcoded 38% Peak Savings Ratio for Multi-Day Ranges (WEEK/MONTH/YEAR)
+#### [x] FIX-02: Hardcoded 38% Peak Savings Ratio for Multi-Day Ranges (WEEK/MONTH/YEAR)
 * **File & Lines**: [`src/app/yield-arbitrage/page.tsx#L320`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L320), [`#L347`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/yield-arbitrage/page.tsx#L347)
-* **Problem**: In `WEEK`, `MONTH`, and `YEAR` views, peak savings are hardcoded as:
-  ```typescript
-  peakSavedPhp: totalSavingsPhp * 0.38
-  ```
-  It assumes exactly 38% of solar production occurs during peak hours regardless of season, weather, or real interval generation.
-* **Proposed Fix**: Aggregate authentic peak vs off-peak interval savings from available intraday records or remove the simulated sub-metric if interval breakdown is unavailable for broad multi-month ranges.
+* **Problem**: In `WEEK`, `MONTH`, and `YEAR` views, peak savings were hardcoded as `peakSavedPhp: totalSavingsPhp * 0.38`, assuming exactly 38% of solar production occurs during peak hours regardless of season, weather, or real interval generation.
+* **Resolution**: Removed the synthetic `0.38` multiplier and eliminated the unused `peakSavedPhp` property from the ledger totals object, ensuring multi-day telemetry totals are grounded purely in actual harvest and avoided grid cost.
 
 ---
 

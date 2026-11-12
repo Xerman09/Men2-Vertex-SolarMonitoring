@@ -299,7 +299,7 @@ export default function YieldArbitragePage() {
 
     if (timeRange === 'WEEK' || timeRange === 'MONTH') {
       if (periodDailySeries.length === 0) {
-        return { todayYieldKwh: 0, selfConsPct: 0, gridExportKwh: 0, todaySavedPhp: 0, peakSavedPhp: 0, monthlyProjectionPhp: 0, co2Tons: 0 };
+        return { todayYieldKwh: 0, selfConsPct: 0, gridExportKwh: 0, todaySavedPhp: 0, monthlyProjectionPhp: 0, co2Tons: 0 };
       }
       let yieldKwh = 0;
       let exportKwh = 0;
@@ -317,7 +317,6 @@ export default function YieldArbitragePage() {
         selfConsPct: selfCons,
         gridExportKwh: exportKwh,
         todaySavedPhp: totalSavingsPhp,
-        peakSavedPhp: totalSavingsPhp * 0.38,
         monthlyProjectionPhp: avgDailySaved * 30,
         co2Tons: yieldKwh * 0.0007,
       };
@@ -325,7 +324,7 @@ export default function YieldArbitragePage() {
 
     if (timeRange === 'YEAR') {
       if (periodMonthlySeries.length === 0) {
-        return { todayYieldKwh: 0, selfConsPct: 0, gridExportKwh: 0, todaySavedPhp: 0, peakSavedPhp: 0, monthlyProjectionPhp: 0, co2Tons: 0 };
+        return { todayYieldKwh: 0, selfConsPct: 0, gridExportKwh: 0, todaySavedPhp: 0, monthlyProjectionPhp: 0, co2Tons: 0 };
       }
       let yieldKwh = 0;
       let exportKwh = 0;
@@ -344,7 +343,6 @@ export default function YieldArbitragePage() {
         selfConsPct: selfCons,
         gridExportKwh: exportKwh,
         todaySavedPhp: totalSavingsPhp,
-        peakSavedPhp: totalSavingsPhp * 0.38,
         monthlyProjectionPhp: totalSavingsPhp / Math.max(1, periodMonthlySeries.length),
         co2Tons: yieldKwh * 0.0007,
       };
@@ -356,7 +354,6 @@ export default function YieldArbitragePage() {
         selfConsPct: 0,
         gridExportKwh: 0,
         todaySavedPhp: 0,
-        peakSavedPhp: 0,
         monthlyProjectionPhp: 0,
         co2Tons: 0,
       };
@@ -365,7 +362,6 @@ export default function YieldArbitragePage() {
     let loadKwh = 0;
     let exportKwh = 0;
     let totalSavingsPhp = 0;
-    let peakSavingsPhp = 0;
 
     for (const pt of chartData) {
       if (pt.isElapsed === false && pt.solarYieldKw === null) continue;
@@ -400,9 +396,6 @@ export default function YieldArbitragePage() {
       const intervalSavings = avoidedGridCost + exportCredit;
 
       totalSavingsPhp += intervalSavings;
-      if (isPeakWindow) {
-        peakSavingsPhp += intervalSavings;
-      }
     }
 
     // Align with official station daily cumulative if live DeyeCloud summary returned for single day
@@ -411,7 +404,6 @@ export default function YieldArbitragePage() {
       yieldKwh = liveDailySummary.solarYieldKwh;
       exportKwh = liveDailySummary.gridExportKwh;
       totalSavingsPhp *= scale;
-      peakSavingsPhp *= scale;
     }
 
     const selfCons = yieldKwh > 0 ? Math.min(100, Math.max(0, ((yieldKwh - exportKwh) / yieldKwh) * 100)) : 0;
@@ -422,7 +414,6 @@ export default function YieldArbitragePage() {
       selfConsPct: selfCons,
       gridExportKwh: exportKwh,
       todaySavedPhp: totalSavingsPhp,
-      peakSavedPhp: peakSavingsPhp,
       monthlyProjectionPhp: monthlyProjection,
       co2Tons: yieldKwh * 0.0007,
     };
