@@ -1444,8 +1444,8 @@ export default function AnalyticsDashboardPage() {
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Status:</span>
-                    <span className={`font-semibold ${analyticsSummary.performanceRatioPct >= 80 ? 'text-emerald-400' : 'text-blue-400'}`}>
-                      {analyticsSummary.performanceRatioPct >= 80 ? 'Optimal Performance' : 'Standard Yield'}
+                    <span className={`font-semibold ${analyticsSummary.performanceRatioPct >= 80 ? 'text-emerald-400' : analyticsSummary.performanceRatioPct > 0 ? 'text-blue-400' : 'text-muted-foreground'}`}>
+                      {analyticsSummary.performanceRatioPct >= 80 ? 'Optimal Performance' : analyticsSummary.performanceRatioPct > 0 ? 'Standard Yield' : 'Unmeasured (No Solar Sensor)'}
                     </span>
                   </div>
                 </div>
@@ -1462,7 +1462,7 @@ export default function AnalyticsDashboardPage() {
             </div>
             <div>
               <div className="text-lg sm:text-xl font-bold font-mono text-blue-400 tracking-tight leading-none">
-                {isTargetPending ? <span className="text-muted-foreground/50">--</span> : `${analyticsSummary.performanceRatioPct.toFixed(1)}%`}
+                {isTargetPending || analyticsSummary.performanceRatioPct === 0 ? <span className="text-muted-foreground/50">--</span> : `${analyticsSummary.performanceRatioPct.toFixed(1)}%`}
               </div>
             </div>
           </HoverInfo>

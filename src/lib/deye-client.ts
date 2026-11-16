@@ -1889,7 +1889,24 @@ export class DeyeCloudClient {
       const rec = byDate.get(cursor) || { solar: 0, load: 0, exportKwh: 0, importKwh: 0, charge: 0, discharge: 0 };
       const selfCons = Math.max(0, rec.solar - rec.exportKwh - rec.charge);
       const specYield = safeCapacity > 0 ? Number((rec.solar / safeCapacity).toFixed(2)) : 0;
-      const pr = rec.solar > 0 ? Number(Math.min(95, Math.max(40, (specYield / 5.0) * 100)).toFixed(1)) : 0;
+
+      // Peak solar kW is derived from recorded intraday telemetry intervals when available;
+      // when only daily aggregate totals are fetched without interval data, it defaults to 0
+      // (and is populated by the history route from merged intraday series if available).
+      let peakSolarKw = 0;
+      const dayCacheKey = opts.deviceSn ? `${opts.deviceSn}:${cursor}` : `${opts.stationId || 'ALL'}:${cursor}`;
+      const cachedDay = opts.deviceSn ? this.cachedDeviceHistoryDay?.get(dayCacheKey) : this.cachedStationHistoryDay?.get(dayCacheKey);
+      if (cachedDay && cachedDay.points) {
+        for (const pt of cachedDay.points) {
+          if (typeof pt.solarYieldKw === 'number' && pt.solarYieldKw > peakSolarKw) {
+            peakSolarKw = pt.solarYieldKw;
+          }
+        }
+      }
+
+      // Performance Ratio requires on-site plane-of-array irradiance sensors (IEC 61724);
+      // without physical pyranometers, report 0 so UI displays honest '--' rather than synthetic estimates.
+      const pr = 0;
 
       points.push({
         date: cursor,
@@ -1901,7 +1918,7 @@ export class DeyeCloudClient {
         batteryDischargedKwh: Number(rec.discharge.toFixed(1)),
         gridExportKwh: Number(rec.exportKwh.toFixed(1)),
         gridImportKwh: Number(rec.importKwh.toFixed(1)),
-        peakSolarKw: Number((safeCapacity * Math.min(1, specYield / 5.2)).toFixed(1)),
+        peakSolarKw: Number(peakSolarKw.toFixed(1)),
         performanceRatioPct: pr,
         specificYieldKwhKwp: specYield,
         savingsUsd: Number((selfCons * 0.25 + rec.exportKwh * 0.12).toFixed(2)),

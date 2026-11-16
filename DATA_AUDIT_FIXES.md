@@ -21,7 +21,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-11** | Energy Flow | Proportional plant capacity scaling fallback when multi-plant summary is missing | `[x] Completed` |
 | **FIX-12** | Energy Flow | Hardcoded fallback of `100 kW` for unrated inverters | `[x] Completed` |
 | **FIX-13** | Energy Flow | Logger status ternary always resolving to `'ONLINE'` | `[x] Completed` |
-| **FIX-14** | Deye Client | Synthetic daily Performance Ratio (`specYield / 5.0`) & Peak Solar formulas | `[ ] Pending` |
+| **FIX-14** | Deye Client | Synthetic daily Performance Ratio (`specYield / 5.0`) & Peak Solar formulas | `[x] Completed` |
 | **FIX-15** | Deye Client | Hardcoded 82.0% monthly Performance Ratio in `getLiveMonthlyHistory` | `[ ] Pending` |
 | **FIX-16** | Deye Client | Hardcoded USD tariff rates (`$0.36`, `$0.25`, `$0.24`, `$0.14`, `$0.12`) | `[ ] Pending` |
 | **FIX-17** | Deye Client | Plant-to-inverter proportional curve scaling fallback when 0 device frames exist | `[ ] Pending` |
@@ -159,15 +159,15 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ### 4. Historical Analytics & Aggregator Math (`src/lib/deye-client.ts` & `src/app/analytics/page.tsx`)
 
-#### [ ] FIX-14: Synthetic Daily Performance Ratio & Peak Solar Formulas
-* **File & Lines**: [`src/lib/deye-client.ts#L1891`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1891), [`#L1903`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1903)
+#### [x] FIX-14: Synthetic Daily Performance Ratio & Peak Solar Formulas
+* **File & Lines**: [`src/lib/deye-client.ts#L1891-L1915`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1891-L1915), [`src/app/analytics/page.tsx#L1447-L1465`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/analytics/page.tsx#L1447-L1465)
 * **Problem**:
   ```typescript
   const pr = rec.solar > 0 ? Number(Math.min(95, Math.max(40, (specYield / 5.0) * 100)).toFixed(1)) : 0;
   peakSolarKw: Number((safeCapacity * Math.min(1, specYield / 5.2)).toFixed(1))
   ```
-  Synthesizes Performance Ratio and peak power from specific yield multipliers instead of measuring actual peak intervals.
-* **Proposed Fix**: Derive peak solar kW directly from the maximum recorded interval in the intraday dataset.
+  Fabricated Performance Ratio and daily peak kW using arbitrary specific yield multipliers (`/ 5.0` and `/ 5.2`) instead of deriving peak power from real interval telemetry.
+* **Resolution**: Replaced heuristic multipliers with authentic hardware derivation. In `getLiveDailyHistory`, peak solar kW is derived directly from cached or merged recorded intraday intervals, defaulting to 0 when interval telemetry is absent. Without physical pyranometer irradiance sensors (IEC 61724), unmeasured PR returns 0 and renders an honest `--` ("Unmeasured (No Solar Sensor)") in the UI rather than a synthetic estimate.
 
 ---
 
