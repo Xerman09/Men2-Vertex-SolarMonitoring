@@ -83,7 +83,56 @@ export const GET = withGate(
       };
 
       if (!deviceSn || deviceSn === 'ALL' || deviceSn === 'ALL_FLEET') {
-        return NextResponse.json(base);
+        const targetPlants =
+          stationId && stationId !== 'ALL'
+            ? (client.plants || []).filter((p) => String(p.stationId) === String(stationId))
+            : client.plants || [];
+        const inverterSns = targetPlants
+          .flatMap((p) => p.devices || [])
+          .filter((d) => String(d.deviceType || '').toUpperCase() === 'INVERTER')
+          .map((d) => d.deviceSn);
+
+        const devices: Record<string, {
+          liveSolarPowerKw: number;
+          dailyYieldKwh: number;
+          totalYieldKwh: number;
+          ratedKw: number;
+        }> = {};
+
+        if (inverterSns.length > 0) {
+          try {
+            const batch = await client.getBatchDeviceLatest(inverterSns);
+            const nowSec = Math.floor(Date.now() / 1000);
+            for (const sn of inverterSns) {
+              const devData = batch.get(sn);
+              if (devData) {
+                const collSec = parseFloat(devData.get('__collectionTime') || '0');
+                const isStale = collSec > 0 && nowSec - collSec > 86400 * 2;
+                const liveKw = !isStale
+                  ? parseFloat((parseFloat(devData.get('TotalActiveACOutputPower') || '0') / 1000).toFixed(2))
+                  : 0;
+                const dailyKwh = !isStale
+                  ? parseFloat(devData.get('DailyActiveProduction') || '0')
+                  : 0;
+                const totalKwh = parseFloat(devData.get('TotalActiveProduction') || '0');
+                const ratedKw = parseFloat((parseFloat(devData.get('RatedPower') || '50000') / 1000).toFixed(1));
+                devices[sn] = {
+                  liveSolarPowerKw: liveKw,
+                  dailyYieldKwh: dailyKwh,
+                  totalYieldKwh: totalKwh,
+                  ratedKw: ratedKw > 0 ? ratedKw : 50,
+                };
+              }
+            }
+          } catch (batchErr) {
+            log.warn('Could not fetch batch device telemetry for station', { stationId, error: batchErr });
+          }
+        }
+
+        return NextResponse.json({
+          ...base,
+          devices,
+        });
       }
 
       if (!isValidInverterSn(client.plants, deviceSn)) {

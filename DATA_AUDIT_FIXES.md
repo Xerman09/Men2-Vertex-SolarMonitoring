@@ -17,7 +17,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-07** | Hardware Telemetry | Synthetic temperature additions (`heatsink + 6.6°C`, `ambient - 2°C`) | `[x] Completed` |
 | **FIX-08** | Hardware Telemetry | Hardcoded protection status strings ("ACTIVE & COMPLIANT", "0.0 mA", "0 DETECTED") | `[x] Completed` |
 | **FIX-09** | Deye Client | Hardcoded fallbacks (`98.4%` efficiency, `45°C` heatsink, `30°C` ambient, `0.99` PF, `1.5%` THD) | `[x] Completed` |
-| **FIX-10** | Energy Flow | Equal-split inverter power distribution (`plantSolarKw / inverters.length`) in drawer | `[ ] Pending` |
+| **FIX-10** | Energy Flow | Equal-split inverter power distribution (`plantSolarKw / inverters.length`) in drawer | `[x] Completed` |
 | **FIX-11** | Energy Flow | Proportional plant capacity scaling fallback when multi-plant summary is missing | `[ ] Pending` |
 | **FIX-12** | Energy Flow | Hardcoded fallback of `100 kW` for unrated inverters | `[ ] Pending` |
 | **FIX-13** | Energy Flow | Logger status ternary always resolving to `'ONLINE'` | `[ ] Pending` |
@@ -117,15 +117,15 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ### 3. Live Energy Flow (`src/app/energy-flow/page.tsx`)
 
-#### [ ] FIX-10: Equal-Split Inverter Distribution in Bottom Drawer
-* **File & Lines**: [`src/app/energy-flow/page.tsx#L259-L260`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/energy-flow/page.tsx#L259-L260)
+#### [x] FIX-10: Equal-Split Inverter Distribution in Bottom Drawer
+* **File & Lines**: [`src/app/energy-flow/page.tsx#L259-L260`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/energy-flow/page.tsx#L259-L260), [`src/app/api/deye/station/route.ts#L85-L135`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/api/deye/station/route.ts#L85-L135)
 * **Problem**: In the Energy Flow drawer, inverter nodes calculate power using:
   ```typescript
   const kwPerInv = plantSolarKw / (inverters.length || 1);
   const dailyYieldPerInv = plantDailyKwh / (inverters.length || 1);
   ```
   Instead of reading each inverter's genuine hardware wattage (as the Fleet view does), it evenly splits plant power across all inverters.
-* **Proposed Fix**: Connect drawer nodes to authentic batch device telemetry (`batchData.get(deviceSn)`) so individual inverters show their true production.
+* **Resolution**: Updated `/api/deye/station` route to batch-query live inverter device telemetry via `client.getBatchDeviceLatest(inverterSns)` and return genuine `devices` telemetry. In `energy-flow/page.tsx`, drawer nodes read authentic individual inverter hardware readings (`devData.liveSolarPowerKw`, `devData.dailyYieldKwh`). Single-inverter stations map directly 1-to-1 to plant telemetry; multi-inverter stations without individual device readings report honest un-split zero readings instead of fabricating equal divisions.
 
 ---
 

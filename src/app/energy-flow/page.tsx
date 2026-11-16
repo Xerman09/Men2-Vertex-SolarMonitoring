@@ -266,6 +266,22 @@ export default function EnergyFlowDashboard() {
                   loggers[i] ||
                   loggers[0];
 
+                const devData = json.devices?.[device.deviceSn];
+                // Authentic device telemetry: read true inverter hardware readings when available.
+                // For single-inverter plants, plant telemetry is 100% authentic to that inverter.
+                // For multi-inverter plants, use individual device telemetry or honest 0 when unmeasured.
+                const invLiveSolarKw = devData
+                  ? devData.liveSolarPowerKw
+                  : inverters.length === 1
+                    ? plantSolarKw
+                    : 0;
+
+                const invDailyYieldKwh = devData
+                  ? devData.dailyYieldKwh
+                  : inverters.length === 1
+                    ? plantDailyKwh
+                    : 0;
+
                 currentStationNodes.push({
                   accountId: selectedAccountId,
                   accountName: selectedAccount.name,
@@ -275,10 +291,13 @@ export default function EnergyFlowDashboard() {
                   deviceType: 'INVERTER',
                   model: device.model || 'Deye Inverter',
                   ratedKw: device.ratedKw || 50,
+                  ratedKw: devData?.ratedKw || device.ratedKw || 50,
                   loggerSn: device.loggerSn || matchingLogger?.deviceSn,
                   loggerStatus: matchingLogger?.status || (plantSummary?.status === 'ONLINE' ? 'ONLINE' : 'ONLINE'),
                   liveSolarPowerKw: kwPerInv,
                   dailyYieldKwh: dailyYieldPerInv,
+                  liveSolarPowerKw: invLiveSolarKw,
+                  dailyYieldKwh: invDailyYieldKwh,
                   gridPowerKw: plantGridKw,
                   consumptionPowerKw: plantLoadKw,
                   batterySoc: plantBatterySoc,
