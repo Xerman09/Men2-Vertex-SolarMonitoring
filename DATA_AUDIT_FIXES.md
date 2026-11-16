@@ -18,7 +18,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-08** | Hardware Telemetry | Hardcoded protection status strings ("ACTIVE & COMPLIANT", "0.0 mA", "0 DETECTED") | `[x] Completed` |
 | **FIX-09** | Deye Client | Hardcoded fallbacks (`98.4%` efficiency, `45°C` heatsink, `30°C` ambient, `0.99` PF, `1.5%` THD) | `[x] Completed` |
 | **FIX-10** | Energy Flow | Equal-split inverter power distribution (`plantSolarKw / inverters.length`) in drawer | `[x] Completed` |
-| **FIX-11** | Energy Flow | Proportional plant capacity scaling fallback when multi-plant summary is missing | `[ ] Pending` |
+| **FIX-11** | Energy Flow | Proportional plant capacity scaling fallback when multi-plant summary is missing | `[x] Completed` |
 | **FIX-12** | Energy Flow | Hardcoded fallback of `100 kW` for unrated inverters | `[ ] Pending` |
 | **FIX-13** | Energy Flow | Logger status ternary always resolving to `'ONLINE'` | `[ ] Pending` |
 | **FIX-14** | Deye Client | Synthetic daily Performance Ratio (`specYield / 5.0`) & Peak Solar formulas | `[ ] Pending` |
@@ -129,13 +129,13 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ---
 
-#### [ ] FIX-11: Proportional Plant Capacity Scaling Fallback
-* **File & Lines**: [`src/app/energy-flow/page.tsx#L239`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/energy-flow/page.tsx#L239), [`#L245`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/energy-flow/page.tsx#L245)
-* **Problem**: If `plantsSummary` is missing, it estimates plant solar with:
+#### [x] FIX-11: Proportional Plant Capacity Scaling Fallback
+* **File & Lines**: [`src/app/energy-flow/page.tsx#L235-L245`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/energy-flow/page.tsx#L235-L245)
+* **Problem**: If `plantsSummary` was missing in a multi-plant station/account view, it synthesized plant solar power and daily energy with:
   ```typescript
   ((plant.installedCapacityKw || 100) / (selectedAccount.capacityKw || 100)) * (json.data?.liveSolarPowerKw || 0)
   ```
-* **Proposed Fix**: Disallow synthetic cross-plant scaling; display 0 or honest empty states when scoped plant telemetry is unavailable.
+* **Resolution**: Eliminated synthetic proportional cross-plant scaling. In multi-plant account views without explicit per-plant hardware summaries, plant generation defaults to honest 0 / unmeasured rather than fabricating artificial proportional numbers from fleet or account-level totals. Single-target plant views continue to map directly to authenticated station telemetry.
 
 ---
 

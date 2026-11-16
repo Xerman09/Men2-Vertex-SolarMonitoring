@@ -233,16 +233,16 @@ export default function EnergyFlowDashboard() {
               );
 
               const plantSolarKw = plantSummary
-                ? plantSummary.liveSolarPowerKw
+                ? (plantSummary.liveSolarPowerKw || 0)
                 : targetPlants.length === 1
                   ? (json.data?.liveSolarPowerKw || 0)
-                  : ((plant.installedCapacityKw || 100) / (selectedAccount.capacityKw || 100)) * (json.data?.liveSolarPowerKw || 0);
+                  : 0;
 
               const plantDailyKwh = plantSummary
-                ? plantSummary.dailyYieldKwh
+                ? (plantSummary.dailyYieldKwh || 0)
                 : targetPlants.length === 1
                   ? (json.data?.dailyYieldKwh || 0)
-                  : ((plant.installedCapacityKw || 100) / (selectedAccount.capacityKw || 100)) * (json.data?.dailyYieldKwh || 0);
+                  : 0;
 
               const plantGridKw = plantSummary
                 ? plantSummary.gridPowerKw
@@ -255,9 +255,6 @@ export default function EnergyFlowDashboard() {
               const plantBatterySoc = plantSummary
                 ? plantSummary.batterySoc
                 : (json.data?.batterySoc || 0);
-
-              const kwPerInv = plantSolarKw / (inverters.length || 1);
-              const dailyYieldPerInv = plantDailyKwh / (inverters.length || 1);
 
               for (let i = 0; i < inverters.length; i++) {
                 const device = inverters[i];
@@ -290,12 +287,9 @@ export default function EnergyFlowDashboard() {
                   deviceSn: device.deviceSn,
                   deviceType: 'INVERTER',
                   model: device.model || 'Deye Inverter',
-                  ratedKw: device.ratedKw || 50,
                   ratedKw: devData?.ratedKw || device.ratedKw || 50,
                   loggerSn: device.loggerSn || matchingLogger?.deviceSn,
                   loggerStatus: matchingLogger?.status || (plantSummary?.status === 'ONLINE' ? 'ONLINE' : 'ONLINE'),
-                  liveSolarPowerKw: kwPerInv,
-                  dailyYieldKwh: dailyYieldPerInv,
                   liveSolarPowerKw: invLiveSolarKw,
                   dailyYieldKwh: invDailyYieldKwh,
                   gridPowerKw: plantGridKw,
