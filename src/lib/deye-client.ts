@@ -281,14 +281,50 @@ export interface SnLiveOverlay {
   todayEnergyKwh: number;
 }
 
+export function extractDeviceSolarPowerWatts(
+  raw: Map<string, string> | undefined | null
+): number {
+  if (!raw) return 0;
+  for (const key of [
+    'TotalActiveACOutputPower',
+    'TotalSolarPower',
+    'TotalInverterOutputPower',
+    'TotalDCInputPower',
+  ]) {
+    const val = parseFloat(raw.get(key) || '');
+    if (Number.isFinite(val)) return val;
+  }
+  return 0;
+}
+
+export function extractDeviceDailyYieldKwh(
+  raw: Map<string, string> | undefined | null
+): number {
+  if (!raw) return 0;
+  for (const key of ['DailyActiveProduction', 'PVDailyPowerGenerationActive']) {
+    const val = parseFloat(raw.get(key) || '');
+    if (Number.isFinite(val)) return val;
+  }
+  return 0;
+}
+
+export function extractDeviceRatedKw(
+  raw: Map<string, string> | undefined | null
+): number {
+  if (!raw) return 0;
+  const val = parseFloat(raw.get('RatedPower') || '');
+  if (!Number.isFinite(val) || val <= 0) return 0;
+  return val > 500 ? Number((val / 1000).toFixed(1)) : Number(val.toFixed(1));
+}
+
 /**
  * Pure helper: parse the live SN overlay fields from a single-inverter
- * `/device/latest` raw map. `TotalActiveACOutputPower` is in watts,
- * `DailyActiveProduction` is already in kWh.
+ * `/device/latest` raw map. Power registers are in watts,
+ * daily energy registers are already in kWh.
  */
 export function getSnLiveOverlay(raw: Map<string, string>): SnLiveOverlay {
-  const activeW = parseFloat(raw.get('TotalActiveACOutputPower') || '0');
-  const dailyKwh = parseFloat(raw.get('DailyActiveProduction') || '0');
+  const activeW = extractDeviceSolarPowerWatts(raw);
+  const dailyKwh = extractDeviceDailyYieldKwh(raw);
   return {
     liveSolarPowerKw: parseFloat(((Number.isFinite(activeW) ? activeW : 0) / 1000).toFixed(2)),
     todayEnergyKwh: Number.isFinite(dailyKwh) ? dailyKwh : 0,
@@ -614,71 +650,168 @@ export class DeyeCloudClient {
   }
 
   /**
-   * Auto-discover all plants and hardware (inverters and loggers) registered under this DeyeCloud account
+   * Auto-discover all plants and hardware (inverters and loggers) registered under this DeyeCloud account.
+   * Uses paginated /v1.0/station/listWithDevice, fetches /v1.0/station/device if a station has truncated devices,
+   * links inverters to parent collectors via parentId, and enriches real RatedPower from /v1.0/device/latest.
    */
   public async discoverPlantsAndDevices(): Promise<{ plants: PlantInfo[]; isLive: boolean }> {
-    const res = await this.fetchWithAuth('/v1.0/station/listWithDevice', {
-      method: 'POST',
-      body: JSON.stringify({}),
-    });
+    const allStations: Record<string, unknown>[] = [];
+    const pageSize = 50;
 
-    if (res && res.ok) {
+    for (let page = 1; page <= 5; page++) {
+      const res = await this.fetchWithAuth('/v1.0/station/listWithDevice', {
+        method: 'POST',
+        body: JSON.stringify({ page, size: pageSize }),
+      });
+
+      if (!res || !res.ok) break;
       try {
         const body = await res.json();
         const stationList = body.stationList || body.data?.stationList || [];
-
-        if (Array.isArray(stationList) && stationList.length > 0) {
-          const plants: PlantInfo[] = stationList.map((st: Record<string, unknown>) => {
-            const rawDevices = (st.deviceListItems || st.deviceList || st.devices || []) as Record<string, unknown>[];
-            const devices: DeviceInfo[] = rawDevices.map((d: Record<string, unknown>) => {
-              const isLogger =
-                d.deviceType === 'LOGGER' ||
-                d.deviceType === 'COLLECTOR' ||
-                d.deviceType === 2 ||
-                d.deviceType === '2' ||
-                d.loggerSn === d.deviceSn;
-
-              const isOnline =
-                d.connectStatus === 1 ||
-                d.connectStatus === '1' ||
-                d.connectionStatus === '1' ||
-                d.status === '1' ||
-                d.status === 'ONLINE';
-
-              return {
-                deviceSn: String(d.deviceSn || d.sn || ''),
-                deviceType: (isLogger ? 'LOGGER' : 'INVERTER') as 'INVERTER' | 'LOGGER',
-                name: String(
-                  d.deviceName ||
-                  d.name ||
-                  (isLogger ? `Deye Collector/Logger (${d.deviceSn})` : `Deye Inverter (${d.deviceSn})`)
-                ),
-                model: String(d.deviceModel || d.model || (isLogger ? 'Deye Smart Collector Logger' : 'SUN-100K-SG01HP3-EU-AM2')),
-                ratedKw: parseFloat(String(d.ratedPower || d.capacity || (isLogger ? '0' : '100'))),
-                loggerSn: d.loggerSn ? String(d.loggerSn) : undefined,
-                status: isOnline ? 'ONLINE' : 'STANDBY',
-                lastSeen: d.collectionTime
-                  ? new Date(Number(d.collectionTime) * 1000).toISOString()
-                  : new Date().toISOString(),
-              };
-            });
-
-            return {
-              stationId: String(st.id || st.stationId || this.defaultStationId),
-              stationName: String(st.name || st.stationName || `${this.accountName} Plant`),
-              installedCapacityKw: parseFloat(String(st.installedCapacity || st.capacity || '100.0')),
-              address: String(st.locationAddress || st.address || st.location || 'Site Array Location'),
-              liveSolarPowerKw: parseFloat(String(st.generationPower || st.livePower || '0.0')),
-              dailyYieldKwh: parseFloat(String(st.dailyEnergy || st.dailyYield || '0.0')),
-              devices,
-            };
-          });
-
-          return { plants, isLive: true };
-        }
+        if (!Array.isArray(stationList) || stationList.length === 0) break;
+        allStations.push(...(stationList as Record<string, unknown>[]));
+        if (stationList.length < pageSize) break;
       } catch (err) {
-        log.warn('Auto-discovery parse error', { accountName: this.accountName }, err);
+        log.warn('Auto-discovery parse error', { accountName: this.accountName, page }, err);
+        break;
       }
+    }
+
+    if (allStations.length === 0) {
+      return { plants: this.getSimulatedPlants(), isLive: false };
+    }
+
+    try {
+      const plants: PlantInfo[] = [];
+
+      for (const st of allStations) {
+        const stationId = String(st.id || st.stationId || this.defaultStationId);
+        let rawDevices = (st.deviceListItems || st.deviceList || st.devices || []) as Record<string, unknown>[];
+        const expectedTotal = Number(st.deviceTotal || 0);
+
+        // If listWithDevice truncated the station's devices, fetch the complete list directly from /station/device
+        if (expectedTotal > rawDevices.length) {
+          try {
+            const devRes = await this.fetchWithAuth('/v1.0/station/device', {
+              method: 'POST',
+              body: JSON.stringify({
+                stationIds: [Number(stationId) || stationId],
+                page: 1,
+                size: Math.max(100, expectedTotal),
+              }),
+            });
+            if (devRes && devRes.ok) {
+              const devBody = await devRes.json();
+              const fullItems = devBody.deviceListItems || devBody.deviceList || devBody.data?.deviceListItems || [];
+              if (Array.isArray(fullItems) && fullItems.length >= rawDevices.length) {
+                rawDevices = fullItems as Record<string, unknown>[];
+              }
+            }
+          } catch (devErr) {
+            log.warn('Station device backfill failed', { stationId }, devErr);
+          }
+        }
+
+        // Map collector deviceId -> collector SN so inverters resolve loggerSn via parentId
+        const collectorByDeviceId = new Map<string, string>();
+        for (const d of rawDevices) {
+          const dt = String(d.deviceType || '').toUpperCase();
+          if (dt === 'LOGGER' || dt === 'COLLECTOR' || dt === '2') {
+            if (d.deviceId != null && d.deviceSn) {
+              collectorByDeviceId.set(String(d.deviceId), String(d.deviceSn));
+            }
+          }
+        }
+
+        const devices: DeviceInfo[] = rawDevices.map((d) => {
+          const isLogger =
+            d.deviceType === 'LOGGER' ||
+            d.deviceType === 'COLLECTOR' ||
+            d.deviceType === 2 ||
+            d.deviceType === '2' ||
+            d.loggerSn === d.deviceSn;
+
+          const isOnline =
+            d.connectStatus === 1 ||
+            d.connectStatus === '1' ||
+            d.connectionStatus === '1' ||
+            d.status === '1' ||
+            d.status === 'ONLINE';
+
+          const resolvedLoggerSn = d.loggerSn
+            ? String(d.loggerSn)
+            : !isLogger && d.parentId != null
+            ? collectorByDeviceId.get(String(d.parentId))
+            : undefined;
+
+          const parsedRated = parseFloat(String(d.ratedPower || d.capacity || '0'));
+          const safeRatedKw = Number.isFinite(parsedRated) && parsedRated > 0 ? parsedRated : 0;
+
+          return {
+            deviceSn: String(d.deviceSn || d.sn || ''),
+            deviceType: (isLogger ? 'LOGGER' : 'INVERTER') as 'INVERTER' | 'LOGGER',
+            name: String(
+              d.deviceName ||
+              d.name ||
+              (isLogger ? `Deye Collector/Logger (${d.deviceSn})` : `Deye Inverter (${d.deviceSn})`)
+            ),
+            model: String(
+              d.deviceModel ||
+              d.model ||
+              (isLogger
+                ? 'Deye Smart Collector Logger'
+                : safeRatedKw > 0
+                ? `SUN-${Math.round(safeRatedKw)}K-SG01HP3-EU-AM2`
+                : 'Deye Inverter')
+            ),
+            ratedKw: isLogger ? 0 : safeRatedKw,
+            loggerSn: resolvedLoggerSn,
+            status: isOnline ? 'ONLINE' : 'STANDBY',
+            lastSeen: d.collectionTime
+              ? new Date(Number(d.collectionTime) * 1000).toISOString()
+              : undefined,
+          };
+        });
+
+        const parsedCap = parseFloat(String(st.installedCapacity ?? st.capacity ?? '0'));
+        plants.push({
+          stationId,
+          stationName: String(st.name || st.stationName || `${this.accountName} Plant`),
+          installedCapacityKw: Number.isFinite(parsedCap) ? parsedCap : 0,
+          address: String(st.locationAddress || st.address || st.location || ''),
+          liveSolarPowerKw: parseFloat(String(st.generationPower || st.livePower || '0.0')) || 0,
+          dailyYieldKwh: parseFloat(String(st.dailyEnergy || st.dailyYield || '0.0')) || 0,
+          devices,
+        });
+      }
+
+      // Enrich authentic inverter RatedPower & live status from a single batched /v1.0/device/latest call
+      const allInverterSns = plants
+        .flatMap((p) => p.devices)
+        .filter((d) => d.deviceType === 'INVERTER' && d.deviceSn)
+        .map((d) => d.deviceSn);
+
+      if (allInverterSns.length > 0) {
+        const batch = await this.getBatchDeviceLatest(allInverterSns);
+        for (const p of plants) {
+          for (const dev of p.devices) {
+            if (dev.deviceType !== 'INVERTER') continue;
+            const reg = batch.get(dev.deviceSn);
+            if (!reg) continue;
+            const realRatedKw = extractDeviceRatedKw(reg);
+            if (realRatedKw > 0) {
+              dev.ratedKw = realRatedKw;
+              if (!dev.model || dev.model === 'Deye Inverter') {
+                dev.model = `SUN-${Math.round(realRatedKw)}K-SG01HP3-EU-AM2`;
+              }
+            }
+          }
+        }
+      }
+
+      return { plants, isLive: true };
+    } catch (err) {
+      log.warn('Auto-discovery assembly error', { accountName: this.accountName }, err);
     }
 
     return { plants: this.getSimulatedPlants(), isLive: false };
@@ -1098,10 +1231,11 @@ export class DeyeCloudClient {
       const nowSec = Math.floor(Date.now() / 1000);
       const isDeviceStale = collTimeSec > 0 && (nowSec - collTimeSec > 86400 * 2);
 
-      const activeW = isDeviceStale ? 0 : parseFloat(dataMap.get('TotalActiveACOutputPower') || '0');
-      const dailyKwh = isDeviceStale ? 0 : parseFloat(dataMap.get('DailyActiveProduction') || '0');
+      const activeW = isDeviceStale ? 0 : extractDeviceSolarPowerWatts(dataMap);
+      const dailyKwh = isDeviceStale ? 0 : extractDeviceDailyYieldKwh(dataMap);
       const totalKwh = parseFloat(dataMap.get('TotalActiveProduction') || '0');
-      const ratedW = parseFloat(dataMap.get('RatedPower') || '50000');
+      const ratedKwParsed = extractDeviceRatedKw(dataMap);
+      const ratedW = ratedKwParsed > 0 ? ratedKwParsed * 1000 : 0;
       const freqHz = isDeviceStale ? 0 : parseFloat(dataMap.get('ACOutputFrequencyR') || '60.0');
 
       const mpptStrings = isDeviceStale

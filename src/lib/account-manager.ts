@@ -13,7 +13,11 @@ import {
   SolarInverterControlLog,
   SolarUserStationPermission,
 } from './types';
-import { DeyeCloudClient } from './deye-client';
+import {
+  DeyeCloudClient,
+  extractDeviceDailyYieldKwh,
+  extractDeviceSolarPowerWatts,
+} from './deye-client';
 import { sanitizeDeyeBaseUrl, sanitizeDirectusBaseUrl } from './url-validator';
 import { hashPassword } from './auth-crypto';
 import { env } from './env';
@@ -52,6 +56,7 @@ class DeyeAccountManager {
   private cachedFleetSummary: Map<string, { data: AggregatedFleetSummary; timestamp: number }> = new Map();
   private inFlightFleetSummary: Map<string, Promise<AggregatedFleetSummary>> = new Map();
   private inFlightAccountsSummary: Map<string, Promise<AccountSummary[]>> = new Map();
+  private inFlightDynamicSync: Map<string, Promise<boolean>> = new Map();
   private clientRegistry: ClientRegistry = clientRegistry;
   private fleetAggregator: FleetAggregator = fleetAggregator;
   private lastLoadedAt: number = 0;
@@ -185,10 +190,45 @@ class DeyeAccountManager {
             };
           });
 
-          // Merge plants by stationId so no stations are lost
+          // Merge plants without clobbering newer DeyeCloud auto-discovery with stale Directus DB rows.
+          const cfgSyncMs = cfg.last_checked_at ? new Date(cfg.last_checked_at).getTime() : 0;
+          const existingSyncMs =
+            existing?.autoDiscovered && existing?.lastSyncedAt
+              ? new Date(existing.lastSyncedAt).getTime()
+              : 0;
+          const diskIsNewer =
+            Boolean(existing?.autoDiscovered) &&
+            Array.isArray(existing?.plants) &&
+            existing.plants.length > 0 &&
+            existingSyncMs > cfgSyncMs;
+
           const plantMap = new Map<string, PlantInfo>();
-          (existing?.plants || []).forEach((p) => plantMap.set(String(p.stationId), p));
-          plants.forEach((p) => plantMap.set(String(p.stationId), p));
+          if (diskIsNewer) {
+            plants.forEach((p) => plantMap.set(String(p.stationId), p));
+            (existing?.plants || []).forEach((p) => {
+              const dbPlant = plantMap.get(String(p.stationId));
+              // Preserve fresher live discovery devices while filling any missing logger metadata
+              if (!dbPlant || p.devices.length >= dbPlant.devices.length) {
+                plantMap.set(String(p.stationId), p);
+              }
+            });
+          } else {
+            (existing?.plants || []).forEach((p) => plantMap.set(String(p.stationId), p));
+            plants.forEach((p) => {
+              const diskPlant = plantMap.get(String(p.stationId));
+              // If disk already has more devices for this station and Directus lacks a fresh sync timestamp, preserve union
+              if (diskPlant && !cfg.last_checked_at && diskPlant.devices.length > p.devices.length) {
+                const seenSns = new Set(p.devices.map((d) => d.deviceSn));
+                const mergedDevices = [
+                  ...p.devices,
+                  ...diskPlant.devices.filter((d) => !seenSns.has(d.deviceSn)),
+                ];
+                plantMap.set(String(p.stationId), { ...p, devices: mergedDevices });
+              } else {
+                plantMap.set(String(p.stationId), p);
+              }
+            });
+          }
           const finalPlants = plantMap.size > 0 ? Array.from(plantMap.values()) : [];
           const firstInverter = finalPlants[0]?.devices?.find((d) => d.deviceType === 'INVERTER');
 
@@ -209,8 +249,8 @@ class DeyeAccountManager {
             password: cfg.account_password || existing?.password || '',
             defaultStationId: finalPlants[0]?.stationId || existing?.defaultStationId || '',
             defaultDeviceSn: firstInverter?.deviceSn || existing?.defaultDeviceSn || '',
-            autoDiscovered: finalPlants.length > 0,
-            lastSyncedAt: cfg.last_checked_at || new Date().toISOString(),
+            autoDiscovered: Boolean(existing?.autoDiscovered || finalPlants.length > 0),
+            lastSyncedAt: cfg.last_checked_at || existing?.lastSyncedAt,
             plants: finalPlants,
             source: 'directus',
           };
@@ -496,32 +536,7 @@ class DeyeAccountManager {
         newAccount.defaultDeviceSn = firstInverter.deviceSn;
       }
 
-      // Persist discovered stations & devices into iot_solar_stations and iot_solar_devices
-      try {
-        for (const p of newAccount.plants) {
-          await this.createItem(COLLECTIONS.STATIONS, {
-            station_id: p.stationId,
-            name: p.stationName,
-            installed_capacity_kw: p.installedCapacityKw,
-            address: p.address || '',
-            deye_config_id: directusId ? Number(directusId) : null,
-          });
-
-          for (const d of p.devices) {
-            await this.createItem(COLLECTIONS.DEVICES, {
-              device_sn: d.deviceSn,
-              station_id: p.stationId,
-              device_type: d.deviceType,
-              name: d.name,
-              model: d.model || '',
-              rated_kw: d.ratedKw || 0,
-              status: d.status || 'ONLINE',
-            });
-          }
-        }
-      } catch (err) {
-        log.warn('Non-fatal error saving stations/devices to database', {}, err);
-      }
+      await this.persistDiscoveredTopologyToDirectus(newAccount, newAccount.plants, newAccount.lastSyncedAt || new Date().toISOString());
     }
 
     // Persist registered user into iot_solar_users with hashed password (skip if consumer linking)
@@ -691,36 +706,7 @@ class DeyeAccountManager {
         target.defaultDeviceSn = firstInverter.deviceSn;
       }
 
-      // Persist discovered stations & devices into iot_solar_stations and iot_solar_devices
-      try {
-        const directusId = target.directusId ? Number(target.directusId) : null;
-        for (const p of discovery.plants) {
-          await this.createItem(COLLECTIONS.STATIONS, {
-            station_id: p.stationId,
-            name: p.stationName,
-            installed_capacity_kw: p.installedCapacityKw,
-            address: p.address || '',
-            deye_config_id: directusId,
-            org_id: 1,
-            grid_type: '3-PHASE',
-            is_active: 1,
-          });
-
-          for (const d of p.devices) {
-            await this.createItem(COLLECTIONS.DEVICES, {
-              device_sn: d.deviceSn,
-              station_id: p.stationId,
-              device_type: d.deviceType,
-              name: d.name,
-              model: d.model || '',
-              rated_kw: d.ratedKw || 0,
-              status: d.status || 'ONLINE',
-            });
-          }
-        }
-      } catch (err) {
-        log.warn('Non-fatal error saving synced stations to database', {}, err);
-      }
+      await this.persistDiscoveredTopologyToDirectus(target, discovery.plants, target.lastSyncedAt);
     }
 
     this.saveAccountsToFile(all);
@@ -730,6 +716,111 @@ class DeyeAccountManager {
       plants: discovery.plants,
       isLive: discovery.isLive,
     };
+  }
+
+  /**
+   * Idempotently upsert discovered stations, devices, and sync timestamp into Directus
+   * so Directus tables stay synchronized with live DeyeCloud discovery.
+   */
+  private async persistDiscoveredTopologyToDirectus(
+    acc: DeyeAccountConfig,
+    plants: PlantInfo[],
+    syncedAtIso: string
+  ): Promise<void> {
+    try {
+      const [existingStations, existingDevices] = await Promise.all([
+        this.fetchCollection<SolarStationRecord>(COLLECTIONS.STATIONS),
+        this.fetchCollection<SolarDeviceRecord>(COLLECTIONS.DEVICES),
+      ]);
+
+      // Skip gracefully when Directus is offline or schema unavailable
+      if (existingStations === null || existingDevices === null) {
+        return;
+      }
+
+      const directusId = acc.directusId ? Number(acc.directusId) || null : null;
+      const stationByExternalId = new Map<string, SolarStationRecord>();
+      for (const s of existingStations) {
+        stationByExternalId.set(String(s.station_id), s);
+      }
+      const deviceBySn = new Map<string, SolarDeviceRecord>();
+      for (const d of existingDevices) {
+        deviceBySn.set(String(d.device_sn), d);
+      }
+
+      for (const p of plants) {
+        const stationKey = String(p.stationId);
+        const existingSt = stationByExternalId.get(stationKey);
+        if (!existingSt) {
+          await this.createItem(COLLECTIONS.STATIONS, {
+            station_id: stationKey,
+            name: p.stationName,
+            installed_capacity_kw: p.installedCapacityKw,
+            address: p.address || '',
+            deye_config_id: directusId,
+            grid_type: '3-PHASE',
+            is_active: 1,
+            last_synced_at: syncedAtIso,
+          });
+        } else if (
+          existingSt.name !== p.stationName ||
+          Math.abs(Number(existingSt.installed_capacity_kw || 0) - Number(p.installedCapacityKw || 0)) > 0.05 ||
+          (existingSt.address || '') !== (p.address || '')
+        ) {
+          await this.updateItem(COLLECTIONS.STATIONS, existingSt.id, {
+            name: p.stationName,
+            installed_capacity_kw: p.installedCapacityKw,
+            address: p.address || '',
+            last_synced_at: syncedAtIso,
+          });
+        }
+
+        for (const d of p.devices) {
+          const existingDev = deviceBySn.get(String(d.deviceSn));
+          if (!existingDev) {
+            await this.createItem(COLLECTIONS.DEVICES, {
+              device_sn: d.deviceSn,
+              station_id: stationKey,
+              device_type: d.deviceType,
+              name: d.name,
+              model: d.model || '',
+              rated_kw: d.ratedKw || 0,
+              logger_sn: d.loggerSn || null,
+              status: d.status || 'ONLINE',
+              last_seen_at: d.lastSeen || syncedAtIso,
+            });
+          } else {
+            const capDiffers =
+              Math.abs(Number(existingDev.rated_kw || 0) - Number(d.ratedKw || 0)) > 0.05;
+            const loggerDiffers = (existingDev.logger_sn || '') !== (d.loggerSn || '');
+            const stationDiffers = String(existingDev.station_id) !== stationKey;
+            const modelDiffers = d.model && existingDev.model !== d.model;
+            const statusDiffers = d.status && existingDev.status !== d.status;
+            if (capDiffers || loggerDiffers || stationDiffers || modelDiffers || statusDiffers) {
+              await this.updateItem(COLLECTIONS.DEVICES, existingDev.id, {
+                station_id: stationKey,
+                device_type: d.deviceType,
+                name: d.name,
+                model: d.model || existingDev.model || '',
+                rated_kw: d.ratedKw || 0,
+                logger_sn: d.loggerSn || null,
+                status: d.status || 'ONLINE',
+                last_seen_at: d.lastSeen || syncedAtIso,
+              });
+            }
+          }
+        }
+      }
+
+      if (directusId) {
+        await this.updateItem(COLLECTIONS.CONFIGS, directusId, {
+          last_checked_at: syncedAtIso,
+          status: 'OPTIMAL',
+        });
+      }
+    } catch (err) {
+      log.warn('Non-fatal error persisting discovered topology to Directus', { accountId: acc.id }, err);
+    }
   }
 
   /**
@@ -764,8 +855,23 @@ class DeyeAccountManager {
 
   /**
    * Dynamically synchronize plant names, capacity, addresses, and devices from Deye Cloud OpenAPI
+   * and persist discovered topology to both deye-accounts.json and Directus.
    */
   public async syncDynamicPlantMetadata(
+    acc: DeyeAccountConfig,
+    client: DeyeCloudClient
+  ): Promise<boolean> {
+    const existingLock = this.inFlightDynamicSync.get(acc.id);
+    if (existingLock) return existingLock;
+
+    const promise = this.performDynamicPlantSync(acc, client).finally(() => {
+      this.inFlightDynamicSync.delete(acc.id);
+    });
+    this.inFlightDynamicSync.set(acc.id, promise);
+    return promise;
+  }
+
+  private async performDynamicPlantSync(
     acc: DeyeAccountConfig,
     client: DeyeCloudClient
   ): Promise<boolean> {
@@ -818,15 +924,18 @@ class DeyeAccountManager {
         changed = true;
       }
 
-      acc.lastSyncedAt = new Date().toISOString();
+      const syncedAtIso = new Date().toISOString();
+      acc.lastSyncedAt = syncedAtIso;
       acc.autoDiscovered = true;
 
-      // Persist dynamic updates to deye-accounts.json
+      // Persist dynamic updates to Directus and deye-accounts.json
+      await this.persistDiscoveredTopologyToDirectus(acc, acc.plants, syncedAtIso);
+
       const all = this.getAllRawAccounts(true);
       const targetIdx = all.findIndex((a) => a.id === acc.id);
       if (targetIdx >= 0) {
         all[targetIdx].plants = acc.plants;
-        all[targetIdx].lastSyncedAt = acc.lastSyncedAt;
+        all[targetIdx].lastSyncedAt = syncedAtIso;
         all[targetIdx].autoDiscovered = true;
         this.saveAccountsToFile(all);
       }
@@ -911,7 +1020,7 @@ class DeyeAccountManager {
 
               // Sum daily yield from real inverter telemetry and enrich per-plant live telemetry
               for (const [, devData] of batchDev) {
-                dailyYield += parseFloat(devData.get('DailyActiveProduction') || '0');
+                dailyYield += extractDeviceDailyYieldKwh(devData);
               }
 
               for (const p of activePlants) {
@@ -924,8 +1033,8 @@ class DeyeAccountManager {
                 for (const inv of plantInvs) {
                   const devData = batchDev.get(inv.deviceSn);
                   if (devData) {
-                    pDaily += parseFloat(devData.get('DailyActiveProduction') || '0');
-                    pSolar += parseFloat(devData.get('TotalActiveACOutputPower') || '0') / 1000;
+                    pDaily += extractDeviceDailyYieldKwh(devData);
+                    pSolar += extractDeviceSolarPowerWatts(devData) / 1000;
                   }
                 }
                 if (plantSum) {
@@ -1052,6 +1161,28 @@ class DeyeAccountManager {
     let rawAccounts = this.loadAccounts(false);
     if (rawAccounts.length === 0) {
       rawAccounts = this.getAllRawAccounts(true);
+    }
+
+    // Ensure any stale (>5 min) live account discovers new DeyeCloud plants/inverters before fleet aggregation
+    let refreshedTopology = false;
+    await Promise.all(
+      rawAccounts.map(async (acc) => {
+        if (acc.enabled === false) return;
+        const client = this.getClient(acc.id);
+        if (!client || !client.hasCredentials()) return;
+        const lastSyncMs = acc.lastSyncedAt ? new Date(acc.lastSyncedAt).getTime() : 0;
+        if (!lastSyncMs || Date.now() - lastSyncMs > 300_000) {
+          const health = await client.getHealth();
+          if (health.isLive) {
+            const changed = await this.syncDynamicPlantMetadata(acc, client);
+            if (changed) refreshedTopology = true;
+          }
+        }
+      })
+    );
+
+    if (refreshedTopology) {
+      rawAccounts = this.loadAccounts(true);
     }
     const clients = this.getAllClients();
     

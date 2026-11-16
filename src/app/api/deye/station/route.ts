@@ -6,6 +6,9 @@ import { withGate } from '@/lib/gate';
 import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
 import { createLogger } from '@/lib/logger';
 import {
+  extractDeviceDailyYieldKwh,
+  extractDeviceRatedKw,
+  extractDeviceSolarPowerWatts,
   getSingleInverterStationView,
   getSnLiveOverlay,
 } from '@/lib/deye-client';
@@ -109,18 +112,18 @@ export const GET = withGate(
                 const collSec = parseFloat(devData.get('__collectionTime') || '0');
                 const isStale = collSec > 0 && nowSec - collSec > 86400 * 2;
                 const liveKw = !isStale
-                  ? parseFloat((parseFloat(devData.get('TotalActiveACOutputPower') || '0') / 1000).toFixed(2))
+                  ? parseFloat((extractDeviceSolarPowerWatts(devData) / 1000).toFixed(2))
                   : 0;
                 const dailyKwh = !isStale
-                  ? parseFloat(devData.get('DailyActiveProduction') || '0')
+                  ? extractDeviceDailyYieldKwh(devData)
                   : 0;
                 const totalKwh = parseFloat(devData.get('TotalActiveProduction') || '0');
-                const ratedKw = parseFloat((parseFloat(devData.get('RatedPower') || '50000') / 1000).toFixed(1));
+                const ratedKw = extractDeviceRatedKw(devData);
                 devices[sn] = {
                   liveSolarPowerKw: liveKw,
                   dailyYieldKwh: dailyKwh,
                   totalYieldKwh: totalKwh,
-                  ratedKw: ratedKw > 0 ? ratedKw : 50,
+                  ratedKw,
                 };
               }
             }

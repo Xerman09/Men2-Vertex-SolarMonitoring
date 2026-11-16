@@ -1,4 +1,9 @@
-import { DeyeCloudClient } from './deye-client';
+import {
+  DeyeCloudClient,
+  extractDeviceDailyYieldKwh,
+  extractDeviceRatedKw,
+  extractDeviceSolarPowerWatts,
+} from './deye-client';
 import {
   DeyeAccountConfig,
   AccountSummary,
@@ -175,14 +180,14 @@ export class FleetAggregator {
             if (!d) return false;
             const collSec = parseFloat(d.get('__collectionTime') || '0');
             const isStale = collSec > 0 && (nowSec - collSec > 86400 * 2);
-            return !isStale && parseFloat(d.get('TotalActiveACOutputPower') || '0') > 0;
+            return !isStale && extractDeviceSolarPowerWatts(d) > 0;
           });
           const plantHasBatchDaily = !plantIsOffline && inverters.some((inv) => {
             const d = item.batchData?.get(inv.deviceSn);
             if (!d) return false;
             const collSec = parseFloat(d.get('__collectionTime') || '0');
             const isStale = collSec > 0 && (nowSec - collSec > 86400 * 2);
-            return !isStale && parseFloat(d.get('DailyActiveProduction') || '0') > 0;
+            return !isStale && extractDeviceDailyYieldKwh(d) > 0;
           });
 
           let plantSolarKw = 0;
@@ -214,17 +219,16 @@ export class FleetAggregator {
             const isDeviceOffline = plantIsOffline || isDevStale;
 
             const liveKw = (!isDeviceOffline && devData)
-              ? parseFloat((parseFloat(devData.get('TotalActiveACOutputPower') || '0') / 1000).toFixed(2))
+              ? parseFloat((extractDeviceSolarPowerWatts(devData) / 1000).toFixed(2))
               : 0;
             const dailyKwh = (!isDeviceOffline && devData)
-              ? parseFloat(devData.get('DailyActiveProduction') || '0')
+              ? extractDeviceDailyYieldKwh(devData)
               : 0;
             const lifetimeKwh = devData
               ? parseFloat(devData.get('TotalActiveProduction') || '0')
               : 0;
-            const ratedPowerW = devData
-              ? parseFloat(devData.get('RatedPower') || '50000')
-              : (device.ratedKw ? device.ratedKw * 1000 : 50000);
+            const realRatedKw = extractDeviceRatedKw(devData) || device.ratedKw || 0;
+            const ratedPowerW = realRatedKw * 1000;
             const consKw = (!isDeviceOffline && devData)
               ? parseFloat((parseFloat(devData.get('TotalConsumptionPower') || '0') / 1000).toFixed(2))
               : 0;
@@ -271,7 +275,12 @@ export class FleetAggregator {
               stationId: plant.stationId,
               deviceSn: device.deviceSn,
               deviceType: 'INVERTER',
-              model: `SUN-${Math.round(ratedPowerW / 1000)}K-SG01HP3-EU-AM2`,
+              model:
+                device.model && device.model !== 'Deye Inverter'
+                  ? device.model
+                  : ratedPowerW > 0
+                  ? `SUN-${Math.round(ratedPowerW / 1000)}K-SG01HP3-EU-AM2`
+                  : 'Deye Inverter',
               ratedKw: Math.round(ratedPowerW / 1000),
               loggerSn: loggerSn,
               loggerStatus: isDeviceOffline ? 'OFFLINE' : loggerStatus,
