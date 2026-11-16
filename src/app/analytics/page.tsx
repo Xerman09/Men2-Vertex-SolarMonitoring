@@ -429,38 +429,38 @@ export default function AnalyticsDashboardPage() {
         const plantSum = acc.plants?.reduce((sum, p) => sum + (p.installedCapacityKw || 0), 0) || 0;
         cap += plantSum > 0 ? plantSum : (acc.capacityKw || 0);
       });
-      return cap > 0 ? cap : 120;
+      return cap > 0 ? cap : 0;
     }
     if (selectedPlant) {
-      return selectedPlant.installedCapacityKw || 120;
+      return selectedPlant.installedCapacityKw || 0;
     }
     if (selectedAccount) {
       const plantSum = selectedAccount.plants?.reduce((sum, p) => sum + (p.installedCapacityKw || 0), 0) || 0;
       if (plantSum > 0) return plantSum;
-      return selectedAccount.capacityKw > 0 ? selectedAccount.capacityKw : 120;
+      return selectedAccount.capacityKw > 0 ? selectedAccount.capacityKw : 0;
     }
-    return 120;
+    return 0;
   }, [isFleetView, accounts, selectedPlant, selectedAccount]);
 
   // Effective capacity when isolated to a single inverter or plant
   const effectiveCapacityKw = useMemo(() => {
     if (selectedInverter) {
-      return selectedInverter.ratedKw || baseCapacityKw || 120;
+      return selectedInverter.ratedKw || baseCapacityKw || 0;
     }
-    return baseCapacityKw || 120;
+    return baseCapacityKw || 0;
   }, [selectedInverter, baseCapacityKw]);
 
   // Active Title reflecting isolation
   const activeDashboardTitle = useMemo(() => {
     if (isFleetView) {
       const plantCount = accounts.reduce((acc, a) => acc + (a.plants?.length || 0), 0);
-      return `Enterprise Fleet Aggregate (${plantCount} Stations · ${baseCapacityKw} kWp)`;
+      return `Enterprise Fleet Aggregate (${plantCount} Stations${baseCapacityKw > 0 ? ` · ${baseCapacityKw} kWp` : ''})`;
     }
     if (selectedInverter) {
       return `Isolated: Inverter ${selectedInverter.model} (${selectedInverter.deviceSn})`;
     }
     if (selectedPlant) {
-      return `${selectedPlant.stationName} (${selectedPlant.installedCapacityKw} kWp)`;
+      return `${selectedPlant.stationName}${selectedPlant.installedCapacityKw ? ` (${selectedPlant.installedCapacityKw} kWp)` : ''}`;
     }
     return selectedAccount?.name || 'Commercial Solar Array';
   }, [isFleetView, accounts, baseCapacityKw, selectedInverter, selectedPlant, selectedAccount]);
@@ -483,12 +483,6 @@ export default function AnalyticsDashboardPage() {
     }
     return 'Commercial Solar Array';
   }, [isFleetView, totalAccounts, selectedInverter, selectedPlant, selectedAccount]);
-
-  // Inverter scaling ratio for solar yield curves
-  const inverterPowerRatio = useMemo(() => {
-    if (!selectedInverter) return 1.0;
-    return Math.min(1.0, selectedInverter.ratedKw / (baseCapacityKw || selectedInverter.ratedKw));
-  }, [selectedInverter, baseCapacityKw]);
 
   // Background idle prefetching for adjacent periods (B1)
   const scheduleIdlePrefetch = useCallback(
@@ -743,40 +737,10 @@ export default function AnalyticsDashboardPage() {
     };
   }, [fetchAnalyticsData, dateSelection, selectedInverterSn]);
 
-  // Scale raw hourly telemetry according to the active selection scope (Fleet / Account / Plant / Inverter).
-  // Live telemetry from DeyeCloud is already in actual kW for the target scope and should never be re-scaled by 120 kWp.
-  const scopeScaleFactor = useMemo(() => {
-    if (historyIsLive) {
-      return 1.0;
-    }
-    if (!isFleetView && selectedInverter && serverScale && serverScale.sn === effectiveInverterSn) {
-      return 1.0;
-    }
-    if (!isFleetView && selectedInverter) {
-      return inverterPowerRatio;
-    }
-    if (effectiveCapacityKw && effectiveCapacityKw > 0) {
-      return Number((effectiveCapacityKw / 120).toFixed(4));
-    }
-    return 1.0;
-  }, [historyIsLive, isFleetView, selectedInverter, serverScale, effectiveInverterSn, inverterPowerRatio, effectiveCapacityKw]);
-
-  const isolatedHourlyData = useMemo(() => {
-    if (scopeScaleFactor === 1.0) return hourlyData;
-    return hourlyData.map((pt) => {
-      const solar = pt.solarYieldKw != null && Number.isFinite(pt.solarYieldKw) ? Number((pt.solarYieldKw * scopeScaleFactor).toFixed(2)) : null;
-      const load = pt.loadDemandKw != null && Number.isFinite(pt.loadDemandKw) ? Number((pt.loadDemandKw * scopeScaleFactor).toFixed(2)) : null;
-      const bat = pt.batteryFlowKw != null && Number.isFinite(pt.batteryFlowKw) ? Number((pt.batteryFlowKw * scopeScaleFactor).toFixed(2)) : null;
-      const grid = pt.gridFlowKw != null && Number.isFinite(pt.gridFlowKw) ? Number((pt.gridFlowKw * scopeScaleFactor).toFixed(2)) : null;
-      return {
-        ...pt,
-        solarYieldKw: solar,
-        loadDemandKw: load,
-        batteryFlowKw: bat,
-        gridFlowKw: grid,
-      };
-    });
-  }, [hourlyData, scopeScaleFactor]);
+  // Telemetry from DeyeCloud is already in actual physical kW for the target scope (Fleet / Account / Plant / Inverter).
+  // In accordance with AGENTS.md, all curves represent 100% genuine hardware telemetry with zero synthetic scaling (/ 120).
+  const scopeScaleFactor = 1.0;
+  const isolatedHourlyData = hourlyData;
 
   // Dynamic Battery Detection (Zero-state for pure grid-tied solar plants)
   const hasBattery = useMemo<boolean>(() => {
@@ -1191,7 +1155,7 @@ export default function AnalyticsDashboardPage() {
                     {selectedInverter?.model || 'Deye Inverter'} · SN: {selectedInverter?.deviceSn || selectedInverterSn}
                   </span>
                   <span className="text-muted-foreground font-mono text-[11px]">
-                    ({effectiveCapacityKw} kW rated · Station: {selectedInverter?.stationName || selectedPlant?.stationName || selectedStationId})
+                    ({effectiveCapacityKw > 0 ? `${effectiveCapacityKw} kW rated` : 'Rated capacity unrecorded'} · Station: {selectedInverter?.stationName || selectedPlant?.stationName || selectedStationId})
                   </span>
                   <button
                     type="button"
@@ -1281,7 +1245,7 @@ export default function AnalyticsDashboardPage() {
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Installed Capacity:</span>
-                    <span className="font-semibold text-foreground">{effectiveCapacityKw} kWp</span>
+                    <span className="font-semibold text-foreground">{effectiveCapacityKw > 0 ? `${effectiveCapacityKw} kWp` : '--'}</span>
                   </div>
                 </div>
               </div>
@@ -1440,7 +1404,7 @@ export default function AnalyticsDashboardPage() {
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Plant Capacity:</span>
-                    <span className="font-semibold text-blue-400">{effectiveCapacityKw} kWp</span>
+                    <span className="font-semibold text-blue-400">{effectiveCapacityKw > 0 ? `${effectiveCapacityKw} kWp` : '--'}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Status:</span>
@@ -1490,7 +1454,7 @@ export default function AnalyticsDashboardPage() {
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Loading:</span>
                     <span className="font-semibold text-foreground">
-                      {analyticsSummary.peakSolarKw > 0
+                      {analyticsSummary.peakSolarKw > 0 && effectiveCapacityKw > 0
                         ? `${Math.min(100, Math.round((analyticsSummary.peakSolarKw / effectiveCapacityKw) * 100))}% Peak Load`
                         : 'Standby'}
                     </span>
@@ -1943,7 +1907,7 @@ export default function AnalyticsDashboardPage() {
                       domain={[
                         0,
                         (dataMax: number) => {
-                          const baseline = effectiveCapacityKw > 0 ? effectiveCapacityKw * 0.9 : 100;
+                          const baseline = effectiveCapacityKw > 0 ? effectiveCapacityKw * 0.9 : 10;
                           const peak = Math.max(dataMax || 0, baseline);
                           return Math.max(10, Math.ceil(peak * 1.1));
                         },

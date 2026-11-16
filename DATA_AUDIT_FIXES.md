@@ -196,16 +196,16 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ---
 
-#### [ ] FIX-18: Hardcoded 120 kWp Scaling Divisor in Analytics Dashboard
-* **File & Lines**: [`src/app/analytics/page.tsx#L754-L756`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar Monitoring/DSM/src/app/analytics/page.tsx#L754-L756)
+#### [x] FIX-18: Hardcoded 120 kWp Scaling Divisor in Analytics Dashboard
+* **File & Lines**: [`src/app/analytics/page.tsx#L425-L451`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/analytics/page.tsx#L425-L451), [`#L745-L770`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/analytics/page.tsx#L745-L770)
 * **Problem**:
   ```typescript
   if (effectiveCapacityKw && effectiveCapacityKw > 0) {
     return Number((effectiveCapacityKw / 120).toFixed(4));
   }
   ```
-  When `historyIsLive` is false, it scales historical curves by `/ 120`.
-* **Proposed Fix**: Drop the `/ 120` scaling; display honest zero/empty states when live telemetry is unavailable.
+  `scopeScaleFactor` scaled telemetry curves by dividing `effectiveCapacityKw / 120`, and `baseCapacityKw` fell back to a hardcoded `120 kW`.
+* **Resolution**: Eliminated the `/ 120` scaling divisor and hardcoded 120 kW capacity fallbacks. In accordance with `AGENTS.md`, all telemetry from DeyeCloud is preserved at its genuine physical hardware scale (`scopeScaleFactor = 1.0`), and zero-states render clean `--` / unrecorded values when capacity or telemetry is absent.
 
 ---
 
