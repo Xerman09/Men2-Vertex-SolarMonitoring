@@ -19,7 +19,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-09** | Deye Client | Hardcoded fallbacks (`98.4%` efficiency, `45°C` heatsink, `30°C` ambient, `0.99` PF, `1.5%` THD) | `[x] Completed` |
 | **FIX-10** | Energy Flow | Equal-split inverter power distribution (`plantSolarKw / inverters.length`) in drawer | `[x] Completed` |
 | **FIX-11** | Energy Flow | Proportional plant capacity scaling fallback when multi-plant summary is missing | `[x] Completed` |
-| **FIX-12** | Energy Flow | Hardcoded fallback of `100 kW` for unrated inverters | `[ ] Pending` |
+| **FIX-12** | Energy Flow | Hardcoded fallback of `100 kW` for unrated inverters | `[x] Completed` |
 | **FIX-13** | Energy Flow | Logger status ternary always resolving to `'ONLINE'` | `[ ] Pending` |
 | **FIX-14** | Deye Client | Synthetic daily Performance Ratio (`specYield / 5.0`) & Peak Solar formulas | `[ ] Pending` |
 | **FIX-15** | Deye Client | Hardcoded 82.0% monthly Performance Ratio in `getLiveMonthlyHistory` | `[ ] Pending` |
@@ -139,10 +139,10 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ---
 
-#### [ ] FIX-12: Hardcoded Fallback of 100 kW for Unrated Inverters
-* **File & Lines**: [`src/app/energy-flow/page.tsx#L1805`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/energy-flow/page.tsx#L1805), [`#L1923`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/energy-flow/page.tsx#L1923)
-* **Problem**: `SN: {node.deviceSn} · {node.ratedKw ? `${node.ratedKw} kW` : '100 kW'}` defaults to `100 kW` for any inverter missing an explicit rating.
-* **Proposed Fix**: Resolve rated power from hardware registers (`RatedPower`) or fallback to `50 kW` / plant capacity division.
+#### [x] FIX-12: Hardcoded Fallback of 100 kW for Unrated Inverters
+* **File & Lines**: [`src/app/energy-flow/page.tsx#L1462`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/energy-flow/page.tsx#L1462), [`#L1619`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/energy-flow/page.tsx#L1619), [`#L1818`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/energy-flow/page.tsx#L1818), [`#L1936`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/energy-flow/page.tsx#L1936)
+* **Problem**: In 4 table/card locations across the drawer, inverter rating defaulted to `'100 kW'` (`node.ratedKw ? `${node.ratedKw} kW` : '100 kW'`) whenever rating was unset or 0, fabricating a 100 kW rating for unrated inverters.
+* **Resolution**: Replaced hardcoded `'100 kW'` fallbacks across all 4 locations with `{node.ratedKw && node.ratedKw > 0 ? `${node.ratedKw} kW` : '--'}`. Inverters with genuine ratings display their true hardware rating; unconfigured devices render an honest `--` indicator without fabricating capacity.
 
 ---
 

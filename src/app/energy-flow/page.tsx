@@ -1459,7 +1459,7 @@ export default function EnergyFlowDashboard() {
                                               <span className="text-xs">{node.model}</span>
                                             </div>
                                             <span className="font-mono text-[11px] text-muted-foreground block mt-0.5">
-                                              SN: {node.deviceSn} · {node.ratedKw ? `${node.ratedKw} kW` : '100 kW'}
+                                              SN: {node.deviceSn} · {node.ratedKw && node.ratedKw > 0 ? `${node.ratedKw} kW` : '--'}
                                             </span>
                                           </td>
                                           <td>
@@ -1616,7 +1616,7 @@ export default function EnergyFlowDashboard() {
                                         <span className="text-xs">{node.model}</span>
                                       </div>
                                       <span className="font-mono text-[11px] text-muted-foreground block mt-0.5">
-                                        SN: {node.deviceSn} · {node.ratedKw ? `${node.ratedKw} kW` : '100 kW'}
+                                        SN: {node.deviceSn} · {node.ratedKw && node.ratedKw > 0 ? `${node.ratedKw} kW` : '--'}
                                       </span>
                                     </td>
                                     <td>
@@ -1815,7 +1815,7 @@ export default function EnergyFlowDashboard() {
 
                                           <div className="space-y-1 text-xs">
                                             <div className="font-mono text-[10.5px] text-muted-foreground truncate">
-                                              SN: {node.deviceSn} · {node.ratedKw ? `${node.ratedKw} kW` : '100 kW'}
+                                              SN: {node.deviceSn} · {node.ratedKw && node.ratedKw > 0 ? `${node.ratedKw} kW` : '--'}
                                             </div>
                                             {node.loggerSn && (
                                               <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-muted/60 border border-border/50 text-[10px] font-mono">
@@ -1933,7 +1933,7 @@ export default function EnergyFlowDashboard() {
 
                                 <div className="space-y-1 text-xs">
                                   <div className="font-mono text-[10.5px] text-muted-foreground truncate">
-                                    SN: {node.deviceSn} · {node.ratedKw ? `${node.ratedKw} kW` : '100 kW'}
+                                    SN: {node.deviceSn} · {node.ratedKw && node.ratedKw > 0 ? `${node.ratedKw} kW` : '--'}
                                   </div>
                                   {node.loggerSn && (
                                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-muted/60 border border-border/50 text-[10px] font-mono">
