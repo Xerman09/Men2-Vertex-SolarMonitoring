@@ -3,6 +3,7 @@ import {
   PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH,
   PHILIPPINES_GRID_EMISSION_FACTOR_TONS_PER_KWH,
   KG_CO2_PER_TREE_ANNUAL,
+  DEFAULT_TARIFF_SCHEDULE,
 } from './tariff-rates';
 
 export interface DailyAnalyticsPoint {
@@ -19,6 +20,7 @@ export interface DailyAnalyticsPoint {
   performanceRatioPct: number;
   specificYieldKwhKwp: number;
   savingsUsd: number;
+  savingsPhp?: number;
   co2AvoidedKg: number;
 }
 
@@ -32,6 +34,7 @@ export interface MonthlyAnalyticsPoint {
   performanceRatioPct: number;
   specificYieldKwhKwp: number;
   savingsUsd: number;
+  savingsPhp?: number;
   co2AvoidedTons: number;
 }
 
@@ -84,6 +87,7 @@ export interface AnalyticsSummary {
   pvModuleEfficiencyPct: number;
   specificYieldKwhKwp: number;
   totalSavingsUsd: number;
+  totalSavingsPhp?: number;
   co2AvoidedKg: number;
   treesEquivalent: number;
   coalAvoidedKg: number;

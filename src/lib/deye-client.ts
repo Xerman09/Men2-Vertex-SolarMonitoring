@@ -12,7 +12,10 @@ import {
   getMockHourlyEnergyPoints,
 } from './mock-telemetry';
 import type { DailyAnalyticsPoint, MonthlyAnalyticsPoint } from './analytics-data';
-import { PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH } from './tariff-rates';
+import {
+  PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH,
+  DEFAULT_TARIFF_SCHEDULE,
+} from './tariff-rates';
 import { sanitizeDeyeBaseUrl } from './url-validator';
 import { fileHistoryCache } from './file-history-cache';
 import { env } from './env';
@@ -1366,7 +1369,9 @@ export class DeyeCloudClient {
       const m = totalMins % 60;
       const hourLabel = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
       const hourDecimal = Number((h + m / 60).toFixed(4));
-      const tariff = h >= 14 && h <= 20 ? 0.36 : 0.14;
+      const tariffPhp = h >= DEFAULT_TARIFF_SCHEDULE.peakStartHour && h <= DEFAULT_TARIFF_SCHEDULE.peakEndHour
+        ? DEFAULT_TARIFF_SCHEDULE.peakRatePerKwh
+        : DEFAULT_TARIFF_SCHEDULE.offPeakRatePerKwh;
 
       if (totalMins > cutoffMins) {
         points.push({
@@ -1377,7 +1382,8 @@ export class DeyeCloudClient {
           batteryFlowKw: null,
           gridFlowKw: null,
           gridExportKw: null,
-          tariffRateUsd: tariff,
+          tariffRateUsd: tariffPhp,
+          tariffRatePhp: tariffPhp,
           isElapsed: false,
         });
         continue;
@@ -1393,7 +1399,8 @@ export class DeyeCloudClient {
           batteryFlowKw: 0,
           gridFlowKw: 0,
           gridExportKw: 0,
-          tariffRateUsd: tariff,
+          tariffRateUsd: tariffPhp,
+          tariffRatePhp: tariffPhp,
           isElapsed: true,
         });
       } else {
@@ -1409,7 +1416,8 @@ export class DeyeCloudClient {
           batteryFlowKw: bat,
           gridFlowKw: grid,
           gridExportKw: Number(Math.max(0, grid).toFixed(2)),
-          tariffRateUsd: tariff,
+          tariffRateUsd: tariffPhp,
+          tariffRatePhp: tariffPhp,
           isElapsed: true,
         });
       }
@@ -1908,6 +1916,10 @@ export class DeyeCloudClient {
       // without physical pyranometers, report 0 so UI displays honest '--' rather than synthetic estimates.
       const pr = 0;
 
+      const dailySavingsPhp = Number(
+        (selfCons * DEFAULT_TARIFF_SCHEDULE.offPeakRatePerKwh + rec.exportKwh * DEFAULT_TARIFF_SCHEDULE.exportCreditPerKwh).toFixed(2)
+      );
+
       points.push({
         date: cursor,
         dayLabel,
@@ -1921,7 +1933,8 @@ export class DeyeCloudClient {
         peakSolarKw: Number(peakSolarKw.toFixed(1)),
         performanceRatioPct: pr,
         specificYieldKwhKwp: specYield,
-        savingsUsd: Number((selfCons * 0.25 + rec.exportKwh * 0.12).toFixed(2)),
+        savingsUsd: dailySavingsPhp,
+        savingsPhp: dailySavingsPhp,
         co2AvoidedKg: Number((rec.solar * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH).toFixed(1)),
       });
       cursor = shiftIsoDate(cursor, 1);
@@ -2002,6 +2015,8 @@ export class DeyeCloudClient {
       const importMwh = Number((rec.importKwh / 1000).toFixed(2));
       const selfConsPct = rec.solarKwh > 0 ? Number(Math.max(0, Math.min(100, ((rec.solarKwh - rec.exportKwh) / rec.solarKwh) * 100)).toFixed(1)) : 0;
 
+      const monthlySavingsPhp = Number((rec.solarKwh * DEFAULT_TARIFF_SCHEDULE.offPeakRatePerKwh).toFixed(0));
+
       points.push({
         month: label,
         solarYieldMwh: yieldMwh,
@@ -2013,7 +2028,8 @@ export class DeyeCloudClient {
         // without physical pyranometers, report 0 so UI displays honest '--' rather than synthetic 82.0% estimates.
         performanceRatioPct: 0,
         specificYieldKwhKwp: safeCapacity > 0 ? Number((rec.solarKwh / safeCapacity).toFixed(1)) : 0,
-        savingsUsd: Number((rec.solarKwh * 0.24).toFixed(0)),
+        savingsUsd: monthlySavingsPhp,
+        savingsPhp: monthlySavingsPhp,
         co2AvoidedTons: Number((yieldMwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH).toFixed(2)),
       });
       cursor = shiftIsoMonth(cursor, 1);

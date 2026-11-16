@@ -84,7 +84,8 @@ export interface HourlyEnergyPoint {
   batteryFlowKw: number | null; // positive charging, negative discharging
   gridFlowKw: number | null; // positive export, negative import
   gridExportKw?: number | null;
-  tariffRateUsd: number;
+  tariffRateUsd: number; // Retained for backward-compat; normalized to Philippine Peso rate
+  tariffRatePhp?: number;
   isElapsed?: boolean;
 }
 

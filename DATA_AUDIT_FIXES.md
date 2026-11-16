@@ -23,7 +23,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-13** | Energy Flow | Logger status ternary always resolving to `'ONLINE'` | `[x] Completed` |
 | **FIX-14** | Deye Client | Synthetic daily Performance Ratio (`specYield / 5.0`) & Peak Solar formulas | `[x] Completed` |
 | **FIX-15** | Deye Client | Hardcoded 82.0% monthly Performance Ratio in `getLiveMonthlyHistory` | `[x] Completed` |
-| **FIX-16** | Deye Client | Hardcoded USD tariff rates (`$0.36`, `$0.25`, `$0.24`, `$0.14`, `$0.12`) | `[ ] Pending` |
+| **FIX-16** | Deye Client | Hardcoded USD tariff rates (`$0.36`, `$0.25`, `$0.24`, `$0.14`, `$0.12`) | `[x] Completed` |
 | **FIX-17** | Deye Client | Plant-to-inverter proportional curve scaling fallback when 0 device frames exist | `[ ] Pending` |
 | **FIX-18** | Analytics Dashboard | Hardcoded 120 kWp scaling divisor in `AnalyticsDashboardPage` when `!historyIsLive` | `[ ] Pending` |
 | **FIX-19** | Trigonometric Graph | Browser local clock used instead of Manila Time (`Asia/Manila` / UTC+8) | `[ ] Pending` |
@@ -182,10 +182,10 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ---
 
-#### [ ] FIX-16: Hardcoded USD Tariff Rates in Core Client
-* **File & Lines**: [`src/lib/deye-client.ts#L1368`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1368), [`#L1906`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1906), [`#L1996`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1996)
-* **Problem**: Intraday points embed `tariffRateUsd: 0.36 / 0.14`, and historical summaries calculate `savingsUsd` using `$0.25 / $0.12` and `$0.24`, conflicting with the Philippine Peso standard.
-* **Proposed Fix**: Remove or align these legacy USD calculations with `useTariff` rates in Philippine Peso (`₱` / PHP).
+#### [x] FIX-16: Hardcoded USD Tariff Rates in Core Client
+* **File & Lines**: [`src/lib/deye-client.ts#L1369-L1415`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1369-L1415), [`#L1920-L1935`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1920-L1935), [`#L2015-L2030`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L2015-L2030), [`src/lib/types.ts#L87`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/types.ts#L87), [`src/lib/analytics-data.ts#L21-L34`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/analytics-data.ts#L21-L34)
+* **Problem**: Intraday points embedded static USD rates (`0.36 / 0.14`), and historical summaries calculated savings using hardcoded USD constants (`$0.25 / $0.12` and `$0.24`), conflicting with the Philippine Peso (`₱` / PHP) platform standard.
+* **Resolution**: Standardized all tariff and financial yield calculations on official Philippine distribution utility rates via `DEFAULT_TARIFF_SCHEDULE` from `tariff-rates.ts` (ERC National Commercial Baseline: Peak ₱14.50/kWh, Off-Peak ₱10.20/kWh, Export Credit ₱6.20/kWh). Daily and monthly avoided cost calculations now compute genuine Philippine Peso values (`savingsPhp` / `totalSavingsPhp`) matching `useTariff` across the entire application.
 
 ---
 
