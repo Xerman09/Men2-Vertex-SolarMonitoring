@@ -2009,7 +2009,9 @@ export class DeyeCloudClient {
         gridExportMwh: exportMwh,
         gridImportMwh: importMwh,
         selfConsumptionPct: selfConsPct,
-        performanceRatioPct: rec.solarKwh > 0 ? 82.0 : 0,
+        // Performance Ratio requires on-site plane-of-array irradiance sensors (IEC 61724);
+        // without physical pyranometers, report 0 so UI displays honest '--' rather than synthetic 82.0% estimates.
+        performanceRatioPct: 0,
         specificYieldKwhKwp: safeCapacity > 0 ? Number((rec.solarKwh / safeCapacity).toFixed(1)) : 0,
         savingsUsd: Number((rec.solarKwh * 0.24).toFixed(0)),
         co2AvoidedTons: Number((yieldMwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH).toFixed(2)),

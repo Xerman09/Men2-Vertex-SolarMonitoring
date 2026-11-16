@@ -22,7 +22,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-12** | Energy Flow | Hardcoded fallback of `100 kW` for unrated inverters | `[x] Completed` |
 | **FIX-13** | Energy Flow | Logger status ternary always resolving to `'ONLINE'` | `[x] Completed` |
 | **FIX-14** | Deye Client | Synthetic daily Performance Ratio (`specYield / 5.0`) & Peak Solar formulas | `[x] Completed` |
-| **FIX-15** | Deye Client | Hardcoded 82.0% monthly Performance Ratio in `getLiveMonthlyHistory` | `[ ] Pending` |
+| **FIX-15** | Deye Client | Hardcoded 82.0% monthly Performance Ratio in `getLiveMonthlyHistory` | `[x] Completed` |
 | **FIX-16** | Deye Client | Hardcoded USD tariff rates (`$0.36`, `$0.25`, `$0.24`, `$0.14`, `$0.12`) | `[ ] Pending` |
 | **FIX-17** | Deye Client | Plant-to-inverter proportional curve scaling fallback when 0 device frames exist | `[ ] Pending` |
 | **FIX-18** | Analytics Dashboard | Hardcoded 120 kWp scaling divisor in `AnalyticsDashboardPage` when `!historyIsLive` | `[ ] Pending` |
@@ -171,14 +171,14 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ---
 
-#### [ ] FIX-15: Hardcoded 82.0% Monthly Performance Ratio
-* **File & Lines**: [`src/lib/deye-client.ts#L1994`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1994)
+#### [x] FIX-15: Hardcoded 82.0% Monthly Performance Ratio
+* **File & Lines**: [`src/lib/deye-client.ts#L2011-L2014`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L2011-L2014)
 * **Problem**:
   ```typescript
   performanceRatioPct: rec.solarKwh > 0 ? 82.0 : 0
   ```
-  Every single month with generation reports an identical `82.0%` PR.
-* **Proposed Fix**: Calculate monthly PR from actual solar yield divided by expected capacity-weighted yield, or display `--` when irradiance data is not present.
+  Every single month with generation reported an identical fabricated `82.0%` PR.
+* **Resolution**: Removed the hardcoded `82.0%` constant. In `getLiveMonthlyHistory`, unmeasured PR defaults to 0 so reporting tables and dashboards display honest `--` ("Unmeasured (No Solar Sensor)") rather than fabricating an identical 82.0% efficiency across all stations, seasons, and weather conditions.
 
 ---
 
