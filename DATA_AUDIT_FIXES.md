@@ -25,8 +25,8 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-15** | Deye Client | Hardcoded 82.0% monthly Performance Ratio in `getLiveMonthlyHistory` | `[x] Completed` |
 | **FIX-16** | Deye Client | Hardcoded USD tariff rates (`$0.36`, `$0.25`, `$0.24`, `$0.14`, `$0.12`) | `[x] Completed` |
 | **FIX-17** | Deye Client | Plant-to-inverter proportional curve scaling fallback when 0 device frames exist | `[x] Completed` |
-| **FIX-18** | Analytics Dashboard | Hardcoded 120 kWp scaling divisor in `AnalyticsDashboardPage` when `!historyIsLive` | `[ ] Pending` |
-| **FIX-19** | Trigonometric Graph | Browser local clock used instead of Manila Time (`Asia/Manila` / UTC+8) | `[ ] Pending` |
+| **FIX-18** | Analytics Dashboard | Hardcoded 120 kWp scaling divisor in `AnalyticsDashboardPage` when `!historyIsLive` | `[x] Completed` |
+| **FIX-19** | Trigonometric Graph | Browser local clock used instead of Manila Time (`Asia/Manila` / UTC+8) | `[x] Completed` |
 
 ---
 
