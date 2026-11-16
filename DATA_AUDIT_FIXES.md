@@ -24,7 +24,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-14** | Deye Client | Synthetic daily Performance Ratio (`specYield / 5.0`) & Peak Solar formulas | `[x] Completed` |
 | **FIX-15** | Deye Client | Hardcoded 82.0% monthly Performance Ratio in `getLiveMonthlyHistory` | `[x] Completed` |
 | **FIX-16** | Deye Client | Hardcoded USD tariff rates (`$0.36`, `$0.25`, `$0.24`, `$0.14`, `$0.12`) | `[x] Completed` |
-| **FIX-17** | Deye Client | Plant-to-inverter proportional curve scaling fallback when 0 device frames exist | `[ ] Pending` |
+| **FIX-17** | Deye Client | Plant-to-inverter proportional curve scaling fallback when 0 device frames exist | `[x] Completed` |
 | **FIX-18** | Analytics Dashboard | Hardcoded 120 kWp scaling divisor in `AnalyticsDashboardPage` when `!historyIsLive` | `[ ] Pending` |
 | **FIX-19** | Trigonometric Graph | Browser local clock used instead of Manila Time (`Asia/Manila` / UTC+8) | `[ ] Pending` |
 
@@ -189,10 +189,10 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ---
 
-#### [ ] FIX-17: Plant-to-Inverter Proportional Curve Fallback
-* **File & Lines**: [`src/lib/deye-client.ts#L1764-L1790`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1764-L1790)
-* **Problem**: When `/v1.0/device/history` returns 0 frames for an inverter, `getLiveDayHistory` scales down the plant's history by `inverterCapacity / plantCapacity` to simulate an inverter curve.
-* **Proposed Fix**: Return clean empty states (0 frames) when device telemetry is unavailable, adhering strictly to the `AGENTS.md` rule against synthetic scope scaling.
+#### [x] FIX-17: Plant-to-Inverter Proportional Curve Fallback
+* **File & Lines**: [`src/lib/deye-client.ts#L1765-L1800`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/deye-client.ts#L1765-L1800)
+* **Problem**: When `/v1.0/device/history` returned 0 frames for an inverter in a multi-inverter station, `getLiveDayHistory` fetched the whole plant's telemetry and multiplied every interval by `inverterCapacity / plantCapacity` to simulate an artificial curve.
+* **Resolution**: Eliminated proportional synthetic curve scaling for multi-inverter plants. When hardware interval telemetry is unavailable or returns 0 frames for an inverter, the client returns an honest empty state (`0 frames` / `null`) rather than synthesizing fake curves. Single-inverter stations continue to map directly 1-to-1 to genuine station telemetry.
 
 ---
 

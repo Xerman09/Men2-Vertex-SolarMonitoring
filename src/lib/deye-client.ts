@@ -1771,33 +1771,34 @@ export class DeyeCloudClient {
         if (discovered.plants.length > 0) this.plants = discovered.plants;
       }
       const shareInfo = getInverterShareInfo(this.plants, opts.deviceSn);
+      // If the plant has exactly 1 inverter, station telemetry is 100% authentic to that device
       if (shareInfo) {
-        const stRes = await this.fetchLiveStationDayHistory(String(shareInfo.plant.stationId), dateStr, stepMinutes);
-        if (stRes) {
-          const factor = shareInfo.ratio;
-          const scaled = stRes.points.map((p) => {
-            if (p.solarYieldKw === null) return p;
-            const solar = Number((p.solarYieldKw * factor).toFixed(2));
-            const load = Number(((p.loadDemandKw ?? 0) * factor).toFixed(2));
-            const bat = Number(((p.batteryFlowKw ?? 0) * factor).toFixed(2));
-            const grid = Number(((p.gridFlowKw ?? solar - load) * factor).toFixed(2));
+        const invCount = (shareInfo.plant.devices || []).filter(
+          (d) => String(d.deviceType || '').toUpperCase() === 'INVERTER'
+        ).length;
+        if (invCount === 1) {
+          const stRes = await this.fetchLiveStationDayHistory(String(shareInfo.plant.stationId), dateStr, stepMinutes);
+          if (stRes && stRes.recordedCount > 0) {
             return {
-              ...p,
-              solarYieldKw: solar,
-              loadDemandKw: load,
-              batteryFlowKw: bat,
-              gridFlowKw: grid,
-              gridExportKw: Number(Math.max(0, grid).toFixed(2)),
+              points: stRes.points,
+              recordedCount: stRes.recordedCount,
+              source: 'station',
+              isLive: true,
+              appliedRatio: 1,
             };
-          });
-          return {
-            points: scaled,
-            recordedCount: stRes.recordedCount,
-            source: 'station',
-            isLive: true,
-            appliedRatio: Number(factor.toFixed(4)),
-          };
+          }
         }
+      }
+      // For multi-inverter plants where device history is unavailable, do NOT synthesize a scaled curve.
+      // Return clean empty telemetry (0 frames) adhering strictly to AGENTS.md data integrity standards.
+      if (devRes) {
+        return {
+          points: devRes.points,
+          recordedCount: devRes.recordedCount,
+          source: 'device',
+          isLive: true,
+          appliedRatio: 1,
+        };
       }
       return null;
     }
