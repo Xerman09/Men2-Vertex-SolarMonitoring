@@ -26,6 +26,8 @@ describe('Manila time helpers', () => {
     const parts = getManilaNowParts(new Date('2026-10-04T17:30:00Z'));
     expect(parts.dateStr).toBe('2026-10-05');
     expect(parts.hourFloat).toBeCloseTo(1.5, 5);
+    expect(parts.hour).toBe(1);
+    expect(parts.minute).toBe(30);
     expect(getManilaToday(new Date('2026-10-04T03:59:00Z'))).toBe('2026-10-04');
   });
 });

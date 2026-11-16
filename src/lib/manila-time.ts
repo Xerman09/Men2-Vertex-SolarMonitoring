@@ -13,7 +13,12 @@ const manilaFormatter = new Intl.DateTimeFormat('en-CA', {
   hourCycle: 'h23',
 });
 
-export function getManilaNowParts(now: Date = new Date()): { dateStr: string; hourFloat: number } {
+export function getManilaNowParts(now: Date = new Date()): {
+  dateStr: string;
+  hourFloat: number;
+  hour: number;
+  minute: number;
+} {
   const map: Record<string, string> = {};
   for (const part of manilaFormatter.formatToParts(now)) {
     if (part.type !== 'literal') map[part.type] = part.value;
@@ -23,6 +28,8 @@ export function getManilaNowParts(now: Date = new Date()): { dateStr: string; ho
   return {
     dateStr: `${map.year}-${map.month}-${map.day}`,
     hourFloat: hour + minute / 60,
+    hour,
+    minute,
   };
 }
 

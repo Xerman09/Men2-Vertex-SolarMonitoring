@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { HourlySolarPoint } from '@/lib/trigonometric-math';
 import { usePolling } from '@/lib/usePolling';
 import { telemetryCache, getHistoryCacheKey } from '@/lib/telemetry-cache';
+import { getManilaNowParts, getManilaToday } from '@/lib/manila-time';
 
 export interface UseTrigonometricGraphProps {
   data?: HourlySolarPoint[];
@@ -60,7 +61,7 @@ export const COLOR_GRID = '#10b981';     // Emerald / Green Grid (+Export / -Imp
 
 export function useTrigonometricGraph({
   data,
-  installedCapacityKw = 120,
+  installedCapacityKw,
   accountId,
   stationId,
   deviceSn,
@@ -117,14 +118,13 @@ export function useTrigonometricGraph({
 
     async function fetchFallbackHistory() {
       try {
-        const nowLocal = new Date();
-        const todayStr = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, '0')}-${String(nowLocal.getDate()).padStart(2, '0')}`;
+        const todayStr = date || getManilaToday();
         const cacheKey = getHistoryCacheKey({
           accountId,
           stationId,
           deviceSn,
           preset: 'TODAY',
-          date: date || todayStr,
+          date: todayStr,
         });
 
         const cached = telemetryCache.get<{ points?: HourlySolarPoint[]; data?: HourlySolarPoint[] }>(cacheKey);
@@ -148,7 +148,7 @@ export function useTrigonometricGraph({
         if (res.ok && !isCancelled) {
           const json = await res.json();
           if (json.data && Array.isArray(json.data) && json.data.length > 0) {
-            const scale = json.isLive || (deviceSn && deviceSn !== 'ALL') ? 1 : (installedCapacityKw > 0 ? installedCapacityKw / 120 : 1);
+            const scale = 1;
             const mapped: HourlySolarPoint[] = json.data.map((item: any) => {
               const parts = String(item.hour || '00:00').split(':');
               const h = parseInt(parts[0], 10) || 0;
@@ -223,8 +223,8 @@ export function useTrigonometricGraph({
   usePolling(
     () => {
       setActiveData((prev) => {
-        const now = new Date();
-        const currentTotalMins = now.getHours() * 60 + now.getMinutes();
+        const { hour, minute } = getManilaNowParts();
+        const currentTotalMins = hour * 60 + minute;
         const currentSlotIndex = Math.floor(currentTotalMins / timeResolution);
 
         return prev.map((pt, idx) => {
@@ -248,8 +248,8 @@ export function useTrigonometricGraph({
   // Manual tick trigger for current slot
   const handleManualTick = useCallback(() => {
     setActiveData((prev) => {
-      const now = new Date();
-      const currentTotalMins = now.getHours() * 60 + now.getMinutes();
+      const { hour, minute } = getManilaNowParts();
+      const currentTotalMins = hour * 60 + minute;
       const currentSlotIndex = Math.floor(currentTotalMins / timeResolution);
 
       return prev.map((pt, idx) => {
@@ -264,9 +264,9 @@ export function useTrigonometricGraph({
     });
   }, [timeResolution]);
 
-  // Find latest active elapsed point for current live KPI display
-  const now = new Date();
-  const currentTotalMins = now.getHours() * 60 + now.getMinutes();
+  // Find latest active elapsed point for current live KPI display (in Asia/Manila standard time)
+  const manilaNow = getManilaNowParts();
+  const currentTotalMins = manilaNow.hour * 60 + manilaNow.minute;
   const currentSlotIndex = Math.floor(currentTotalMins / timeResolution);
 
   const currentLivePoint = useMemo(() => {
@@ -277,10 +277,10 @@ export function useTrigonometricGraph({
     return elapsed.length > 0 ? elapsed[elapsed.length - 1] : activeData[0];
   }, [activeData, currentSlotIndex]);
 
-  // Current 5-minute reference label
-  const nowSlotMinutes = Math.floor(now.getMinutes() / timeResolution) * timeResolution;
-  const nowSlotStr = `${String(now.getHours()).padStart(2, '0')}:${String(nowSlotMinutes).padStart(2, '0')}`;
-  const nowExactTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  // Current 5-minute reference label in Asia/Manila time
+  const nowSlotMinutes = Math.floor(manilaNow.minute / timeResolution) * timeResolution;
+  const nowSlotStr = `${String(manilaNow.hour).padStart(2, '0')}:${String(nowSlotMinutes).padStart(2, '0')}`;
+  const nowExactTimeStr = `${String(manilaNow.hour).padStart(2, '0')}:${String(manilaNow.minute).padStart(2, '0')}`;
 
   // Exact power series data (PV, Consumption, Grid)
   const powerSeriesData: PowerSeriesPoint[] = useMemo(() => {

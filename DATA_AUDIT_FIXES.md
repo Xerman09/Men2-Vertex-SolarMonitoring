@@ -211,8 +211,13 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ### 5. Client Timezone Offset (`src/components/analytics/useTrigonometricGraph.ts`)
 
-#### [ ] FIX-19: Browser Local Clock Used Instead of Manila Time
-* **File & Lines**: [`src/components/analytics/useTrigonometricGraph.ts#L120-L121`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/components/analytics/useTrigonometricGraph.ts#L120-L121), [`#L226-L228`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/components/analytics/useTrigonometricGraph.ts#L226-L228), [`#L268-L270`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/components/analytics/useTrigonometricGraph.ts#L268-L270)
-* **Problem**: Uses `new Date().getHours()` and `new Date().getMinutes()`, reading the user's browser local time instead of Philippine Standard Time (`Asia/Manila` / UTC+8).
-* **Proposed Fix**: Replace with `getManilaNowParts()` and `getManilaToday()` from `@/lib/manila-time`.
+#### [x] FIX-19: Browser Local Clock Used Instead of Manila Time
+* **File & Lines**: [`src/components/analytics/useTrigonometricGraph.ts#L120-L121`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/components/analytics/useTrigonometricGraph.ts#L120-L121), [`#L151`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/components/analytics/useTrigonometricGraph.ts#L151), [`#L226-L228`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/components/analytics/useTrigonometricGraph.ts#L226-L228), [`#L268-L284`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/components/analytics/useTrigonometricGraph.ts#L268-L284), [`src/lib/manila-time.ts#L16-L27`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/lib/manila-time.ts#L16-L27)
+* **Problem**:
+  ```typescript
+  const now = new Date();
+  const currentTotalMins = now.getHours() * 60 + now.getMinutes();
+  ```
+  Read the user's browser local OS time instead of Philippine Standard Time (`Asia/Manila` / UTC+8), causing misaligned elapsed slot indexes and reference labels for users outside the UTC+8 timezone, along with residual `/ 120` scaling on fallback telemetry.
+* **Resolution**: Extended `getManilaNowParts()` to return exact Manila `hour` and `minute`. Replaced all local `Date` clock lookups in `useTrigonometricGraph` with `getManilaNowParts()` and `getManilaToday()`, and eliminated fallback `/ 120` scaling. Interval slot tracking, elapsed indicators, and live reference timestamps now consistently evaluate against Philippine Standard Time regardless of user client timezone.
 
