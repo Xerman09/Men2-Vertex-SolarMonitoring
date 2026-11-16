@@ -20,7 +20,7 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 | **FIX-10** | Energy Flow | Equal-split inverter power distribution (`plantSolarKw / inverters.length`) in drawer | `[x] Completed` |
 | **FIX-11** | Energy Flow | Proportional plant capacity scaling fallback when multi-plant summary is missing | `[x] Completed` |
 | **FIX-12** | Energy Flow | Hardcoded fallback of `100 kW` for unrated inverters | `[x] Completed` |
-| **FIX-13** | Energy Flow | Logger status ternary always resolving to `'ONLINE'` | `[ ] Pending` |
+| **FIX-13** | Energy Flow | Logger status ternary always resolving to `'ONLINE'` | `[x] Completed` |
 | **FIX-14** | Deye Client | Synthetic daily Performance Ratio (`specYield / 5.0`) & Peak Solar formulas | `[ ] Pending` |
 | **FIX-15** | Deye Client | Hardcoded 82.0% monthly Performance Ratio in `getLiveMonthlyHistory` | `[ ] Pending` |
 | **FIX-16** | Deye Client | Hardcoded USD tariff rates (`$0.36`, `$0.25`, `$0.24`, `$0.14`, `$0.12`) | `[ ] Pending` |
@@ -146,14 +146,14 @@ This tracking document catalogs all identified data errors, synthetic/simulated 
 
 ---
 
-#### [ ] FIX-13: Logger Status Ternary Bug Always Resolving to 'ONLINE'
-* **File & Lines**: [`src/app/energy-flow/page.tsx#L279`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/energy-flow/page.tsx#L279)
+#### [x] FIX-13: Logger Status Ternary Bug Always Resolving to 'ONLINE'
+* **File & Lines**: [`src/app/energy-flow/page.tsx#L292`](file:///c:/Users/admin/Documents/Work%20Men2/Iot/Iot%20System/Deye%20Solar%20Monitoring/DSM/src/app/energy-flow/page.tsx#L292)
 * **Problem**:
   ```typescript
   loggerStatus: matchingLogger?.status || (plantSummary?.status === 'ONLINE' ? 'ONLINE' : 'ONLINE')
   ```
-  Both branches of the ternary return `'ONLINE'`.
-* **Proposed Fix**: Correct to `(plantSummary?.status === 'ONLINE' ? 'ONLINE' : 'OFFLINE')` or pass matching logger status accurately.
+  Both branches of the ternary returned `'ONLINE'`, masking offline logger status.
+* **Resolution**: Corrected ternary evaluation to inspect matching logger status and station offline status accurately: `loggerStatus: (matchingLogger?.status === 'OFFLINE' || plantSummary?.status === 'OFFLINE') ? 'OFFLINE' : 'ONLINE'`. If either the datalogger or the parent station is offline, the status correctly reflects `'OFFLINE'`.
 
 ---
 

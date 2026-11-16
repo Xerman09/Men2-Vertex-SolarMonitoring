@@ -289,7 +289,7 @@ export default function EnergyFlowDashboard() {
                   model: device.model || 'Deye Inverter',
                   ratedKw: devData?.ratedKw || device.ratedKw || 50,
                   loggerSn: device.loggerSn || matchingLogger?.deviceSn,
-                  loggerStatus: matchingLogger?.status || (plantSummary?.status === 'ONLINE' ? 'ONLINE' : 'ONLINE'),
+                  loggerStatus: (matchingLogger?.status === 'OFFLINE' || plantSummary?.status === 'OFFLINE') ? 'OFFLINE' : 'ONLINE',
                   liveSolarPowerKw: invLiveSolarKw,
                   dailyYieldKwh: invDailyYieldKwh,
                   gridPowerKw: plantGridKw,
