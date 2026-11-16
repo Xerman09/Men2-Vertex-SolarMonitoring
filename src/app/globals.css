@@ -533,3 +533,192 @@
     grid-row: var(--cell-row);
   }
 }
+
+/* ============================================================
+   ACCESSIBILITY & MODERN FLEET NOC PRIMITIVES
+   ============================================================ */
+.visually-hidden:where(:not(:focus-within, :active)) {
+  position: absolute !important;
+  clip-path: inset(50%) !important;
+  overflow: hidden !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  white-space: nowrap !important;
+}
+
+.fleet-containment {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
+@supports not (content-visibility: auto) {
+  .fleet-containment {
+    contain: layout style paint;
+  }
+}
+
+/* Fleet Control Toolbar */
+[data-fleet-toolbar] button,
+[data-fleet-toolbar] select {
+  min-inline-size: 24px;
+  min-block-size: 28px;
+}
+
+@media (pointer: coarse) {
+  [data-fleet-toolbar] button,
+  [data-fleet-toolbar] select {
+    min-block-size: 2.5rem;
+  }
+}
+
+[data-fleet-toolbar] button:focus-visible,
+[data-fleet-toolbar] select:focus-visible,
+.fleet-table-wrapper:focus-visible,
+.fleet-noc-table th button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+[data-fleet-toolbar] button[aria-pressed="true"] {
+  border-color: hsl(var(--primary) / 0.55);
+  box-shadow: inset 0 -2px 0 0 hsl(var(--primary));
+}
+
+@media (forced-colors: active) {
+  [data-fleet-toolbar] button[aria-pressed="true"] {
+    outline: 2px solid Highlight;
+  }
+  [data-fleet-toolbar] [role="separator"] {
+    border-inline-start: 1px solid ButtonText;
+  }
+}
+
+/* Responsive & Sortable Fleet NOC Matrix Table */
+.fleet-table-wrapper {
+  overflow: auto;
+  max-inline-size: 100%;
+  max-block-size: min(680px, 75vh);
+  container-type: inline-size;
+}
+
+.fleet-noc-table {
+  width: 100%;
+  min-inline-size: 860px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.fleet-noc-table thead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  background-color: hsl(var(--muted));
+}
+
+.fleet-noc-table th:has(> button) {
+  padding: 0;
+}
+
+.fleet-noc-table th > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  min-block-size: 36px;
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  text-align: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.fleet-noc-table th[data-align="right"] > button {
+  justify-content: flex-end;
+}
+
+/* Visual sort icon state driven purely by th[aria-sort] */
+.fleet-noc-table th [data-sort-indicator] {
+  opacity: 0.25;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.fleet-noc-table th[aria-sort] [data-sort-indicator] {
+  opacity: 1;
+  color: hsl(var(--primary));
+}
+
+.fleet-noc-table th[aria-sort="descending"] [data-sort-indicator] {
+  transform: rotate(180deg);
+}
+
+.fleet-noc-table tbody th[scope="row"] {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background-color: hsl(var(--card));
+}
+
+@media (hover: hover) {
+  .fleet-noc-table tbody tr:hover,
+  .fleet-noc-table tbody tr:hover th[scope="row"] {
+    background-color: hsl(var(--muted) / 0.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fleet-noc-table th [data-sort-indicator] {
+    transition: none;
+  }
+}
+
+@container (width < 680px) {
+  .fleet-noc-table {
+    min-inline-size: 0;
+  }
+  .fleet-noc-table,
+  .fleet-noc-table thead,
+  .fleet-noc-table tbody,
+  .fleet-noc-table tr,
+  .fleet-noc-table th,
+  .fleet-noc-table td {
+    display: block;
+  }
+  .fleet-noc-table thead {
+    display: none;
+  }
+  .fleet-noc-table tbody tr {
+    margin-block-end: 0.75rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+  .fleet-noc-table tbody th[scope="row"] {
+    position: sticky;
+    inset-block-start: 0;
+    inset-inline-start: auto;
+    z-index: 2;
+    background-color: hsl(var(--muted) / 0.65);
+    border-block-end: 1px solid hsl(var(--border) / 0.6);
+  }
+  .fleet-noc-table tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.45rem 0.75rem;
+    text-align: right;
+    border-top: 1px solid hsl(var(--border) / 0.35);
+  }
+  .fleet-noc-table tbody td[data-label]::before {
+    content: attr(data-label) ": ";
+    font-weight: 600;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+    text-align: left;
+  }
+}

@@ -77,16 +77,22 @@ async function loadScopedHistory(scope: HistoryScope, date: string, force: boole
 export function useScopedHistory(scope: HistoryScope): ScopedHistoryState {
   const accountId = scope.accountId;
   const stationId = scope.stationId;
+  const deviceSn = scope.deviceSn;
+
   const [state, setState] = useState<ScopedHistoryState>(() => {
-    const hit = cache.get(scopeKey({ accountId, stationId }, getManilaToday()));
+    const hit = cache.get(scopeKey({ accountId, stationId, deviceSn }, getManilaToday()));
     return hit ? hit.state : { status: 'loading', points: [] };
   });
 
   useEffect(() => {
     let active = true;
+    const scoped: HistoryScope = { accountId, stationId, deviceSn };
+    const cachedHit = cache.get(scopeKey(scoped, getManilaToday()));
+    setState(cachedHit ? cachedHit.state : { status: 'loading', points: [] });
+
     const run = async (force: boolean) => {
       if (typeof document !== 'undefined' && document.hidden && !force) return;
-      const next = await loadScopedHistory({ accountId, stationId }, getManilaToday(), force);
+      const next = await loadScopedHistory(scoped, getManilaToday(), force);
       if (active) setState(next);
     };
     run(false);
@@ -100,7 +106,7 @@ export function useScopedHistory(scope: HistoryScope): ScopedHistoryState {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [accountId, stationId]);
+  }, [accountId, stationId, deviceSn]);
 
   return state;
 }
