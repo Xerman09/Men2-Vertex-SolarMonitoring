@@ -19,7 +19,7 @@ import {
 import { ApiHealthMetrics } from '@/lib/types';
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { HoverInfo } from '@/components/ui/tooltip';
@@ -230,77 +230,89 @@ export default function ApiDiagnosticsPage() {
 
       {/* Health Metrics Grid in VOS Format */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-border/60 bg-card/80 p-5 shadow-xs">
-          <div className="flex items-center justify-between pb-2 mb-1">
-            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-              API Ping Latency
-            </span>
-            <Activity size={16} className="text-emerald-500" />
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-3xl font-black font-mono text-emerald-500">
-              {health?.pingMs !== undefined ? health.pingMs : '--'}
-            </span>
-            <span className="text-xs text-muted-foreground font-mono">ms</span>
-          </div>
-          <span className="text-xs text-muted-foreground mt-1 block">
-            {health?.region || '--'}
-          </span>
-        </Card>
+        <HoverInfo
+          title="API Ping Latency"
+          content={`Region: ${health?.region || '--'}`}
+          className="block w-full"
+        >
+          <Card className="border-border/60 bg-card/80 p-5 shadow-xs cursor-help">
+            <div className="flex items-center justify-between pb-2 mb-1">
+              <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
+                API Ping Latency
+              </span>
+              <Activity size={16} className="text-emerald-500" />
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-3xl font-black font-mono text-emerald-500">
+                {health?.pingMs !== undefined ? health.pingMs : '--'}
+              </span>
+              <span className="text-xs text-muted-foreground font-mono">ms</span>
+            </div>
+          </Card>
+        </HoverInfo>
 
-        <Card className="border-border/60 bg-card/80 p-5 shadow-xs">
-          <div className="flex items-center justify-between pb-2 mb-1">
-            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-              OAuth Token Cache
-            </span>
-            <Key size={16} className="text-cyan-500" />
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-3xl font-black font-mono text-cyan-500">
-              {health?.tokenExpiresAt ? 'ACTIVE' : health ? 'READY' : '--'}
-            </span>
-          </div>
-          <span className="text-xs text-muted-foreground mt-1 block">
-            Auto-refreshing Bearer token
-          </span>
-        </Card>
+        <HoverInfo
+          title="OAuth Token Cache"
+          content="Auto-refreshing Bearer token"
+          className="block w-full"
+        >
+          <Card className="border-border/60 bg-card/80 p-5 shadow-xs cursor-help">
+            <div className="flex items-center justify-between pb-2 mb-1">
+              <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
+                OAuth Token Cache
+              </span>
+              <Key size={16} className="text-cyan-500" />
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-3xl font-black font-mono text-cyan-500">
+                {health?.tokenExpiresAt ? 'ACTIVE' : health ? 'READY' : '--'}
+              </span>
+            </div>
+          </Card>
+        </HoverInfo>
 
-        <Card className="border-border/60 bg-card/80 p-5 shadow-xs">
-          <div className="flex items-center justify-between pb-2 mb-1">
-            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-              Rate Limit Capacity
-            </span>
-            <Server size={16} className="text-primary" />
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-3xl font-black font-mono text-primary">
-              {health ? health.rateLimitMax - health.rateLimitUsed : '--'}
-            </span>
-            <span className="text-xs text-muted-foreground font-mono">
-              {health?.rateLimitMax ? `/ ${health.rateLimitMax} req` : ''}
-            </span>
-          </div>
-          <span className="text-xs text-muted-foreground mt-1 block">
-            Refreshes every 60 seconds
-          </span>
-        </Card>
+        <HoverInfo
+          title="Rate Limit Capacity"
+          content="Refreshes every 60 seconds"
+          className="block w-full"
+        >
+          <Card className="border-border/60 bg-card/80 p-5 shadow-xs cursor-help">
+            <div className="flex items-center justify-between pb-2 mb-1">
+              <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
+                Rate Limit Capacity
+              </span>
+              <Server size={16} className="text-primary" />
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-3xl font-black font-mono text-primary">
+                {health ? health.rateLimitMax - health.rateLimitUsed : '--'}
+              </span>
+              <span className="text-xs text-muted-foreground font-mono">
+                {health?.rateLimitMax ? `/ ${health.rateLimitMax} req` : ''}
+              </span>
+            </div>
+          </Card>
+        </HoverInfo>
 
-        <Card className="border-border/60 bg-card/80 p-5 shadow-xs">
-          <div className="flex items-center justify-between pb-2 mb-1">
-            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-              Inverter Cloud State
-            </span>
-            <Radio size={16} className="text-emerald-500" />
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-3xl font-black font-mono text-emerald-500">
-              {health?.status || '--'}
-            </span>
-          </div>
-          <span className="text-xs text-muted-foreground mt-1 block">
-            {health?.status ? 'Cloud polling active' : 'Connecting to gateway...'}
-          </span>
-        </Card>
+        <HoverInfo
+          title="Inverter Cloud State"
+          content={health?.status ? 'Cloud polling active' : 'Connecting to gateway...'}
+          className="block w-full"
+        >
+          <Card className="border-border/60 bg-card/80 p-5 shadow-xs cursor-help">
+            <div className="flex items-center justify-between pb-2 mb-1">
+              <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
+                Inverter Cloud State
+              </span>
+              <Radio size={16} className="text-emerald-500" />
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-3xl font-black font-mono text-emerald-500">
+                {health?.status || '--'}
+              </span>
+            </div>
+          </Card>
+        </HoverInfo>
       </div>
 
       {/* Main Console & Command Dispatcher */}
@@ -309,12 +321,19 @@ export default function ApiDiagnosticsPage() {
         <Card className="border-border/60 bg-card/80 p-6 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-border/50">
-              <div className="flex items-center gap-2">
-                <Terminal size={18} className="text-cyan-500" />
-                <span className="text-sm font-bold text-foreground">
-                  REST Endpoint Inspector
-                </span>
-              </div>
+              <HoverInfo
+                title="REST Endpoint Inspector"
+                content="Database / DeyeCloud OpenAPI"
+                side="bottom"
+                align="start"
+              >
+                <div className="flex items-center gap-2 cursor-help">
+                  <Terminal size={18} className="text-cyan-500" />
+                  <span className="text-sm font-bold text-foreground">
+                    REST Endpoint Inspector
+                  </span>
+                </div>
+              </HoverInfo>
               <div className="flex items-center gap-1.5">
                 {(['curl', 'python', 'node'] as const).map((lang) => (
                   <button
@@ -364,10 +383,7 @@ export default function ApiDiagnosticsPage() {
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground font-mono">
-              Database / DeyeCloud OpenAPI
-            </span>
+          <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-end">
             <Button
               onClick={executePlayground}
               disabled={executing}
@@ -421,14 +437,16 @@ export default function ApiDiagnosticsPage() {
             </div>
 
             <div className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50">
-              <div>
-                <span className="text-xs font-bold text-foreground block">
+              <HoverInfo
+                title="Force Grid Charging"
+                side="top"
+                align="start"
+                content="Allow grid power to top off battery pack during off-peak hours"
+              >
+                <span className="text-xs font-bold text-foreground block cursor-help">
                   Force Grid Charging
                 </span>
-                <span className="text-[11px] text-muted-foreground">
-                  Allow grid power to top off battery pack during off-peak hours
-                </span>
-              </div>
+              </HoverInfo>
               <input
                 type="checkbox"
                 checked={gridCharge}

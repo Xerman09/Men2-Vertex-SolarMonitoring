@@ -21,7 +21,7 @@ import { InverterTelemetry, InverterConfig } from '@/lib/types';
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { HoverInfo } from '@/components/ui/tooltip';
@@ -415,14 +415,16 @@ export default function HardwareTelemetryPage() {
               <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 border border-amber-500/20">
                 <Zap size={16} />
               </div>
-              <div>
-                <CardTitle className="text-sm font-bold text-foreground">
+              <HoverInfo
+                title={pv1.stringId}
+                side="bottom"
+                align="start"
+                content={pv1.powerKw > 0 || pv1.voltageV > 0 ? 'DC MPPT Channel 1 (Active)' : 'DC MPPT Channel 1 (Idle)'}
+              >
+                <CardTitle className="text-sm font-bold text-foreground cursor-help">
                   {pv1.stringId}
                 </CardTitle>
-                <span className="text-[11px] text-muted-foreground">
-                  {pv1.powerKw > 0 || pv1.voltageV > 0 ? 'DC MPPT Channel 1' : 'Channel 1 (Idle)'}
-                </span>
-              </div>
+              </HoverInfo>
             </div>
             <span className="font-mono text-xl font-bold text-amber-500">
               {(pv1.powerKw ?? 0).toFixed(2)} kW
@@ -474,14 +476,16 @@ export default function HardwareTelemetryPage() {
               <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 border border-amber-500/20">
                 <Zap size={16} />
               </div>
-              <div>
-                <CardTitle className="text-sm font-bold text-foreground">
+              <HoverInfo
+                title={pv2.stringId}
+                side="bottom"
+                align="start"
+                content={pv2.powerKw > 0 || pv2.voltageV > 0 ? 'DC MPPT Channel 2 (Active)' : 'DC MPPT Channel 2 (Idle)'}
+              >
+                <CardTitle className="text-sm font-bold text-foreground cursor-help">
                   {pv2.stringId}
                 </CardTitle>
-                <span className="text-[11px] text-muted-foreground">
-                  {pv2.powerKw > 0 || pv2.voltageV > 0 ? 'DC MPPT Channel 2' : 'Channel 2 (Idle)'}
-                </span>
-              </div>
+              </HoverInfo>
             </div>
             <span className="font-mono text-xl font-bold text-amber-500">
               {(pv2.powerKw ?? 0).toFixed(2)} kW

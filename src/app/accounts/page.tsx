@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { AccountSummary, PlantInfo } from '@/lib/types';
 import { useRole } from '@/lib/role-context';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { HoverInfo } from '@/components/ui/tooltip';
@@ -558,15 +558,19 @@ export default function AccountsManagementPage() {
               <X size={18} />
             </button>
 
-            <div className="flex items-center gap-2.5 mb-1">
-              <Building2 className="text-primary" size={22} />
+            <div className="flex items-center gap-2.5 mb-4">
+              <Building2 className="text-primary shrink-0" size={22} />
               <h3 id="add-account-dialog-title" className="text-lg font-bold text-foreground font-headline">
-                Add DeyeCloud Account
+                <HoverInfo
+                  title="Add DeyeCloud Account"
+                  side="bottom"
+                  align="start"
+                  content="Enter your DeyeCloud Developer Application credentials. The system will automatically discover all plants, inverters, and loggers registered under this account."
+                >
+                  <span>Add DeyeCloud Account</span>
+                </HoverInfo>
               </h3>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">
-              Enter your DeyeCloud Developer Application credentials. The system will automatically discover all plants, inverters, and loggers registered under this account.
-            </p>
 
             <form onSubmit={handleAddAccountSubmit} className="flex flex-col gap-3.5">
               <div>
@@ -714,15 +718,19 @@ export default function AccountsManagementPage() {
               <X size={18} />
             </button>
 
-            <div className="flex items-center gap-2.5 mb-1">
-              <Zap className="text-primary" size={22} />
+            <div className="flex items-center gap-2.5 mb-4">
+              <Zap className="text-primary shrink-0" size={22} />
               <h3 id="add-plant-dialog-title" className="text-lg font-bold text-foreground font-headline">
-                Add Solar Plant Station
+                <HoverInfo
+                  title="Add Solar Plant Station"
+                  side="bottom"
+                  align="start"
+                  content="Manually register a solar station, inverter units, and telemetry data logger."
+                >
+                  <span>Add Solar Plant Station</span>
+                </HoverInfo>
               </h3>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">
-              Manually register a solar station, inverter units, and telemetry data logger.
-            </p>
 
             <form onSubmit={handleAddPlantSubmit} className="flex flex-col gap-3.5">
               <div className="grid grid-cols-2 gap-3">

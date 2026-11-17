@@ -56,7 +56,7 @@ import {
 } from '@/lib/tariff-rates';
 import { useRole } from '@/lib/role-context';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { HoverInfo } from '@/components/ui/tooltip';
@@ -773,40 +773,36 @@ export default function YieldArbitragePage() {
                 <div className="space-y-1.5 text-[11px]">
                   <p>{TELEMETRY_DESCRIPTIONS.yieldArbitrage.diurnalCurveLegend}</p>
                   <div className="pt-1 border-t border-border/50 text-amber-400 font-mono font-medium">
-                    {selectedScopeTitle} · Real-time 5-minute sampling
+                    {selectedScopeTitle} ·{' '}
+                    {timeRange === 'YEAR'
+                      ? '12-Month Seasonal Solar Yield vs Demand (MWh)'
+                      : timeRange === 'MONTH'
+                      ? `30-Day Arbitrage Envelope ending ${formatHumanDate(selectedDate)} (kWh)`
+                      : timeRange === 'WEEK'
+                      ? `7-Day Arbitrage Envelope ending ${formatHumanDate(selectedDate)} (kWh)`
+                      : `${formatHumanDate(selectedDate)} · 5-Min Generation vs Load (kW)`}
                   </div>
                 </div>
               }
               showIcon
             >
-              <div className="space-y-1">
-                <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-help flex-wrap">
-                  {selectedInverter ? (
-                    <Cpu className="w-5 h-5 text-cyan-400 shrink-0" />
-                  ) : isFleetView ? (
-                    <Globe className="w-5 h-5 text-primary shrink-0" />
-                  ) : selectedPlant ? (
-                    <Building2 className="w-5 h-5 text-amber-500 shrink-0" />
-                  ) : (
-                    <Sun className="w-5 h-5 text-amber-500 shrink-0" />
-                  )}
-                  <span>{selectedScopeTitle}</span>
-                  {selectedPlant && selectedAccount && selectedAccount.plants && selectedAccount.plants.length > 1 && (
-                    <span className="text-xs font-normal text-muted-foreground font-mono">
-                      ({selectedAccount.name})
-                    </span>
-                  )}
-                </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">
-                  {timeRange === 'YEAR'
-                    ? '12-Month Seasonal Solar Yield vs Demand (MWh)'
-                    : timeRange === 'MONTH'
-                    ? `30-Day Arbitrage Envelope ending ${formatHumanDate(selectedDate)} (kWh)`
-                    : timeRange === 'WEEK'
-                    ? `7-Day Arbitrage Envelope ending ${formatHumanDate(selectedDate)} (kWh)`
-                    : `${formatHumanDate(selectedDate)} · 5-Min Generation vs Load (kW)`}
-                </CardDescription>
-              </div>
+              <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-help flex-wrap">
+                {selectedInverter ? (
+                  <Cpu className="w-5 h-5 text-cyan-400 shrink-0" />
+                ) : isFleetView ? (
+                  <Globe className="w-5 h-5 text-primary shrink-0" />
+                ) : selectedPlant ? (
+                  <Building2 className="w-5 h-5 text-amber-500 shrink-0" />
+                ) : (
+                  <Sun className="w-5 h-5 text-amber-500 shrink-0" />
+                )}
+                <span>{selectedScopeTitle}</span>
+                {selectedPlant && selectedAccount && selectedAccount.plants && selectedAccount.plants.length > 1 && (
+                  <span className="text-xs font-normal text-muted-foreground font-mono">
+                    ({selectedAccount.name})
+                  </span>
+                )}
+              </CardTitle>
             </HoverInfo>
           </div>
         </CardHeader>
@@ -950,12 +946,16 @@ export default function YieldArbitragePage() {
       {/* Historical Yield & Arbitrage Table in VOS Data-Grid format */}
       <Card className="border-border/60 bg-card/80 shadow-xs">
         <CardHeader className="flex flex-row items-center justify-between pb-3 p-5 border-b border-border/50">
-          <CardTitle className="text-base font-bold text-foreground">
-            Historical Generation & Arbitrage Log
-          </CardTitle>
-          <span className="text-xs font-mono text-muted-foreground">
-            Synchronized to Database Financial Ledger
-          </span>
+          <HoverInfo
+            title="Historical Generation & Arbitrage Log"
+            content="Synchronized to Database Financial Ledger"
+            side="bottom"
+            align="start"
+          >
+            <CardTitle className="text-base font-bold text-foreground cursor-help">
+              Historical Generation &amp; Arbitrage Log
+            </CardTitle>
+          </HoverInfo>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">

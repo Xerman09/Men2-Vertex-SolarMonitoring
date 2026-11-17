@@ -38,6 +38,7 @@ import { useRole } from '@/lib/role-context';
 import { ModeToggle } from '@/components/theme/ModeToggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { HoverInfo } from '@/components/ui/tooltip';
 
 import { InverterConfig } from '@/lib/types';
 
@@ -781,16 +782,20 @@ export function Header({
               <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center text-primary">
                 <User size={20} />
               </div>
-              <div>
-                <h3 id="auth-modal-title" className="text-base font-bold text-foreground">
-                  {authModalTab === 'signin' ? 'Sign In' : 'Create Account'}
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  {authModalTab === 'signin'
-                    ? 'Access your registered solar plant dashboard'
-                    : 'Customer self-service portal registration'}
-                </p>
-              </div>
+              <h3 id="auth-modal-title" className="text-base font-bold text-foreground">
+                <HoverInfo
+                  title={authModalTab === 'signin' ? 'Sign In' : 'Create Account'}
+                  side="bottom"
+                  align="start"
+                  content={
+                    authModalTab === 'signin'
+                      ? 'Access your registered solar plant dashboard'
+                      : 'Customer self-service portal registration'
+                  }
+                >
+                  <span>{authModalTab === 'signin' ? 'Sign In' : 'Create Account'}</span>
+                </HoverInfo>
+              </h3>
             </div>
 
             {/* Tab Switcher */}

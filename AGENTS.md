@@ -21,10 +21,10 @@ A primary recurring pattern in user reviews and refactor commits is **aggressive
 ### Core Principles
 
 ### A. Progressive Disclosure over Explanatory Bloat
-* **Rule**: Never place long explanatory paragraphs, helper sentences, calculation formulas, or technical descriptions directly on card faces, banners, or modal bodies.
+* **Rule**: Never place inline subtitles, sub-texts, `CardDescription` helpers, long explanatory paragraphs, helper sentences, calculation formulas, or technical descriptions directly below page/card/modal titles or on card faces, banners, and modal bodies.
 * **Pattern**:
-  - Keep visible text strictly to concise titles, primary metrics, units, and active controls.
-  - Move descriptions, regional coverage details, net-metering math, and sync statuses into contextual hover tooltips (`HoverInfo` from `@/components/ui/tooltip`).
+  - Keep visible text strictly to concise titles, primary metrics, units, form labels, and active controls (plus empty states or error alerts).
+  - Move all subtitles, sub-texts, descriptions, regional coverage details, net-metering math, and sync statuses into contextual hover tooltips (`HoverInfo` from `@/components/ui/tooltip`) on the corresponding title.
   - *Git history reference*: `refactor(energy-flow): move helper statements from card faces to hover tooltips` (`7d216e2`), `refactor(energy-flow): move power flow description and sync status to title hover tooltip` (`b467779`), and `refactor(tariff): minimalize tariff configuration UI` (`940b3b5`).
 
 ### B. Eliminate "Badge Soup" & Unnecessary Pills
@@ -77,9 +77,9 @@ Before concluding any UI/UX task, verify against this checklist:
 
 | Check | Requirement |
 | :--- | :--- |
-| **No Text Bloat** | Is there any paragraph longer than 1-2 sentences on a card or modal? If yes, move to a `<HoverInfo>` tooltip. |
+| **No Text Bloat & No Inline Subtitles** | Are all subtitles, sub-texts, `CardDescription` helpers, and modal/card descriptions removed from visible faces and moved into `<HoverInfo>` tooltips? |
 | **No Pill Clutter** | Are there redundant `<Badge>` pills (`Auto`, `Custom`, rates, or branding tags)? Remove them. |
-| **Clean Headers** | Is the modal or card header minimal (Icon + Title + Close)? No extra badges or pills in the header. |
+| **Clean Headers** | Is the modal, card, or page header minimal (Icon + Title + Close, no inline subtitle descriptions or extra badges)? |
 | **No Fake Controls** | Do all buttons, toggles, and data points connect to real API state and hardware telemetry? |
 | **No Fake / Simulated Data** | Are all curves, intervals, and metrics backed 100% by real DeyeCloud hardware telemetry? Zero synthetic math curves, fake baseline load formulas, or mock fallback points. |
 | **Clickable Cards** | Are whole cards directly interactive rather than requiring tiny separate "Expand" buttons? |

@@ -31,7 +31,7 @@ import {
 import { StationSummary, AggregatedFleetSummary, FleetMatrixNode, PlantInfo, DeviceInfo } from '@/lib/types';
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';

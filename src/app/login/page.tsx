@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { HoverInfo } from '@/components/ui/tooltip';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -121,56 +122,68 @@ export default function LoginPage() {
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-400 text-white flex items-center justify-center shadow-lg shadow-amber-500/20">
                 <Sun size={26} className="animate-spin-slow" />
               </div>
-              <div>
-                <h1 className="text-xl font-bold font-headline tracking-tight text-foreground">
-                  VOSolar
-                </h1>
-                <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
-                  Telemetry Operations
-                </p>
-              </div>
+              <h1 className="text-xl font-bold font-headline tracking-tight text-foreground">
+                <HoverInfo
+                  title="VOSolar Telemetry Operations"
+                  side="bottom"
+                  align="start"
+                  content="High-frequency inverter telemetry, battery state-of-charge profiling, and multi-tenant plant monitoring."
+                >
+                  <span>VOSolar</span>
+                </HoverInfo>
+              </h1>
             </div>
 
-            <div className="space-y-4">
+            <div>
               <h2 className="text-2xl font-bold tracking-tight text-foreground leading-snug">
-                Mission Control &amp; Photovoltaic Synoptics
+                <HoverInfo
+                  title="Mission Control & Photovoltaic Synoptics"
+                  side="bottom"
+                  align="start"
+                  content="High-frequency inverter telemetry, battery state-of-charge profiling, and multi-tenant plant monitoring."
+                >
+                  <span>Mission Control &amp; Photovoltaic Synoptics</span>
+                </HoverInfo>
               </h2>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                High-frequency inverter telemetry, battery state-of-charge profiling, and multi-tenant plant monitoring.
-              </p>
             </div>
 
             {/* Feature Highlights */}
-            <div className="mt-8 space-y-3.5">
-              <div className="flex items-start gap-3 text-xs text-muted-foreground">
-                <div className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5">
+            <div className="mt-8 space-y-3">
+              <HoverInfo
+                title="Zero-Latency Telemetry"
+                side="right"
+                content="Instant inverter power harvest and battery charge cycle metrics."
+                className="flex items-center gap-3 text-xs text-foreground font-semibold cursor-help"
+              >
+                <div className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
                   <Zap size={13} />
                 </div>
-                <div>
-                  <span className="font-semibold text-foreground block">Zero-Latency Telemetry</span>
-                  <span>Instant inverter power harvest and battery charge cycle metrics.</span>
-                </div>
-              </div>
+                <span>Zero-Latency Telemetry</span>
+              </HoverInfo>
 
-              <div className="flex items-start gap-3 text-xs text-muted-foreground">
-                <div className="w-6 h-6 rounded-lg bg-cyan-500/10 text-cyan-500 flex items-center justify-center shrink-0 mt-0.5">
+              <HoverInfo
+                title="Customer Plant Scoping"
+                side="right"
+                content="Customers monitor strictly their personal DeyeCloud stations."
+                className="flex items-center gap-3 text-xs text-foreground font-semibold cursor-help"
+              >
+                <div className="w-6 h-6 rounded-lg bg-cyan-500/10 text-cyan-500 flex items-center justify-center shrink-0">
                   <Building2 size={13} />
                 </div>
-                <div>
-                  <span className="font-semibold text-foreground block">Customer Plant Scoping</span>
-                  <span>Customers monitor strictly their personal DeyeCloud stations.</span>
-                </div>
-              </div>
+                <span>Customer Plant Scoping</span>
+              </HoverInfo>
 
-              <div className="flex items-start gap-3 text-xs text-muted-foreground">
-                <div className="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
+              <HoverInfo
+                title="Direct DeyeCloud Link"
+                side="right"
+                content="Auto-discover inverters and loggers with your developer keys."
+                className="flex items-center gap-3 text-xs text-foreground font-semibold cursor-help"
+              >
+                <div className="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
                   <Shield size={13} />
                 </div>
-                <div>
-                  <span className="font-semibold text-foreground block">Direct DeyeCloud Link</span>
-                  <span>Auto-discover inverters and loggers with your developer keys.</span>
-                </div>
-              </div>
+                <span>Direct DeyeCloud Link</span>
+              </HoverInfo>
             </div>
           </div>
 
@@ -226,11 +239,15 @@ export default function LoginPage() {
               <>
                 <div className="mb-6">
                   <h2 className="text-2xl font-bold tracking-tight text-foreground font-headline">
-                    Sign In to Portal
+                    <HoverInfo
+                      title="Sign In to Portal"
+                      side="bottom"
+                      align="start"
+                      content="Enter your registered email or username to access your solar monitoring."
+                    >
+                      <span>Sign In to Portal</span>
+                    </HoverInfo>
                   </h2>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Enter your registered email or username to access your solar monitoring.
-                  </p>
                 </div>
 
                 {error && (
@@ -320,11 +337,15 @@ export default function LoginPage() {
               <>
                 <div className="mb-6">
                   <h2 className="text-2xl font-bold tracking-tight text-foreground font-headline">
-                    Create Customer Account
+                    <HoverInfo
+                      title="Create Customer Account"
+                      side="bottom"
+                      align="start"
+                      content="Register your customer portal profile to link and monitor your solar plants."
+                    >
+                      <span>Create Customer Account</span>
+                    </HoverInfo>
                   </h2>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Register your customer portal profile to link and monitor your solar plants.
-                  </p>
                 </div>
 
                 {regError && (

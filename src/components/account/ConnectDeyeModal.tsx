@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Zap,
   Radio,
   Lock,
   Mail,
@@ -11,12 +10,12 @@ import {
   Building2,
   AlertCircle,
   CheckCircle2,
-  ExternalLink,
   ChevronDown,
   ChevronUp,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { HoverInfo } from '@/components/ui/tooltip';
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
 
@@ -197,37 +196,26 @@ export function ConnectDeyeModal() {
 
         {/* Modal Header */}
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center shadow-xs">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center shadow-xs shrink-0">
             <Radio size={20} className="animate-pulse" />
           </div>
-          <div>
-            <h2 id="connect-modal-title" className="text-lg font-bold text-foreground font-headline">
-              Connect DeyeCloud Account
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              Link your developer credentials to auto-discover stations and inverters.
-            </p>
-          </div>
-        </div>
-
-        {/* Developer Portal Guide Box */}
-        <div className="mb-4 p-3 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground flex items-start gap-2.5">
-          <Zap size={15} className="text-amber-500 shrink-0 mt-0.5" />
-          <div>
-            <span className="text-foreground font-medium block mb-0.5">Where to find these credentials:</span>
-            <span>
-              Log in to{' '}
-              <a
-                href="https://open.deyecloud.com"
-                target="_blank"
-                rel="noreferrer"
-                className="text-primary hover:underline inline-flex items-center gap-0.5 font-semibold"
-              >
-                open.deyecloud.com <ExternalLink size={10} />
-              </a>{' '}
-              &gt; Developer Center &gt; App Management to obtain your App ID and App Secret.
-            </span>
-          </div>
+          <h2 id="connect-modal-title" className="text-lg font-bold text-foreground font-headline">
+            <HoverInfo
+              title="Connect DeyeCloud Account"
+              side="bottom"
+              align="start"
+              content={
+                <div className="space-y-1.5 text-[11px]">
+                  <p>Link your developer credentials to auto-discover stations and inverters.</p>
+                  <p className="pt-1 border-t border-border/50 text-foreground/90">
+                    Credentials: Log in to open.deyecloud.com &gt; Developer Center &gt; App Management for your App ID &amp; App Secret.
+                  </p>
+                </div>
+              }
+            >
+              <span>Connect DeyeCloud Account</span>
+            </HoverInfo>
+          </h2>
         </div>
 
         {error && (
@@ -378,9 +366,16 @@ export function ConnectDeyeModal() {
 
               {showAdvanced && (
                 <div className="mt-2 p-3 rounded-xl bg-muted/30 border border-border/50 animate-in fade-in-50">
-                  <label htmlFor="connect-baseurl" className="block text-[11px] font-semibold text-muted-foreground mb-1">
-                    DeyeCloud API Base URL (Region Server)
-                  </label>
+                  <HoverInfo
+                    title="DeyeCloud API Base URL"
+                    side="top"
+                    align="start"
+                    content="Default global server: https://api.deyecloud.com"
+                  >
+                    <label htmlFor="connect-baseurl" className="block text-[11px] font-semibold text-muted-foreground mb-1 cursor-help">
+                      DeyeCloud API Base URL (Region Server)
+                    </label>
+                  </HoverInfo>
                   <input
                     id="connect-baseurl"
                     type="url"
@@ -389,9 +384,6 @@ export function ConnectDeyeModal() {
                     placeholder="https://api.deyecloud.com"
                     className="w-full px-3 py-1.5 rounded-lg bg-background border border-border/70 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                   />
-                  <span className="text-[10px] text-muted-foreground mt-1 block">
-                    Default is global server: <code>https://api.deyecloud.com</code>
-                  </span>
                 </div>
               )}
             </div>

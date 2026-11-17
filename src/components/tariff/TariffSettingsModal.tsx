@@ -8,7 +8,6 @@ import {
   X,
   Sliders,
   RotateCcw,
-  Info,
 } from 'lucide-react';
 import { useTariff } from '@/lib/tariff-context';
 import { Button } from '@/components/ui/button';
@@ -280,11 +279,6 @@ export function TariffSettingsModal() {
                     />
                   </div>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-1">
-                <Info size={12} className="text-cyan-400 shrink-0" />
-                <span>Hover over fields to see definitions or match with your electric bill.</span>
               </div>
             </div>
           )}
