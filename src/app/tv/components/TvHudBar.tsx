@@ -19,6 +19,7 @@ import type { TvSlide } from '../types';
 
 export const TV_INTERVAL_OPTIONS_SEC = [15, 30, 60] as const;
 export type TvIntervalSeconds = (typeof TV_INTERVAL_OPTIONS_SEC)[number];
+export const DEFAULT_TV_INTERVAL_SEC: TvIntervalSeconds = 15;
 
 export interface TvScopeAccountOption {
   id: string;

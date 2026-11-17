@@ -3,7 +3,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { buildTvSlides, filterTvAuthorizedAccounts, getTvScopeKey } from '../types';
 import { TvSlideDeck } from '../components/TvSlideDeck';
-import { TvHudBar } from '../components/TvHudBar';
+import { DEFAULT_TV_INTERVAL_SEC, TvHudBar } from '../components/TvHudBar';
 import type { AccountSummary, FleetMatrixNode } from '@/lib/types';
 
 function makeMultiTenantFixture(): {
@@ -306,12 +306,14 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     expect(slideHtml).toContain('aria-roledescription="slide"');
     expect(slideHtml).toContain('data-direction="backward"');
 
+    expect(DEFAULT_TV_INTERVAL_SEC).toBe(15);
+
     const hudHtml = renderToStaticMarkup(
       React.createElement(TvHudBar, {
         slides,
         activeIndex: 0,
         paused: false,
-        intervalSec: 30,
+        intervalSec: DEFAULT_TV_INTERVAL_SEC,
         progressRatio: 0.5,
         hudVisible: true,
         isFullscreen: false,

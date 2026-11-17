@@ -11,6 +11,7 @@ import type { DailyAnalyticsPoint } from '@/lib/analytics-data';
 import type { TvBriefResult } from '@/lib/gemini-tv-brief';
 import type { AggregatedFleetSummary } from '@/lib/types';
 import {
+  DEFAULT_TV_INTERVAL_SEC,
   TvHudBar,
   type TvIntervalSeconds,
   type TvScopeAccountOption,
@@ -63,7 +64,7 @@ export default function TvSlideshowPage() {
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward');
   const [paused, setPaused] = useState<boolean>(false);
-  const [intervalSec, setIntervalSec] = useState<TvIntervalSeconds>(30);
+  const [intervalSec, setIntervalSec] = useState<TvIntervalSeconds>(DEFAULT_TV_INTERVAL_SEC);
   const [elapsedMs, setElapsedMs] = useState<number>(0);
 
   const [hudVisible, setHudVisible] = useState<boolean>(true);
