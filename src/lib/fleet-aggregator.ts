@@ -180,7 +180,7 @@ export class FleetAggregator {
             if (!d) return false;
             const collSec = parseFloat(d.get('__collectionTime') || '0');
             const isStale = collSec > 0 && (nowSec - collSec > 86400 * 2);
-            return !isStale && extractDeviceSolarPowerWatts(d) > 0;
+            return !isStale && extractDeviceSolarPowerWatts(d) !== 0;
           });
           const plantHasBatchDaily = !plantIsOffline && inverters.some((inv) => {
             const d = item.batchData?.get(inv.deviceSn);
@@ -255,7 +255,7 @@ export class FleetAggregator {
             const assignedGridKw = isDeviceOffline ? 0 : (plantSum ? plantSum.gridPowerKw : item.station.gridPowerKw);
             const assignedConsKw = isDeviceOffline
               ? 0
-              : consKw > 0
+              : consKw !== 0
               ? consKw
               : plantSum
               ? parseFloat(((plantSum.loadPowerKw || 0) / (inverters.length || 1)).toFixed(2))

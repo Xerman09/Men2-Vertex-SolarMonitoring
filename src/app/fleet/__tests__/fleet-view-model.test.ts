@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import {
   buildFleetAccountTree,
   buildNocTableRows,
@@ -6,6 +8,8 @@ import {
   filterFleetTree,
   sortNocTableRows,
 } from '../types';
+import { PlantSolarCurve } from '../components/PlantSolarCurve';
+import { InverterSolarCurve } from '../components/InverterSolarCurve';
 import type { AccountSummary, FleetMatrixNode } from '@/lib/types';
 
 function makeMockAccounts(): AccountSummary[] {
@@ -177,5 +181,56 @@ describe('Fleet View Model & Telemetry Integrity', () => {
 
     const sortedSnAsc = sortNocTableRows(allRows, 'deviceSn', 'ascending');
     expect(sortedSnAsc.map((r) => r.deviceSn)).toEqual(['INV-M1', 'INV-M2', 'INV-S1']);
+  });
+
+  it('preserves negative power and renders signed Fleet & Inverter SVG axes below zero', () => {
+    const accounts = makeMockAccounts();
+    const negNodes: FleetMatrixNode[] = [
+      {
+        accountId: 'acc-1',
+        accountName: 'Hanvin Solar Corp',
+        stationName: 'Branch Office',
+        stationId: 'st-single',
+        deviceSn: 'INV-S1',
+        deviceType: 'INVERTER',
+        model: 'SUN-60K',
+        ratedKw: 60,
+        liveSolarPowerKw: -2.4,
+        dailyYieldKwh: 0,
+        gridPowerKw: -24.5,
+        consumptionPowerKw: 22.1,
+        batterySoc: 40,
+        mode: 'GRID',
+        status: 'ONLINE',
+        isLive: true,
+      },
+    ];
+    const tree = buildFleetAccountTree(accounts, negNodes);
+    const branch = tree[0].plants.find((p) => p.plant.stationId === 'st-single')!;
+    expect(branch.livePowerKw).toBe(-2.4);
+    expect(branch.gridPowerKw).toBe(-24.5);
+
+    const plantHtml = renderToStaticMarkup(
+      React.createElement(PlantSolarCurve, {
+        capacityKw: 60,
+        livePowerKw: 5,
+        demandKw: 29.5,
+        gridPowerKw: -24.5,
+        scope: { accountId: 'acc-1', stationId: 'st-single' },
+      })
+    );
+    expect(plantHtml).toContain('-24.5 kW');
+    expect(plantHtml).toContain('-27');
+    expect(plantHtml).toContain('grid-stroke');
+
+    const invHtml = renderToStaticMarkup(
+      React.createElement(InverterSolarCurve, {
+        ratedKw: 60,
+        liveSolarPowerKw: -12.4,
+        scope: { accountId: 'acc-1', stationId: 'st-single', deviceSn: 'INV-S1' },
+      })
+    );
+    expect(invHtml).toContain('-12.4 kW');
+    expect(invHtml).toContain('-14');
   });
 });

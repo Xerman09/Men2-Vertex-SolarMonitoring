@@ -233,7 +233,7 @@ export function buildFleetAccountTree(
         0
       );
       const plantLivePowerKw =
-        inverters.length > 0 && sumInvLiveKw > 0
+        inverters.length > 0 && sumInvLiveKw !== 0
           ? sumInvLiveKw
           : plant.liveSolarPowerKw ?? sumInvLiveKw;
 
@@ -311,7 +311,7 @@ export function buildFleetAccountTree(
 
     const sumPlantLiveKw = plants.reduce((sum, p) => sum + p.livePowerKw, 0);
     const accLivePowerKw =
-      sumPlantLiveKw > 0 ? sumPlantLiveKw : acc.liveSolarPowerKw || 0;
+      sumPlantLiveKw !== 0 ? sumPlantLiveKw : acc.liveSolarPowerKw || 0;
     const sumPlantDailyKwh = plants.reduce((sum, p) => sum + p.dailyYieldKwh, 0);
     const accDailyYieldKwh =
       sumPlantDailyKwh > 0 ? sumPlantDailyKwh : acc.dailyYieldKwh || 0;

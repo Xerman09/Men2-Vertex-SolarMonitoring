@@ -37,7 +37,7 @@ export function InverterSolarCurve({
   loadPct,
   scope,
 }: InverterSolarCurveProps) {
-  const [hoveredPoint, setHoveredPoint] = useState<{ hour: number; power: number; x: number; y: number } | null>(null);
+  const [hoveredPoint, setHoveredPoint] = useState<{ label: string; power: number; x: number; y: number } | null>(null);
   const { status: historyStatus, points: historyPoints } = useScopedHistory(scope || {});
   const rawId = useId();
   const gradId = `invSolarGrad-${rawId.replace(/:/g, '')}`;
@@ -87,7 +87,7 @@ export function InverterSolarCurve({
   const yBounds = useMemo(() => {
     const setKw = Math.max(safeRatedKw || 10, 10);
     return computeSignedYAxisBounds(
-      [safeLiveSolarPowerKw, ...points.map((p) => p.power)],
+      [safeLiveSolarPowerKw, ...points.filter((p) => !p.isFuture).map((p) => p.power)],
       setKw,
       0.1
     );
@@ -97,6 +97,11 @@ export function InverterSolarCurve({
     () => valueToSvgY(0, yBounds.min, yBounds.max, paddingY, plotHeight),
     [yBounds, paddingY, plotHeight]
   );
+
+  const zeroOffsetRatio = useMemo(() => {
+    const raw = (zeroY - paddingY) / plotHeight;
+    return Math.max(0, Math.min(1, Number.isFinite(raw) ? raw : 1));
+  }, [zeroY, paddingY, plotHeight]);
 
   const coords = useMemo(() => {
     const list = points.length > 0 ? points : [
@@ -159,7 +164,7 @@ export function InverterSolarCurve({
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="flex items-center gap-1 font-bold text-foreground bg-primary/10 text-primary px-1 py-0.2 rounded text-[7.5px]">
               <Clock className="size-2 text-primary" />
-              {String(hoveredPoint.hour).padStart(2, '0')}:00
+              {hoveredPoint.label}
             </span>
             <div className="flex items-center gap-1">
               <span className="size-1.5 rounded-full inline-block shrink-0 bg-[#f59e0b]" />
@@ -198,15 +203,28 @@ export function InverterSolarCurve({
         style={{ height: `${height}px`, minHeight: `${height}px` }}
       >
         {/* Inverter Mini Y-Axis Column */}
-        <div className="flex flex-col justify-between items-end pr-1 text-[7px] font-mono text-muted-foreground/80 shrink-0 select-none pb-3 pt-0.5 w-7 sm:w-8 border-r border-border/30">
-          <div className="flex items-center justify-end w-full leading-none">
-            <span className="font-semibold text-foreground/90">{formatSignedKwLabel(yBounds.max)}</span>
-          </div>
-          <div className="flex items-center justify-end w-full leading-none text-muted-foreground/70">
-            <span>{formatSignedKwLabel((yBounds.max + yBounds.min) * 0.5)}</span>
-          </div>
-          <div className="flex items-center justify-end w-full leading-none text-muted-foreground/70">
-            <span>{formatSignedKwLabel(yBounds.min)}</span>
+        <div className="flex flex-col shrink-0 select-none pb-3 pt-0.5 w-7 sm:w-8 border-r border-border/30 pr-1 text-[7px] font-mono text-muted-foreground/80">
+          <div className="relative flex-1 flex flex-col justify-between items-end w-full">
+            <div className="flex items-center justify-end w-full leading-none">
+              <span className="font-semibold text-foreground/90">{formatSignedKwLabel(yBounds.max)}</span>
+            </div>
+            <div className="flex items-center justify-end w-full leading-none text-muted-foreground/70">
+              <span>{formatSignedKwLabel((yBounds.max + yBounds.min) * 0.5)}</span>
+            </div>
+            <div className="flex items-center justify-end w-full leading-none text-muted-foreground/70">
+              <span>{formatSignedKwLabel(yBounds.min)}</span>
+            </div>
+            {yBounds.min < 0 &&
+              zeroOffsetRatio * 100 >= 18 &&
+              zeroOffsetRatio * 100 <= 82 &&
+              Math.abs(zeroOffsetRatio * 100 - 50) > 16 && (
+                <span
+                  className="pointer-events-none absolute right-0 -translate-y-1/2 text-[6.5px] text-foreground/85 font-semibold leading-none"
+                  style={{ top: `${(zeroOffsetRatio * 100).toFixed(1)}%` }}
+                >
+                  0
+                </span>
+              )}
           </div>
         </div>
 
@@ -220,9 +238,17 @@ export function InverterSolarCurve({
           >
             <defs>
               {/* Exact colorSolar from Analytics Dashboard: #f59e0b (0.8 opacity down to 0) */}
-              <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={COLOR_SOLAR} stopOpacity={0.8} />
-                <stop offset="95%" stopColor={COLOR_SOLAR} stopOpacity={0.0} />
+              <linearGradient
+                id={gradId}
+                gradientUnits="userSpaceOnUse"
+                x1="0"
+                y1={paddingY}
+                x2="0"
+                y2={paddingY + plotHeight}
+              >
+                <stop offset="0%" stopColor={COLOR_SOLAR} stopOpacity={0.75} />
+                <stop offset={`${(zeroOffsetRatio * 100).toFixed(2)}%`} stopColor={COLOR_SOLAR} stopOpacity={0.0} />
+                {yBounds.min < 0 && <stop offset="100%" stopColor={COLOR_SOLAR} stopOpacity={0.45} />}
               </linearGradient>
 
               {/* Plot boundary clip path to guarantee paths never leak outside */}
@@ -329,7 +355,7 @@ export function InverterSolarCurve({
                 fill="transparent"
                 className="cursor-pointer"
                 onMouseEnter={() =>
-                  setHoveredPoint({ hour: c.hour, power: c.power, x: c.x, y: c.y })
+                  setHoveredPoint({ label: c.label, power: c.power, x: c.x, y: c.y })
                 }
               />
             ))}

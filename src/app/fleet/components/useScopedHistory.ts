@@ -7,6 +7,7 @@ export interface ScopedHistoryPoint {
   hour?: string;
   solarYieldKw?: number | null;
   loadDemandKw?: number | null;
+  batteryFlowKw?: number | null;
   gridFlowKw?: number | null;
   isElapsed?: boolean;
 }

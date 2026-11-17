@@ -12,9 +12,11 @@ import {
 import { useScopedHistory, type HistoryScope } from './useScopedHistory';
 
 // Exact Color Palette from Analytics Dashboard (src/app/analytics/page.tsx)
-const COLOR_SOLAR = '#f59e0b'; // Amber-500 / Solar Gold
-const COLOR_LOAD = '#6366f1';  // Indigo-500 / Facility Demand
-const COLOR_GRID = '#10b981';  // Emerald-500 / Grid Net Exchange
+const COLOR_SOLAR = '#f59e0b';   // Amber-500 / Solar Gold
+const COLOR_LOAD = '#6366f1';    // Indigo-500 / Facility Demand
+const COLOR_GRID = '#10b981';    // Emerald-500 / Grid Net Export (+)
+const COLOR_IMPORT = '#f43f5e';  // Rose-500 / Grid Net Import (-)
+const COLOR_BATTERY = '#06b6d4'; // Cyan-500 / Battery ESS Flow (+Chg/-Dchg)
 
 interface PlantSolarCurveProps {
   capacityKw: number;
@@ -38,9 +40,12 @@ interface HoverData {
   solar: number;
   load: number;
   gridNet: number;
+  battery: number;
   x: number;
   solarY: number;
   loadY: number;
+  gridY: number;
+  batteryY: number;
   svgXPercent: number;
   svgYPercent: number;
   isRightHalf: boolean;
@@ -95,10 +100,11 @@ export function PlantSolarCurve({
       const num = (v: number | null | undefined) => (v !== null && v !== undefined && Number.isFinite(v) ? v : 0);
       const solar = num(pt.solarYieldKw);
       const load = num(pt.loadDemandKw);
+      const battery = num(pt.batteryFlowKw);
       const grid =
         pt.gridFlowKw !== null && pt.gridFlowKw !== undefined && Number.isFinite(pt.gridFlowKw)
           ? pt.gridFlowKw
-          : solar - load;
+          : solar - load - battery;
 
       return {
         hour: hourFloat,
@@ -106,12 +112,17 @@ export function PlantSolarCurve({
         solar: parseFloat(solar.toFixed(2)),
         load: parseFloat(load.toFixed(2)),
         gridNet: parseFloat(grid.toFixed(2)),
+        battery: parseFloat(battery.toFixed(2)),
         isNow: Math.abs(hourFloat - nowHour) <= 0.05,
         isFuture,
       };
     });
   }, [historyPoints, nowHour]);
 
+  const hasBatteryFlow = useMemo(
+    () => points.some((p) => !p.isFuture && Math.abs(p.battery) > 0.05),
+    [points]
+  );
 
   // SVG dimensions: bigger graph drawing area
   const width = 280;
@@ -121,20 +132,27 @@ export function PlantSolarCurve({
   const svgHeight = 60;
   const plotHeight = svgHeight - paddingY * 2;
 
-  // Compute signed [min, max] bounds so negative telemetry renders cleanly below 0 kW
+  // Compute signed [min, max] bounds across all plotted curves (including negative Grid Import & ESS discharge)
   const yBounds = useMemo(() => {
     const setKwp = Math.max(safeCapacityKw || 10, 10);
-    const values: number[] = [safeLivePowerKw, currentDemand];
+    const values: number[] = [safeLivePowerKw, currentDemand, currentGridNet];
     for (const p of points) {
-      values.push(p.solar, p.load);
+      if (p.isFuture) continue;
+      values.push(p.solar, p.load, p.gridNet);
+      if (hasBatteryFlow) values.push(p.battery);
     }
     return computeSignedYAxisBounds(values, setKwp, 0.1);
-  }, [safeCapacityKw, safeLivePowerKw, currentDemand, points]);
+  }, [safeCapacityKw, safeLivePowerKw, currentDemand, currentGridNet, points, hasBatteryFlow]);
 
   const zeroY = useMemo(
     () => valueToSvgY(0, yBounds.min, yBounds.max, paddingY, plotHeight),
     [yBounds, paddingY, plotHeight]
   );
+
+  const zeroOffsetRatio = useMemo(() => {
+    const raw = (zeroY - paddingY) / plotHeight;
+    return Math.max(0, Math.min(1, Number.isFinite(raw) ? raw : 1));
+  }, [zeroY, paddingY, plotHeight]);
 
   const coords = useMemo(() => {
     return points.map((p) => {
@@ -143,9 +161,13 @@ export function PlantSolarCurve({
       const x = paddingX + (validHour / 24) * plotWidth;
       const validSolar = Number.isFinite(p.solar) ? p.solar : 0;
       const validLoad = Number.isFinite(p.load) ? p.load : 0;
+      const validGrid = Number.isFinite(p.gridNet) ? p.gridNet : 0;
+      const validBat = Number.isFinite(p.battery) ? p.battery : 0;
       const solarY = valueToSvgY(validSolar, yBounds.min, yBounds.max, paddingY, plotHeight);
       const loadY = valueToSvgY(validLoad, yBounds.min, yBounds.max, paddingY, plotHeight);
-      return { ...p, x, solarY, loadY };
+      const gridY = valueToSvgY(validGrid, yBounds.min, yBounds.max, paddingY, plotHeight);
+      const batteryY = valueToSvgY(validBat, yBounds.min, yBounds.max, paddingY, plotHeight);
+      return { ...p, x, solarY, loadY, gridY, batteryY };
     });
   }, [points, yBounds, plotWidth, plotHeight, paddingX, paddingY]);
 
@@ -163,12 +185,17 @@ export function PlantSolarCurve({
         ? currentDemand
         : (lastElapsed?.load ?? currentDemand);
     const effectiveNowGrid =
-      gridPowerKw !== undefined && gridPowerKw !== 0
-        ? (Number.isFinite(gridPowerKw) ? gridPowerKw : 0)
-        : parseFloat((effectiveNowSolar - effectiveNowLoad).toFixed(2));
+      gridPowerKw !== undefined && Number.isFinite(gridPowerKw) && gridPowerKw !== 0
+        ? gridPowerKw
+        : historyPoints && historyPoints.length > 0 && lastElapsed
+          ? lastElapsed.gridNet
+          : parseFloat((effectiveNowSolar - effectiveNowLoad).toFixed(2));
+    const effectiveNowBat = lastElapsed?.battery ?? 0;
 
     const nowSolarY = valueToSvgY(effectiveNowSolar, yBounds.min, yBounds.max, paddingY, plotHeight);
     const nowLoadY = valueToSvgY(effectiveNowLoad, yBounds.min, yBounds.max, paddingY, plotHeight);
+    const nowGridY = valueToSvgY(effectiveNowGrid, yBounds.min, yBounds.max, paddingY, plotHeight);
+    const nowBatY = valueToSvgY(effectiveNowBat, yBounds.min, yBounds.max, paddingY, plotHeight);
 
     const list = [...elapsed];
     // Ensure final coordinate anchors precisely at the current moment
@@ -179,11 +206,14 @@ export function PlantSolarCurve({
         solar: 0,
         load: 0,
         gridNet: 0,
+        battery: 0,
         isNow: false,
         isFuture: false,
         x: paddingX,
         solarY: zeroY,
         loadY: zeroY,
+        gridY: zeroY,
+        batteryY: zeroY,
       });
     }
     if (Math.abs(list[list.length - 1].x - nowX) > 1) {
@@ -193,11 +223,14 @@ export function PlantSolarCurve({
         solar: effectiveNowSolar,
         load: effectiveNowLoad,
         gridNet: effectiveNowGrid,
+        battery: effectiveNowBat,
         isNow: true,
         isFuture: false,
         x: nowX,
         solarY: nowSolarY,
         loadY: nowLoadY,
+        gridY: nowGridY,
+        batteryY: nowBatY,
       });
     } else {
       list[list.length - 1] = {
@@ -205,9 +238,12 @@ export function PlantSolarCurve({
         solar: effectiveNowSolar,
         load: effectiveNowLoad,
         gridNet: effectiveNowGrid,
+        battery: effectiveNowBat,
         x: nowX,
         solarY: nowSolarY,
         loadY: nowLoadY,
+        gridY: nowGridY,
+        batteryY: nowBatY,
       };
     }
     return list;
@@ -216,10 +252,14 @@ export function PlantSolarCurve({
   const nowCoord = elapsedCoords.length > 0 ? elapsedCoords[elapsedCoords.length - 1] : null;
 
   const svgPaths = useMemo(() => {
-    if (elapsedCoords.length === 0) return { solarLine: '', solarArea: '', loadLine: '', loadArea: '' };
+    if (elapsedCoords.length === 0) {
+      return { solarLine: '', solarArea: '', loadLine: '', loadArea: '', gridLine: '', gridArea: '', batteryLine: '' };
+    }
 
     let solarLine = `M ${elapsedCoords[0].x} ${elapsedCoords[0].solarY}`;
     let loadLine = `M ${elapsedCoords[0].x} ${elapsedCoords[0].loadY}`;
+    let gridLine = `M ${elapsedCoords[0].x} ${elapsedCoords[0].gridY}`;
+    let batteryLine = `M ${elapsedCoords[0].x} ${elapsedCoords[0].batteryY}`;
 
     for (let i = 1; i < elapsedCoords.length; i++) {
       const prev = elapsedCoords[i - 1];
@@ -227,6 +267,8 @@ export function PlantSolarCurve({
       const midX = (prev.x + curr.x) / 2;
       solarLine += ` C ${midX} ${prev.solarY}, ${midX} ${curr.solarY}, ${curr.x} ${curr.solarY}`;
       loadLine += ` C ${midX} ${prev.loadY}, ${midX} ${curr.loadY}, ${curr.x} ${curr.loadY}`;
+      gridLine += ` C ${midX} ${prev.gridY}, ${midX} ${curr.gridY}, ${curr.x} ${curr.gridY}`;
+      batteryLine += ` C ${midX} ${prev.batteryY}, ${midX} ${curr.batteryY}, ${curr.x} ${curr.batteryY}`;
     }
 
     const first = elapsedCoords[0];
@@ -234,8 +276,9 @@ export function PlantSolarCurve({
 
     const solarArea = `${solarLine} L ${last.x} ${zeroY} L ${first.x} ${zeroY} Z`;
     const loadArea = `${loadLine} L ${last.x} ${zeroY} L ${first.x} ${zeroY} Z`;
+    const gridArea = `${gridLine} L ${last.x} ${zeroY} L ${first.x} ${zeroY} Z`;
 
-    return { solarLine, solarArea, loadLine, loadArea };
+    return { solarLine, solarArea, loadLine, loadArea, gridLine, gridArea, batteryLine };
   }, [elapsedCoords, zeroY]);
 
   const handleMouseMove = useCallback(
@@ -263,9 +306,12 @@ export function PlantSolarCurve({
         solar: closest.solar,
         load: closest.load,
         gridNet: closest.gridNet,
+        battery: closest.battery,
         x: closest.x,
         solarY: closest.solarY,
         loadY: closest.loadY,
+        gridY: closest.gridY,
+        batteryY: closest.batteryY,
         svgXPercent: (closest.x / width) * 100,
         svgYPercent: (closest.solarY / svgHeight) * 100,
         isRightHalf: closest.x > width * 0.55,
@@ -303,12 +349,24 @@ export function PlantSolarCurve({
               </span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_GRID }} />
+              <span
+                className="size-1.5 rounded-full inline-block shrink-0"
+                style={{ backgroundColor: (hoveredPoint.gridNet ?? 0) >= 0 ? COLOR_GRID : COLOR_IMPORT }}
+              />
               <span className="text-muted-foreground/80">Grid:</span>
               <span className={`font-bold whitespace-nowrap ${(hoveredPoint.gridNet ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
                 {(hoveredPoint.gridNet ?? 0) >= 0 ? `+${(hoveredPoint.gridNet ?? 0).toFixed(2)}` : (hoveredPoint.gridNet ?? 0).toFixed(2)} kW
               </span>
             </div>
+            {hasBatteryFlow && (
+              <div className="flex items-center gap-1">
+                <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_BATTERY }} />
+                <span className="text-muted-foreground/80">BESS:</span>
+                <span className="font-bold text-cyan-400 whitespace-nowrap">
+                  {(hoveredPoint.battery ?? 0) > 0 ? `+${(hoveredPoint.battery ?? 0).toFixed(2)}` : (hoveredPoint.battery ?? 0).toFixed(2)} kW
+                </span>
+              </div>
+            )}
           </div>
         ) : showLabels ? (
           <div className="flex items-center gap-2 sm:gap-3 font-mono flex-wrap">
@@ -376,16 +434,29 @@ export function PlantSolarCurve({
         {/* Main Plot Area: Y-Axis Column on Left + Chart Canvas in Center + Vertical Utilization on Right */}
         <div className="flex flex-1 min-h-0 w-full gap-1 items-stretch">
           {/* Y-Axis Column */}
-          <div className="flex flex-col justify-between items-end pr-1 text-[7.5px] sm:text-[8px] font-mono text-muted-foreground/80 shrink-0 select-none pb-4 pt-0.5 w-9 sm:w-10 border-r border-border/40">
-            <div className="flex items-center gap-0.5 justify-end w-full leading-none">
-              <span className="font-semibold text-foreground/90">{formatSignedKwLabel(yBounds.max)}</span>
-              <span className="text-[6.5px] text-muted-foreground">kW</span>
-            </div>
-            <div className="flex items-center justify-end w-full leading-none text-muted-foreground/75">
-              <span>{formatSignedKwLabel((yBounds.max + yBounds.min) * 0.5)}</span>
-            </div>
-            <div className="flex items-center justify-end w-full leading-none text-muted-foreground/75">
-              <span>{formatSignedKwLabel(yBounds.min)}</span>
+          <div className="flex flex-col shrink-0 select-none pb-4 pt-0.5 w-9 sm:w-10 border-r border-border/40 pr-1 text-[7.5px] sm:text-[8px] font-mono text-muted-foreground/80">
+            <div className="relative flex-1 flex flex-col justify-between items-end w-full">
+              <div className="flex items-center gap-0.5 justify-end w-full leading-none">
+                <span className="font-semibold text-foreground/90">{formatSignedKwLabel(yBounds.max)}</span>
+                <span className="text-[6.5px] text-muted-foreground">kW</span>
+              </div>
+              <div className="flex items-center justify-end w-full leading-none text-muted-foreground/75">
+                <span>{formatSignedKwLabel((yBounds.max + yBounds.min) * 0.5)}</span>
+              </div>
+              <div className="flex items-center justify-end w-full leading-none text-muted-foreground/75">
+                <span>{formatSignedKwLabel(yBounds.min)}</span>
+              </div>
+              {yBounds.min < 0 &&
+                zeroOffsetRatio * 100 >= 18 &&
+                zeroOffsetRatio * 100 <= 82 &&
+                Math.abs(zeroOffsetRatio * 100 - 50) > 14 && (
+                  <span
+                    className="pointer-events-none absolute right-0 -translate-y-1/2 text-[7px] text-foreground/85 font-semibold leading-none"
+                    style={{ top: `${(zeroOffsetRatio * 100).toFixed(1)}%` }}
+                  >
+                    0
+                  </span>
+                )}
             </div>
           </div>
 
@@ -399,17 +470,66 @@ export function PlantSolarCurve({
               onMouseLeave={() => setHoveredPoint(null)}
             >
               <defs>
-                {/* Exact colorSolar from Analytics Dashboard: #f59e0b (0.8 opacity down to 0) */}
-                <linearGradient id={`${gradId}-solar`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLOR_SOLAR} stopOpacity={0.8} />
-                  <stop offset="95%" stopColor={COLOR_SOLAR} stopOpacity={0.0} />
+                {/* Exact colorSolar from Analytics Dashboard: #f59e0b (fades to 0 at 0 kW line) */}
+                <linearGradient
+                  id={`${gradId}-solar`}
+                  gradientUnits="userSpaceOnUse"
+                  x1="0"
+                  y1={paddingY}
+                  x2="0"
+                  y2={paddingY + plotHeight}
+                >
+                  <stop offset="0%" stopColor={COLOR_SOLAR} stopOpacity={0.75} />
+                  <stop offset={`${(zeroOffsetRatio * 100).toFixed(2)}%`} stopColor={COLOR_SOLAR} stopOpacity={0.0} />
+                  {yBounds.min < 0 && <stop offset="100%" stopColor={COLOR_SOLAR} stopOpacity={0.45} />}
                 </linearGradient>
 
-                {/* Exact colorLoad from Analytics Dashboard: #6366f1 (0.35 opacity down to 0) */}
-                <linearGradient id={`${gradId}-load`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLOR_LOAD} stopOpacity={0.35} />
-                  <stop offset="95%" stopColor={COLOR_LOAD} stopOpacity={0.0} />
+                {/* Exact colorLoad from Analytics Dashboard: #6366f1 (fades to 0 at 0 kW line) */}
+                <linearGradient
+                  id={`${gradId}-load`}
+                  gradientUnits="userSpaceOnUse"
+                  x1="0"
+                  y1={paddingY}
+                  x2="0"
+                  y2={paddingY + plotHeight}
+                >
+                  <stop offset="0%" stopColor={COLOR_LOAD} stopOpacity={0.35} />
+                  <stop offset={`${(zeroOffsetRatio * 100).toFixed(2)}%`} stopColor={COLOR_LOAD} stopOpacity={0.0} />
+                  {yBounds.min < 0 && <stop offset="100%" stopColor={COLOR_LOAD} stopOpacity={0.25} />}
                 </linearGradient>
+
+                {/* Signed Grid Net gradient: emerald above 0 (+export), rose below 0 (-import) */}
+                <linearGradient
+                  id={`${gradId}-grid-fill`}
+                  gradientUnits="userSpaceOnUse"
+                  x1="0"
+                  y1={paddingY}
+                  x2="0"
+                  y2={paddingY + plotHeight}
+                >
+                  <stop offset="0%" stopColor={COLOR_GRID} stopOpacity={0.22} />
+                  <stop offset={`${(zeroOffsetRatio * 100).toFixed(2)}%`} stopColor={COLOR_GRID} stopOpacity={0.0} />
+                  {yBounds.min < 0 && (
+                    <>
+                      <stop offset={`${(zeroOffsetRatio * 100).toFixed(2)}%`} stopColor={COLOR_IMPORT} stopOpacity={0.04} />
+                      <stop offset="100%" stopColor={COLOR_IMPORT} stopOpacity={0.28} />
+                    </>
+                  )}
+                </linearGradient>
+
+                {yBounds.min < 0 && (
+                  <linearGradient
+                    id={`${gradId}-grid-stroke`}
+                    gradientUnits="userSpaceOnUse"
+                    x1="0"
+                    y1={paddingY}
+                    x2="0"
+                    y2={paddingY + plotHeight}
+                  >
+                    <stop offset={`${(zeroOffsetRatio * 100).toFixed(2)}%`} stopColor={COLOR_GRID} />
+                    <stop offset={`${(zeroOffsetRatio * 100).toFixed(2)}%`} stopColor={COLOR_IMPORT} />
+                  </linearGradient>
+                )}
 
                 {/* Plot boundary clip path to guarantee paths never leak outside */}
                 <clipPath id={`${gradId}-plot-clip`}>
@@ -461,6 +581,17 @@ export function PlantSolarCurve({
 
               {/* Clipped Curve Layers */}
               <g clipPath={`url(#${gradId}-plot-clip)`}>
+                {/* Net Grid Exchange Area & Line (+Export Emerald / -Import Rose) */}
+                <path d={svgPaths.gridArea} fill={`url(#${gradId}-grid-fill)`} />
+                <path
+                  d={svgPaths.gridLine}
+                  fill="none"
+                  stroke={yBounds.min < 0 ? `url(#${gradId}-grid-stroke)` : COLOR_GRID}
+                  strokeWidth="1.35"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+
                 {/* Facility Demand Area & Line (Analytics colorLoad #6366f1) */}
                 <path d={svgPaths.loadArea} fill={`url(#${gradId}-load)`} />
                 <path
@@ -472,6 +603,19 @@ export function PlantSolarCurve({
                   strokeLinecap="round"
                   vectorEffect="non-scaling-stroke"
                 />
+
+                {/* Battery ESS Flow Line when active (+Charge / -Discharge) */}
+                {hasBatteryFlow && (
+                  <path
+                    d={svgPaths.batteryLine}
+                    fill="none"
+                    stroke={COLOR_BATTERY}
+                    strokeWidth="1.25"
+                    strokeDasharray="1.5 1.5"
+                    strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                )}
 
                 {/* Solar Generation Area & Line (Analytics colorSolar #f59e0b) */}
                 <path d={svgPaths.solarArea} fill={`url(#${gradId}-solar)`} />
@@ -521,6 +665,26 @@ export function PlantSolarCurve({
                     strokeDasharray="2 2"
                     vectorEffect="non-scaling-stroke"
                   />
+                  {/* Net Grid Exchange Point on Curve */}
+                  <circle
+                    cx={hoveredPoint.x}
+                    cy={hoveredPoint.gridY}
+                    r="2.75"
+                    fill="#ffffff"
+                    stroke={hoveredPoint.gridNet >= 0 ? COLOR_GRID : COLOR_IMPORT}
+                    strokeWidth="1.65"
+                  />
+                  {/* Battery ESS Point on Curve */}
+                  {hasBatteryFlow && (
+                    <circle
+                      cx={hoveredPoint.x}
+                      cy={hoveredPoint.batteryY}
+                      r="2.5"
+                      fill="#ffffff"
+                      stroke={COLOR_BATTERY}
+                      strokeWidth="1.5"
+                    />
+                  )}
                   {/* Facility Demand Point on Curve */}
                   <circle
                     cx={hoveredPoint.x}
@@ -585,13 +749,27 @@ export function PlantSolarCurve({
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1 text-muted-foreground text-[8.5px]">
-                        <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_GRID }} />
+                        <span
+                          className="size-1.5 rounded-full inline-block shrink-0"
+                          style={{ backgroundColor: (hoveredPoint.gridNet ?? 0) >= 0 ? COLOR_GRID : COLOR_IMPORT }}
+                        />
                         Grid Net:
                       </span>
                       <span className={`font-bold ${(hoveredPoint.gridNet ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
                         {(hoveredPoint.gridNet ?? 0) >= 0 ? `+${(hoveredPoint.gridNet ?? 0).toFixed(2)}` : (hoveredPoint.gridNet ?? 0).toFixed(2)} kW
                       </span>
                     </div>
+                    {hasBatteryFlow && (
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1 text-muted-foreground text-[8.5px]">
+                          <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_BATTERY }} />
+                          Battery:
+                        </span>
+                        <span className="font-bold text-cyan-400">
+                          {(hoveredPoint.battery ?? 0) > 0 ? `+${(hoveredPoint.battery ?? 0).toFixed(2)}` : (hoveredPoint.battery ?? 0).toFixed(2)} kW
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
