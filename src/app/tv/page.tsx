@@ -21,6 +21,7 @@ import { TvSlideDeck } from './components/TvSlideDeck';
 import {
   buildTvSlides,
   filterTvAuthorizedAccounts,
+  getSlideTickerCommentary,
   getTvScopeKey,
 } from './types';
 
@@ -537,26 +538,10 @@ export default function TvSlideshowPage() {
   const shift = SHIFT_OFFSETS[shiftIndex];
   const progressRatio = slides.length <= 1 ? 1 : elapsedMs / (intervalSec * 1000);
 
-  const fallbackHeadline = useMemo(() => {
-    const overview = slides.find((s) => s.kind === 'overview' || s.kind === 'curve');
-    if (overview && (overview.kind === 'overview' || overview.kind === 'curve')) {
-      if (overview.faultCount > 0) {
-        return `ALERT: ${overview.faultCount} inverter fault · Solar ${overview.liveSolarKw.toFixed(1)} kW`;
-      }
-      if (overview.offlineCount > 0) {
-        return `Solar ${overview.liveSolarKw.toFixed(1)} kW · ${overview.offlineCount} inverter offline`;
-      }
-      return `Solar ${overview.liveSolarKw.toFixed(1)} kW · ${overview.dailyYieldKwh.toFixed(0)} kWh today · ₱${Math.round(overview.dailyYieldKwh * tariffRatePhp).toLocaleString('en-US')} saved`;
-    }
-    const primary = slides.find((s) => s.kind === 'station' || s.kind === 'account');
-    if (primary && primary.kind === 'station') {
-      return `${primary.title}: ${primary.plant.livePowerKw.toFixed(1)} kW live · ${primary.plant.dailyYieldKwh.toFixed(0)} kWh today`;
-    }
-    if (primary && primary.kind === 'account') {
-      return `${primary.account.account.name}: ${primary.account.livePowerKw.toFixed(1)} kW live · ${primary.account.dailyYieldKwh.toFixed(0)} kWh today`;
-    }
-    return 'Awaiting live DeyeCloud station telemetry';
-  }, [slides, tariffRatePhp]);
+  const ticker = useMemo(
+    () => getSlideTickerCommentary(currentSlide, tariffRatePhp, currentWeeklySeries, brief),
+    [currentSlide, tariffRatePhp, currentWeeklySeries, brief]
+  );
 
   return (
     <main
@@ -585,7 +570,7 @@ export default function TvSlideshowPage() {
         <section
           aria-roledescription="carousel"
           aria-label="Solar telemetry slideshow"
-          className="flex flex-1 min-h-0 w-full items-center justify-center p-2 sm:p-4 lg:p-6"
+          className="flex flex-1 min-h-0 w-full"
         >
           <TvSlideDeck
             key={currentSlide.id}
@@ -611,8 +596,8 @@ export default function TvSlideshowPage() {
         isFullscreen={isFullscreen}
         isStale={isStale}
         manilaClock={manilaClock}
-        headline={brief?.headline || fallbackHeadline}
-        severity={brief?.severity || 'normal'}
+        headline={ticker.headline}
+        severity={ticker.severity}
         scopeAccountOptions={scopeAccountOptions}
         scopeStationOptions={scopeStationOptions}
         selectedAccountId={filterAccountId}

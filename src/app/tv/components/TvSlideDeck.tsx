@@ -131,7 +131,7 @@ export function TvSlideDeck({
       aria-roledescription="slide"
       aria-label={`${slideIndex + 1} of ${totalSlides}`}
       data-direction={direction}
-      className="tv-slide-stage relative mx-auto flex h-full w-full max-w-[177.78dvh] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-[0_28px_80px_-24px_rgba(0,0,0,0.65)] backdrop-blur-xl"
+      className="tv-slide-stage relative flex h-full w-full flex-col overflow-hidden"
     >
       {/* Top keynote accent rule */}
       <div
@@ -531,7 +531,7 @@ export function TvSlideDeck({
                 )}
               </div>
 
-              <div className="lg:col-span-8 xl:col-span-9 flex flex-col min-h-[260px] rounded-xl border border-border/50 bg-background/40 p-4">
+              <div className="lg:col-span-8 xl:col-span-9 flex flex-col min-h-[260px]">
                 <PlantSolarCurve
                   capacityKw={capKw}
                   livePowerKw={liveKw}
@@ -691,7 +691,7 @@ export function TvSlideDeck({
                 </div>
               </div>
 
-              <div className="lg:col-span-8 flex flex-col justify-between min-h-[260px] rounded-xl border border-border/50 bg-background/40 p-5">
+              <div className="lg:col-span-8 flex flex-col justify-between min-h-[260px]">
                 <div className="flex items-center justify-between border-b border-border/40 pb-2.5">
                   <h2 className="font-sans text-base font-bold text-foreground">
                     Daily Solar Harvest

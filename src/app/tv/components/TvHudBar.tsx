@@ -238,15 +238,18 @@ export function TvHudBar({
           />
         </div>
 
-        <div className="mx-auto flex max-w-[1920px] items-center justify-between gap-4 px-5 py-2">
-          {/* Status Ticker */}
+        <div className="flex w-full items-center justify-between gap-4 px-[clamp(1.5rem,3.5vw,3.5rem)] py-2">
+          {/* Dynamic Slide Commentary Ticker */}
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             {severity === 'critical' ? (
               <AlertTriangle size={16} className="text-rose-400 shrink-0" aria-hidden="true" />
             ) : (
               <Radio size={15} className={`${tickerAccent} shrink-0`} aria-hidden="true" />
             )}
-            <p className="truncate font-mono text-xs sm:text-sm font-semibold text-foreground">
+            <p
+              key={headline}
+              className="tv-kpi-stagger truncate font-mono text-xs sm:text-sm font-semibold text-foreground"
+            >
               {headline}
             </p>
             {isStale && (

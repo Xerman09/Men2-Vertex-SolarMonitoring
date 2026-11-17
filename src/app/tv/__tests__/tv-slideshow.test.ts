@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { buildTvSlides, filterTvAuthorizedAccounts, getTvScopeKey } from '../types';
+import {
+  buildTvSlides,
+  filterTvAuthorizedAccounts,
+  getSlideTickerCommentary,
+  getTvScopeKey,
+} from '../types';
 import { TvSlideDeck } from '../components/TvSlideDeck';
 import { DEFAULT_TV_INTERVAL_SEC, TvHudBar } from '../components/TvHudBar';
 import type { AccountSummary, FleetMatrixNode } from '@/lib/types';
@@ -306,6 +311,20 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     expect(slideHtml).toContain('aria-roledescription="slide"');
     expect(slideHtml).toContain('data-direction="backward"');
     expect(slideHtml).toContain('VOSOLAR');
+    expect(slideHtml).toContain('from-amber-500 via-primary to-emerald-400');
+
+    // Bottom ticker commentary updates dynamically per active slide instead of staying static
+    const accSlide = slides.find((s) => s.kind === 'account')!;
+    const accTicker = getSlideTickerCommentary(accSlide, 13.9, null, null);
+    const staTicker = getSlideTickerCommentary(stationSlide!, 13.9, null, null);
+    const triageSlide = slides.find((s) => s.kind === 'triage')!;
+    const triageTicker = getSlideTickerCommentary(triageSlide, 13.9, null, null);
+    expect(accTicker.headline).toContain('Hanvin Solar');
+    expect(accTicker.headline).toContain('68.5 kW');
+    expect(staTicker.headline).toContain('Dagupan Main');
+    expect(staTicker.headline).toContain('48.5 kW');
+    expect(triageTicker.severity).toBe('critical');
+    expect(triageTicker.headline).toContain('Beta Plant');
 
     expect(DEFAULT_TV_INTERVAL_SEC).toBe(15);
 

@@ -5,7 +5,10 @@ import {
   type FleetPlantNode,
 } from '@/app/fleet/types';
 import type { HistoryScope } from '@/app/fleet/components/useScopedHistory';
+import type { DailyAnalyticsPoint } from '@/lib/analytics-data';
+import type { TvBriefResult, TvBriefSeverity } from '@/lib/gemini-tv-brief';
 import type { AuthUser } from '@/lib/role-context';
+import { PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH } from '@/lib/tariff-rates';
 import type { AccountSummary, FleetMatrixNode } from '@/lib/types';
 
 export interface TvOverviewSlide {
@@ -459,4 +462,144 @@ export function buildTvSlides(
   }
 
   return slides;
+}
+
+export interface TvTickerCommentary {
+  headline: string;
+  severity: TvBriefSeverity;
+}
+
+/**
+ * Computes slide-specific bottom commentary grounded strictly in verified telemetry
+ * so the theater ticker dynamically narrates whichever slide is on screen.
+ */
+export function getSlideTickerCommentary(
+  slide: TvSlide | null,
+  tariffRatePhp: number,
+  weeklySeries: DailyAnalyticsPoint[] | null,
+  fleetBrief: TvBriefResult | null
+): TvTickerCommentary {
+  if (!slide) {
+    return {
+      headline: fleetBrief?.headline || 'Awaiting live DeyeCloud station telemetry',
+      severity: fleetBrief?.severity || 'normal',
+    };
+  }
+
+  const formatSavings = (kwh: number) =>
+    `₱${Math.round(kwh * tariffRatePhp).toLocaleString('en-US')}`;
+
+  switch (slide.kind) {
+    case 'overview':
+    case 'curve': {
+      if (fleetBrief?.headline) {
+        return { headline: fleetBrief.headline, severity: fleetBrief.severity };
+      }
+      if (slide.faultCount > 0) {
+        return {
+          headline: `ALERT: ${slide.faultCount} inverter fault · Solar ${slide.liveSolarKw.toFixed(1)} kW live · ${slide.dailyYieldKwh.toFixed(0)} kWh today`,
+          severity: 'critical',
+        };
+      }
+      if (slide.offlineCount > 0) {
+        return {
+          headline: `Solar ${slide.liveSolarKw.toFixed(1)} kW live · ${slide.offlineCount} inverter offline · ${slide.dailyYieldKwh.toFixed(0)} kWh today`,
+          severity: 'warning',
+        };
+      }
+      const gridStr =
+        slide.gridNetKw >= 0
+          ? `+${slide.gridNetKw.toFixed(1)} kW grid export`
+          : `${slide.gridNetKw.toFixed(1)} kW grid import`;
+      return {
+        headline: `Solar ${slide.liveSolarKw.toFixed(1)} kW live · ${slide.dailyYieldKwh.toFixed(0)} kWh today · ${formatSavings(slide.dailyYieldKwh)} saved · ${gridStr}`,
+        severity: 'normal',
+      };
+    }
+
+    case 'account': {
+      const acc = slide.account;
+      if (acc.faultCount > 0) {
+        return {
+          headline: `${acc.account.name}: ${acc.faultCount} inverter fault · ${acc.livePowerKw.toFixed(1)} kW live · ${acc.dailyYieldKwh.toFixed(0)} kWh today`,
+          severity: 'critical',
+        };
+      }
+      if (acc.offlineCount > 0) {
+        return {
+          headline: `${acc.account.name}: ${acc.offlineCount} inverter offline · ${acc.livePowerKw.toFixed(1)} kW live · ${acc.dailyYieldKwh.toFixed(0)} kWh today`,
+          severity: 'warning',
+        };
+      }
+      return {
+        headline: `${acc.account.name}: ${acc.livePowerKw.toFixed(1)} kW live across ${acc.plants.length} ${acc.plants.length === 1 ? 'station' : 'stations'} · ${acc.dailyYieldKwh.toFixed(0)} kWh · ${formatSavings(acc.dailyYieldKwh)} saved`,
+        severity: 'normal',
+      };
+    }
+
+    case 'account-stations': {
+      const acc = slide.account;
+      const leader = [...acc.plants].sort((a, b) => b.livePowerKw - a.livePowerKw)[0];
+      const sev: TvBriefSeverity =
+        acc.faultCount > 0 ? 'critical' : acc.offlineCount > 0 ? 'warning' : 'normal';
+      const leadText = leader
+        ? `${leader.plant.stationName} leads at ${leader.livePowerKw.toFixed(1)} kW`
+        : `${acc.plants.length} stations`;
+      return {
+        headline: `${acc.account.name} Stations: ${leadText} · ${acc.dailyYieldKwh.toFixed(0)} kWh combined · ${formatSavings(acc.dailyYieldKwh)} saved`,
+        severity: sev,
+      };
+    }
+
+    case 'station': {
+      const p = slide.plant;
+      const faultInv = p.inverters.find((i) => i.status === 'FAULT');
+      const offlineInv = p.inverters.find((i) => i.status === 'OFFLINE');
+      if (faultInv || p.status === 'FAULT') {
+        return {
+          headline: `${p.plant.stationName}: FAULT on ${faultInv?.deviceSn || 'inverter'} · ${p.livePowerKw.toFixed(1)} kW live · ${p.dailyYieldKwh.toFixed(0)} kWh today`,
+          severity: 'critical',
+        };
+      }
+      if (offlineInv || p.hasOfflineLogger || p.status === 'OFFLINE') {
+        return {
+          headline: `${p.plant.stationName}: ${offlineInv ? `${offlineInv.deviceSn} offline` : 'Device/logger offline'} · ${p.livePowerKw.toFixed(1)} kW live`,
+          severity: 'warning',
+        };
+      }
+      const gridVal = p.gridPowerKw ?? 0;
+      const gridStr =
+        gridVal >= 0
+          ? `+${gridVal.toFixed(1)} kW export`
+          : `${gridVal.toFixed(1)} kW import`;
+      return {
+        headline: `${p.plant.stationName} (${slide.accountName}): ${p.livePowerKw.toFixed(1)} kW live · ${p.dailyYieldKwh.toFixed(0)} kWh today · ${gridStr} · ${formatSavings(p.dailyYieldKwh)} saved`,
+        severity: 'normal',
+      };
+    }
+
+    case 'financial': {
+      if (weeklySeries && weeklySeries.length > 0) {
+        const weekKwh = weeklySeries.reduce((s, d) => s + (d.solarYieldKwh || 0), 0);
+        const co2Kg = Math.round(weekKwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH);
+        return {
+          headline: `${slide.title}: ${weekKwh.toFixed(0)} kWh harvested over 7D · ${formatSavings(weekKwh)} avoided cost · ${co2Kg.toLocaleString('en-US')} kg CO₂ offset`,
+          severity: 'normal',
+        };
+      }
+      return {
+        headline: `${slide.title}: ${slide.dailyYieldKwh.toFixed(0)} kWh today (${formatSavings(slide.dailyYieldKwh)} at ₱${tariffRatePhp.toFixed(2)}/kWh)`,
+        severity: 'normal',
+      };
+    }
+
+    case 'triage': {
+      const top = slide.entries[0];
+      const priorityText = top ? ` · Priority: ${top.stationName} (${top.accountName})` : '';
+      return {
+        headline: `Asset Health Triage: ${slide.totalFaults} fault, ${slide.totalOffline} offline${priorityText}`,
+        severity: slide.totalFaults > 0 ? 'critical' : 'warning',
+      };
+    }
+  }
 }
