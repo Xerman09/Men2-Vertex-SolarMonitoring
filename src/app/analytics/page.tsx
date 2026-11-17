@@ -90,6 +90,7 @@ import {
   formatHumanDate,
   shiftDays,
 } from '@/components/analytics/AnalyticsDatePicker';
+import { AiAnalyticsPanel } from '@/components/analytics/AiAnalyticsPanel';
 
 const log = createLogger('AnalyticsDashboard');
 
@@ -846,6 +847,32 @@ export default function AnalyticsDashboardPage() {
     return undefined;
   }, [isFleetView, accounts, selectedInverter, selectedPlant, selectedAccount]);
 
+  const aiTariff = useMemo(
+    () => ({
+      utilityName: activeTariff.schedule?.shortName || 'Philippine Grid TOU',
+      peakRatePhp: activeTariff.peakRate,
+      offPeakRatePhp: activeTariff.offPeakRate,
+      exportCreditPhp: activeTariff.exportCredit,
+      peakStartHour: activeTariff.peakStartHour,
+      peakEndHour: activeTariff.peakEndHour,
+    }),
+    [
+      activeTariff.schedule?.shortName,
+      activeTariff.peakRate,
+      activeTariff.offPeakRate,
+      activeTariff.exportCredit,
+      activeTariff.peakStartHour,
+      activeTariff.peakEndHour,
+    ]
+  );
+
+  const aiRange = useMemo<'TODAY' | 'WEEK' | 'MONTH' | 'YEAR'>(() => {
+    if (dateSelection.preset === '12M') return 'YEAR';
+    if (dateSelection.preset === '30D' || dateSelection.preset === 'THIS_MONTH') return 'MONTH';
+    if (dateSelection.preset === '7D') return 'WEEK';
+    return 'TODAY';
+  }, [dateSelection.preset]);
+
   const dailyPoints7D = useMemo<DailyAnalyticsPoint[]>(() => {
     if (liveDailySeries && liveDailySeries.length > 0 && timeRange !== '30D') {
       return liveDailySeries.slice(-7);
@@ -1527,6 +1554,21 @@ export default function AnalyticsDashboardPage() {
           </HoverInfo>
         </Card>
       </div>
+
+      {/* AI Telemetry Analysis Card */}
+      <AiAnalyticsPanel
+        accountId={!isFleetView && selectedAccountId !== 'ALL' ? selectedAccountId : undefined}
+        stationId={!isFleetView && selectedStationId !== 'ALL' ? selectedStationId : undefined}
+        deviceSn={!isFleetView && selectedInverterSn !== 'ALL' ? selectedInverterSn : undefined}
+        range={aiRange}
+        date={dateSelection.selectedDate}
+        startDate={dateSelection.startDate}
+        endDate={dateSelection.endDate}
+        historyIsLive={historyIsLive}
+        noLiveData={noLiveData}
+        isPending={isTargetPending}
+        tariff={aiTariff}
+      />
 
       {/* Main Analytics Charts Section */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">

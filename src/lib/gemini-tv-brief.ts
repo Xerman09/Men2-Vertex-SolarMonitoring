@@ -1,6 +1,9 @@
-import { GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
-import { env } from './env';
+import {
+  GEMINI_FLASH_LITE_MODEL,
+  invokeGeminiStructuredJson,
+  type StructuredInteractionInvoke,
+} from './gemini-client';
 import { createLogger } from './logger';
 import { getManilaNowParts } from './manila-time';
 import { DEFAULT_TARIFF_SCHEDULE } from './tariff-rates';
@@ -8,7 +11,7 @@ import type { AggregatedFleetSummary } from './types';
 
 const log = createLogger('GeminiTvBrief');
 
-export const TV_BRIEF_MODEL = 'gemini-3.5-flash-lite';
+export const TV_BRIEF_MODEL = GEMINI_FLASH_LITE_MODEL;
 const BRIEF_CACHE_TTL_MS = 5 * 60_000;
 const BRIEF_TIMEOUT_MS = 8_000;
 
@@ -62,7 +65,7 @@ const tvBriefOutputSchema = z.object({
   priorityStationId: z.string().nullable().optional(),
 });
 
-const TV_BRIEF_JSON_SCHEMA = {
+const TV_BRIEF_JSON_SCHEMA: Record<string, unknown> = {
   type: 'object',
   properties: {
     headline: {
@@ -84,7 +87,7 @@ const TV_BRIEF_JSON_SCHEMA = {
   },
   required: ['headline', 'severity', 'priorityStationId'],
   additionalProperties: false,
-} as const;
+};
 
 interface BriefCacheEntry {
   result: TvBriefResult;
@@ -230,13 +233,7 @@ export function buildDeterministicTvBrief(snapshot: TvTelemetrySnapshot): TvBrie
 
 export interface TvBriefDeps {
   apiKey?: string;
-  createInteraction?: (params: {
-    model: string;
-    input: string;
-    system_instruction: string;
-    store: false;
-    response_format: Record<string, unknown>;
-  }) => Promise<{ output_text?: string | null }>;
+  createInteraction?: StructuredInteractionInvoke;
 }
 
 export async function getCachedOrGenerateTvBrief(
@@ -253,84 +250,63 @@ export async function getCachedOrGenerateTvBrief(
   if (pending) return pending;
 
   const promise = (async (): Promise<TvBriefResult> => {
-    const apiKey = (deps?.apiKey ?? env.GEMINI_API_KEY ?? process.env.GEMINI_API_KEY ?? '').trim();
-    if (!apiKey && !deps?.createInteraction) {
+    const systemInstruction =
+      'You write a single ultra-concise NOC TV ticker headline (<= 90 chars) strictly from verified Philippine solar telemetry JSON. ' +
+      'Never invent metrics, stations, or causes not present in the JSON. Format currency with ₱ (PHP). ' +
+      'Prioritize faults or offline loggers/inverters first; otherwise report live kW, today kWh, ₱ savings, or grid exchange.';
+
+    const inputPayload = JSON.stringify({
+      manilaTimestamp: snapshot.manilaTimestamp,
+      isLive: snapshot.isLive,
+      liveSolarKw: snapshot.liveSolarKw,
+      capacityKw: snapshot.capacityKw,
+      dailyYieldKwh: snapshot.dailyYieldKwh,
+      facilityLoadKw: snapshot.facilityLoadKw,
+      gridNetKw: snapshot.gridNetKw,
+      avgBatterySoc: snapshot.avgBatterySoc,
+      estimatedSavingsPhp: snapshot.estimatedSavingsPhp,
+      faultCount: snapshot.faultCount,
+      offlineInverterCount: snapshot.offlineInverterCount,
+      offlineLoggerCount: snapshot.offlineLoggerCount,
+      stations: snapshot.stations.slice(0, 12),
+    });
+
+    const response = await invokeGeminiStructuredJson({
+      model: TV_BRIEF_MODEL,
+      systemInstruction,
+      input: inputPayload,
+      jsonSchema: TV_BRIEF_JSON_SCHEMA,
+      outputSchema: tvBriefOutputSchema,
+      timeoutMs: BRIEF_TIMEOUT_MS,
+      apiKey: deps?.apiKey,
+      createInteraction: deps?.createInteraction,
+    });
+
+    if (!response.ok) {
+      if (response.reason === 'error') {
+        log.warn('Falling back to deterministic TV brief', { scopeKey: snapshot.scopeKey });
+      }
       const fallback = buildDeterministicTvBrief(snapshot);
       briefCache.set(snapshot.scopeKey, { result: fallback, expiresAt: Date.now() + 60_000 });
       return fallback;
     }
 
-    try {
-      const invoke =
-        deps?.createInteraction ??
-        (async (params) => {
-          const ai = new GoogleGenAI({ apiKey });
-          return ai.interactions.create(params);
-        });
+    const validStationIds = new Set(snapshot.stations.map((s) => s.stationId));
+    const priorityStationId =
+      response.data.priorityStationId && validStationIds.has(response.data.priorityStationId)
+        ? response.data.priorityStationId
+        : null;
 
-      const systemInstruction =
-        'You write a single ultra-concise NOC TV ticker headline (<= 90 chars) strictly from verified Philippine solar telemetry JSON. ' +
-        'Never invent metrics, stations, or causes not present in the JSON. Format currency with ₱ (PHP). ' +
-        'Prioritize faults or offline loggers/inverters first; otherwise report live kW, today kWh, ₱ savings, or grid exchange.';
-
-      const inputPayload = JSON.stringify({
-        manilaTimestamp: snapshot.manilaTimestamp,
-        isLive: snapshot.isLive,
-        liveSolarKw: snapshot.liveSolarKw,
-        capacityKw: snapshot.capacityKw,
-        dailyYieldKwh: snapshot.dailyYieldKwh,
-        facilityLoadKw: snapshot.facilityLoadKw,
-        gridNetKw: snapshot.gridNetKw,
-        avgBatterySoc: snapshot.avgBatterySoc,
-        estimatedSavingsPhp: snapshot.estimatedSavingsPhp,
-        faultCount: snapshot.faultCount,
-        offlineInverterCount: snapshot.offlineInverterCount,
-        offlineLoggerCount: snapshot.offlineLoggerCount,
-        stations: snapshot.stations.slice(0, 12),
-      });
-
-      const interaction = await Promise.race([
-        invoke({
-          model: TV_BRIEF_MODEL,
-          system_instruction: systemInstruction,
-          input: inputPayload,
-          store: false,
-          response_format: {
-            type: 'text',
-            mime_type: 'application/json',
-            schema: TV_BRIEF_JSON_SCHEMA,
-          },
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Gemini TV brief timeout')), BRIEF_TIMEOUT_MS)
-        ),
-      ]);
-
-      const rawText = String(interaction?.output_text || '').trim();
-      const parsed = tvBriefOutputSchema.parse(JSON.parse(rawText));
-
-      const validStationIds = new Set(snapshot.stations.map((s) => s.stationId));
-      const priorityStationId =
-        parsed.priorityStationId && validStationIds.has(parsed.priorityStationId)
-          ? parsed.priorityStationId
-          : null;
-
-      const result: TvBriefResult = {
-        headline: clampHeadline(parsed.headline),
-        severity: parsed.severity,
-        priorityStationId,
-        source: 'gemini',
-        model: TV_BRIEF_MODEL,
-        generatedAt: new Date().toISOString(),
-      };
-      briefCache.set(snapshot.scopeKey, { result, expiresAt: Date.now() + BRIEF_CACHE_TTL_MS });
-      return result;
-    } catch (err) {
-      log.warn('Falling back to deterministic TV brief', { scopeKey: snapshot.scopeKey }, err);
-      const fallback = buildDeterministicTvBrief(snapshot);
-      briefCache.set(snapshot.scopeKey, { result: fallback, expiresAt: Date.now() + 60_000 });
-      return fallback;
-    }
+    const result: TvBriefResult = {
+      headline: clampHeadline(response.data.headline),
+      severity: response.data.severity,
+      priorityStationId,
+      source: 'gemini',
+      model: response.model,
+      generatedAt: new Date().toISOString(),
+    };
+    briefCache.set(snapshot.scopeKey, { result, expiresAt: Date.now() + BRIEF_CACHE_TTL_MS });
+    return result;
   })().finally(() => {
     inFlightBriefs.delete(snapshot.scopeKey);
   });
