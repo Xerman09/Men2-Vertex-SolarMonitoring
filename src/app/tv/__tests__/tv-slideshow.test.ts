@@ -212,6 +212,7 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
         slide: slides[0],
         slideIndex: 0,
         totalSlides: slides.length,
+        direction: 'backward',
         tariffRatePhp: 13.9,
         tariffLabel: 'DECORP',
         weeklySeries: null,
@@ -220,6 +221,7 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     expect(slideHtml).toContain('-14.2');
     expect(slideHtml).toContain('₱');
     expect(slideHtml).toContain('aria-roledescription="slide"');
+    expect(slideHtml).toContain('data-direction="backward"');
 
     const hudHtml = renderToStaticMarkup(
       React.createElement(TvHudBar, {

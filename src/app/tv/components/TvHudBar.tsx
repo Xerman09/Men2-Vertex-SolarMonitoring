@@ -72,8 +72,10 @@ export function TvHudBar({
     <>
       {/* Auto-hiding top-right TV control dock (always keyboard-reachable via focus-within) */}
       <div
-        className={`tv-hud-fade fixed top-4 right-4 z-40 flex items-center gap-1.5 rounded-2xl border border-border/80 bg-card/90 px-2.5 py-1.5 shadow-xl backdrop-blur-md focus-within:opacity-100 ${
-          showOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none focus-within:pointer-events-auto'
+        className={`tv-hud-fade fixed top-4 right-4 z-40 flex items-center gap-1.5 rounded-2xl border border-border/80 bg-card/90 px-2.5 py-1.5 shadow-xl backdrop-blur-md focus-within:opacity-100 focus-within:translate-y-0 ${
+          showOverlay
+            ? 'opacity-100 translate-y-0'
+            : 'opacity-0 -translate-y-1.5 pointer-events-none focus-within:pointer-events-auto'
         }`}
       >
         <button

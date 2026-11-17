@@ -39,6 +39,7 @@ export default function TvSlideshowPage() {
   const [weeklySeries, setWeeklySeries] = useState<DailyAnalyticsPoint[] | null>(null);
 
   const [activeIndex, setActiveIndex] = useState<number>(0);
+  const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward');
   const [paused, setPaused] = useState<boolean>(false);
   const [intervalSec, setIntervalSec] = useState<TvIntervalSeconds>(30);
   const [elapsedMs, setElapsedMs] = useState<number>(0);
@@ -265,12 +266,14 @@ export default function TvSlideshowPage() {
 
   const goPrev = useCallback(() => {
     if (slides.length <= 1) return;
+    setSlideDirection('backward');
     setActiveIndex((prev) => (prev - 1 + slides.length) % slides.length);
     setElapsedMs(0);
   }, [slides.length]);
 
   const goNext = useCallback(() => {
     if (slides.length <= 1) return;
+    setSlideDirection('forward');
     setActiveIndex((prev) => (prev + 1) % slides.length);
     setElapsedMs(0);
   }, [slides.length]);
@@ -278,10 +281,11 @@ export default function TvSlideshowPage() {
   const selectSlide = useCallback(
     (idx: number) => {
       if (idx < 0 || idx >= slides.length) return;
+      setSlideDirection(idx >= activeIndex ? 'forward' : 'backward');
       setActiveIndex(idx);
       setElapsedMs(0);
     },
-    [slides.length]
+    [slides.length, activeIndex]
   );
 
   // Auto-advance timer & preload next slide's curve ~4s before transition
@@ -302,6 +306,7 @@ export default function TvSlideshowPage() {
           }
         }
         if (nextElapsed >= totalMs) {
+          setSlideDirection('forward');
           setActiveIndex((cur) => (cur + 1) % slides.length);
           return 0;
         }
@@ -372,7 +377,7 @@ export default function TvSlideshowPage() {
 
   return (
     <main
-      className="tv-pixel-shift-surface relative min-h-screen w-full overflow-x-hidden bg-background text-foreground"
+      className="tv-stage-atmosphere tv-pixel-shift-surface relative min-h-screen w-full overflow-x-hidden bg-background text-foreground"
       style={{ translate: `${shift.x}px ${shift.y}px` }}
     >
       <p className="visually-hidden" role="status" aria-live="polite">
@@ -400,9 +405,11 @@ export default function TvSlideshowPage() {
           className="min-h-screen flex flex-col"
         >
           <TvSlideDeck
+            key={currentSlide.id}
             slide={currentSlide}
             slideIndex={activeIndex}
             totalSlides={slides.length}
+            direction={slideDirection}
             tariffRatePhp={tariffRatePhp}
             tariffLabel={tariffLabel}
             weeklySeries={weeklySeries}

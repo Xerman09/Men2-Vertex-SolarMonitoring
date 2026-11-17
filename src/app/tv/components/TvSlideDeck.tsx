@@ -28,6 +28,7 @@ interface TvSlideDeckProps {
   slide: TvSlide;
   slideIndex: number;
   totalSlides: number;
+  direction?: 'forward' | 'backward';
   tariffRatePhp: number;
   tariffLabel: string;
   weeklySeries: DailyAnalyticsPoint[] | null;
@@ -48,22 +49,35 @@ function TvKpiTile({
   value,
   unit,
   accentClass = 'text-foreground',
+  topBarClass = 'bg-border/70',
+  staggerIndex = 0,
   icon: Icon,
 }: {
   label: string;
   value: string;
   unit?: string;
   accentClass?: string;
+  topBarClass?: string;
+  staggerIndex?: number;
   icon: React.ComponentType<{ size?: number; className?: string }>;
 }) {
   return (
-    <div className="rounded-2xl border border-border/70 bg-card/85 p-4 flex flex-col justify-between gap-2 min-w-0">
+    <div
+      style={{ '--tv-stagger': staggerIndex } as React.CSSProperties}
+      className="tv-kpi-stagger relative overflow-hidden rounded-2xl border border-border/65 bg-card/85 shadow-sm p-4 sm:p-5 flex flex-col justify-between gap-2.5 min-w-0"
+    >
+      <span
+        aria-hidden="true"
+        className={`absolute inset-x-0 top-0 h-[2px] opacity-80 ${topBarClass}`}
+      />
       <div className="flex items-center justify-between gap-2 text-xs font-mono uppercase tracking-wider text-muted-foreground">
         <span className="truncate">{label}</span>
         <Icon size={16} className={`${accentClass} shrink-0`} aria-hidden="true" />
       </div>
       <div className="flex items-baseline gap-1.5 font-mono tabular-nums min-w-0">
-        <span className={`text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight truncate ${accentClass}`}>
+        <span
+          className={`text-[clamp(1.5rem,1.05rem+1.6vw,2.75rem)] leading-tight font-bold tracking-tight truncate ${accentClass}`}
+        >
           {value}
         </span>
         {unit && (
@@ -80,6 +94,7 @@ export function TvSlideDeck({
   slide,
   slideIndex,
   totalSlides,
+  direction = 'forward',
   tariffRatePhp,
   tariffLabel,
   weeklySeries,
@@ -89,7 +104,8 @@ export function TvSlideDeck({
       role="group"
       aria-roledescription="slide"
       aria-label={`${slideIndex + 1} of ${totalSlides}`}
-      className="mx-auto flex h-full w-full max-w-[1920px] flex-col gap-5 px-6 pt-6 pb-20"
+      data-direction={direction}
+      className="tv-slide-stage mx-auto flex h-full w-full max-w-[1920px] flex-col gap-5 px-[clamp(1.25rem,4vw,4rem)] pt-[clamp(1.25rem,3vh,2.5rem)] pb-24"
     >
       {slide.kind === 'overview' && (
         <>
@@ -98,7 +114,7 @@ export function TvSlideDeck({
               <div className="p-2.5 rounded-2xl bg-primary/10 text-primary border border-primary/20 shrink-0">
                 <Sun size={26} aria-hidden="true" />
               </div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-foreground truncate">
+              <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
                 <HoverInfo
                   title={slide.title}
                   side="bottom"
@@ -143,43 +159,55 @@ export function TvSlideDeck({
           {/* Primary 10-foot KPI Strip */}
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5">
             <TvKpiTile
+              staggerIndex={0}
               label="Live Solar"
               value={slide.liveSolarKw.toFixed(1)}
               unit="kW"
               accentClass="text-amber-500"
+              topBarClass="bg-amber-500"
               icon={Sun}
             />
             <TvKpiTile
+              staggerIndex={1}
               label="Today Harvest"
               value={slide.dailyYieldKwh.toFixed(1)}
               unit="kWh"
               accentClass="text-emerald-400"
+              topBarClass="bg-emerald-400"
               icon={Zap}
             />
             <TvKpiTile
+              staggerIndex={2}
               label="Facility Load"
               value={slide.demandKw.toFixed(1)}
               unit="kW"
               accentClass="text-indigo-400"
+              topBarClass="bg-indigo-400"
               icon={Activity}
             />
             <TvKpiTile
+              staggerIndex={3}
               label="Grid Net"
               value={formatSignedGridKw(slide.gridNetKw)}
               unit="kW"
               accentClass={slide.gridNetKw >= 0 ? 'text-emerald-500' : 'text-rose-400'}
+              topBarClass={slide.gridNetKw >= 0 ? 'bg-emerald-500' : 'bg-rose-400'}
               icon={TrendingUp}
             />
             <TvKpiTile
+              staggerIndex={4}
               label="BESS SoC"
               value={slide.avgBatterySoc !== null ? `${slide.avgBatterySoc}%` : '--'}
               accentClass="text-cyan-400"
+              topBarClass="bg-cyan-400"
               icon={BatteryCharging}
             />
             <TvKpiTile
+              staggerIndex={5}
               label="Est. Savings"
               value={formatPhp(slide.dailyYieldKwh * tariffRatePhp)}
               accentClass="text-primary"
+              topBarClass="bg-primary"
               icon={ShieldCheck}
             />
           </div>
@@ -237,7 +265,7 @@ export function TvSlideDeck({
               <div className="p-2.5 rounded-2xl bg-primary/10 text-primary border border-primary/20 shrink-0">
                 <Building2 size={26} aria-hidden="true" />
               </div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-foreground truncate">
+              <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
                 <HoverInfo
                   title={slide.account.account.name}
                   side="bottom"
@@ -283,6 +311,8 @@ export function TvSlideDeck({
               value={slide.account.livePowerKw.toFixed(1)}
               unit="kW"
               accentClass="text-amber-500"
+              topBarClass="bg-amber-500/80"
+              staggerIndex={0}
               icon={Sun}
             />
             <TvKpiTile
@@ -290,6 +320,8 @@ export function TvSlideDeck({
               value={slide.account.dailyYieldKwh.toFixed(1)}
               unit="kWh"
               accentClass="text-emerald-400"
+              topBarClass="bg-emerald-500/80"
+              staggerIndex={1}
               icon={Zap}
             />
             <TvKpiTile
@@ -297,6 +329,8 @@ export function TvSlideDeck({
               value={(slide.account.demandKw ?? 0).toFixed(1)}
               unit="kW"
               accentClass="text-indigo-400"
+              topBarClass="bg-indigo-400/80"
+              staggerIndex={2}
               icon={Activity}
             />
             <TvKpiTile
@@ -304,12 +338,16 @@ export function TvSlideDeck({
               value={formatSignedGridKw(slide.account.gridPowerKw ?? 0)}
               unit="kW"
               accentClass={(slide.account.gridPowerKw ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-400'}
+              topBarClass={(slide.account.gridPowerKw ?? 0) >= 0 ? 'bg-emerald-500/80' : 'bg-rose-400/80'}
+              staggerIndex={3}
               icon={TrendingUp}
             />
             <TvKpiTile
               label="Est. Savings"
               value={formatPhp(slide.account.dailyYieldKwh * tariffRatePhp)}
               accentClass="text-primary"
+              topBarClass="bg-primary/80"
+              staggerIndex={4}
               icon={ShieldCheck}
             />
           </div>
@@ -374,7 +412,7 @@ export function TvSlideDeck({
               <div className="p-2.5 rounded-2xl bg-rose-500/15 text-rose-400 border border-rose-500/30 shrink-0">
                 <AlertTriangle size={26} aria-hidden="true" />
               </div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-foreground truncate">
+              <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
                 {slide.title}
               </h1>
             </div>
@@ -457,7 +495,7 @@ export function TvSlideDeck({
               <div className="p-2.5 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
                 <Leaf size={26} aria-hidden="true" />
               </div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-foreground truncate">
+              <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
                 <HoverInfo
                   title={slide.title}
                   side="bottom"
@@ -503,6 +541,8 @@ export function TvSlideDeck({
                     label="Today Yield Value"
                     value={formatPhp(slide.dailyYieldKwh * tariffRatePhp)}
                     accentClass="text-emerald-400"
+                    topBarClass="bg-emerald-500/80"
+                    staggerIndex={0}
                     icon={ShieldCheck}
                   />
                   <TvKpiTile
@@ -510,12 +550,16 @@ export function TvSlideDeck({
                     value={weeklySeries ? weekYieldKwh.toFixed(0) : '--'}
                     unit={weeklySeries ? 'kWh' : undefined}
                     accentClass="text-amber-500"
+                    topBarClass="bg-amber-500/80"
+                    staggerIndex={1}
                     icon={Zap}
                   />
                   <TvKpiTile
                     label="7D Avoided Cost"
                     value={weeklySeries ? formatPhp(weekYieldKwh * tariffRatePhp) : '--'}
                     accentClass="text-primary"
+                    topBarClass="bg-primary/80"
+                    staggerIndex={2}
                     icon={TrendingUp}
                   />
                   <TvKpiTile
@@ -523,6 +567,8 @@ export function TvSlideDeck({
                     value={`${co2AvoidedKg.toFixed(0)}`}
                     unit={`kg (${treesEq} trees)`}
                     accentClass="text-emerald-400"
+                    topBarClass="bg-emerald-400/80"
+                    staggerIndex={3}
                     icon={Leaf}
                   />
                 </div>

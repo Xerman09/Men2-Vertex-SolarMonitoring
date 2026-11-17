@@ -740,21 +740,75 @@ dialog.vos-modal::backdrop {
   overscroll-behavior: contain;
 }
 
-/* TV Slideshow: compositor-only burn-in pixel shift and HUD transitions gated on reduced motion */
+/* TV Slideshow: 10-foot presentation atmosphere & compositor-only directional transitions */
+.tv-stage-atmosphere {
+  background-image:
+    radial-gradient(ellipse 75% 42% at 15% -5%, hsl(var(--primary) / 0.08), transparent 65%),
+    radial-gradient(ellipse 65% 38% at 88% -8%, hsl(var(--solar) / 0.07), transparent 60%);
+}
+
 .tv-pixel-shift-surface {
   translate: 0 0;
 }
 
+@keyframes tv-enter-forward {
+  from {
+    opacity: 0;
+    translate: 22px 0;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes tv-enter-backward {
+  from {
+    opacity: 0;
+    translate: -22px 0;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes tv-kpi-rise {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .tv-pixel-shift-surface {
-    transition: translate 900ms ease-out;
+    transition: translate 900ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .tv-hud-fade {
-    transition: opacity 250ms ease-out;
+    transition:
+      opacity 260ms cubic-bezier(0.22, 1, 0.36, 1),
+      translate 260ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .tv-progress-fill {
     transition: transform 250ms linear;
+  }
+
+  .tv-slide-stage[data-direction='forward'] {
+    animation: tv-enter-forward 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .tv-slide-stage[data-direction='backward'] {
+    animation: tv-enter-backward 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .tv-kpi-stagger {
+    animation: tv-kpi-rise 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(var(--tv-stagger, 0) * 35ms);
   }
 }
