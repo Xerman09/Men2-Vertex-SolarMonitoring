@@ -560,7 +560,7 @@ export default function TvSlideshowPage() {
 
   return (
     <main
-      className="tv-stage-atmosphere tv-pixel-shift-surface relative min-h-screen w-full overflow-x-hidden bg-background text-foreground"
+      className="tv-stage-atmosphere tv-pixel-shift-surface relative flex h-dvh w-screen flex-col overflow-hidden bg-background text-foreground"
       style={{ translate: `${shift.x}px ${shift.y}px` }}
     >
       <p className="visually-hidden" role="status" aria-live="polite">
@@ -568,14 +568,14 @@ export default function TvSlideshowPage() {
       </p>
 
       {loading && slides.length === 0 ? (
-        <div className="flex min-h-screen items-center justify-center p-8">
+        <div className="flex flex-1 min-h-0 items-center justify-center p-8">
           <div className="flex flex-col items-center gap-3 font-mono text-sm text-muted-foreground">
             <Tv size={36} className="text-primary animate-pulse" aria-hidden="true" />
             <span>Loading TV telemetry…</span>
           </div>
         </div>
       ) : !currentSlide ? (
-        <div className="flex min-h-screen items-center justify-center p-8">
+        <div className="flex flex-1 min-h-0 items-center justify-center p-8">
           <div className="flex flex-col items-center gap-3 text-center">
             <AlertTriangle size={34} className="text-amber-500" aria-hidden="true" />
             <h1 className="text-xl font-bold text-foreground">No Authorized Stations</h1>
@@ -585,7 +585,7 @@ export default function TvSlideshowPage() {
         <section
           aria-roledescription="carousel"
           aria-label="Solar telemetry slideshow"
-          className="min-h-screen flex flex-col"
+          className="flex flex-1 min-h-0 w-full items-center justify-center p-2 sm:p-4 lg:p-6"
         >
           <TvSlideDeck
             key={currentSlide.id}

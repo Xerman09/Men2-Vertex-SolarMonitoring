@@ -3,16 +3,12 @@
 import React from 'react';
 import {
   Sun,
-  Zap,
-  Activity,
-  TrendingUp,
-  BatteryCharging,
-  ShieldCheck,
   AlertTriangle,
   WifiOff,
   Building2,
   Layers,
   Leaf,
+  Activity,
   Cpu,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -46,50 +42,72 @@ function formatSignedGridKw(val: number): string {
   return val.toFixed(1);
 }
 
-function TvKpiTile({
+function getSlideEyebrow(slide: TvSlide): string {
+  switch (slide.kind) {
+    case 'overview':
+      return 'FLEET EXECUTIVE SUMMARY';
+    case 'curve':
+      return 'FLEET DIURNAL TELEMETRY';
+    case 'account':
+      return 'ACCOUNT TELEMETRY';
+    case 'account-stations':
+      return 'STATION BENCHMARK';
+    case 'station':
+      return `STATION · ${slide.accountName}`;
+    case 'financial':
+      return '7-DAY HARVEST & FINANCIAL YIELD';
+    case 'triage':
+      return 'ASSET HEALTH TRIAGE';
+  }
+}
+
+function SlideMetricRow({
   label,
   value,
   unit,
   accentClass = 'text-foreground',
-  topBarClass = 'bg-border/70',
   staggerIndex = 0,
-  icon: Icon,
 }: {
   label: string;
   value: string;
   unit?: string;
   accentClass?: string;
-  topBarClass?: string;
   staggerIndex?: number;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
 }) {
   return (
     <div
       style={{ '--tv-stagger': staggerIndex } as React.CSSProperties}
-      className="tv-kpi-stagger relative overflow-hidden rounded-2xl border border-border/65 bg-card/85 shadow-sm p-4 sm:p-5 flex flex-col justify-between gap-2.5 min-w-0"
+      className="tv-kpi-stagger flex items-baseline justify-between gap-4 py-3"
     >
-      <span
-        aria-hidden="true"
-        className={`absolute inset-x-0 top-0 h-[2px] opacity-80 ${topBarClass}`}
-      />
-      <div className="flex items-center justify-between gap-2 text-xs font-mono uppercase tracking-wider text-muted-foreground">
-        <span className="truncate">{label}</span>
-        <Icon size={16} className={`${accentClass} shrink-0`} aria-hidden="true" />
-      </div>
-      <div className="flex items-baseline gap-1.5 font-mono tabular-nums min-w-0">
-        <span
-          className={`text-[clamp(1.5rem,1.05rem+1.6vw,2.75rem)] leading-tight font-bold tracking-tight truncate ${accentClass}`}
-        >
-          {value}
-        </span>
+      <span className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </span>
+      <span className={`font-mono text-xl sm:text-2xl font-bold tabular-nums ${accentClass}`}>
+        {value}
         {unit && (
-          <span className="text-xs sm:text-sm font-semibold text-muted-foreground shrink-0">
-            {unit}
-          </span>
+          <span className="ml-1 text-xs font-semibold text-muted-foreground">{unit}</span>
         )}
-      </div>
+      </span>
     </div>
   );
+}
+
+function HeaderIcon({ slide }: { slide: TvSlide }) {
+  switch (slide.kind) {
+    case 'curve':
+      return <Activity size={22} className="text-amber-500" aria-hidden="true" />;
+    case 'account':
+      return <Building2 size={22} className="text-primary" aria-hidden="true" />;
+    case 'account-stations':
+    case 'station':
+      return <Layers size={22} className="text-primary" aria-hidden="true" />;
+    case 'financial':
+      return <Leaf size={22} className="text-emerald-400" aria-hidden="true" />;
+    case 'triage':
+      return <AlertTriangle size={22} className="text-rose-400" aria-hidden="true" />;
+    default:
+      return <Sun size={22} className="text-amber-500" aria-hidden="true" />;
+  }
 }
 
 export function TvSlideDeck({
@@ -102,37 +120,45 @@ export function TvSlideDeck({
   weeklySeries,
   weeklyLoading = false,
 }: TvSlideDeckProps) {
+  const chapterLabel = `${String(slideIndex + 1).padStart(2, '0')} / ${String(
+    Math.max(1, totalSlides)
+  ).padStart(2, '0')}`;
+  const eyebrow = getSlideEyebrow(slide);
+
   return (
-    <div
+    <article
       role="group"
       aria-roledescription="slide"
       aria-label={`${slideIndex + 1} of ${totalSlides}`}
       data-direction={direction}
-      className="tv-slide-stage mx-auto flex h-full w-full max-w-[1920px] flex-col gap-5 px-[clamp(1.25rem,4vw,4rem)] pt-[clamp(1.25rem,3vh,2.5rem)] pb-24"
+      className="tv-slide-stage relative mx-auto flex h-full w-full max-w-[177.78dvh] flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-[0_28px_80px_-24px_rgba(0,0,0,0.65)] backdrop-blur-xl"
     >
-      {/* 1. Fleet Overview: KPI Summary + All Authorized Accounts Portfolio */}
-      {slide.kind === 'overview' && (
-        <>
-          <header className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2.5 rounded-2xl bg-primary/10 text-primary border border-primary/20 shrink-0">
-                <Sun size={26} aria-hidden="true" />
-              </div>
-              <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
+      {/* Top keynote accent rule */}
+      <div
+        aria-hidden="true"
+        className="h-[3px] w-full shrink-0 bg-gradient-to-r from-amber-500 via-primary to-emerald-400"
+      />
+
+      {/* Consistent PowerPoint Master Header */}
+      <header className="flex shrink-0 items-center justify-between gap-6 border-b border-border/50 px-[clamp(1.5rem,3.5vw,3.5rem)] pt-[clamp(1rem,2.4vh,2rem)] pb-4">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-background/60">
+            <HeaderIcon slide={slide} />
+          </div>
+          <div className="min-w-0">
+            <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-500/90 truncate">
+              {chapterLabel} · {eyebrow}
+            </div>
+            <div className="flex items-center gap-2.5 min-w-0 mt-0.5">
+              <h1 className="text-[clamp(1.45rem,1rem+1.55vw,2.65rem)] text-balance leading-tight font-bold tracking-tight text-foreground truncate">
                 <HoverInfo
                   title={slide.title}
                   side="bottom"
                   align="start"
                   content={
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs tabular-nums">
-                      <dt className="text-muted-foreground">Accounts</dt>
-                      <dd className="text-right font-semibold">{slide.accounts.length}</dd>
-                      <dt className="text-muted-foreground">Stations</dt>
-                      <dd className="text-right font-semibold">{slide.plants.length}</dd>
-                      <dt className="text-muted-foreground">Installed</dt>
-                      <dd className="text-right font-semibold">
-                        {slide.capacityKw > 0 ? `${slide.capacityKw.toFixed(0)} kWp` : '--'}
-                      </dd>
+                      <dt className="text-muted-foreground">Slide</dt>
+                      <dd className="text-right font-semibold">{chapterLabel}</dd>
                       <dt className="text-muted-foreground">Tariff</dt>
                       <dd className="text-right font-semibold">
                         {tariffLabel} (₱{tariffRatePhp.toFixed(2)}/kWh)
@@ -143,616 +169,601 @@ export function TvSlideDeck({
                   <span>{slide.title}</span>
                 </HoverInfo>
               </h1>
-              {slide.faultCount > 0 && (
-                <Badge variant="destructive" className="font-mono text-xs">
+
+              {((slide.kind === 'overview' || slide.kind === 'curve') &&
+                slide.faultCount > 0) && (
+                <Badge variant="destructive" className="font-mono text-xs shrink-0">
                   {slide.faultCount} Fault
                 </Badge>
               )}
-              {slide.offlineCount > 0 && (
-                <Badge variant="warning" className="font-mono text-xs">
+              {((slide.kind === 'overview' || slide.kind === 'curve') &&
+                slide.offlineCount > 0) && (
+                <Badge variant="warning" className="font-mono text-xs shrink-0">
                   {slide.offlineCount} Offline
                 </Badge>
               )}
-            </div>
-
-            <div className="font-mono text-sm sm:text-base font-bold text-foreground tabular-nums shrink-0">
-              {slide.onlineInverters}/{slide.totalInverters} Online
-            </div>
-          </header>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5">
-            <TvKpiTile
-              staggerIndex={0}
-              label="Live Solar"
-              value={slide.liveSolarKw.toFixed(1)}
-              unit="kW"
-              accentClass="text-amber-500"
-              topBarClass="bg-amber-500"
-              icon={Sun}
-            />
-            <TvKpiTile
-              staggerIndex={1}
-              label="Today Harvest"
-              value={slide.dailyYieldKwh.toFixed(1)}
-              unit="kWh"
-              accentClass="text-emerald-400"
-              topBarClass="bg-emerald-400"
-              icon={Zap}
-            />
-            <TvKpiTile
-              staggerIndex={2}
-              label="Facility Load"
-              value={slide.demandKw.toFixed(1)}
-              unit="kW"
-              accentClass="text-indigo-400"
-              topBarClass="bg-indigo-400"
-              icon={Activity}
-            />
-            <TvKpiTile
-              staggerIndex={3}
-              label="Grid Net"
-              value={formatSignedGridKw(slide.gridNetKw)}
-              unit="kW"
-              accentClass={slide.gridNetKw >= 0 ? 'text-emerald-500' : 'text-rose-400'}
-              topBarClass={slide.gridNetKw >= 0 ? 'bg-emerald-500' : 'bg-rose-400'}
-              icon={TrendingUp}
-            />
-            <TvKpiTile
-              staggerIndex={4}
-              label="BESS SoC"
-              value={slide.avgBatterySoc !== null ? `${slide.avgBatterySoc}%` : '--'}
-              accentClass="text-cyan-400"
-              topBarClass="bg-cyan-400"
-              icon={BatteryCharging}
-            />
-            <TvKpiTile
-              staggerIndex={5}
-              label="Est. Savings"
-              value={formatPhp(slide.dailyYieldKwh * tariffRatePhp)}
-              accentClass="text-primary"
-              topBarClass="bg-primary"
-              icon={ShieldCheck}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 content-start flex-1">
-            {slide.accounts.map((acc) => (
-              <div
-                key={acc.account.id}
-                className="rounded-2xl border border-border/70 bg-card/85 p-5 flex flex-col justify-between gap-4 font-mono tabular-nums"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="font-sans text-base font-bold text-foreground truncate">
-                      {acc.account.name}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {acc.plants.length} {acc.plants.length === 1 ? 'Station' : 'Stations'} ·{' '}
-                      {acc.capacityKw > 0 ? `${acc.capacityKw.toFixed(0)} kWp` : '--'}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {acc.faultCount > 0 && (
-                      <Badge variant="destructive" className="text-[10px]">
-                        {acc.faultCount} Fault
-                      </Badge>
-                    )}
-                    {acc.offlineCount > 0 && (
-                      <Badge variant="warning" className="text-[10px]">
-                        {acc.offlineCount} Offline
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 border-t border-border/50 pt-3">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                      Live Solar
-                    </div>
-                    <div className="text-xl font-bold text-amber-500">
-                      {acc.livePowerKw.toFixed(1)} kW
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                      Today Yield
-                    </div>
-                    <div className="text-xl font-bold text-emerald-400">
-                      {acc.dailyYieldKwh.toFixed(0)} kWh
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* 2. Separated Fleet Diurnal Curve Slide */}
-      {slide.kind === 'curve' && (
-        <>
-          <header className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2.5 rounded-2xl bg-amber-500/15 text-amber-500 border border-amber-500/25 shrink-0">
-                <Activity size={26} aria-hidden="true" />
-              </div>
-              <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
-                <HoverInfo
-                  title={slide.title}
-                  side="bottom"
-                  align="start"
-                  content={
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs tabular-nums">
-                      <dt className="text-muted-foreground">Installed</dt>
-                      <dd className="text-right font-semibold">
-                        {slide.capacityKw > 0 ? `${slide.capacityKw.toFixed(0)} kWp` : '--'}
-                      </dd>
-                      <dt className="text-muted-foreground">Inverters</dt>
-                      <dd className="text-right font-semibold">
-                        {slide.onlineInverters}/{slide.totalInverters} Online
-                      </dd>
-                      <dt className="text-muted-foreground">Live Solar</dt>
-                      <dd className="text-right font-semibold">{slide.liveSolarKw.toFixed(1)} kW</dd>
-                      <dt className="text-muted-foreground">Grid Net</dt>
-                      <dd className="text-right font-semibold">
-                        {formatSignedGridKw(slide.gridNetKw)} kW
-                      </dd>
-                    </dl>
-                  }
-                >
-                  <span>{slide.title}</span>
-                </HoverInfo>
-              </h1>
-              {slide.faultCount > 0 && (
-                <Badge variant="destructive" className="font-mono text-xs">
-                  {slide.faultCount} Fault
-                </Badge>
-              )}
-              {slide.offlineCount > 0 && (
-                <Badge variant="warning" className="font-mono text-xs">
-                  {slide.offlineCount} Offline
-                </Badge>
-              )}
-            </div>
-
-            <div className="flex items-center gap-4 font-mono text-sm sm:text-base font-bold tabular-nums shrink-0">
-              <span className="text-amber-500">{slide.liveSolarKw.toFixed(1)} kW</span>
-              <span className="text-emerald-400">{slide.dailyYieldKwh.toFixed(0)} kWh</span>
-            </div>
-          </header>
-
-          <div className="rounded-2xl border border-border/70 bg-card/85 p-6 flex-1 min-h-[380px] flex flex-col">
-            <PlantSolarCurve
-              capacityKw={slide.capacityKw}
-              livePowerKw={slide.liveSolarKw}
-              dailyYieldKwh={slide.dailyYieldKwh}
-              demandKw={slide.demandKw}
-              gridPowerKw={slide.gridNetKw}
-              scope={slide.scope}
-              height={380}
-              className="w-full flex-1"
-              showLabels={true}
-            />
-          </div>
-        </>
-      )}
-
-      {/* 3. Account Live Telemetry Slide (Separated from Station List) */}
-      {slide.kind === 'account' && (
-        <>
-          <header className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2.5 rounded-2xl bg-primary/10 text-primary border border-primary/20 shrink-0">
-                <Building2 size={26} aria-hidden="true" />
-              </div>
-              <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
-                <HoverInfo
-                  title={slide.title}
-                  side="bottom"
-                  align="start"
-                  content={
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs tabular-nums">
-                      <dt className="text-muted-foreground">Account</dt>
-                      <dd className="text-right font-semibold">{slide.account.account.name}</dd>
-                      <dt className="text-muted-foreground">Stations</dt>
-                      <dd className="text-right font-semibold">{slide.account.plants.length}</dd>
-                      <dt className="text-muted-foreground">Inverters</dt>
-                      <dd className="text-right font-semibold">{slide.account.invertersCount}</dd>
-                      <dt className="text-muted-foreground">Installed</dt>
-                      <dd className="text-right font-semibold">
-                        {slide.account.capacityKw > 0
-                          ? `${slide.account.capacityKw.toFixed(0)} kWp`
-                          : '--'}
-                      </dd>
-                    </dl>
-                  }
-                >
-                  <span>{slide.title}</span>
-                </HoverInfo>
-              </h1>
-              {slide.account.faultCount > 0 && (
-                <Badge variant="destructive" className="font-mono text-xs">
-                  {slide.account.faultCount} Fault
-                </Badge>
-              )}
-              {slide.account.offlineCount > 0 && (
-                <Badge variant="warning" className="font-mono text-xs">
-                  {slide.account.offlineCount} Offline
-                </Badge>
-              )}
-            </div>
-
-            <div className="font-mono text-sm sm:text-base font-bold text-foreground tabular-nums shrink-0">
-              {slide.account.capacityKw > 0 ? `${slide.account.capacityKw.toFixed(0)} kWp` : '--'}
-            </div>
-          </header>
-
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
-            <TvKpiTile
-              label="Live Solar"
-              value={slide.account.livePowerKw.toFixed(1)}
-              unit="kW"
-              accentClass="text-amber-500"
-              topBarClass="bg-amber-500/80"
-              staggerIndex={0}
-              icon={Sun}
-            />
-            <TvKpiTile
-              label="Today Harvest"
-              value={slide.account.dailyYieldKwh.toFixed(1)}
-              unit="kWh"
-              accentClass="text-emerald-400"
-              topBarClass="bg-emerald-500/80"
-              staggerIndex={1}
-              icon={Zap}
-            />
-            <TvKpiTile
-              label="Facility Load"
-              value={(slide.account.demandKw ?? 0).toFixed(1)}
-              unit="kW"
-              accentClass="text-indigo-400"
-              topBarClass="bg-indigo-400/80"
-              staggerIndex={2}
-              icon={Activity}
-            />
-            <TvKpiTile
-              label="Grid Net"
-              value={formatSignedGridKw(slide.account.gridPowerKw ?? 0)}
-              unit="kW"
-              accentClass={(slide.account.gridPowerKw ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-400'}
-              topBarClass={(slide.account.gridPowerKw ?? 0) >= 0 ? 'bg-emerald-500/80' : 'bg-rose-400/80'}
-              staggerIndex={3}
-              icon={TrendingUp}
-            />
-            <TvKpiTile
-              label="Est. Savings"
-              value={formatPhp(slide.account.dailyYieldKwh * tariffRatePhp)}
-              accentClass="text-primary"
-              topBarClass="bg-primary/80"
-              staggerIndex={4}
-              icon={ShieldCheck}
-            />
-          </div>
-
-          <div className="rounded-2xl border border-border/70 bg-card/85 p-5 flex-1 min-h-[300px] flex flex-col">
-            <PlantSolarCurve
-              capacityKw={slide.account.capacityKw}
-              livePowerKw={slide.account.livePowerKw}
-              dailyYieldKwh={slide.account.dailyYieldKwh}
-              demandKw={slide.account.demandKw}
-              gridPowerKw={slide.account.gridPowerKw}
-              utilizationPct={slide.account.utilizationPct}
-              scope={slide.scope}
-              height={300}
-              className="w-full flex-1"
-              showLabels={true}
-            />
-          </div>
-        </>
-      )}
-
-      {/* 4. Separated Account Stations Roster Slide (All Stations, No Cap) */}
-      {slide.kind === 'account-stations' && (
-        <>
-          <header className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2.5 rounded-2xl bg-primary/10 text-primary border border-primary/20 shrink-0">
-                <Layers size={26} aria-hidden="true" />
-              </div>
-              <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
-                <HoverInfo
-                  title={slide.title}
-                  side="bottom"
-                  align="start"
-                  content={
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs tabular-nums">
-                      <dt className="text-muted-foreground">Account</dt>
-                      <dd className="text-right font-semibold">{slide.account.account.name}</dd>
-                      <dt className="text-muted-foreground">Stations</dt>
-                      <dd className="text-right font-semibold">{slide.account.plants.length}</dd>
-                      <dt className="text-muted-foreground">Inverters</dt>
-                      <dd className="text-right font-semibold">{slide.account.invertersCount}</dd>
-                    </dl>
-                  }
-                >
-                  <span>{slide.title}</span>
-                </HoverInfo>
-              </h1>
-              {slide.account.faultCount > 0 && (
-                <Badge variant="destructive" className="font-mono text-xs">
-                  {slide.account.faultCount} Fault
-                </Badge>
-              )}
-              {slide.account.offlineCount > 0 && (
-                <Badge variant="warning" className="font-mono text-xs">
-                  {slide.account.offlineCount} Offline
-                </Badge>
-              )}
-            </div>
-
-            <div className="font-mono text-sm sm:text-base font-bold text-foreground tabular-nums shrink-0">
-              {slide.account.plants.length} Stations
-            </div>
-          </header>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 content-start flex-1">
-            {slide.account.plants.map((plant) => (
-              <div
-                key={plant.plantKey}
-                className="rounded-2xl border border-border/70 bg-card/85 p-5 flex flex-col justify-between gap-4"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h2 className="text-lg font-bold text-foreground truncate">
-                      {plant.plant.stationName}
-                    </h2>
-                    <div className="text-xs font-mono text-muted-foreground mt-0.5 tabular-nums">
-                      {plant.capacityKw > 0 ? `${plant.capacityKw.toFixed(0)} kWp` : '--'} ·{' '}
-                      {plant.inverters.length}{' '}
-                      {plant.inverters.length === 1 ? 'Inverter' : 'Inverters'}
-                    </div>
-                  </div>
-                  {plant.status === 'FAULT' && (
-                    <Badge variant="destructive" className="text-[10px] font-mono shrink-0">
-                      Fault
-                    </Badge>
-                  )}
-                  {plant.status === 'OFFLINE' && (
-                    <Badge variant="warning" className="text-[10px] font-mono shrink-0">
-                      Offline
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 font-mono tabular-nums border-t border-border/50 pt-3">
-                  <div>
-                    <div className="text-[10px] uppercase text-muted-foreground">Live Solar</div>
-                    <div className="text-lg font-bold text-amber-500">
-                      {plant.livePowerKw.toFixed(1)} kW
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] uppercase text-muted-foreground">Today</div>
-                    <div className="text-lg font-bold text-emerald-400">
-                      {plant.dailyYieldKwh.toFixed(0)} kWh
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[10px] uppercase text-muted-foreground">
-                      {typeof plant.batterySoc === 'number' && plant.batterySoc > 0
-                        ? 'SoC'
-                        : 'Util'}
-                    </div>
-                    <div className="text-lg font-bold text-cyan-400">
-                      {typeof plant.batterySoc === 'number' && plant.batterySoc > 0
-                        ? `${Math.round(plant.batterySoc)}%`
-                        : `${Math.round(plant.utilizationPct)}%`}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* 5. Dedicated Per-Station Live Telemetry & Diurnal Curve Slide */}
-      {slide.kind === 'station' && (
-        <>
-          <header className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2.5 rounded-2xl bg-primary/10 text-primary border border-primary/20 shrink-0">
-                <Layers size={26} aria-hidden="true" />
-              </div>
-              <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
-                <HoverInfo
-                  title={slide.title}
-                  side="bottom"
-                  align="start"
-                  content={
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs tabular-nums">
-                      <dt className="text-muted-foreground">Account</dt>
-                      <dd className="text-right font-semibold">{slide.accountName}</dd>
-                      <dt className="text-muted-foreground">Station ID</dt>
-                      <dd className="text-right font-semibold">{slide.plant.plant.stationId}</dd>
-                      <dt className="text-muted-foreground">Installed</dt>
-                      <dd className="text-right font-semibold">
-                        {slide.plant.capacityKw > 0
-                          ? `${slide.plant.capacityKw.toFixed(0)} kWp`
-                          : '--'}
-                      </dd>
-                      <dt className="text-muted-foreground">Inverters</dt>
-                      <dd className="text-right font-semibold">{slide.plant.inverters.length}</dd>
-                    </dl>
-                  }
-                >
-                  <span>{slide.title}</span>
-                </HoverInfo>
-              </h1>
-              {slide.plant.status === 'FAULT' && (
-                <Badge variant="destructive" className="font-mono text-xs">
+              {(slide.kind === 'account' || slide.kind === 'account-stations') &&
+                slide.account.faultCount > 0 && (
+                  <Badge variant="destructive" className="font-mono text-xs shrink-0">
+                    {slide.account.faultCount} Fault
+                  </Badge>
+                )}
+              {(slide.kind === 'account' || slide.kind === 'account-stations') &&
+                slide.account.offlineCount > 0 && (
+                  <Badge variant="warning" className="font-mono text-xs shrink-0">
+                    {slide.account.offlineCount} Offline
+                  </Badge>
+                )}
+              {slide.kind === 'station' && slide.plant.status === 'FAULT' && (
+                <Badge variant="destructive" className="font-mono text-xs shrink-0">
                   Fault
                 </Badge>
               )}
-              {slide.plant.status === 'OFFLINE' && (
-                <Badge variant="warning" className="font-mono text-xs">
+              {slide.kind === 'station' && slide.plant.status === 'OFFLINE' && (
+                <Badge variant="warning" className="font-mono text-xs shrink-0">
                   Offline
                 </Badge>
               )}
             </div>
-
-            <div className="font-mono text-sm sm:text-base font-bold text-foreground tabular-nums shrink-0">
-              {slide.accountName} ·{' '}
-              {slide.plant.capacityKw > 0 ? `${slide.plant.capacityKw.toFixed(0)} kWp` : '--'}
-            </div>
-          </header>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5">
-            <TvKpiTile
-              staggerIndex={0}
-              label="Live Solar"
-              value={slide.plant.livePowerKw.toFixed(1)}
-              unit="kW"
-              accentClass="text-amber-500"
-              topBarClass="bg-amber-500"
-              icon={Sun}
-            />
-            <TvKpiTile
-              staggerIndex={1}
-              label="Today Harvest"
-              value={slide.plant.dailyYieldKwh.toFixed(1)}
-              unit="kWh"
-              accentClass="text-emerald-400"
-              topBarClass="bg-emerald-400"
-              icon={Zap}
-            />
-            <TvKpiTile
-              staggerIndex={2}
-              label="Facility Load"
-              value={(slide.plant.demandKw ?? 0).toFixed(1)}
-              unit="kW"
-              accentClass="text-indigo-400"
-              topBarClass="bg-indigo-400"
-              icon={Activity}
-            />
-            <TvKpiTile
-              staggerIndex={3}
-              label="Grid Net"
-              value={formatSignedGridKw(slide.plant.gridPowerKw ?? 0)}
-              unit="kW"
-              accentClass={(slide.plant.gridPowerKw ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-400'}
-              topBarClass={(slide.plant.gridPowerKw ?? 0) >= 0 ? 'bg-emerald-500' : 'bg-rose-400'}
-              icon={TrendingUp}
-            />
-            <TvKpiTile
-              staggerIndex={4}
-              label="BESS SoC"
-              value={
-                typeof slide.plant.batterySoc === 'number' && slide.plant.batterySoc > 0
-                  ? `${Math.round(slide.plant.batterySoc)}%`
-                  : '--'
-              }
-              accentClass="text-cyan-400"
-              topBarClass="bg-cyan-400"
-              icon={BatteryCharging}
-            />
-            <TvKpiTile
-              staggerIndex={5}
-              label="Est. Savings"
-              value={formatPhp(slide.plant.dailyYieldKwh * tariffRatePhp)}
-              accentClass="text-primary"
-              topBarClass="bg-primary"
-              icon={ShieldCheck}
-            />
           </div>
+        </div>
 
-          <div className="rounded-2xl border border-border/70 bg-card/85 p-5 flex-1 min-h-[260px] flex flex-col">
-            <PlantSolarCurve
-              capacityKw={slide.plant.capacityKw}
-              livePowerKw={slide.plant.livePowerKw}
-              dailyYieldKwh={slide.plant.dailyYieldKwh}
-              demandKw={slide.plant.demandKw}
-              gridPowerKw={slide.plant.gridPowerKw}
-              utilizationPct={slide.plant.utilizationPct}
-              scope={slide.scope}
-              height={260}
-              className="w-full flex-1"
-              showLabels={true}
-            />
-          </div>
+        <div className="hidden sm:flex flex-col items-end shrink-0 text-right">
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+            VOSOLAR
+          </span>
+          <span className="mt-1 font-mono text-sm font-bold text-foreground tabular-nums">
+            {slide.kind === 'overview' || slide.kind === 'curve'
+              ? `${slide.onlineInverters}/${slide.totalInverters} Online · ${slide.capacityKw.toFixed(0)} kWp`
+              : slide.kind === 'account' || slide.kind === 'account-stations'
+                ? `${slide.account.plants.length} Stations · ${slide.account.capacityKw.toFixed(0)} kWp`
+                : slide.kind === 'station'
+                  ? `${slide.plant.inverters.length} Inverters · ${slide.plant.capacityKw.toFixed(0)} kWp`
+                  : slide.kind === 'financial'
+                    ? `${slide.scopeLabel} · ₱${tariffRatePhp.toFixed(2)}/kWh`
+                    : `${slide.totalFaults} Fault · ${slide.totalOffline} Offline`}
+          </span>
+        </div>
+      </header>
 
-          {slide.plant.inverters.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {slide.plant.inverters.map((inv) => (
-                <div
-                  key={inv.deviceSn}
-                  className="rounded-xl border border-border/70 bg-card/75 px-4 py-2.5 flex items-center justify-between gap-2 font-mono tabular-nums"
-                >
-                  <div className="min-w-0 flex items-center gap-2">
-                    <Cpu size={14} className="text-muted-foreground shrink-0" aria-hidden="true" />
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-foreground truncate">
-                        {inv.deviceSn}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground truncate">{inv.model}</div>
+      {/* Main Slide Body Stage (non-scrolling executive 16:9 canvas) */}
+      <div className="flex flex-1 min-h-0 flex-col px-[clamp(1.5rem,3.5vw,3.5rem)] py-[clamp(1rem,2.4vh,2rem)]">
+        {/* 1. MASTER A: FLEET OVERVIEW (Left Hero Metric + Right Portfolio Table) */}
+        {slide.kind === 'overview' && (
+          <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+            <div className="lg:col-span-5 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-8">
+              <div className="tv-kpi-stagger" style={{ '--tv-stagger': 0 } as React.CSSProperties}>
+                <div className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                  Live Solar Generation
+                </div>
+                <div className="mt-2 flex items-baseline gap-2.5 font-mono tabular-nums">
+                  <span className="text-[clamp(2.75rem,1.9rem+3.2vw,5rem)] font-bold leading-none tracking-tight text-amber-500">
+                    {slide.liveSolarKw.toFixed(1)}
+                  </span>
+                  <span className="text-xl font-semibold text-muted-foreground">kW</span>
+                </div>
+                {slide.capacityKw > 0 && (
+                  <div className="mt-4 space-y-1.5">
+                    <div className="flex justify-between font-mono text-xs text-muted-foreground tabular-nums">
+                      <span>Fleet Utilization</span>
+                      <span className="font-semibold text-foreground">
+                        {Math.min(100, Math.round((slide.liveSolarKw / slide.capacityKw) * 100))}% of{' '}
+                        {slide.capacityKw.toFixed(0)} kWp
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.max(2, (slide.liveSolarKw / slide.capacityKw) * 100)
+                          )}%`,
+                        }}
+                      />
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {inv.status === 'FAULT' && (
-                      <Badge variant="destructive" className="text-[10px]">
-                        Fault
-                      </Badge>
-                    )}
-                    {inv.status === 'OFFLINE' && (
-                      <Badge variant="warning" className="text-[10px]">
-                        Offline
-                      </Badge>
-                    )}
-                    <span className="text-sm font-bold text-amber-500">
-                      {inv.liveSolarPowerKw.toFixed(1)} kW
-                    </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border/50 pt-5 mt-6">
+                <div className="tv-kpi-stagger" style={{ '--tv-stagger': 1 } as React.CSSProperties}>
+                  <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                    Today Harvest
+                  </div>
+                  <div className="mt-1 font-mono text-2xl sm:text-3xl font-bold text-emerald-400 tabular-nums">
+                    {slide.dailyYieldKwh.toFixed(1)}
+                    <span className="ml-1 text-xs font-semibold text-muted-foreground">kWh</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* 6. Asset Health Triage Slide */}
-      {slide.kind === 'triage' && (
-        <>
-          <header className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2.5 rounded-2xl bg-rose-500/15 text-rose-400 border border-rose-500/30 shrink-0">
-                <AlertTriangle size={26} aria-hidden="true" />
+                <div className="tv-kpi-stagger" style={{ '--tv-stagger': 2 } as React.CSSProperties}>
+                  <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                    Est. Savings
+                  </div>
+                  <div className="mt-1 font-mono text-2xl sm:text-3xl font-bold text-primary tabular-nums">
+                    {formatPhp(slide.dailyYieldKwh * tariffRatePhp)}
+                  </div>
+                </div>
+                <div className="tv-kpi-stagger border-t border-border/40 pt-3" style={{ '--tv-stagger': 3 } as React.CSSProperties}>
+                  <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                    Facility Load
+                  </div>
+                  <div className="mt-1 font-mono text-xl sm:text-2xl font-bold text-indigo-400 tabular-nums">
+                    {slide.demandKw.toFixed(1)}
+                    <span className="ml-1 text-xs font-semibold text-muted-foreground">kW</span>
+                  </div>
+                </div>
+                <div className="tv-kpi-stagger border-t border-border/40 pt-3" style={{ '--tv-stagger': 4 } as React.CSSProperties}>
+                  <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                    Grid Net {slide.avgBatterySoc !== null ? `· BESS ${slide.avgBatterySoc}%` : ''}
+                  </div>
+                  <div
+                    className={`mt-1 font-mono text-xl sm:text-2xl font-bold tabular-nums ${
+                      slide.gridNetKw >= 0 ? 'text-emerald-500' : 'text-rose-400'
+                    }`}
+                  >
+                    {formatSignedGridKw(slide.gridNetKw)}
+                    <span className="ml-1 text-xs font-semibold text-muted-foreground">kW</span>
+                  </div>
+                </div>
               </div>
-              <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
-                {slide.title}
-              </h1>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              {slide.totalFaults > 0 && (
-                <Badge variant="destructive" className="font-mono text-xs px-2.5 py-1">
-                  {slide.totalFaults} Fault
-                </Badge>
-              )}
-              {slide.totalOffline > 0 && (
-                <Badge variant="warning" className="font-mono text-xs px-2.5 py-1">
-                  {slide.totalOffline} Offline
-                </Badge>
-              )}
-            </div>
-          </header>
+            <div className="lg:col-span-7 flex flex-col justify-between min-h-0">
+              <div className="grid grid-cols-12 gap-3 border-b border-border/50 pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                <div className="col-span-5">Account</div>
+                <div className="col-span-3">Share</div>
+                <div className="col-span-2 text-right">Live</div>
+                <div className="col-span-2 text-right">Today</div>
+              </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 content-start flex-1">
-            {slide.entries.map((entry) => (
+              <div className="flex-1 divide-y divide-border/40 overflow-y-auto">
+                {(() => {
+                  const maxLive = Math.max(1, ...slide.accounts.map((a) => a.livePowerKw));
+                  const dense = slide.accounts.length > 6;
+                  return slide.accounts.map((acc, idx) => {
+                    const sharePct = Math.max(3, Math.min(100, (acc.livePowerKw / maxLive) * 100));
+                    return (
+                      <div
+                        key={acc.account.id}
+                        style={{ '--tv-stagger': idx } as React.CSSProperties}
+                        className={`tv-kpi-stagger grid grid-cols-12 items-center gap-3 font-mono tabular-nums ${
+                          dense ? 'py-2' : 'py-3'
+                        }`}
+                      >
+                        <div className="col-span-5 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-sans text-base font-bold text-foreground truncate">
+                              {acc.account.name}
+                            </span>
+                            {acc.faultCount > 0 && (
+                              <Badge variant="destructive" className="text-[10px] shrink-0">
+                                {acc.faultCount} Fault
+                              </Badge>
+                            )}
+                            {acc.offlineCount > 0 && (
+                              <Badge variant="warning" className="text-[10px] shrink-0">
+                                {acc.offlineCount} Offline
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {acc.plants.length}{' '}
+                            {acc.plants.length === 1 ? 'Station' : 'Stations'} ·{' '}
+                            {acc.capacityKw > 0 ? `${acc.capacityKw.toFixed(0)} kWp` : '--'}
+                          </div>
+                        </div>
+
+                        <div className="col-span-3 pr-2">
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-muted/60">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300"
+                              style={{ width: `${sharePct}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="col-span-2 text-right text-base sm:text-lg font-bold text-amber-500">
+                          {acc.livePowerKw.toFixed(1)} <span className="text-[11px] text-muted-foreground">kW</span>
+                        </div>
+
+                        <div className="col-span-2 text-right">
+                          <div className="text-sm sm:text-base font-bold text-emerald-400">
+                            {acc.dailyYieldKwh.toFixed(0)} <span className="text-[11px] text-muted-foreground">kWh</span>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {formatPhp(acc.dailyYieldKwh * tariffRatePhp)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2. MASTER B: SPLIT KEYNOTE CHART SLIDE (Fleet Curve, Account Curve, Station Curve) */}
+        {(slide.kind === 'curve' || slide.kind === 'account' || slide.kind === 'station') && (() => {
+          const liveKw =
+            slide.kind === 'curve'
+              ? slide.liveSolarKw
+              : slide.kind === 'account'
+                ? slide.account.livePowerKw
+                : slide.plant.livePowerKw;
+          const capKw =
+            slide.kind === 'curve'
+              ? slide.capacityKw
+              : slide.kind === 'account'
+                ? slide.account.capacityKw
+                : slide.plant.capacityKw;
+          const yieldKwh =
+            slide.kind === 'curve'
+              ? slide.dailyYieldKwh
+              : slide.kind === 'account'
+                ? slide.account.dailyYieldKwh
+                : slide.plant.dailyYieldKwh;
+          const demandKw =
+            slide.kind === 'curve'
+              ? slide.demandKw
+              : slide.kind === 'account'
+                ? slide.account.demandKw ?? 0
+                : slide.plant.demandKw ?? 0;
+          const gridKw =
+            slide.kind === 'curve'
+              ? slide.gridNetKw
+              : slide.kind === 'account'
+                ? slide.account.gridPowerKw ?? 0
+                : slide.plant.gridPowerKw ?? 0;
+          const bessSoc =
+            slide.kind === 'curve'
+              ? slide.avgBatterySoc
+              : slide.kind === 'account'
+                ? typeof slide.account.batterySoc === 'number' && slide.account.batterySoc > 0
+                  ? Math.round(slide.account.batterySoc)
+                  : null
+                : typeof slide.plant.batterySoc === 'number' && slide.plant.batterySoc > 0
+                  ? Math.round(slide.plant.batterySoc)
+                  : null;
+          const utilPct =
+            capKw > 0 ? Math.min(100, Math.round((liveKw / capKw) * 100)) : 0;
+
+          return (
+            <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+              <div className="lg:col-span-4 xl:col-span-3 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0">
+                <div>
+                  <div className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                    Live Solar
+                  </div>
+                  <div className="mt-1.5 flex items-baseline gap-2 font-mono tabular-nums">
+                    <span className="text-[clamp(2.25rem,1.45rem+2.4vw,3.8rem)] font-bold leading-none tracking-tight text-amber-500">
+                      {liveKw.toFixed(1)}
+                    </span>
+                    <span className="text-base font-semibold text-muted-foreground">kW</span>
+                  </div>
+                  {capKw > 0 && (
+                    <div className="mt-3 space-y-1">
+                      <div className="flex justify-between font-mono text-[11px] text-muted-foreground tabular-nums">
+                        <span>Utilization</span>
+                        <span className="font-semibold text-foreground">{utilPct}%</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300"
+                          style={{ width: `${Math.max(2, utilPct)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="divide-y divide-border/45 border-t border-border/50 mt-4">
+                  <SlideMetricRow
+                    staggerIndex={1}
+                    label="Today Harvest"
+                    value={yieldKwh.toFixed(1)}
+                    unit="kWh"
+                    accentClass="text-emerald-400"
+                  />
+                  <SlideMetricRow
+                    staggerIndex={2}
+                    label="Est. Savings"
+                    value={formatPhp(yieldKwh * tariffRatePhp)}
+                    accentClass="text-primary"
+                  />
+                  <SlideMetricRow
+                    staggerIndex={3}
+                    label="Facility Load"
+                    value={demandKw.toFixed(1)}
+                    unit="kW"
+                    accentClass="text-indigo-400"
+                  />
+                  <SlideMetricRow
+                    staggerIndex={4}
+                    label="Grid Net"
+                    value={formatSignedGridKw(gridKw)}
+                    unit="kW"
+                    accentClass={gridKw >= 0 ? 'text-emerald-500' : 'text-rose-400'}
+                  />
+                  {bessSoc !== null && (
+                    <SlideMetricRow
+                      staggerIndex={5}
+                      label="BESS SoC"
+                      value={`${bessSoc}%`}
+                      accentClass="text-cyan-400"
+                    />
+                  )}
+                </div>
+
+                {slide.kind === 'station' && slide.plant.inverters.length > 0 && (
+                  <div className="mt-3 border-t border-border/50 pt-3 space-y-1.5 overflow-hidden">
+                    <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Inverters
+                    </div>
+                    {slide.plant.inverters.slice(0, 4).map((inv) => (
+                      <div
+                        key={inv.deviceSn}
+                        className="flex items-center justify-between gap-2 font-mono text-xs tabular-nums"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Cpu size={12} className="text-muted-foreground shrink-0" aria-hidden="true" />
+                          <span className="truncate font-semibold text-foreground">{inv.deviceSn}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {inv.status === 'FAULT' && (
+                            <Badge variant="destructive" className="text-[10px]">
+                              Fault
+                            </Badge>
+                          )}
+                          {inv.status === 'OFFLINE' && (
+                            <Badge variant="warning" className="text-[10px]">
+                              Offline
+                            </Badge>
+                          )}
+                          <span className="font-bold text-amber-500">
+                            {inv.liveSolarPowerKw.toFixed(1)} kW
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="lg:col-span-8 xl:col-span-9 flex flex-col min-h-[260px] rounded-xl border border-border/50 bg-background/40 p-4">
+                <PlantSolarCurve
+                  capacityKw={capKw}
+                  livePowerKw={liveKw}
+                  dailyYieldKwh={yieldKwh}
+                  demandKw={demandKw}
+                  gridPowerKw={gridKw}
+                  utilizationPct={
+                    slide.kind === 'account'
+                      ? slide.account.utilizationPct
+                      : slide.kind === 'station'
+                        ? slide.plant.utilizationPct
+                        : undefined
+                  }
+                  scope={slide.scope}
+                  height="100%"
+                  className="w-full h-full flex-1 min-h-0"
+                  showLabels={true}
+                />
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 3. MASTER C: ACCOUNT STATIONS BENCHMARK MATRIX */}
+        {slide.kind === 'account-stations' && (
+          <div className="flex flex-1 min-h-0 flex-col justify-between">
+            <div className="grid grid-cols-12 gap-4 border-b border-border/50 pb-2.5 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <div className="col-span-4">Station</div>
+              <div className="col-span-3">Output Ratio</div>
+              <div className="col-span-2 text-right">Live Solar</div>
+              <div className="col-span-2 text-right">Today Yield</div>
+              <div className="col-span-1 text-right">SoC / Util</div>
+            </div>
+
+            <div className="flex-1 divide-y divide-border/40 overflow-y-auto">
+              {(() => {
+                const maxKw = Math.max(1, ...slide.account.plants.map((p) => p.livePowerKw));
+                const dense = slide.account.plants.length > 6;
+                return slide.account.plants.map((plant, idx) => {
+                  const barPct = Math.max(3, Math.min(100, (plant.livePowerKw / maxKw) * 100));
+                  const hasSoc = typeof plant.batterySoc === 'number' && plant.batterySoc > 0;
+                  return (
+                    <div
+                      key={plant.plantKey}
+                      style={{ '--tv-stagger': idx } as React.CSSProperties}
+                      className={`tv-kpi-stagger grid grid-cols-12 items-center gap-4 font-mono tabular-nums ${
+                        dense ? 'py-2' : 'py-3'
+                      }`}
+                    >
+                      <div className="col-span-4 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-sans text-base sm:text-lg font-bold text-foreground truncate">
+                            {plant.plant.stationName}
+                          </span>
+                          {plant.status === 'FAULT' && (
+                            <Badge variant="destructive" className="text-[10px] shrink-0">
+                              Fault
+                            </Badge>
+                          )}
+                          {plant.status === 'OFFLINE' && (
+                            <Badge variant="warning" className="text-[10px] shrink-0">
+                              Offline
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {plant.capacityKw > 0 ? `${plant.capacityKw.toFixed(0)} kWp` : '--'} ·{' '}
+                          {plant.inverters.length}{' '}
+                          {plant.inverters.length === 1 ? 'Inverter' : 'Inverters'}
+                        </div>
+                      </div>
+
+                      <div className="col-span-3 pr-3">
+                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted/60">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300"
+                            style={{ width: `${barPct}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="col-span-2 text-right text-lg font-bold text-amber-500">
+                        {plant.livePowerKw.toFixed(1)}{' '}
+                        <span className="text-xs text-muted-foreground">kW</span>
+                      </div>
+
+                      <div className="col-span-2 text-right">
+                        <div className="text-base font-bold text-emerald-400">
+                          {plant.dailyYieldKwh.toFixed(0)}{' '}
+                          <span className="text-xs text-muted-foreground">kWh</span>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {formatPhp(plant.dailyYieldKwh * tariffRatePhp)}
+                        </div>
+                      </div>
+
+                      <div className="col-span-1 text-right text-base font-bold text-cyan-400">
+                        {hasSoc
+                          ? `${Math.round(plant.batterySoc!)}%`
+                          : `${Math.round(plant.utilizationPct)}%`}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* 4. MASTER D: 7D FINANCIAL & ENVIRONMENTAL IMPACT SLIDE */}
+        {slide.kind === 'financial' && (() => {
+          const weekYieldKwh = weeklySeries
+            ? weeklySeries.reduce((s, d) => s + (d.solarYieldKwh || 0), 0)
+            : null;
+          const co2AvoidedKg =
+            weekYieldKwh !== null
+              ? weekYieldKwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH
+              : slide.dailyYieldKwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH;
+          const treesEq = Math.round(co2AvoidedKg / KG_CO2_PER_TREE_ANNUAL);
+          const maxDayKwh = weeklySeries
+            ? Math.max(1, ...weeklySeries.map((d) => d.solarYieldKwh || 0))
+            : 1;
+
+          return (
+            <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+              <div className="lg:col-span-4 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-8">
+                <div className="tv-kpi-stagger" style={{ '--tv-stagger': 0 } as React.CSSProperties}>
+                  <div className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                    7-Day Avoided Cost
+                  </div>
+                  <div className="mt-2 font-mono text-[clamp(2.25rem,1.45rem+2.5vw,3.9rem)] font-bold leading-none tracking-tight text-emerald-400 tabular-nums">
+                    {weekYieldKwh !== null ? formatPhp(weekYieldKwh * tariffRatePhp) : '--'}
+                  </div>
+                </div>
+
+                <div className="divide-y divide-border/45 border-t border-border/50 mt-6">
+                  <SlideMetricRow
+                    staggerIndex={1}
+                    label="Today Yield Value"
+                    value={formatPhp(slide.dailyYieldKwh * tariffRatePhp)}
+                    accentClass="text-primary"
+                  />
+                  <SlideMetricRow
+                    staggerIndex={2}
+                    label="7D Solar Harvest"
+                    value={weekYieldKwh !== null ? weekYieldKwh.toFixed(0) : '--'}
+                    unit={weekYieldKwh !== null ? 'kWh' : undefined}
+                    accentClass="text-amber-500"
+                  />
+                  <SlideMetricRow
+                    staggerIndex={3}
+                    label="CO₂ Offset"
+                    value={co2AvoidedKg.toFixed(0)}
+                    unit={`kg · ${treesEq} trees`}
+                    accentClass="text-emerald-400"
+                  />
+                </div>
+              </div>
+
+              <div className="lg:col-span-8 flex flex-col justify-between min-h-[260px] rounded-xl border border-border/50 bg-background/40 p-5">
+                <div className="flex items-center justify-between border-b border-border/40 pb-2.5">
+                  <h2 className="font-sans text-base font-bold text-foreground">
+                    Daily Solar Harvest
+                  </h2>
+                  <span className="font-mono text-xs text-muted-foreground">{tariffLabel}</span>
+                </div>
+
+                {weeklyLoading && (!weeklySeries || weeklySeries.length === 0) ? (
+                  <div className="flex-1 flex items-center justify-center font-mono text-sm text-muted-foreground">
+                    Loading 7D DeyeCloud telemetry…
+                  </div>
+                ) : !weeklySeries || weeklySeries.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center font-mono text-sm text-muted-foreground">
+                    No weekly DeyeCloud telemetry recorded for this scope
+                  </div>
+                ) : (
+                  <div className="relative flex-1 pt-6 flex flex-col justify-end">
+                    {/* Subtle architectural horizontal guides */}
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 top-12 bottom-7 flex flex-col justify-between"
+                    >
+                      <div className="border-t border-dashed border-border/35" />
+                      <div className="border-t border-dashed border-border/35" />
+                      <div className="border-t border-border/50" />
+                    </div>
+
+                    <div className="relative z-10 grid grid-cols-7 gap-3 sm:gap-4 items-end h-full">
+                      {weeklySeries.slice(-7).map((day, idx) => {
+                        const kwh = day.solarYieldKwh || 0;
+                        const pct = Math.max(5, Math.min(100, (kwh / maxDayKwh) * 100));
+                        return (
+                          <div
+                            key={day.date}
+                            style={{ '--tv-stagger': idx } as React.CSSProperties}
+                            className="tv-kpi-stagger h-full flex flex-col items-center justify-end gap-1.5 font-mono tabular-nums"
+                          >
+                            <div className="text-xs sm:text-sm font-bold text-foreground">
+                              {kwh.toFixed(0)} <span className="text-[10px] text-muted-foreground">kWh</span>
+                            </div>
+                            <div className="text-[11px] font-semibold text-emerald-400">
+                              {formatPhp(kwh * tariffRatePhp)}
+                            </div>
+                            <div className="w-full max-w-[68px] flex-1 min-h-[100px] flex items-end">
+                              <div
+                                className="w-full rounded-t-lg bg-gradient-to-t from-amber-600 via-amber-500 to-amber-300 shadow-[0_0_24px_-6px_rgba(245,158,11,0.45)]"
+                                style={{ height: `${pct}%` }}
+                              />
+                            </div>
+                            <div className="text-xs text-muted-foreground pt-1">
+                              {day.date.slice(5)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 5. MASTER E: ASSET HEALTH TRIAGE SLIDE */}
+        {slide.kind === 'triage' && (
+          <div className="grid flex-1 min-h-0 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 content-start overflow-y-auto">
+            {slide.entries.map((entry, idx) => (
               <div
                 key={`${entry.accountId}:${entry.stationId}`}
-                className={`rounded-2xl border bg-card/85 p-5 flex flex-col gap-3 ${
-                  entry.status === 'FAULT' ? 'border-rose-500/50' : 'border-amber-500/40'
+                style={{ '--tv-stagger': idx } as React.CSSProperties}
+                className={`tv-kpi-stagger rounded-xl border border-border/60 bg-background/50 p-5 flex flex-col gap-3 border-l-4 ${
+                  entry.status === 'FAULT' ? 'border-l-rose-500' : 'border-l-amber-500'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -772,27 +783,27 @@ export function TvSlideDeck({
                   </Badge>
                 </div>
 
-                <div className="space-y-1.5 font-mono text-xs">
+                <div className="space-y-1.5 font-mono text-xs border-t border-border/40 pt-2.5">
                   {entry.faultInverters.map((inv) => (
                     <div
                       key={inv.deviceSn}
-                      className="flex items-center justify-between rounded-lg bg-rose-500/10 border border-rose-500/30 px-3 py-1.5"
+                      className="flex items-center justify-between text-foreground"
                     >
-                      <span className="font-semibold text-foreground">{inv.deviceSn}</span>
+                      <span className="font-semibold">{inv.deviceSn}</span>
                       <span className="text-rose-400 font-bold">FAULT</span>
                     </div>
                   ))}
                   {entry.offlineInverters.map((inv) => (
                     <div
                       key={inv.deviceSn}
-                      className="flex items-center justify-between rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-1.5"
+                      className="flex items-center justify-between text-foreground"
                     >
-                      <span className="font-semibold text-foreground">{inv.deviceSn}</span>
+                      <span className="font-semibold">{inv.deviceSn}</span>
                       <span className="text-amber-400 font-bold">OFFLINE</span>
                     </div>
                   ))}
                   {entry.hasOfflineLogger && (
-                    <div className="flex items-center gap-2 rounded-lg bg-muted/40 border border-border/60 px-3 py-1.5 text-muted-foreground">
+                    <div className="flex items-center gap-2 text-muted-foreground">
                       <WifiOff size={13} className="text-rose-400 shrink-0" aria-hidden="true" />
                       <span>Data logger offline</span>
                     </div>
@@ -801,151 +812,8 @@ export function TvSlideDeck({
               </div>
             ))}
           </div>
-        </>
-      )}
-
-      {/* 7. Scoped 7D Harvest & Financial Yield Analytics (Fleet, Account, or Station) */}
-      {slide.kind === 'financial' && (
-        <>
-          <header className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2.5 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
-                <Leaf size={26} aria-hidden="true" />
-              </div>
-              <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
-                <HoverInfo
-                  title={slide.title}
-                  side="bottom"
-                  align="start"
-                  content={
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs tabular-nums">
-                      <dt className="text-muted-foreground">Scope</dt>
-                      <dd className="text-right font-semibold">{slide.scopeLabel}</dd>
-                      <dt className="text-muted-foreground">Utility</dt>
-                      <dd className="text-right font-semibold">{tariffLabel}</dd>
-                      <dt className="text-muted-foreground">Rate</dt>
-                      <dd className="text-right font-semibold">₱{tariffRatePhp.toFixed(2)}/kWh</dd>
-                      <dt className="text-muted-foreground">Grid Factor</dt>
-                      <dd className="text-right font-semibold">
-                        {PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH} kg CO₂/kWh
-                      </dd>
-                    </dl>
-                  }
-                >
-                  <span>{slide.title}</span>
-                </HoverInfo>
-              </h1>
-            </div>
-
-            <div className="font-mono text-sm sm:text-base font-bold text-foreground tabular-nums shrink-0">
-              {slide.scopeLabel} · ₱{tariffRatePhp.toFixed(2)} / kWh
-            </div>
-          </header>
-
-          {(() => {
-            const weekYieldKwh = weeklySeries
-              ? weeklySeries.reduce((s, d) => s + (d.solarYieldKwh || 0), 0)
-              : null;
-            const co2AvoidedKg =
-              weekYieldKwh !== null
-                ? weekYieldKwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH
-                : slide.dailyYieldKwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH;
-            const treesEq = Math.round(co2AvoidedKg / KG_CO2_PER_TREE_ANNUAL);
-            const maxDayKwh = weeklySeries
-              ? Math.max(1, ...weeklySeries.map((d) => d.solarYieldKwh || 0))
-              : 1;
-
-            return (
-              <>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-                  <TvKpiTile
-                    label="Today Yield Value"
-                    value={formatPhp(slide.dailyYieldKwh * tariffRatePhp)}
-                    accentClass="text-emerald-400"
-                    topBarClass="bg-emerald-500/80"
-                    staggerIndex={0}
-                    icon={ShieldCheck}
-                  />
-                  <TvKpiTile
-                    label="7D Harvest"
-                    value={weekYieldKwh !== null ? weekYieldKwh.toFixed(0) : '--'}
-                    unit={weekYieldKwh !== null ? 'kWh' : undefined}
-                    accentClass="text-amber-500"
-                    topBarClass="bg-amber-500/80"
-                    staggerIndex={1}
-                    icon={Zap}
-                  />
-                  <TvKpiTile
-                    label="7D Avoided Cost"
-                    value={weekYieldKwh !== null ? formatPhp(weekYieldKwh * tariffRatePhp) : '--'}
-                    accentClass="text-primary"
-                    topBarClass="bg-primary/80"
-                    staggerIndex={2}
-                    icon={TrendingUp}
-                  />
-                  <TvKpiTile
-                    label="CO₂ Offset"
-                    value={`${co2AvoidedKg.toFixed(0)}`}
-                    unit={`kg (${treesEq} trees)`}
-                    accentClass="text-emerald-400"
-                    topBarClass="bg-emerald-400/80"
-                    staggerIndex={3}
-                    icon={Leaf}
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-border/70 bg-card/85 p-5 flex-1 flex flex-col justify-between gap-4 min-h-[280px]">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-base font-bold text-foreground">Daily Solar Harvest</h2>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {tariffLabel}
-                    </span>
-                  </div>
-
-                  {weeklyLoading && (!weeklySeries || weeklySeries.length === 0) ? (
-                    <div className="flex-1 flex items-center justify-center font-mono text-sm text-muted-foreground">
-                      Loading 7D DeyeCloud telemetry…
-                    </div>
-                  ) : !weeklySeries || weeklySeries.length === 0 ? (
-                    <div className="flex-1 flex items-center justify-center font-mono text-sm text-muted-foreground">
-                      No weekly DeyeCloud telemetry recorded for this scope
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-7 gap-3 items-end flex-1 pt-4">
-                      {weeklySeries.slice(-7).map((day) => {
-                        const kwh = day.solarYieldKwh || 0;
-                        const pct = Math.max(4, Math.min(100, (kwh / maxDayKwh) * 100));
-                        return (
-                          <div
-                            key={day.date}
-                            className="h-full flex flex-col items-center justify-end gap-2 font-mono tabular-nums"
-                          >
-                            <div className="text-xs font-bold text-foreground">
-                              {kwh.toFixed(0)} kWh
-                            </div>
-                            <div className="text-[11px] text-emerald-400 font-semibold">
-                              {formatPhp(kwh * tariffRatePhp)}
-                            </div>
-                            <div className="w-full max-w-[64px] flex-1 min-h-[110px] bg-muted/40 rounded-t-xl border border-border/40 flex items-end overflow-hidden">
-                              <div
-                                className="w-full bg-gradient-to-t from-amber-600 via-amber-500 to-amber-400 rounded-t-lg"
-                                style={{ height: `${pct}%` }}
-                              />
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {day.date.slice(5)}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </>
-            );
-          })()}
-        </>
-      )}
-    </div>
+        )}
+      </div>
+    </article>
   );
 }

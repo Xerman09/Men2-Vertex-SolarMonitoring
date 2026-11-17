@@ -227,9 +227,9 @@ export function TvHudBar({
         </Link>
       </div>
 
-      {/* Persistent bottom ticker, markers & progress bar */}
-      <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-card/88 backdrop-blur-md">
-        <div className="h-[3px] w-full bg-muted/40 overflow-hidden" aria-hidden="true">
+      {/* Persistent bottom presentation ribbon (docked below slide stage, never overlapping slides) */}
+      <footer className="shrink-0 z-30 border-t border-border/50 bg-card/85 backdrop-blur-md">
+        <div className="h-[2px] w-full bg-muted/40 overflow-hidden" aria-hidden="true">
           <div
             className="tv-progress-fill h-full w-full origin-left bg-primary"
             style={{
@@ -238,7 +238,7 @@ export function TvHudBar({
           />
         </div>
 
-        <div className="mx-auto flex max-w-[1920px] items-center justify-between gap-4 px-5 py-2.5">
+        <div className="mx-auto flex max-w-[1920px] items-center justify-between gap-4 px-5 py-2">
           {/* Status Ticker */}
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             {severity === 'critical' ? (

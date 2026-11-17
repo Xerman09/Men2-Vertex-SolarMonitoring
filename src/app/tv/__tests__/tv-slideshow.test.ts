@@ -305,6 +305,7 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     expect(slideHtml).toContain('₱');
     expect(slideHtml).toContain('aria-roledescription="slide"');
     expect(slideHtml).toContain('data-direction="backward"');
+    expect(slideHtml).toContain('VOSOLAR');
 
     expect(DEFAULT_TV_INTERVAL_SEC).toBe(15);
 
