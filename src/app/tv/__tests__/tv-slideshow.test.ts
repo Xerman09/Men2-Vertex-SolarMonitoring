@@ -328,6 +328,45 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     expect(triageTicker.severity).toBe('critical');
     expect(triageTicker.headline).toContain('Beta Plant');
 
+    // Triage card should NOT badge the station itself as "Offline" when loggers/assets already report offline
+    const loggerOnlyAccount = {
+      ...accounts[0],
+      plants: [
+        {
+          ...accounts[0].plants[0],
+          devices: [
+            ...accounts[0].plants[0].devices,
+            {
+              deviceSn: 'LOG-101',
+              deviceType: 'LOGGER' as const,
+              name: 'Logger 101',
+              model: 'LSW-3',
+              ratedKw: 0,
+              status: 'OFFLINE' as const,
+            },
+          ],
+        },
+      ],
+    };
+    const loggerOnlyTriageSlides = buildTvSlides([loggerOnlyAccount], [nodes[0]], {
+      isConsumer: true,
+    });
+    const loggerTriage = loggerOnlyTriageSlides.find((s) => s.kind === 'triage')!;
+    expect(loggerTriage).toBeDefined();
+    const triageHtml = renderToStaticMarkup(
+      React.createElement(TvSlideDeck, {
+        slide: loggerTriage,
+        slideIndex: 0,
+        totalSlides: 1,
+        tariffRatePhp: 13.9,
+        tariffLabel: 'DECORP',
+        weeklySeries: null,
+      })
+    );
+    expect(triageHtml).toContain('LOG-101');
+    expect(triageHtml).toContain('LOGGER OFFLINE');
+    expect(triageHtml).not.toContain('>Offline<');
+
     expect(DEFAULT_TV_INTERVAL_SEC).toBe(15);
 
     const hudHtml = renderToStaticMarkup(

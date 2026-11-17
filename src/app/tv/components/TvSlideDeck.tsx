@@ -775,12 +775,11 @@ export function TvSlideDeck({
                       {entry.accountName}
                     </div>
                   </div>
-                  <Badge
-                    variant={entry.status === 'FAULT' ? 'destructive' : 'warning'}
-                    className="font-mono text-xs shrink-0"
-                  >
-                    {entry.status === 'FAULT' ? 'Fault' : 'Offline'}
-                  </Badge>
+                  {entry.faultInverters.length > 0 && (
+                    <Badge variant="destructive" className="font-mono text-xs shrink-0">
+                      Fault
+                    </Badge>
+                  )}
                 </div>
 
                 <div className="space-y-1.5 font-mono text-xs border-t border-border/40 pt-2.5">
@@ -802,10 +801,25 @@ export function TvSlideDeck({
                       <span className="text-amber-400 font-bold">OFFLINE</span>
                     </div>
                   ))}
-                  {entry.hasOfflineLogger && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <WifiOff size={13} className="text-rose-400 shrink-0" aria-hidden="true" />
-                      <span>Data logger offline</span>
+                  {entry.offlineLoggers.map((logger) => (
+                    <div
+                      key={logger.deviceSn}
+                      className="flex items-center justify-between gap-2 text-foreground"
+                    >
+                      <span className="inline-flex items-center gap-1.5 font-semibold truncate">
+                        <WifiOff size={13} className="text-amber-400 shrink-0" aria-hidden="true" />
+                        <span>{logger.deviceSn}</span>
+                      </span>
+                      <span className="text-amber-400 font-bold shrink-0">LOGGER OFFLINE</span>
+                    </div>
+                  ))}
+                  {entry.hasOfflineLogger && entry.offlineLoggers.length === 0 && (
+                    <div className="flex items-center justify-between gap-2 text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5">
+                        <WifiOff size={13} className="text-amber-400 shrink-0" aria-hidden="true" />
+                        <span>Data logger</span>
+                      </span>
+                      <span className="text-amber-400 font-bold shrink-0">OFFLINE</span>
                     </div>
                   )}
                 </div>

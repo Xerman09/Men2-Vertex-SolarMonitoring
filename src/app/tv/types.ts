@@ -9,7 +9,7 @@ import type { DailyAnalyticsPoint } from '@/lib/analytics-data';
 import type { TvBriefResult, TvBriefSeverity } from '@/lib/gemini-tv-brief';
 import type { AuthUser } from '@/lib/role-context';
 import { PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH } from '@/lib/tariff-rates';
-import type { AccountSummary, FleetMatrixNode } from '@/lib/types';
+import type { AccountSummary, DeviceInfo, FleetMatrixNode } from '@/lib/types';
 
 export interface TvOverviewSlide {
   id: string;
@@ -81,6 +81,7 @@ export interface TvTriageEntry {
   status: 'FAULT' | 'OFFLINE';
   faultInverters: FleetInverterNode[];
   offlineInverters: FleetInverterNode[];
+  offlineLoggers: DeviceInfo[];
   hasOfflineLogger: boolean;
 }
 
@@ -424,7 +425,13 @@ export function buildTvSlides(
     for (const plant of acc.plants) {
       const faultInvs = plant.inverters.filter((i) => i.status === 'FAULT');
       const offlineInvs = plant.inverters.filter((i) => i.status === 'OFFLINE');
-      if (faultInvs.length > 0 || offlineInvs.length > 0 || plant.hasOfflineLogger) {
+      const offlineLoggers = plant.loggers.filter((l) => l.status === 'OFFLINE');
+      if (
+        faultInvs.length > 0 ||
+        offlineInvs.length > 0 ||
+        offlineLoggers.length > 0 ||
+        plant.hasOfflineLogger
+      ) {
         triageEntries.push({
           accountId: acc.account.id,
           accountName: acc.account.name,
@@ -433,7 +440,8 @@ export function buildTvSlides(
           status: faultInvs.length > 0 ? 'FAULT' : 'OFFLINE',
           faultInverters: faultInvs,
           offlineInverters: offlineInvs,
-          hasOfflineLogger: plant.hasOfflineLogger,
+          offlineLoggers,
+          hasOfflineLogger: plant.hasOfflineLogger || offlineLoggers.length > 0,
         });
       }
     }
