@@ -10,18 +10,64 @@ const KNOWN_DEV_SESSION_SECRETS = new Set([
 
 const WEAK_PINS = new Set(['8888', '0000', '1234', '1111', '123456']);
 
+const DEV_SESSION_GLOBAL_KEY = '__dsmDevSessionSecret';
+
 /**
  * Dynamic fallback generator for non-production environments.
- * Prevents hardcoding static secrets in git repository.
+ * Prevents hardcoding static secrets in git repository while sharing one ephemeral
+ * dev secret across Next.js workers, Node proxy guards, and HMR reloads.
  */
 function getNonProdSessionSecret(): string {
   if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 16) {
     return process.env.SESSION_SECRET;
   }
+
+  const g = globalThis as Record<string, unknown>;
+  if (typeof g[DEV_SESSION_GLOBAL_KEY] === 'string' && (g[DEV_SESSION_GLOBAL_KEY] as string).length >= 16) {
+    return g[DEV_SESSION_GLOBAL_KEY] as string;
+  }
+
+  const canUseDevDiskCache =
+    typeof process !== 'undefined' &&
+    Boolean(process.versions?.node) &&
+    process.env.NODE_ENV === 'development';
+
+  if (canUseDevDiskCache) {
+    try {
+      const fsMod = eval('require')('fs') as typeof import('fs');
+      const pathMod = eval('require')('path') as typeof import('path');
+      const cacheDir = pathMod.resolve(process.cwd(), '.next');
+      const secretFile = pathMod.join(cacheDir, '.dsm-dev-session-secret');
+      if (fsMod.existsSync(secretFile)) {
+        const persisted = fsMod.readFileSync(secretFile, 'utf8').trim();
+        if (persisted.length >= 32) {
+          g[DEV_SESSION_GLOBAL_KEY] = persisted;
+          process.env.SESSION_SECRET = persisted;
+          return persisted;
+        }
+      }
+      const buf = new Uint8Array(32);
+      crypto.getRandomValues(buf);
+      const generated = Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+      fsMod.mkdirSync(cacheDir, { recursive: true });
+      fsMod.writeFileSync(secretFile, generated, { mode: 0o600 });
+      g[DEV_SESSION_GLOBAL_KEY] = generated;
+      process.env.SESSION_SECRET = generated;
+      return generated;
+    } catch {
+      // Fallback cleanly to in-memory random secret if disk cache is unavailable
+    }
+  }
+
   // Generate a random 32-byte hex string in-memory for local dev/test if unset
   const buf = new Uint8Array(32);
   crypto.getRandomValues(buf);
-  return Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+  const generated = Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+  g[DEV_SESSION_GLOBAL_KEY] = generated;
+  if (typeof process !== 'undefined' && process.env) {
+    process.env.SESSION_SECRET = generated;
+  }
+  return generated;
 }
 
 const envSchema = z

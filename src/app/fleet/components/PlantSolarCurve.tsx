@@ -709,7 +709,13 @@ export function PlantSolarCurve({
 
             {historyStatus !== 'ready' && (
               <div className="pointer-events-none absolute inset-x-0 top-0 bottom-5 flex items-center justify-center text-[9px] font-mono text-muted-foreground/80">
-                {historyStatus === 'loading' ? 'Loading telemetry…' : 'No live telemetry'}
+                {historyStatus === 'loading'
+                  ? 'Loading telemetry…'
+                  : historyStatus === 'unauthorized'
+                    ? 'Sign in required'
+                    : historyStatus === 'error'
+                      ? 'Telemetry reconnecting…'
+                      : 'No live telemetry'}
               </div>
             )}
 

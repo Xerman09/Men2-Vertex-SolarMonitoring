@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { verifySessionToken, extractSessionToken } from './lib/session';
 import { createLogger } from './lib/logger';
 
-const log = createLogger('Middleware');
+const log = createLogger('Proxy');
 
 function applyCorsHeaders(response: NextResponse, origin: string | null): NextResponse {
   // Allow all origins: mirror back origin or '*'
@@ -14,7 +14,7 @@ function applyCorsHeaders(response: NextResponse, origin: string | null): NextRe
   return response;
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const method = req.method;
   const requestOrigin = req.headers.get('origin');

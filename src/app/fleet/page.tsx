@@ -27,6 +27,7 @@ import { FleetControlBar } from './components/FleetControlBar';
 import { FleetScopeSidebar } from './components/FleetScopeSidebar';
 import { FleetDetailWorkspace } from './components/FleetDetailWorkspace';
 import { FleetNocTable } from './components/FleetNocTable';
+import { clearScopedHistoryCache } from './components/useScopedHistory';
 
 const log = createLogger('FleetMonitoring');
 const FLEET_CACHE_KEY = 'fleet:aggregate';
@@ -392,6 +393,7 @@ export default function FleetMonitoringPage() {
 
   const handleManualRefresh = useCallback(async () => {
     telemetryCache.delete(FLEET_CACHE_KEY);
+    clearScopedHistoryCache();
     await Promise.all([fetchFleet(true), refreshAccounts(true, true)]);
   }, [fetchFleet, refreshAccounts]);
 

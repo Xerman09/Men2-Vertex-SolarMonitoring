@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createLogger } from './logger';
 
 const log = createLogger('RoleProvider');
@@ -48,6 +48,15 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [authModalTab, setAuthModalTab] = useState<'signin' | 'register'>('signin');
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const authSigRef = useRef<string>('');
+
+  const dispatchAuthChangedIfNeeded = useCallback((nextSig: string) => {
+    if (authSigRef.current === nextSig) return;
+    authSigRef.current = nextSig;
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('dsm:auth-changed'));
+    }
+  }, []);
 
   // Synchronize initial session state from server cookie (server-authoritative)
   useEffect(() => {
@@ -62,6 +71,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
             if (data.authenticated && data.user) {
               setRole(data.role);
               setUser(data.user);
+              dispatchAuthChangedIfNeeded(`${data.role}:${data.user.id || ''}:${data.user.accountId || ''}`);
               try {
                 localStorage.setItem('dsm_user_role', data.role);
                 localStorage.setItem('dsm_auth_user', JSON.stringify(data.user));
@@ -72,6 +82,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
               // Server explicitly reports unauthenticated: purge cached hints
               setRole('viewer');
               setUser(null);
+              authSigRef.current = 'viewer::';
               try {
                 localStorage.removeItem('dsm_user_role');
                 localStorage.removeItem('dsm_auth_user');
@@ -120,7 +131,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       window.removeEventListener('focus', handleFocus);
     };
-  }, []);
+  }, [dispatchAuthChangedIfNeeded]);
 
   const applyRoleState = useCallback((newRole: UserRole, newUser?: AuthUser | null) => {
     setRole(newRole);
@@ -137,7 +148,9 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // LocalStorage access fail safe
     }
-  }, []);
+    const nextSig = newUser ? `${newRole}:${newUser.id || ''}:${newUser.accountId || ''}` : `${newRole}::`;
+    dispatchAuthChangedIfNeeded(nextSig);
+  }, [dispatchAuthChangedIfNeeded]);
 
   const login = useCallback(
     async (

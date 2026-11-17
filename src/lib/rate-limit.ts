@@ -29,7 +29,7 @@ export const RATE_LIMIT_CONFIGS = {
   ACCOUNT_MUTATION: { maxRequests: 20, windowMs: ONE_MINUTE_MS },
   SYNC_ACCOUNT: { maxRequests: 20, windowMs: ONE_MINUTE_MS },
   AUTH_LOGIN: { maxRequests: 10, windowMs: ONE_MINUTE_MS },
-  READ_HISTORY: { maxRequests: 30, windowMs: ONE_MINUTE_MS },
+  READ_HISTORY: { maxRequests: 120, windowMs: ONE_MINUTE_MS },
   READ_ACCOUNTS: { maxRequests: 30, windowMs: ONE_MINUTE_MS },
   READ_STATIONS: { maxRequests: 60, windowMs: ONE_MINUTE_MS },
   READ_PLANTS: { maxRequests: 60, windowMs: ONE_MINUTE_MS },

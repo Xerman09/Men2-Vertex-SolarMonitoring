@@ -152,8 +152,11 @@ export const GET = withGate(
     }
 
     try {
-      // Hot-path optimization: Skip redundant sync with Directus if clients are already loaded in memory
-      if (accountManager.getAllClients().length === 0) {
+      // Sync Directus if no clients are cached or the requested tenant account is not registered yet.
+      if (
+        accountManager.getAllClients().length === 0 ||
+        (tenantCheck.targetAccountId && !accountManager.getClient(tenantCheck.targetAccountId))
+      ) {
         await accountManager.syncWithDirectus().catch((e) => {
           log.warn('Non-fatal Directus sync error before history lookup', {}, e);
         });

@@ -112,7 +112,7 @@ describe('API Gate & Schemas Validation Suite', () => {
     it('ensures all critical endpoints have explicit rate limits', () => {
       expect(RATE_LIMIT_CONFIGS.CONTROL.maxRequests).toBe(5);
       expect(RATE_LIMIT_CONFIGS.ACCOUNT_MUTATION.maxRequests).toBe(20);
-      expect(RATE_LIMIT_CONFIGS.READ_HISTORY.maxRequests).toBe(30);
+      expect(RATE_LIMIT_CONFIGS.READ_HISTORY.maxRequests).toBe(120);
       expect(RATE_LIMIT_CONFIGS.READ_ACCOUNTS.maxRequests).toBe(30);
       expect(RATE_LIMIT_CONFIGS.READ_STATIONS.maxRequests).toBe(60);
       expect(RATE_LIMIT_CONFIGS.READ_PLANTS.maxRequests).toBe(60);
