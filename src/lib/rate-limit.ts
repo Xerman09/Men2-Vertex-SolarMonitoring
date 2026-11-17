@@ -36,6 +36,7 @@ export const RATE_LIMIT_CONFIGS = {
   READ_AGGREGATE: { maxRequests: 60, windowMs: ONE_MINUTE_MS },
   READ_HEALTH: { maxRequests: 60, windowMs: ONE_MINUTE_MS },
   READ_TELEMETRY: { maxRequests: 60, windowMs: ONE_MINUTE_MS },
+  TV_BRIEF: { maxRequests: 12, windowMs: ONE_MINUTE_MS },
 } as const;
 
 export const POLL_INTERVALS = {

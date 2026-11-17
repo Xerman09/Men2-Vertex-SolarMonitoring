@@ -30,6 +30,7 @@ import {
   Mail,
   LogOut,
   AlertCircle,
+  Tv,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAccount } from '@/lib/account-context';
@@ -711,7 +712,16 @@ export function Header({
           {/* UTC Clock */}
           <UtcClock />
 
-          {/* Theme Mode Toggle (Light/Dark/System) */}
+          {/* Theme Mode Toggle (Light/Dark/System) & TV Slideshow Link */}
+          <Link
+            href="/tv"
+            aria-label="TV Slideshow"
+            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-border/60 bg-background hover:bg-accent/60 text-xs font-medium text-foreground transition-colors shrink-0"
+          >
+            <Tv size={14} className="text-primary" aria-hidden="true" />
+            <span className="hidden md:inline">TV Slideshow</span>
+          </Link>
+
           <div className="shrink-0">
             <ModeToggle />
           </div>

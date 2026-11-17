@@ -119,7 +119,8 @@ export async function proxy(req: NextRequest) {
     pathname.startsWith('/accounts') ||
     pathname.startsWith('/api-diagnostics') ||
     pathname.startsWith('/fleet') ||
-    pathname.startsWith('/analytics')
+    pathname.startsWith('/analytics') ||
+    pathname.startsWith('/tv')
   ) {
     const token = extractSessionToken(req.cookies);
     const session = await verifySessionToken(token);
@@ -143,5 +144,7 @@ export const config = {
     '/fleet',
     '/analytics/:path*',
     '/analytics',
+    '/tv/:path*',
+    '/tv',
   ],
 };

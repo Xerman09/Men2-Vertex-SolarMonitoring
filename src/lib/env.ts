@@ -87,6 +87,7 @@ const envSchema = z
     ADMIN_ACCESS_PIN: z.string().optional(),
     SESSION_SECRET: z.string().min(16).default(getNonProdSessionSecret),
     ALLOWED_DEV_ORIGINS: z.string().optional(),
+    GEMINI_API_KEY: z.string().optional().default(''),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {

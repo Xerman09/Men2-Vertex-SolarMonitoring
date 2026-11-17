@@ -14,6 +14,7 @@ import {
   Activity,
   LayoutGrid,
   BarChart3,
+  Tv,
   X,
 } from 'lucide-react';
 import { useAccount } from '@/lib/account-context';
@@ -54,6 +55,11 @@ export function Sidebar() {
       href: '/fleet',
       icon: LayoutGrid,
       badge: totalAccounts > 1 ? `${totalAccounts} Acc` : undefined,
+    },
+    {
+      label: 'TV Slideshow',
+      href: '/tv',
+      icon: Tv,
     },
     {
       label: 'Energy Flow & Fleet',

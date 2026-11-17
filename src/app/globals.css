@@ -739,3 +739,22 @@ dialog.vos-modal::backdrop {
   overflow: hidden;
   overscroll-behavior: contain;
 }
+
+/* TV Slideshow: compositor-only burn-in pixel shift and HUD transitions gated on reduced motion */
+.tv-pixel-shift-surface {
+  translate: 0 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tv-pixel-shift-surface {
+    transition: translate 900ms ease-out;
+  }
+
+  .tv-hud-fade {
+    transition: opacity 250ms ease-out;
+  }
+
+  .tv-progress-fill {
+    transition: transform 250ms linear;
+  }
+}

@@ -16,6 +16,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, isInitialized } = useRole();
 
   const isLoginPage = pathname === '/login';
+  const isTvPage = pathname.startsWith('/tv');
 
   useEffect(() => {
     if (!isInitialized) return;
@@ -47,6 +48,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </p>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (isTvPage) {
+    return (
+      <div className="min-h-screen w-full bg-background text-foreground">
+        {children}
       </div>
     );
   }
