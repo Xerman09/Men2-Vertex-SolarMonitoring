@@ -41,3 +41,7 @@ next-env.d.ts
 
 # Agent / Tooling state
 .omo/
+opencodeRecs*.md
+slopRecs*.md
+fullRecs*.md
+CLAUDE.md
