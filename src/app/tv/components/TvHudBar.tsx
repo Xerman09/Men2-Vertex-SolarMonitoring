@@ -20,6 +20,17 @@ import type { TvSlide } from '../types';
 export const TV_INTERVAL_OPTIONS_SEC = [15, 30, 60] as const;
 export type TvIntervalSeconds = (typeof TV_INTERVAL_OPTIONS_SEC)[number];
 
+export interface TvScopeAccountOption {
+  id: string;
+  name: string;
+}
+
+export interface TvScopeStationOption {
+  stationId: string;
+  stationName: string;
+  accountId: string;
+}
+
 interface TvHudBarProps {
   slides: TvSlide[];
   activeIndex: number;
@@ -32,6 +43,12 @@ interface TvHudBarProps {
   manilaClock: string;
   headline: string;
   severity: TvBriefSeverity;
+  scopeAccountOptions?: TvScopeAccountOption[];
+  scopeStationOptions?: TvScopeStationOption[];
+  selectedAccountId?: string;
+  selectedStationId?: string;
+  onSelectAccount?: (accountId: string) => void;
+  onSelectStation?: (stationId: string) => void;
   onPrev: () => void;
   onNext: () => void;
   onSelectSlide: (idx: number) => void;
@@ -52,6 +69,12 @@ export function TvHudBar({
   manilaClock,
   headline,
   severity,
+  scopeAccountOptions = [],
+  scopeStationOptions = [],
+  selectedAccountId = 'ALL',
+  selectedStationId = 'ALL',
+  onSelectAccount,
+  onSelectStation,
   onPrev,
   onNext,
   onSelectSlide,
@@ -60,6 +83,8 @@ export function TvHudBar({
   onToggleFullscreen,
 }: TvHudBarProps) {
   const showOverlay = hudVisible || paused;
+  const showAccountFilter = scopeAccountOptions.length > 1 && Boolean(onSelectAccount);
+  const showStationFilter = scopeStationOptions.length > 1 && Boolean(onSelectStation);
 
   const tickerAccent =
     severity === 'critical'
@@ -72,12 +97,50 @@ export function TvHudBar({
     <>
       {/* Auto-hiding top-right TV control dock (always keyboard-reachable via focus-within) */}
       <div
-        className={`tv-hud-fade fixed top-4 right-4 z-40 flex items-center gap-1.5 rounded-2xl border border-border/80 bg-card/90 px-2.5 py-1.5 shadow-xl backdrop-blur-md focus-within:opacity-100 focus-within:translate-y-0 ${
+        className={`tv-hud-fade fixed top-4 right-4 z-40 flex flex-wrap items-center justify-end gap-1.5 rounded-2xl border border-border/80 bg-card/90 px-2.5 py-1.5 shadow-xl backdrop-blur-md focus-within:opacity-100 focus-within:translate-y-0 max-w-[calc(100vw-2rem)] ${
           showOverlay
             ? 'opacity-100 translate-y-0'
             : 'opacity-0 -translate-y-1.5 pointer-events-none focus-within:pointer-events-auto'
         }`}
       >
+        {(showAccountFilter || showStationFilter) && (
+          <>
+            <div className="flex items-center gap-1.5" role="group" aria-label="Scope filter">
+              {showAccountFilter && (
+                <select
+                  aria-label="Filter TV by account"
+                  value={selectedAccountId}
+                  onChange={(e) => onSelectAccount?.(e.target.value)}
+                  className="min-h-[30px] max-w-[160px] rounded-lg border border-border/70 bg-background/80 px-2 text-[11px] font-mono font-semibold text-foreground focus-visible:outline-2 focus-visible:outline-ring cursor-pointer"
+                >
+                  <option value="ALL">All Accounts</option>
+                  {scopeAccountOptions.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {showStationFilter && (
+                <select
+                  aria-label="Filter TV by station"
+                  value={selectedStationId}
+                  onChange={(e) => onSelectStation?.(e.target.value)}
+                  className="min-h-[30px] max-w-[170px] rounded-lg border border-border/70 bg-background/80 px-2 text-[11px] font-mono font-semibold text-foreground focus-visible:outline-2 focus-visible:outline-ring cursor-pointer"
+                >
+                  <option value="ALL">All Stations</option>
+                  {scopeStationOptions.map((st) => (
+                    <option key={`${st.accountId}:${st.stationId}`} value={st.stationId}>
+                      {st.stationName}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div className="h-5 w-px bg-border/70 mx-0.5" aria-hidden="true" />
+          </>
+        )}
+
         <button
           type="button"
           onClick={onPrev}
@@ -192,8 +255,8 @@ export function TvHudBar({
             )}
           </div>
 
-          {/* Slide Navigation Markers (non-color active distinction via shape + border) */}
-          {slides.length > 1 && (
+          {/* Slide Navigation Markers (non-color active distinction via shape + border, adaptive for dynamic decks) */}
+          {slides.length > 1 && slides.length <= 12 && (
             <nav aria-label="Choose a slide" className="hidden md:flex items-center gap-1 shrink-0">
               {slides.map((s, idx) => {
                 const isActive = idx === activeIndex;
@@ -218,6 +281,23 @@ export function TvHudBar({
                 );
               })}
             </nav>
+          )}
+
+          {slides.length > 12 && (
+            <div className="hidden md:flex items-center shrink-0">
+              <select
+                aria-label="Choose a slide"
+                value={activeIndex}
+                onChange={(e) => onSelectSlide(Number(e.target.value))}
+                className="min-h-[28px] max-w-[240px] rounded-lg border border-border/70 bg-background/80 px-2 text-xs font-mono font-semibold text-foreground focus-visible:outline-2 focus-visible:outline-ring cursor-pointer"
+              >
+                {slides.map((s, idx) => (
+                  <option key={s.id} value={idx}>
+                    {idx + 1}. {s.title}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
 
           {/* Slide Counter & Manila Clock */}

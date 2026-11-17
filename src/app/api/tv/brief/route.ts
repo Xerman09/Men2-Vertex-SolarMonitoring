@@ -20,6 +20,12 @@ export const tvBriefQuerySchema = z.object({
     .max(64)
     .regex(ACCOUNT_ID_REGEX, 'Invalid account ID format')
     .optional(),
+  stationId: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[A-Za-z0-9_-]{1,64}$/, 'Invalid station ID format')
+    .optional(),
   tariffRate: z.coerce.number().positive().max(100).optional(),
 });
 
@@ -61,6 +67,63 @@ function scopeAggregateToAccount(
   };
 }
 
+function scopeAggregateToStation(
+  aggregate: AggregatedFleetSummary,
+  stationId: string
+): AggregatedFleetSummary {
+  const scopedAccounts = (aggregate.accounts || [])
+    .map((acc) => {
+      const plants = (acc.plants || []).filter((p) => String(p.stationId) === stationId);
+      if (plants.length === 0) return null;
+      const liveSolarPowerKw = plants.reduce((s, p) => s + (p.liveSolarPowerKw || 0), 0);
+      const dailyYieldKwh = plants.reduce((s, p) => s + (p.dailyYieldKwh || 0), 0);
+      const capacityKw = plants.reduce((s, p) => s + (p.installedCapacityKw || 0), 0);
+      const consumptionPowerKw = plants.reduce((s, p) => s + (p.consumptionPowerKw || 0), 0);
+      const gridPowerKw = plants.reduce((s, p) => s + (p.gridPowerKw || 0), 0);
+      const inverterCount = plants.reduce(
+        (s, p) => s + (p.devices || []).filter((d) => d.deviceType === 'INVERTER').length,
+        0
+      );
+      return {
+        ...acc,
+        plants,
+        stationCount: plants.length,
+        inverterCount,
+        liveSolarPowerKw,
+        dailyYieldKwh,
+        capacityKw,
+        consumptionPowerKw,
+        gridPowerKw,
+      };
+    })
+    .filter((a): a is NonNullable<typeof a> => a !== null);
+
+  const matchedNodes = (aggregate.nodes || []).filter((n) => String(n.stationId) === stationId);
+  const totalSolarPowerKw = scopedAccounts.reduce((s, a) => s + (a.liveSolarPowerKw || 0), 0);
+  const totalDailyYieldKwh = scopedAccounts.reduce((s, a) => s + (a.dailyYieldKwh || 0), 0);
+  const totalCapacityKw = scopedAccounts.reduce((s, a) => s + (a.capacityKw || 0), 0);
+  const totalLoadPowerKw = scopedAccounts.reduce((s, a) => s + (a.consumptionPowerKw || 0), 0);
+  const netGridPowerKw = scopedAccounts.reduce((s, a) => s + (a.gridPowerKw || 0), 0);
+  const totalPlants = scopedAccounts.reduce((s, a) => s + (a.plants?.length || 0), 0);
+  const totalInverters = scopedAccounts.reduce((s, a) => s + (a.inverterCount || 0), 0);
+
+  return {
+    ...aggregate,
+    totalAccounts: scopedAccounts.length,
+    activeAccounts: scopedAccounts.filter((a) => a.isLive).length,
+    totalPlants,
+    totalInverters,
+    totalCapacityKw,
+    totalSolarPowerKw,
+    totalDailyYieldKwh,
+    totalLoadPowerKw,
+    netGridPowerKw,
+    accounts: scopedAccounts,
+    nodes: matchedNodes,
+    isLive: scopedAccounts.some((a) => a.isLive),
+  };
+}
+
 export const GET = withGate(
   {
     allowUnauthenticated: false,
@@ -74,6 +137,7 @@ export const GET = withGate(
     const { searchParams } = new URL(req.url);
     const parsed = tvBriefQuerySchema.safeParse({
       accountId: searchParams.get('accountId') || undefined,
+      stationId: searchParams.get('stationId') || searchParams.get('station_id') || undefined,
       tariffRate: searchParams.get('tariffRate') || undefined,
     });
 
@@ -84,11 +148,13 @@ export const GET = withGate(
       );
     }
 
-    const { accountId: requestedAccountId, tariffRate } = parsed.data;
+    const { accountId: requestedAccountId, stationId: requestedStationId, tariffRate } = parsed.data;
     const normalizedRequested =
       requestedAccountId === 'ALL' || requestedAccountId === 'ALL_FLEET'
         ? null
         : requestedAccountId ?? null;
+    const normalizedStationId =
+      requestedStationId === 'ALL' ? undefined : requestedStationId;
 
     const tenantCheck = enforceTenantAccess(session, normalizedRequested);
     if (!tenantCheck.allowed) {
@@ -110,7 +176,12 @@ export const GET = withGate(
         aggregate = { ...aggregate, accounts: nonDemo };
       }
 
-      const scopeKey = targetAccountId || (session.role === 'admin' ? 'ALL_ADMIN' : 'ALL');
+      if (normalizedStationId) {
+        aggregate = scopeAggregateToStation(aggregate, normalizedStationId);
+      }
+
+      const baseScope = targetAccountId || (session.role === 'admin' ? 'ALL_ADMIN' : 'ALL');
+      const scopeKey = normalizedStationId ? `${baseScope}:STA:${normalizedStationId}` : baseScope;
       const snapshot = extractTvSnapshotFromAggregate(aggregate, scopeKey, tariffRate);
       const brief = await getCachedOrGenerateTvBrief(snapshot);
 

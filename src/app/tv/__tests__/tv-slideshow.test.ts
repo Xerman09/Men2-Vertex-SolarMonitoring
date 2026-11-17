@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { buildTvSlides, filterTvAuthorizedAccounts } from '../types';
+import { buildTvSlides, filterTvAuthorizedAccounts, getTvScopeKey } from '../types';
 import { TvSlideDeck } from '../components/TvSlideDeck';
 import { TvHudBar } from '../components/TvHudBar';
 import type { AccountSummary, FleetMatrixNode } from '@/lib/types';
@@ -17,15 +17,15 @@ function makeMultiTenantFixture(): {
       name: 'Hanvin Solar',
       email: 'hanvin@solar.local',
       isLive: true,
-      stationCount: 1,
-      deviceCount: 2,
-      inverterCount: 1,
+      stationCount: 2,
+      deviceCount: 3,
+      inverterCount: 2,
       loggerCount: 1,
-      liveSolarPowerKw: 48.5,
-      dailyYieldKwh: 210,
+      liveSolarPowerKw: 68.5,
+      dailyYieldKwh: 302,
       gridPowerKw: -14.2,
-      consumptionPowerKw: 62.7,
-      capacityKw: 100,
+      consumptionPowerKw: 82.7,
+      capacityKw: 150,
       status: 'ONLINE',
       lastPingMs: 12,
       plants: [
@@ -44,6 +44,25 @@ function makeMultiTenantFixture(): {
               name: 'Inv 101',
               model: 'SUN-100K',
               ratedKw: 100,
+              status: 'ONLINE',
+            },
+          ],
+        },
+        {
+          stationId: 'st-102',
+          stationName: 'Hanvin Branch',
+          installedCapacityKw: 50,
+          liveSolarPowerKw: 20,
+          dailyYieldKwh: 92,
+          gridPowerKw: 0,
+          consumptionPowerKw: 20,
+          devices: [
+            {
+              deviceSn: 'INV-102',
+              deviceType: 'INVERTER',
+              name: 'Inv 102',
+              model: 'SUN-50K',
+              ratedKw: 50,
               status: 'ONLINE',
             },
           ],
@@ -124,6 +143,25 @@ function makeMultiTenantFixture(): {
       isLive: true,
     },
     {
+      accountId: 'acc-hanvin',
+      accountName: 'Hanvin Solar',
+      stationId: 'st-102',
+      stationName: 'Hanvin Branch',
+      deviceSn: 'INV-102',
+      deviceType: 'INVERTER',
+      model: 'SUN-50K',
+      ratedKw: 50,
+      liveSolarPowerKw: 20,
+      dailyYieldKwh: 92,
+      gridPowerKw: 0,
+      consumptionPowerKw: 20,
+      batterySoc: 0,
+      mode: 'GRID',
+      status: 'ONLINE',
+      loggerStatus: 'ONLINE',
+      isLive: true,
+    },
+    {
       accountId: 'acc-tenant-b',
       accountName: 'Tenant Beta',
       stationId: 'st-202',
@@ -148,30 +186,68 @@ function makeMultiTenantFixture(): {
 }
 
 describe('TV Slideshow Mode View Model, Isolation & UI', () => {
-  it('builds triage slide only when faults or offline assets exist and orders priority station first', () => {
+  it('builds separated per-account and per-station analytics dynamically across all accounts', () => {
     const { accounts, nodes } = makeMultiTenantFixture();
 
-    // Consumer scoped strictly to healthy acc-hanvin: zero faults => no triage slide
-    const healthySlides = buildTvSlides([accounts[0]], nodes, { isConsumer: true });
-    expect(healthySlides.map((s) => s.kind)).toEqual(['overview', 'financial']);
+    // Consumer scoped to healthy multi-station acc-hanvin:
+    // separated Account curve + Account Stations grid + Account 7D + per-station curves & 7D, zero triage
+    const consumerSlides = buildTvSlides([accounts[0]], nodes, { isConsumer: true });
+    expect(consumerSlides.map((s) => s.kind)).toEqual([
+      'account',
+      'account-stations',
+      'financial',
+      'station',
+      'financial',
+      'station',
+      'financial',
+    ]);
+    expect(consumerSlides.map((s) => getTvScopeKey(s.scope))).toEqual([
+      'ACC:acc-hanvin',
+      'ACC:acc-hanvin',
+      'ACC:acc-hanvin',
+      'STA:acc-hanvin:st-101',
+      'STA:acc-hanvin:st-101',
+      'STA:acc-hanvin:st-102',
+      'STA:acc-hanvin:st-102',
+    ]);
 
-    // Admin with both accounts sees overview, 2 accounts, dynamic triage (with INV-202 fault), and financial
+    // Admin sees separated Fleet (overview, curve, financial) + every Account + every Station + triage
     const adminSlides = buildTvSlides(accounts.slice(0, 2), nodes, {
       priorityStationId: 'st-202',
     });
     expect(adminSlides.map((s) => s.kind)).toEqual([
       'overview',
-      'account',
-      'account',
-      'triage',
+      'curve',
       'financial',
+      'account',
+      'account-stations',
+      'financial',
+      'station',
+      'financial',
+      'station',
+      'financial',
+      'station',
+      'financial',
+      'triage',
     ]);
+
     const triage = adminSlides.find((s) => s.kind === 'triage');
     expect(triage?.kind).toBe('triage');
     if (triage && triage.kind === 'triage') {
       expect(triage.totalFaults).toBe(1);
       expect(triage.entries[0].stationId).toBe('st-202');
     }
+
+    // Pinning to a single station isolates only that station's separated live + 7D + triage slides
+    const singleStationSlides = buildTvSlides(accounts.slice(0, 2), nodes, {
+      filterAccountId: 'acc-hanvin',
+      filterStationId: 'st-101',
+    });
+    expect(singleStationSlides.map((s) => s.kind)).toEqual(['station', 'financial']);
+    expect(singleStationSlides[1].scope).toEqual({
+      accountId: 'acc-hanvin',
+      stationId: 'st-101',
+    });
   });
 
   it('strictly isolates consumer TV slides to authorized account and hides demo accounts', () => {
@@ -203,14 +279,18 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     expect(mismatched).toEqual([]);
   });
 
-  it('renders signed grid import, PHP currency, and accessible HUD without aria-pressed conflict', () => {
+  it('renders separated station slide, scope controls, PHP currency, and adaptive HUD', () => {
     const { accounts, nodes } = makeMultiTenantFixture();
-    const slides = buildTvSlides([accounts[0]], nodes, { isConsumer: true });
+    const slides = buildTvSlides(accounts.slice(0, 2), nodes);
+    const stationSlide = slides.find(
+      (s) => s.kind === 'station' && s.scope.stationId === 'st-101'
+    );
+    expect(stationSlide).toBeDefined();
 
     const slideHtml = renderToStaticMarkup(
       React.createElement(TvSlideDeck, {
-        slide: slides[0],
-        slideIndex: 0,
+        slide: stationSlide!,
+        slideIndex: 6,
         totalSlides: slides.length,
         direction: 'backward',
         tariffRatePhp: 13.9,
@@ -218,6 +298,9 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
         weeklySeries: null,
       })
     );
+    expect(slideHtml).toContain('Dagupan Main');
+    expect(slideHtml).toContain('Hanvin Solar');
+    expect(slideHtml).toContain('INV-101');
     expect(slideHtml).toContain('-14.2');
     expect(slideHtml).toContain('₱');
     expect(slideHtml).toContain('aria-roledescription="slide"');
@@ -234,8 +317,21 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
         isFullscreen: false,
         isStale: false,
         manilaClock: '14:25 PHT',
-        headline: 'Hanvin Solar 48.5 kW live',
+        headline: 'Hanvin Solar 68.5 kW live',
         severity: 'normal',
+        scopeAccountOptions: [
+          { id: 'acc-hanvin', name: 'Hanvin Solar' },
+          { id: 'acc-tenant-b', name: 'Tenant Beta' },
+        ],
+        scopeStationOptions: [
+          { stationId: 'st-101', stationName: 'Dagupan Main', accountId: 'acc-hanvin' },
+          { stationId: 'st-102', stationName: 'Hanvin Branch', accountId: 'acc-hanvin' },
+          { stationId: 'st-202', stationName: 'Beta Plant', accountId: 'acc-tenant-b' },
+        ],
+        selectedAccountId: 'ALL',
+        selectedStationId: 'ALL',
+        onSelectAccount: () => {},
+        onSelectStation: () => {},
         onPrev: () => {},
         onNext: () => {},
         onSelectSlide: () => {},
@@ -246,6 +342,9 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     );
     expect(hudHtml).toContain('Pause slideshow');
     expect(hudHtml).not.toContain('aria-pressed');
-    expect(hudHtml).toContain('aria-current="true"');
+    expect(hudHtml).toContain('Filter TV by account');
+    expect(hudHtml).toContain('Filter TV by station');
+    // 13 slides > 12 => adaptive select jump control in footer instead of overflowing dot list
+    expect(hudHtml).toContain('1. Fleet Overview');
   });
 });

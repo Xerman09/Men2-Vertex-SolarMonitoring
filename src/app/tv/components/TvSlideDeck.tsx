@@ -13,6 +13,7 @@ import {
   Building2,
   Layers,
   Leaf,
+  Cpu,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { HoverInfo } from '@/components/ui/tooltip';
@@ -32,6 +33,7 @@ interface TvSlideDeckProps {
   tariffRatePhp: number;
   tariffLabel: string;
   weeklySeries: DailyAnalyticsPoint[] | null;
+  weeklyLoading?: boolean;
 }
 
 function formatPhp(amount: number): string {
@@ -98,6 +100,7 @@ export function TvSlideDeck({
   tariffRatePhp,
   tariffLabel,
   weeklySeries,
+  weeklyLoading = false,
 }: TvSlideDeckProps) {
   return (
     <div
@@ -107,6 +110,7 @@ export function TvSlideDeck({
       data-direction={direction}
       className="tv-slide-stage mx-auto flex h-full w-full max-w-[1920px] flex-col gap-5 px-[clamp(1.25rem,4vw,4rem)] pt-[clamp(1.25rem,3vh,2.5rem)] pb-24"
     >
+      {/* 1. Fleet Overview: KPI Summary + All Authorized Accounts Portfolio */}
       {slide.kind === 'overview' && (
         <>
           <header className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
@@ -156,7 +160,6 @@ export function TvSlideDeck({
             </div>
           </header>
 
-          {/* Primary 10-foot KPI Strip */}
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5">
             <TvKpiTile
               staggerIndex={0}
@@ -212,8 +215,114 @@ export function TvSlideDeck({
             />
           </div>
 
-          {/* Main Live Diurnal Curve */}
-          <div className="rounded-2xl border border-border/70 bg-card/85 p-5 flex-1 min-h-[290px] flex flex-col">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 content-start flex-1">
+            {slide.accounts.map((acc) => (
+              <div
+                key={acc.account.id}
+                className="rounded-2xl border border-border/70 bg-card/85 p-5 flex flex-col justify-between gap-4 font-mono tabular-nums"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-sans text-base font-bold text-foreground truncate">
+                      {acc.account.name}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {acc.plants.length} {acc.plants.length === 1 ? 'Station' : 'Stations'} ·{' '}
+                      {acc.capacityKw > 0 ? `${acc.capacityKw.toFixed(0)} kWp` : '--'}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {acc.faultCount > 0 && (
+                      <Badge variant="destructive" className="text-[10px]">
+                        {acc.faultCount} Fault
+                      </Badge>
+                    )}
+                    {acc.offlineCount > 0 && (
+                      <Badge variant="warning" className="text-[10px]">
+                        {acc.offlineCount} Offline
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 border-t border-border/50 pt-3">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Live Solar
+                    </div>
+                    <div className="text-xl font-bold text-amber-500">
+                      {acc.livePowerKw.toFixed(1)} kW
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Today Yield
+                    </div>
+                    <div className="text-xl font-bold text-emerald-400">
+                      {acc.dailyYieldKwh.toFixed(0)} kWh
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* 2. Separated Fleet Diurnal Curve Slide */}
+      {slide.kind === 'curve' && (
+        <>
+          <header className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2.5 rounded-2xl bg-amber-500/15 text-amber-500 border border-amber-500/25 shrink-0">
+                <Activity size={26} aria-hidden="true" />
+              </div>
+              <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
+                <HoverInfo
+                  title={slide.title}
+                  side="bottom"
+                  align="start"
+                  content={
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs tabular-nums">
+                      <dt className="text-muted-foreground">Installed</dt>
+                      <dd className="text-right font-semibold">
+                        {slide.capacityKw > 0 ? `${slide.capacityKw.toFixed(0)} kWp` : '--'}
+                      </dd>
+                      <dt className="text-muted-foreground">Inverters</dt>
+                      <dd className="text-right font-semibold">
+                        {slide.onlineInverters}/{slide.totalInverters} Online
+                      </dd>
+                      <dt className="text-muted-foreground">Live Solar</dt>
+                      <dd className="text-right font-semibold">{slide.liveSolarKw.toFixed(1)} kW</dd>
+                      <dt className="text-muted-foreground">Grid Net</dt>
+                      <dd className="text-right font-semibold">
+                        {formatSignedGridKw(slide.gridNetKw)} kW
+                      </dd>
+                    </dl>
+                  }
+                >
+                  <span>{slide.title}</span>
+                </HoverInfo>
+              </h1>
+              {slide.faultCount > 0 && (
+                <Badge variant="destructive" className="font-mono text-xs">
+                  {slide.faultCount} Fault
+                </Badge>
+              )}
+              {slide.offlineCount > 0 && (
+                <Badge variant="warning" className="font-mono text-xs">
+                  {slide.offlineCount} Offline
+                </Badge>
+              )}
+            </div>
+
+            <div className="flex items-center gap-4 font-mono text-sm sm:text-base font-bold tabular-nums shrink-0">
+              <span className="text-amber-500">{slide.liveSolarKw.toFixed(1)} kW</span>
+              <span className="text-emerald-400">{slide.dailyYieldKwh.toFixed(0)} kWh</span>
+            </div>
+          </header>
+
+          <div className="rounded-2xl border border-border/70 bg-card/85 p-6 flex-1 min-h-[380px] flex flex-col">
             <PlantSolarCurve
               capacityKw={slide.capacityKw}
               livePowerKw={slide.liveSolarKw}
@@ -221,43 +330,15 @@ export function TvSlideDeck({
               demandKw={slide.demandKw}
               gridPowerKw={slide.gridNetKw}
               scope={slide.scope}
-              height={265}
+              height={380}
               className="w-full flex-1"
               showLabels={true}
             />
           </div>
-
-          {/* Account Tiles */}
-          {slide.accounts.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {slide.accounts.slice(0, 4).map((acc) => (
-                <div
-                  key={acc.account.id}
-                  className="rounded-xl border border-border/70 bg-card/75 px-4 py-3 flex items-center justify-between gap-3 font-mono tabular-nums"
-                >
-                  <div className="min-w-0">
-                    <div className="font-sans text-sm font-bold text-foreground truncate">
-                      {acc.account.name}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {acc.plants.length} Stations
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-lg font-bold text-amber-500">
-                      {acc.livePowerKw.toFixed(1)} kW
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {acc.dailyYieldKwh.toFixed(0)} kWh
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </>
       )}
 
+      {/* 3. Account Live Telemetry Slide (Separated from Station List) */}
       {slide.kind === 'account' && (
         <>
           <header className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
@@ -267,11 +348,13 @@ export function TvSlideDeck({
               </div>
               <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
                 <HoverInfo
-                  title={slide.account.account.name}
+                  title={slide.title}
                   side="bottom"
                   align="start"
                   content={
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs tabular-nums">
+                      <dt className="text-muted-foreground">Account</dt>
+                      <dd className="text-right font-semibold">{slide.account.account.name}</dd>
                       <dt className="text-muted-foreground">Stations</dt>
                       <dd className="text-right font-semibold">{slide.account.plants.length}</dd>
                       <dt className="text-muted-foreground">Inverters</dt>
@@ -285,7 +368,7 @@ export function TvSlideDeck({
                     </dl>
                   }
                 >
-                  <span>{slide.account.account.name}</span>
+                  <span>{slide.title}</span>
                 </HoverInfo>
               </h1>
               {slide.account.faultCount > 0 && (
@@ -352,59 +435,292 @@ export function TvSlideDeck({
             />
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 flex-1 min-h-0">
-            <div className="xl:col-span-7 rounded-2xl border border-border/70 bg-card/85 p-5 flex flex-col min-h-[270px]">
-              <PlantSolarCurve
-                capacityKw={slide.account.capacityKw}
-                livePowerKw={slide.account.livePowerKw}
-                dailyYieldKwh={slide.account.dailyYieldKwh}
-                demandKw={slide.account.demandKw}
-                gridPowerKw={slide.account.gridPowerKw}
-                utilizationPct={slide.account.utilizationPct}
-                scope={slide.scope}
-                height={260}
-                className="w-full flex-1"
-                showLabels={true}
-              />
-            </div>
-
-            <div className="xl:col-span-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2.5 content-start">
-              {slide.account.plants.slice(0, 6).map((plant) => (
-                <div
-                  key={plant.plantKey}
-                  className="rounded-xl border border-border/70 bg-card/75 px-4 py-3 flex items-center justify-between gap-3"
-                >
-                  <div className="min-w-0 flex items-center gap-2">
-                    <Layers size={15} className="text-primary shrink-0" aria-hidden="true" />
-                    <span className="font-semibold text-sm text-foreground truncate">
-                      {plant.plant.stationName}
-                    </span>
-                    {plant.status === 'FAULT' && (
-                      <Badge variant="destructive" className="text-[10px] font-mono shrink-0">
-                        Fault
-                      </Badge>
-                    )}
-                    {plant.status === 'OFFLINE' && (
-                      <Badge variant="warning" className="text-[10px] font-mono shrink-0">
-                        Offline
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-right font-mono tabular-nums shrink-0">
-                    <div className="text-base font-bold text-amber-500">
-                      {plant.livePowerKw.toFixed(1)} kW
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {plant.dailyYieldKwh.toFixed(0)} kWh
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="rounded-2xl border border-border/70 bg-card/85 p-5 flex-1 min-h-[300px] flex flex-col">
+            <PlantSolarCurve
+              capacityKw={slide.account.capacityKw}
+              livePowerKw={slide.account.livePowerKw}
+              dailyYieldKwh={slide.account.dailyYieldKwh}
+              demandKw={slide.account.demandKw}
+              gridPowerKw={slide.account.gridPowerKw}
+              utilizationPct={slide.account.utilizationPct}
+              scope={slide.scope}
+              height={300}
+              className="w-full flex-1"
+              showLabels={true}
+            />
           </div>
         </>
       )}
 
+      {/* 4. Separated Account Stations Roster Slide (All Stations, No Cap) */}
+      {slide.kind === 'account-stations' && (
+        <>
+          <header className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2.5 rounded-2xl bg-primary/10 text-primary border border-primary/20 shrink-0">
+                <Layers size={26} aria-hidden="true" />
+              </div>
+              <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
+                <HoverInfo
+                  title={slide.title}
+                  side="bottom"
+                  align="start"
+                  content={
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs tabular-nums">
+                      <dt className="text-muted-foreground">Account</dt>
+                      <dd className="text-right font-semibold">{slide.account.account.name}</dd>
+                      <dt className="text-muted-foreground">Stations</dt>
+                      <dd className="text-right font-semibold">{slide.account.plants.length}</dd>
+                      <dt className="text-muted-foreground">Inverters</dt>
+                      <dd className="text-right font-semibold">{slide.account.invertersCount}</dd>
+                    </dl>
+                  }
+                >
+                  <span>{slide.title}</span>
+                </HoverInfo>
+              </h1>
+              {slide.account.faultCount > 0 && (
+                <Badge variant="destructive" className="font-mono text-xs">
+                  {slide.account.faultCount} Fault
+                </Badge>
+              )}
+              {slide.account.offlineCount > 0 && (
+                <Badge variant="warning" className="font-mono text-xs">
+                  {slide.account.offlineCount} Offline
+                </Badge>
+              )}
+            </div>
+
+            <div className="font-mono text-sm sm:text-base font-bold text-foreground tabular-nums shrink-0">
+              {slide.account.plants.length} Stations
+            </div>
+          </header>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 content-start flex-1">
+            {slide.account.plants.map((plant) => (
+              <div
+                key={plant.plantKey}
+                className="rounded-2xl border border-border/70 bg-card/85 p-5 flex flex-col justify-between gap-4"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-bold text-foreground truncate">
+                      {plant.plant.stationName}
+                    </h2>
+                    <div className="text-xs font-mono text-muted-foreground mt-0.5 tabular-nums">
+                      {plant.capacityKw > 0 ? `${plant.capacityKw.toFixed(0)} kWp` : '--'} ·{' '}
+                      {plant.inverters.length}{' '}
+                      {plant.inverters.length === 1 ? 'Inverter' : 'Inverters'}
+                    </div>
+                  </div>
+                  {plant.status === 'FAULT' && (
+                    <Badge variant="destructive" className="text-[10px] font-mono shrink-0">
+                      Fault
+                    </Badge>
+                  )}
+                  {plant.status === 'OFFLINE' && (
+                    <Badge variant="warning" className="text-[10px] font-mono shrink-0">
+                      Offline
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 font-mono tabular-nums border-t border-border/50 pt-3">
+                  <div>
+                    <div className="text-[10px] uppercase text-muted-foreground">Live Solar</div>
+                    <div className="text-lg font-bold text-amber-500">
+                      {plant.livePowerKw.toFixed(1)} kW
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase text-muted-foreground">Today</div>
+                    <div className="text-lg font-bold text-emerald-400">
+                      {plant.dailyYieldKwh.toFixed(0)} kWh
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase text-muted-foreground">
+                      {typeof plant.batterySoc === 'number' && plant.batterySoc > 0
+                        ? 'SoC'
+                        : 'Util'}
+                    </div>
+                    <div className="text-lg font-bold text-cyan-400">
+                      {typeof plant.batterySoc === 'number' && plant.batterySoc > 0
+                        ? `${Math.round(plant.batterySoc)}%`
+                        : `${Math.round(plant.utilizationPct)}%`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* 5. Dedicated Per-Station Live Telemetry & Diurnal Curve Slide */}
+      {slide.kind === 'station' && (
+        <>
+          <header className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2.5 rounded-2xl bg-primary/10 text-primary border border-primary/20 shrink-0">
+                <Layers size={26} aria-hidden="true" />
+              </div>
+              <h1 className="text-[clamp(1.5rem,1rem+1.5vw,2.5rem)] text-balance font-bold tracking-tight text-foreground truncate">
+                <HoverInfo
+                  title={slide.title}
+                  side="bottom"
+                  align="start"
+                  content={
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs tabular-nums">
+                      <dt className="text-muted-foreground">Account</dt>
+                      <dd className="text-right font-semibold">{slide.accountName}</dd>
+                      <dt className="text-muted-foreground">Station ID</dt>
+                      <dd className="text-right font-semibold">{slide.plant.plant.stationId}</dd>
+                      <dt className="text-muted-foreground">Installed</dt>
+                      <dd className="text-right font-semibold">
+                        {slide.plant.capacityKw > 0
+                          ? `${slide.plant.capacityKw.toFixed(0)} kWp`
+                          : '--'}
+                      </dd>
+                      <dt className="text-muted-foreground">Inverters</dt>
+                      <dd className="text-right font-semibold">{slide.plant.inverters.length}</dd>
+                    </dl>
+                  }
+                >
+                  <span>{slide.title}</span>
+                </HoverInfo>
+              </h1>
+              {slide.plant.status === 'FAULT' && (
+                <Badge variant="destructive" className="font-mono text-xs">
+                  Fault
+                </Badge>
+              )}
+              {slide.plant.status === 'OFFLINE' && (
+                <Badge variant="warning" className="font-mono text-xs">
+                  Offline
+                </Badge>
+              )}
+            </div>
+
+            <div className="font-mono text-sm sm:text-base font-bold text-foreground tabular-nums shrink-0">
+              {slide.accountName} ·{' '}
+              {slide.plant.capacityKw > 0 ? `${slide.plant.capacityKw.toFixed(0)} kWp` : '--'}
+            </div>
+          </header>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5">
+            <TvKpiTile
+              staggerIndex={0}
+              label="Live Solar"
+              value={slide.plant.livePowerKw.toFixed(1)}
+              unit="kW"
+              accentClass="text-amber-500"
+              topBarClass="bg-amber-500"
+              icon={Sun}
+            />
+            <TvKpiTile
+              staggerIndex={1}
+              label="Today Harvest"
+              value={slide.plant.dailyYieldKwh.toFixed(1)}
+              unit="kWh"
+              accentClass="text-emerald-400"
+              topBarClass="bg-emerald-400"
+              icon={Zap}
+            />
+            <TvKpiTile
+              staggerIndex={2}
+              label="Facility Load"
+              value={(slide.plant.demandKw ?? 0).toFixed(1)}
+              unit="kW"
+              accentClass="text-indigo-400"
+              topBarClass="bg-indigo-400"
+              icon={Activity}
+            />
+            <TvKpiTile
+              staggerIndex={3}
+              label="Grid Net"
+              value={formatSignedGridKw(slide.plant.gridPowerKw ?? 0)}
+              unit="kW"
+              accentClass={(slide.plant.gridPowerKw ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-400'}
+              topBarClass={(slide.plant.gridPowerKw ?? 0) >= 0 ? 'bg-emerald-500' : 'bg-rose-400'}
+              icon={TrendingUp}
+            />
+            <TvKpiTile
+              staggerIndex={4}
+              label="BESS SoC"
+              value={
+                typeof slide.plant.batterySoc === 'number' && slide.plant.batterySoc > 0
+                  ? `${Math.round(slide.plant.batterySoc)}%`
+                  : '--'
+              }
+              accentClass="text-cyan-400"
+              topBarClass="bg-cyan-400"
+              icon={BatteryCharging}
+            />
+            <TvKpiTile
+              staggerIndex={5}
+              label="Est. Savings"
+              value={formatPhp(slide.plant.dailyYieldKwh * tariffRatePhp)}
+              accentClass="text-primary"
+              topBarClass="bg-primary"
+              icon={ShieldCheck}
+            />
+          </div>
+
+          <div className="rounded-2xl border border-border/70 bg-card/85 p-5 flex-1 min-h-[260px] flex flex-col">
+            <PlantSolarCurve
+              capacityKw={slide.plant.capacityKw}
+              livePowerKw={slide.plant.livePowerKw}
+              dailyYieldKwh={slide.plant.dailyYieldKwh}
+              demandKw={slide.plant.demandKw}
+              gridPowerKw={slide.plant.gridPowerKw}
+              utilizationPct={slide.plant.utilizationPct}
+              scope={slide.scope}
+              height={260}
+              className="w-full flex-1"
+              showLabels={true}
+            />
+          </div>
+
+          {slide.plant.inverters.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {slide.plant.inverters.map((inv) => (
+                <div
+                  key={inv.deviceSn}
+                  className="rounded-xl border border-border/70 bg-card/75 px-4 py-2.5 flex items-center justify-between gap-2 font-mono tabular-nums"
+                >
+                  <div className="min-w-0 flex items-center gap-2">
+                    <Cpu size={14} className="text-muted-foreground shrink-0" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-foreground truncate">
+                        {inv.deviceSn}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground truncate">{inv.model}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {inv.status === 'FAULT' && (
+                      <Badge variant="destructive" className="text-[10px]">
+                        Fault
+                      </Badge>
+                    )}
+                    {inv.status === 'OFFLINE' && (
+                      <Badge variant="warning" className="text-[10px]">
+                        Offline
+                      </Badge>
+                    )}
+                    <span className="text-sm font-bold text-amber-500">
+                      {inv.liveSolarPowerKw.toFixed(1)} kW
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* 6. Asset Health Triage Slide */}
       {slide.kind === 'triage' && (
         <>
           <header className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
@@ -432,7 +748,7 @@ export function TvSlideDeck({
           </header>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 content-start flex-1">
-            {slide.entries.slice(0, 9).map((entry) => (
+            {slide.entries.map((entry) => (
               <div
                 key={`${entry.accountId}:${entry.stationId}`}
                 className={`rounded-2xl border bg-card/85 p-5 flex flex-col gap-3 ${
@@ -488,6 +804,7 @@ export function TvSlideDeck({
         </>
       )}
 
+      {/* 7. Scoped 7D Harvest & Financial Yield Analytics (Fleet, Account, or Station) */}
       {slide.kind === 'financial' && (
         <>
           <header className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
@@ -502,6 +819,8 @@ export function TvSlideDeck({
                   align="start"
                   content={
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs tabular-nums">
+                      <dt className="text-muted-foreground">Scope</dt>
+                      <dd className="text-right font-semibold">{slide.scopeLabel}</dd>
                       <dt className="text-muted-foreground">Utility</dt>
                       <dd className="text-right font-semibold">{tariffLabel}</dd>
                       <dt className="text-muted-foreground">Rate</dt>
@@ -519,16 +838,18 @@ export function TvSlideDeck({
             </div>
 
             <div className="font-mono text-sm sm:text-base font-bold text-foreground tabular-nums shrink-0">
-              ₱{tariffRatePhp.toFixed(2)} / kWh
+              {slide.scopeLabel} · ₱{tariffRatePhp.toFixed(2)} / kWh
             </div>
           </header>
 
           {(() => {
             const weekYieldKwh = weeklySeries
               ? weeklySeries.reduce((s, d) => s + (d.solarYieldKwh || 0), 0)
-              : slide.dailyYieldKwh;
+              : null;
             const co2AvoidedKg =
-              weekYieldKwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH;
+              weekYieldKwh !== null
+                ? weekYieldKwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH
+                : slide.dailyYieldKwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH;
             const treesEq = Math.round(co2AvoidedKg / KG_CO2_PER_TREE_ANNUAL);
             const maxDayKwh = weeklySeries
               ? Math.max(1, ...weeklySeries.map((d) => d.solarYieldKwh || 0))
@@ -547,8 +868,8 @@ export function TvSlideDeck({
                   />
                   <TvKpiTile
                     label="7D Harvest"
-                    value={weeklySeries ? weekYieldKwh.toFixed(0) : '--'}
-                    unit={weeklySeries ? 'kWh' : undefined}
+                    value={weekYieldKwh !== null ? weekYieldKwh.toFixed(0) : '--'}
+                    unit={weekYieldKwh !== null ? 'kWh' : undefined}
                     accentClass="text-amber-500"
                     topBarClass="bg-amber-500/80"
                     staggerIndex={1}
@@ -556,7 +877,7 @@ export function TvSlideDeck({
                   />
                   <TvKpiTile
                     label="7D Avoided Cost"
-                    value={weeklySeries ? formatPhp(weekYieldKwh * tariffRatePhp) : '--'}
+                    value={weekYieldKwh !== null ? formatPhp(weekYieldKwh * tariffRatePhp) : '--'}
                     accentClass="text-primary"
                     topBarClass="bg-primary/80"
                     staggerIndex={2}
@@ -573,7 +894,7 @@ export function TvSlideDeck({
                   />
                 </div>
 
-                <div className="rounded-2xl border border-border/70 bg-card/85 p-5 flex-1 flex flex-col justify-between gap-4 min-h-[260px]">
+                <div className="rounded-2xl border border-border/70 bg-card/85 p-5 flex-1 flex flex-col justify-between gap-4 min-h-[280px]">
                   <div className="flex items-center justify-between">
                     <h2 className="text-base font-bold text-foreground">Daily Solar Harvest</h2>
                     <span className="font-mono text-xs text-muted-foreground">
@@ -581,7 +902,11 @@ export function TvSlideDeck({
                     </span>
                   </div>
 
-                  {!weeklySeries || weeklySeries.length === 0 ? (
+                  {weeklyLoading && (!weeklySeries || weeklySeries.length === 0) ? (
+                    <div className="flex-1 flex items-center justify-center font-mono text-sm text-muted-foreground">
+                      Loading 7D DeyeCloud telemetry…
+                    </div>
+                  ) : !weeklySeries || weeklySeries.length === 0 ? (
                     <div className="flex-1 flex items-center justify-center font-mono text-sm text-muted-foreground">
                       No weekly DeyeCloud telemetry recorded for this scope
                     </div>
@@ -601,7 +926,7 @@ export function TvSlideDeck({
                             <div className="text-[11px] text-emerald-400 font-semibold">
                               {formatPhp(kwh * tariffRatePhp)}
                             </div>
-                            <div className="w-full max-w-[64px] flex-1 min-h-[90px] bg-muted/40 rounded-t-xl border border-border/40 flex items-end overflow-hidden">
+                            <div className="w-full max-w-[64px] flex-1 min-h-[110px] bg-muted/40 rounded-t-xl border border-border/40 flex items-end overflow-hidden">
                               <div
                                 className="w-full bg-gradient-to-t from-amber-600 via-amber-500 to-amber-400 rounded-t-lg"
                                 style={{ height: `${pct}%` }}

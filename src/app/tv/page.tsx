@@ -6,16 +6,26 @@ import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
 import { useTariff } from '@/lib/tariff-context';
 import { getManilaNowParts, getManilaToday } from '@/lib/manila-time';
-import { loadScopedHistory } from '@/app/fleet/components/useScopedHistory';
+import { loadScopedHistory, type HistoryScope } from '@/app/fleet/components/useScopedHistory';
 import type { DailyAnalyticsPoint } from '@/lib/analytics-data';
 import type { TvBriefResult } from '@/lib/gemini-tv-brief';
 import type { AggregatedFleetSummary } from '@/lib/types';
-import { TvHudBar, type TvIntervalSeconds } from './components/TvHudBar';
+import {
+  TvHudBar,
+  type TvIntervalSeconds,
+  type TvScopeAccountOption,
+  type TvScopeStationOption,
+} from './components/TvHudBar';
 import { TvSlideDeck } from './components/TvSlideDeck';
-import { buildTvSlides, filterTvAuthorizedAccounts } from './types';
+import {
+  buildTvSlides,
+  filterTvAuthorizedAccounts,
+  getTvScopeKey,
+} from './types';
 
 const AGGREGATE_POLL_MS = 30_000;
 const BRIEF_POLL_MS = 5 * 60_000;
+const WEEKLY_SERIES_TTL_MS = 5 * 60_000;
 const HUD_IDLE_HIDE_MS = 3_000;
 const PIXEL_SHIFT_INTERVAL_MS = 10 * 60_000;
 
@@ -27,6 +37,11 @@ const SHIFT_OFFSETS: ReadonlyArray<{ x: number; y: number }> = [
   { x: -1, y: 2 },
 ];
 
+interface WeeklyCacheEntry {
+  series: DailyAnalyticsPoint[] | null;
+  ts: number;
+}
+
 export default function TvSlideshowPage() {
   const { accounts: contextAccounts } = useAccount();
   const { isAdmin, isConsumer, user, isInitialized } = useRole();
@@ -36,7 +51,14 @@ export default function TvSlideshowPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isStale, setIsStale] = useState<boolean>(false);
   const [brief, setBrief] = useState<TvBriefResult | null>(null);
-  const [weeklySeries, setWeeklySeries] = useState<DailyAnalyticsPoint[] | null>(null);
+
+  const [filterAccountId, setFilterAccountId] = useState<string>('ALL');
+  const [filterStationId, setFilterStationId] = useState<string>('ALL');
+
+  const [weeklyByScope, setWeeklyByScope] = useState<Record<string, WeeklyCacheEntry>>({});
+  const [weeklyLoadingKeys, setWeeklyLoadingKeys] = useState<Record<string, boolean>>({});
+  const weeklyCacheRef = useRef<Record<string, WeeklyCacheEntry>>({});
+  const weeklyInFlightRef = useRef<Map<string, Promise<void>>>(new Map());
 
   const [activeIndex, setActiveIndex] = useState<number>(0);
   const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward');
@@ -59,6 +81,16 @@ export default function TvSlideshowPage() {
 
   const tariffRatePhp = activeTariff?.peakRate ?? 13.9;
   const tariffLabel = activeTariff?.schedule?.shortName || 'Standard PHP';
+
+  // Read optional initial URL scope (?accountId=...&stationId=...) safely client-side
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const accParam = params.get('accountId')?.trim();
+    const staParam = params.get('stationId')?.trim();
+    if (accParam && accParam !== 'ALL') setFilterAccountId(accParam);
+    if (staParam && staParam !== 'ALL') setFilterStationId(staParam);
+  }, []);
 
   // Fetch fleet aggregate every 30s, retaining last verified telemetry on transient errors
   const fetchAggregate = useCallback(async () => {
@@ -96,16 +128,54 @@ export default function TvSlideshowPage() {
     return filterTvAuthorizedAccounts(source, { isAdmin, isConsumer, user });
   }, [aggregate, contextAccounts, isAdmin, isConsumer, user]);
 
+  // Dynamic Account & Station options for HUD scope filtering (respecting tenant isolation)
+  const scopeAccountOptions: TvScopeAccountOption[] = useMemo(
+    () =>
+      authorizedAccounts.map((acc) => ({
+        id: acc.id,
+        name: acc.name || acc.id,
+      })),
+    [authorizedAccounts]
+  );
+
+  const scopeStationOptions: TvScopeStationOption[] = useMemo(() => {
+    const targetAccs =
+      filterAccountId !== 'ALL'
+        ? authorizedAccounts.filter((a) => a.id === filterAccountId)
+        : authorizedAccounts;
+
+    const list: TvScopeStationOption[] = [];
+    for (const acc of targetAccs) {
+      for (const plant of acc.plants || []) {
+        list.push({
+          stationId: String(plant.stationId),
+          stationName: plant.stationName || `Station ${plant.stationId}`,
+          accountId: acc.id,
+        });
+      }
+    }
+    return list;
+  }, [authorizedAccounts, filterAccountId]);
+
   const slides = useMemo(
     () =>
       buildTvSlides(authorizedAccounts, aggregate?.nodes || [], {
         isConsumer,
         priorityStationId: brief?.priorityStationId,
+        filterAccountId: filterAccountId !== 'ALL' ? filterAccountId : null,
+        filterStationId: filterStationId !== 'ALL' ? filterStationId : null,
       }),
-    [authorizedAccounts, aggregate?.nodes, isConsumer, brief?.priorityStationId]
+    [
+      authorizedAccounts,
+      aggregate?.nodes,
+      isConsumer,
+      brief?.priorityStationId,
+      filterAccountId,
+      filterStationId,
+    ]
   );
 
-  // Clamp activeIndex if slides count changes (e.g. triage slide appears/disappears)
+  // Clamp activeIndex if slides count changes (e.g. scope filter or triage slide changes)
   useEffect(() => {
     if (slides.length > 0 && activeIndex >= slides.length) {
       setActiveIndex(0);
@@ -113,15 +183,22 @@ export default function TvSlideshowPage() {
     }
   }, [slides.length, activeIndex]);
 
-  // Fetch Gemini 3.5 grounded TV ticker brief every 5m
-  const consumerTargetAccountId =
-    isConsumer && authorizedAccounts[0] ? authorizedAccounts[0].id : undefined;
+  // Fetch Gemini 3.5 grounded TV ticker brief every 5m scoped to selected Account/Station
+  const effectiveBriefAccountId =
+    filterAccountId !== 'ALL'
+      ? filterAccountId
+      : isConsumer && authorizedAccounts[0]
+        ? authorizedAccounts[0].id
+        : undefined;
+  const effectiveBriefStationId =
+    filterStationId !== 'ALL' ? filterStationId : undefined;
 
   const fetchBrief = useCallback(async () => {
     if (!isInitialized || !user) return;
     try {
       const qs = new URLSearchParams({ tariffRate: String(tariffRatePhp) });
-      if (consumerTargetAccountId) qs.set('accountId', consumerTargetAccountId);
+      if (effectiveBriefAccountId) qs.set('accountId', effectiveBriefAccountId);
+      if (effectiveBriefStationId) qs.set('stationId', effectiveBriefStationId);
       const res = await fetch(`/api/tv/brief?${qs.toString()}`);
       if (!res.ok) return;
       const json = (await res.json()) as TvBriefResult;
@@ -129,7 +206,13 @@ export default function TvSlideshowPage() {
     } catch {
       // Retain previous brief or deterministic local summary
     }
-  }, [isInitialized, user, tariffRatePhp, consumerTargetAccountId]);
+  }, [
+    isInitialized,
+    user,
+    tariffRatePhp,
+    effectiveBriefAccountId,
+    effectiveBriefStationId,
+  ]);
 
   useEffect(() => {
     void fetchBrief();
@@ -140,32 +223,67 @@ export default function TvSlideshowPage() {
     return () => clearInterval(timer);
   }, [fetchBrief]);
 
-  // Fetch real 7D harvest summary for Financial slide
-  useEffect(() => {
-    if (!isInitialized || !user) return;
-    let active = true;
-    const qs = new URLSearchParams({
-      range: 'WEEK',
-      step: '5',
-      part: 'period',
-      date: getManilaToday(),
-    });
-    if (consumerTargetAccountId) qs.set('accountId', consumerTargetAccountId);
-    fetch(`/api/deye/history?${qs.toString()}`)
-      .then(async (res) => {
-        if (!res.ok) return;
-        const json = (await res.json()) as { dailySeries?: DailyAnalyticsPoint[] | null };
-        if (active && Array.isArray(json.dailySeries) && json.dailySeries.length > 0) {
-          setWeeklySeries(json.dailySeries);
-        }
-      })
-      .catch(() => {
-        // Keep last verified weekly series
+  // Dynamically load & cache real 7D harvest series per scope (Fleet, Account, or Station)
+  const ensureWeeklySeriesForScope = useCallback(
+    (scope: HistoryScope, force = false) => {
+      if (!isInitialized || !user) return;
+      const key = getTvScopeKey(scope);
+      const cached = weeklyCacheRef.current[key];
+      if (!force && cached && Date.now() - cached.ts < WEEKLY_SERIES_TTL_MS) {
+        return;
+      }
+      if (weeklyInFlightRef.current.has(key)) return;
+
+      setWeeklyLoadingKeys((prev) => ({ ...prev, [key]: true }));
+      const qs = new URLSearchParams({
+        range: 'WEEK',
+        step: '5',
+        part: 'period',
+        date: getManilaToday(),
       });
-    return () => {
-      active = false;
-    };
-  }, [isInitialized, user, consumerTargetAccountId]);
+      if (scope.accountId && scope.accountId !== 'ALL') {
+        qs.set('accountId', scope.accountId);
+      }
+      if (scope.stationId && scope.stationId !== 'ALL') {
+        qs.set('station_id', scope.stationId);
+      }
+
+      const promise = fetch(`/api/deye/history?${qs.toString()}`)
+        .then(async (res) => {
+          if (!res.ok) return;
+          const json = (await res.json()) as { dailySeries?: DailyAnalyticsPoint[] | null };
+          const nextSeries =
+            Array.isArray(json.dailySeries) && json.dailySeries.length > 0
+              ? json.dailySeries
+              : null;
+          const entry: WeeklyCacheEntry = { series: nextSeries, ts: Date.now() };
+          weeklyCacheRef.current[key] = entry;
+          setWeeklyByScope((prev) => ({ ...prev, [key]: entry }));
+        })
+        .catch(() => {
+          // Retain last verified weekly series for this scope
+        })
+        .finally(() => {
+          weeklyInFlightRef.current.delete(key);
+          setWeeklyLoadingKeys((prev) => {
+            if (!prev[key]) return prev;
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
+        });
+
+      weeklyInFlightRef.current.set(key, promise);
+    },
+    [isInitialized, user]
+  );
+
+  // Trigger weekly analytics load when displaying any financial slide
+  const currentSlide = slides[activeIndex] || null;
+  useEffect(() => {
+    if (!currentSlide || currentSlide.kind !== 'financial') return;
+    ensureWeeklySeriesForScope(currentSlide.scope);
+  }, [currentSlide, ensureWeeklySeriesForScope]);
 
   // Manila clock ticker + anti-burn-in pixel shift every 10 minutes
   useEffect(() => {
@@ -264,6 +382,55 @@ export default function TvSlideshowPage() {
     };
   }, [bumpHud]);
 
+  const updateUrlScope = useCallback((nextAcc: string, nextSta: string) => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (nextAcc && nextAcc !== 'ALL') {
+      params.set('accountId', nextAcc);
+    } else {
+      params.delete('accountId');
+    }
+    if (nextSta && nextSta !== 'ALL') {
+      params.set('stationId', nextSta);
+    } else {
+      params.delete('stationId');
+    }
+    const qs = params.toString();
+    const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}`;
+    window.history.replaceState(null, '', nextUrl);
+  }, []);
+
+  const handleSelectAccount = useCallback(
+    (nextAccountId: string) => {
+      setFilterAccountId(nextAccountId);
+      setFilterStationId('ALL');
+      setSlideDirection('forward');
+      setActiveIndex(0);
+      setElapsedMs(0);
+      updateUrlScope(nextAccountId, 'ALL');
+    },
+    [updateUrlScope]
+  );
+
+  const handleSelectStation = useCallback(
+    (nextStationId: string) => {
+      let nextAcc = filterAccountId;
+      if (nextStationId !== 'ALL' && nextAcc === 'ALL') {
+        const matchedStation = scopeStationOptions.find((s) => s.stationId === nextStationId);
+        if (matchedStation) {
+          nextAcc = matchedStation.accountId;
+          setFilterAccountId(nextAcc);
+        }
+      }
+      setFilterStationId(nextStationId);
+      setSlideDirection('forward');
+      setActiveIndex(0);
+      setElapsedMs(0);
+      updateUrlScope(nextAcc, nextStationId);
+    },
+    [filterAccountId, scopeStationOptions, updateUrlScope]
+  );
+
   const goPrev = useCallback(() => {
     if (slides.length <= 1) return;
     setSlideDirection('backward');
@@ -288,7 +455,7 @@ export default function TvSlideshowPage() {
     [slides.length, activeIndex]
   );
 
-  // Auto-advance timer & preload next slide's curve ~4s before transition
+  // Auto-advance timer & preload next slide's curve/7D series ~4s before transition
   useEffect(() => {
     if (paused || slides.length <= 1) return;
     const totalMs = intervalSec * 1000;
@@ -302,7 +469,12 @@ export default function TvSlideshowPage() {
           const nextIdx = (activeIndex + 1) % slides.length;
           if (preloadedIndex !== nextIdx && slides[nextIdx]) {
             preloadedIndex = nextIdx;
-            void loadScopedHistory(slides[nextIdx].scope, getManilaToday(), false);
+            const nextSlide = slides[nextIdx];
+            if (nextSlide.kind === 'financial') {
+              ensureWeeklySeriesForScope(nextSlide.scope);
+            } else {
+              void loadScopedHistory(nextSlide.scope, getManilaToday(), false);
+            }
           }
         }
         if (nextElapsed >= totalMs) {
@@ -315,7 +487,7 @@ export default function TvSlideshowPage() {
     }, tickMs);
 
     return () => clearInterval(timer);
-  }, [paused, intervalSec, slides, activeIndex]);
+  }, [paused, intervalSec, slides, activeIndex, ensureWeeklySeriesForScope]);
 
   // Announce slide change after initial load for screen readers
   useEffect(() => {
@@ -357,22 +529,32 @@ export default function TvSlideshowPage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [goPrev, goNext, toggleFullscreen]);
 
-  const currentSlide = slides[activeIndex] || null;
+  const currentScopeKey = currentSlide ? getTvScopeKey(currentSlide.scope) : 'FLEET';
+  const currentWeeklySeries = weeklyByScope[currentScopeKey]?.series ?? null;
+  const currentWeeklyLoading = Boolean(weeklyLoadingKeys[currentScopeKey]);
+
   const shift = SHIFT_OFFSETS[shiftIndex];
   const progressRatio = slides.length <= 1 ? 1 : elapsedMs / (intervalSec * 1000);
 
   const fallbackHeadline = useMemo(() => {
-    const overview = slides.find((s) => s.kind === 'overview');
-    if (!overview || overview.kind !== 'overview') {
-      return 'Awaiting live DeyeCloud station telemetry';
+    const overview = slides.find((s) => s.kind === 'overview' || s.kind === 'curve');
+    if (overview && (overview.kind === 'overview' || overview.kind === 'curve')) {
+      if (overview.faultCount > 0) {
+        return `ALERT: ${overview.faultCount} inverter fault · Solar ${overview.liveSolarKw.toFixed(1)} kW`;
+      }
+      if (overview.offlineCount > 0) {
+        return `Solar ${overview.liveSolarKw.toFixed(1)} kW · ${overview.offlineCount} inverter offline`;
+      }
+      return `Solar ${overview.liveSolarKw.toFixed(1)} kW · ${overview.dailyYieldKwh.toFixed(0)} kWh today · ₱${Math.round(overview.dailyYieldKwh * tariffRatePhp).toLocaleString('en-US')} saved`;
     }
-    if (overview.faultCount > 0) {
-      return `ALERT: ${overview.faultCount} inverter fault · Solar ${overview.liveSolarKw.toFixed(1)} kW`;
+    const primary = slides.find((s) => s.kind === 'station' || s.kind === 'account');
+    if (primary && primary.kind === 'station') {
+      return `${primary.title}: ${primary.plant.livePowerKw.toFixed(1)} kW live · ${primary.plant.dailyYieldKwh.toFixed(0)} kWh today`;
     }
-    if (overview.offlineCount > 0) {
-      return `Solar ${overview.liveSolarKw.toFixed(1)} kW · ${overview.offlineCount} inverter offline`;
+    if (primary && primary.kind === 'account') {
+      return `${primary.account.account.name}: ${primary.account.livePowerKw.toFixed(1)} kW live · ${primary.account.dailyYieldKwh.toFixed(0)} kWh today`;
     }
-    return `Solar ${overview.liveSolarKw.toFixed(1)} kW · ${overview.dailyYieldKwh.toFixed(0)} kWh today · ₱${Math.round(overview.dailyYieldKwh * tariffRatePhp).toLocaleString('en-US')} saved`;
+    return 'Awaiting live DeyeCloud station telemetry';
   }, [slides, tariffRatePhp]);
 
   return (
@@ -412,7 +594,8 @@ export default function TvSlideshowPage() {
             direction={slideDirection}
             tariffRatePhp={tariffRatePhp}
             tariffLabel={tariffLabel}
-            weeklySeries={weeklySeries}
+            weeklySeries={currentWeeklySeries}
+            weeklyLoading={currentWeeklyLoading}
           />
         </section>
       )}
@@ -429,6 +612,12 @@ export default function TvSlideshowPage() {
         manilaClock={manilaClock}
         headline={brief?.headline || fallbackHeadline}
         severity={brief?.severity || 'normal'}
+        scopeAccountOptions={scopeAccountOptions}
+        scopeStationOptions={scopeStationOptions}
+        selectedAccountId={filterAccountId}
+        selectedStationId={filterStationId}
+        onSelectAccount={handleSelectAccount}
+        onSelectStation={handleSelectStation}
         onPrev={goPrev}
         onNext={goNext}
         onSelectSlide={selectSlide}
