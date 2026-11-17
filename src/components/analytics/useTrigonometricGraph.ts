@@ -422,10 +422,14 @@ export function useTrigonometricGraph({
     const vals = powerSeriesData.map((d) => d.pvPowerKw).filter((v): v is number => v !== null);
     if (vals.length === 0) return [-8, 140];
     const rawMax = Math.max(...vals, 10);
-    const span = Math.max(20, rawMax);
+    const rawMin = Math.min(...vals, 0);
+    const span = Math.max(20, rawMax - rawMin);
     const topPad = Math.max(10, span * 0.18);
     const maxVal = Math.ceil((rawMax + topPad) / 10) * 10;
-    const minVal = -Math.max(6, Math.round(maxVal * 0.05));
+    const minVal =
+      rawMin < 0
+        ? Math.floor((rawMin - Math.max(6, span * 0.14)) / 10) * 10
+        : -Math.max(6, Math.round(maxVal * 0.05));
     return [minVal, maxVal];
   }, [powerSeriesData]);
 
@@ -437,7 +441,10 @@ export function useTrigonometricGraph({
     const span = Math.max(20, rawMax - rawMin);
     const topPad = Math.max(10, span * 0.18);
     const maxVal = Math.ceil((rawMax + topPad) / 10) * 10;
-    const minVal = -Math.max(5, Math.round(maxVal * 0.05));
+    const minVal =
+      rawMin < 0
+        ? Math.floor((rawMin - Math.max(5, span * 0.14)) / 10) * 10
+        : -Math.max(5, Math.round(maxVal * 0.05));
     return [minVal, maxVal];
   }, [powerSeriesData]);
 

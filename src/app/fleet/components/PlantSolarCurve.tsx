@@ -4,47 +4,17 @@ import React, { useState, useMemo, useId, useCallback, useEffect } from 'react';
 import { HoverInfo } from '@/components/ui/tooltip';
 import { Clock } from 'lucide-react';
 import { getManilaNowParts } from '@/lib/manila-time';
+import {
+  computeSignedYAxisBounds,
+  formatSignedKwLabel,
+  valueToSvgY,
+} from '@/lib/chart-domain';
 import { useScopedHistory, type HistoryScope } from './useScopedHistory';
 
 // Exact Color Palette from Analytics Dashboard (src/app/analytics/page.tsx)
 const COLOR_SOLAR = '#f59e0b'; // Amber-500 / Solar Gold
 const COLOR_LOAD = '#6366f1';  // Indigo-500 / Facility Demand
 const COLOR_GRID = '#10b981';  // Emerald-500 / Grid Net Exchange
-
-// Helper to determine clean rounded Y-axis max
-function getNiceMax(val: number): number {
-  if (val <= 5) return 5;
-  if (val <= 10) return 10;
-  if (val <= 20) return 20;
-  if (val <= 30) return 30;
-  if (val <= 50) return 50;
-  if (val <= 75) return 75;
-  if (val <= 100) return 100;
-  if (val <= 150) return 150;
-  if (val <= 200) return 200;
-  if (val <= 300) return 300;
-  if (val <= 500) return 500;
-  if (val <= 750) return 750;
-  if (val <= 1000) return 1000;
-  if (val <= 1500) return 1500;
-  if (val <= 2000) return 2000;
-  const factor = Math.pow(10, Math.floor(Math.log10(val)));
-  return Math.ceil(val / factor) * factor;
-}
-
-function formatYAxisLabel(val: number): string {
-  if (val >= 1000) {
-    const k = val / 1000;
-    return `${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}M`;
-  }
-  if (val >= 100) {
-    return Math.round(val).toString();
-  }
-  if (val % 1 === 0) {
-    return val.toString();
-  }
-  return val.toFixed(1);
-}
 
 interface PlantSolarCurveProps {
   capacityKw: number;
@@ -95,7 +65,7 @@ export function PlantSolarCurve({
   const gradId = `analyticsDiurnalGrad-${rawId.replace(/:/g, '')}`;
 
   const safeCapacityKw = Number.isFinite(capacityKw) && capacityKw > 0 ? capacityKw : 10;
-  const safeLivePowerKw = Number.isFinite(livePowerKw) && livePowerKw >= 0 ? livePowerKw : 0;
+  const safeLivePowerKw = Number.isFinite(livePowerKw) ? livePowerKw : 0;
   const safeDailyYieldKwh = Number.isFinite(dailyYieldKwh) && dailyYieldKwh >= 0 ? dailyYieldKwh : 0;
 
   // "Now" follows Asia/Manila time (same zone as the history API) and ticks every minute.
@@ -106,7 +76,7 @@ export function PlantSolarCurve({
   }, []);
 
   // No invented values: demand/grid come from telemetry, or are zero when none is reported.
-  const currentDemand = demandKw !== undefined && Number.isFinite(demandKw) && demandKw > 0 ? demandKw : 0;
+  const currentDemand = demandKw !== undefined && Number.isFinite(demandKw) ? demandKw : 0;
   const currentGridNet = gridPowerKw !== undefined && Number.isFinite(gridPowerKw) && gridPowerKw !== 0
     ? gridPowerKw
     : parseFloat((safeLivePowerKw - currentDemand).toFixed(1));
@@ -133,8 +103,8 @@ export function PlantSolarCurve({
       return {
         hour: hourFloat,
         label: pt.hour || `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
-        solar: parseFloat(Math.max(0, solar).toFixed(2)),
-        load: parseFloat(Math.max(0, load).toFixed(2)),
+        solar: parseFloat(solar.toFixed(2)),
+        load: parseFloat(load.toFixed(2)),
         gridNet: parseFloat(grid.toFixed(2)),
         isNow: Math.abs(hourFloat - nowHour) <= 0.05,
         isFuture,
@@ -151,20 +121,20 @@ export function PlantSolarCurve({
   const svgHeight = 60;
   const plotHeight = svgHeight - paddingY * 2;
 
-  // Set kWp (capacityKw) is the minimum baseline ceiling, but dynamically expands if actual telemetry exceeds it
-  const maxPower = useMemo(() => {
+  // Compute signed [min, max] bounds so negative telemetry renders cleanly below 0 kW
+  const yBounds = useMemo(() => {
     const setKwp = Math.max(safeCapacityKw || 10, 10);
-    let peakData = Math.max(safeLivePowerKw || 0, currentDemand || 0);
-
+    const values: number[] = [safeLivePowerKw, currentDemand];
     for (const p of points) {
-      if (Number.isFinite(p.solar) && p.solar > peakData) peakData = p.solar;
-      if (Number.isFinite(p.load) && p.load > peakData) peakData = p.load;
+      values.push(p.solar, p.load);
     }
-
-    const ceiling = Math.max(setKwp, peakData);
-    // 10% headroom so curves comfortably fit inside without touching the top border
-    return Math.max(10, Math.ceil((Number.isFinite(ceiling) ? ceiling : 10) * 1.10));
+    return computeSignedYAxisBounds(values, setKwp, 0.1);
   }, [safeCapacityKw, safeLivePowerKw, currentDemand, points]);
+
+  const zeroY = useMemo(
+    () => valueToSvgY(0, yBounds.min, yBounds.max, paddingY, plotHeight),
+    [yBounds, paddingY, plotHeight]
+  );
 
   const coords = useMemo(() => {
     return points.map((p) => {
@@ -173,13 +143,11 @@ export function PlantSolarCurve({
       const x = paddingX + (validHour / 24) * plotWidth;
       const validSolar = Number.isFinite(p.solar) ? p.solar : 0;
       const validLoad = Number.isFinite(p.load) ? p.load : 0;
-      const rawSolarY = paddingY + plotHeight - (validSolar / maxPower) * plotHeight;
-      const rawLoadY = paddingY + plotHeight - (validLoad / maxPower) * plotHeight;
-      const solarY = Math.max(paddingY, Math.min(paddingY + plotHeight, Number.isFinite(rawSolarY) ? rawSolarY : paddingY + plotHeight));
-      const loadY = Math.max(paddingY, Math.min(paddingY + plotHeight, Number.isFinite(rawLoadY) ? rawLoadY : paddingY + plotHeight));
+      const solarY = valueToSvgY(validSolar, yBounds.min, yBounds.max, paddingY, plotHeight);
+      const loadY = valueToSvgY(validLoad, yBounds.min, yBounds.max, paddingY, plotHeight);
       return { ...p, x, solarY, loadY };
     });
-  }, [points, maxPower, plotWidth, plotHeight, paddingX, paddingY]);
+  }, [points, yBounds, plotWidth, plotHeight, paddingX, paddingY]);
 
   // Elapsed curve coordinates only up to current time (no future values!)
   const elapsedCoords = useMemo(() => {
@@ -187,11 +155,11 @@ export function PlantSolarCurve({
     const nowX = paddingX + (Math.min(24, Math.max(0, nowHour)) / 24) * plotWidth;
     const lastElapsed = elapsed.length > 0 ? elapsed[elapsed.length - 1] : null;
     const effectiveNowSolar =
-      safeLivePowerKw > 0 || !historyPoints || historyPoints.length === 0
+      safeLivePowerKw !== 0 || !historyPoints || historyPoints.length === 0
         ? safeLivePowerKw
         : (lastElapsed?.solar ?? safeLivePowerKw);
     const effectiveNowLoad =
-      (demandKw !== undefined && demandKw > 0) || !historyPoints || historyPoints.length === 0
+      (demandKw !== undefined && Number.isFinite(demandKw) && demandKw !== 0) || !historyPoints || historyPoints.length === 0
         ? currentDemand
         : (lastElapsed?.load ?? currentDemand);
     const effectiveNowGrid =
@@ -199,15 +167,12 @@ export function PlantSolarCurve({
         ? (Number.isFinite(gridPowerKw) ? gridPowerKw : 0)
         : parseFloat((effectiveNowSolar - effectiveNowLoad).toFixed(2));
 
-    const rawNowSolarY = paddingY + plotHeight - (effectiveNowSolar / maxPower) * plotHeight;
-    const rawNowLoadY = paddingY + plotHeight - (effectiveNowLoad / maxPower) * plotHeight;
-    const nowSolarY = Math.max(paddingY, Math.min(paddingY + plotHeight, Number.isFinite(rawNowSolarY) ? rawNowSolarY : paddingY + plotHeight));
-    const nowLoadY = Math.max(paddingY, Math.min(paddingY + plotHeight, Number.isFinite(rawNowLoadY) ? rawNowLoadY : paddingY + plotHeight));
+    const nowSolarY = valueToSvgY(effectiveNowSolar, yBounds.min, yBounds.max, paddingY, plotHeight);
+    const nowLoadY = valueToSvgY(effectiveNowLoad, yBounds.min, yBounds.max, paddingY, plotHeight);
 
     const list = [...elapsed];
     // Ensure final coordinate anchors precisely at the current moment
     if (list.length === 0) {
-      const bottomY = paddingY + plotHeight;
       list.push({
         hour: 0,
         label: '00:00',
@@ -217,8 +182,8 @@ export function PlantSolarCurve({
         isNow: false,
         isFuture: false,
         x: paddingX,
-        solarY: bottomY,
-        loadY: bottomY,
+        solarY: zeroY,
+        loadY: zeroY,
       });
     }
     if (Math.abs(list[list.length - 1].x - nowX) > 1) {
@@ -246,7 +211,7 @@ export function PlantSolarCurve({
       };
     }
     return list;
-  }, [coords, nowHour, paddingX, plotWidth, paddingY, plotHeight, maxPower, safeLivePowerKw, demandKw, gridPowerKw, historyPoints, currentDemand]);
+  }, [coords, nowHour, paddingX, plotWidth, paddingY, plotHeight, yBounds, zeroY, safeLivePowerKw, demandKw, gridPowerKw, historyPoints, currentDemand]);
 
   const nowCoord = elapsedCoords.length > 0 ? elapsedCoords[elapsedCoords.length - 1] : null;
 
@@ -266,13 +231,12 @@ export function PlantSolarCurve({
 
     const first = elapsedCoords[0];
     const last = elapsedCoords[elapsedCoords.length - 1];
-    const bottomY = paddingY + plotHeight;
 
-    const solarArea = `${solarLine} L ${last.x} ${bottomY} L ${first.x} ${bottomY} Z`;
-    const loadArea = `${loadLine} L ${last.x} ${bottomY} L ${first.x} ${bottomY} Z`;
+    const solarArea = `${solarLine} L ${last.x} ${zeroY} L ${first.x} ${zeroY} Z`;
+    const loadArea = `${loadLine} L ${last.x} ${zeroY} L ${first.x} ${zeroY} Z`;
 
     return { solarLine, solarArea, loadLine, loadArea };
-  }, [elapsedCoords, paddingY, plotHeight]);
+  }, [elapsedCoords, zeroY]);
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
@@ -389,7 +353,7 @@ export function PlantSolarCurve({
               <div className="flex items-center gap-1 cursor-help">
                 <span className="size-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
                 <span className="text-muted-foreground/80">Grid Net:</span>
-                <span className="font-bold text-emerald-500 whitespace-nowrap">
+                <span className={`font-bold whitespace-nowrap ${(currentGridNet ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
                   {(currentGridNet ?? 0) >= 0 ? `+${(currentGridNet ?? 0).toFixed(1)}` : (currentGridNet ?? 0).toFixed(1)} kW
                 </span>
               </div>
@@ -414,14 +378,14 @@ export function PlantSolarCurve({
           {/* Y-Axis Column */}
           <div className="flex flex-col justify-between items-end pr-1 text-[7.5px] sm:text-[8px] font-mono text-muted-foreground/80 shrink-0 select-none pb-4 pt-0.5 w-9 sm:w-10 border-r border-border/40">
             <div className="flex items-center gap-0.5 justify-end w-full leading-none">
-              <span className="font-semibold text-foreground/90">{formatYAxisLabel(maxPower)}</span>
+              <span className="font-semibold text-foreground/90">{formatSignedKwLabel(yBounds.max)}</span>
               <span className="text-[6.5px] text-muted-foreground">kW</span>
             </div>
             <div className="flex items-center justify-end w-full leading-none text-muted-foreground/75">
-              <span>{formatYAxisLabel(maxPower * 0.5)}</span>
+              <span>{formatSignedKwLabel((yBounds.max + yBounds.min) * 0.5)}</span>
             </div>
             <div className="flex items-center justify-end w-full leading-none text-muted-foreground/75">
-              <span>0</span>
+              <span>{formatSignedKwLabel(yBounds.min)}</span>
             </div>
           </div>
 
@@ -483,6 +447,17 @@ export function PlantSolarCurve({
                 strokeWidth="1"
                 vectorEffect="non-scaling-stroke"
               />
+              {yBounds.min < 0 && (
+                <line
+                  x1={paddingX}
+                  y1={zeroY}
+                  x2={width - paddingX}
+                  y2={zeroY}
+                  stroke="hsl(var(--border) / 0.75)"
+                  strokeWidth="1"
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
 
               {/* Clipped Curve Layers */}
               <g clipPath={`url(#${gradId}-plot-clip)`}>

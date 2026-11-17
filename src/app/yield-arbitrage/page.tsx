@@ -34,7 +34,9 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ReferenceLine,
 } from 'recharts';
+import { rechartsSignedMin } from '@/lib/chart-domain';
 import { HourlyEnergyPoint } from '@/lib/types';
 import {
   type DailyAnalyticsPoint,
@@ -829,7 +831,8 @@ export default function YieldArbitragePage() {
                   <BarChart key="ya-year" data={periodMonthlySeries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
                     <XAxis dataKey="month" stroke="currentColor" className="text-[10px] opacity-60" />
-                    <YAxis stroke="currentColor" className="text-[10px] opacity-60" unit=" MWh" />
+                    <YAxis stroke="currentColor" className="text-[10px] opacity-60" unit=" MWh" domain={[rechartsSignedMin, 'auto']} />
+                    <ReferenceLine y={0} stroke="currentColor" className="opacity-25" />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: 'rgba(23, 31, 51, 0.95)',
@@ -856,7 +859,8 @@ export default function YieldArbitragePage() {
                       className="text-[10px] opacity-60"
                       interval={timeRange === 'MONTH' ? 4 : 0}
                     />
-                    <YAxis stroke="currentColor" className="text-[10px] opacity-60" unit=" kWh" />
+                    <YAxis stroke="currentColor" className="text-[10px] opacity-60" unit=" kWh" domain={[rechartsSignedMin, 'auto']} />
+                    <ReferenceLine y={0} stroke="currentColor" className="opacity-25" />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: 'rgba(23, 31, 51, 0.95)',
@@ -888,7 +892,8 @@ export default function YieldArbitragePage() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-15" />
                     <XAxis dataKey="hour" stroke="currentColor" className="text-[10px] opacity-60" />
-                    <YAxis stroke="currentColor" className="text-[10px] opacity-60" unit="kW" />
+                    <YAxis stroke="currentColor" className="text-[10px] opacity-60" unit="kW" domain={[rechartsSignedMin, 'auto']} />
+                    <ReferenceLine y={0} stroke="currentColor" className="opacity-30" />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: 'rgba(23, 31, 51, 0.95)',

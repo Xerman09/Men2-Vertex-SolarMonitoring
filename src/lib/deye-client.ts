@@ -1538,8 +1538,8 @@ export class DeyeCloudClient {
           isElapsed: true,
         });
       } else {
-        const solar = Math.max(0, Number((acc.solarSum / acc.count).toFixed(2)));
-        const load = Math.max(0, Number((acc.loadSum / acc.count).toFixed(2)));
+        const solar = Number((acc.solarSum / acc.count).toFixed(2));
+        const load = Number((acc.loadSum / acc.count).toFixed(2));
         const bat = Number((acc.batSum / acc.count).toFixed(2));
         const grid = Number((acc.gridSum / acc.count).toFixed(2));
         points.push({

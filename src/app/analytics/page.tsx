@@ -62,6 +62,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { HoverInfo } from '@/components/ui/tooltip';
 import { TELEMETRY_DESCRIPTIONS } from '@/lib/descriptions';
+import {
+  rechartsSignedMin,
+  rechartsBipolarMin,
+  rechartsBipolarMax,
+} from '@/lib/chart-domain';
 import { HourlyEnergyPoint, InverterConfig } from '@/lib/types';
 import {
   generateBatteryHourlyTelemetry,
@@ -1693,7 +1698,9 @@ export default function AnalyticsDashboardPage() {
                       axisLine={{ stroke: 'hsl(var(--border) / 0.6)' }}
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                       unit=" MWh"
+                      domain={[rechartsSignedMin, 'auto']}
                     />
+                    <ReferenceLine y={0} stroke="hsl(var(--border) / 0.8)" />
                     <Tooltip
                       content={({ active, payload, label }) => {
                         if (!active || !payload?.length) return null;
@@ -1794,7 +1801,9 @@ export default function AnalyticsDashboardPage() {
                       axisLine={{ stroke: 'hsl(var(--border) / 0.6)' }}
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                       unit=" kWh"
+                      domain={[rechartsSignedMin, 'auto']}
                     />
+                    <ReferenceLine y={0} stroke="hsl(var(--border) / 0.8)" />
                     <Tooltip
                       content={({ active, payload, label }) => {
                         if (!active || !payload?.length) return null;
@@ -1905,7 +1914,7 @@ export default function AnalyticsDashboardPage() {
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                       unit=" kW"
                       domain={[
-                        0,
+                        rechartsSignedMin,
                         (dataMax: number) => {
                           const baseline = effectiveCapacityKw > 0 ? effectiveCapacityKw * 0.9 : 10;
                           const peak = Math.max(dataMax || 0, baseline);
@@ -1913,6 +1922,7 @@ export default function AnalyticsDashboardPage() {
                         },
                       ]}
                     />
+                    <ReferenceLine y={0} stroke="hsl(var(--border) / 0.8)" />
                     <Tooltip
                       content={({ active, payload, label }) => {
                         if (!active || !payload?.length) return null;
@@ -2207,7 +2217,9 @@ export default function AnalyticsDashboardPage() {
                       axisLine={{ stroke: 'hsl(var(--border) / 0.6)' }}
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                       unit=" MWh"
+                      domain={[rechartsSignedMin, 'auto']}
                     />
+                    <ReferenceLine y={0} stroke="hsl(var(--border) / 0.8)" />
                     <Tooltip
                       content={({ active, payload, label }) => {
                         if (!active || !payload?.length) return null;
@@ -2253,7 +2265,9 @@ export default function AnalyticsDashboardPage() {
                       axisLine={{ stroke: 'hsl(var(--border) / 0.6)' }}
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                       unit=" kWh"
+                      domain={[rechartsSignedMin, 'auto']}
                     />
+                    <ReferenceLine y={0} stroke="hsl(var(--border) / 0.8)" />
                     <Tooltip
                       content={({ active, payload, label }) => {
                         if (!active || !payload?.length) return null;
@@ -2343,12 +2357,13 @@ export default function AnalyticsDashboardPage() {
                   <YAxis
                     yAxisId="power"
                     orientation="right"
-                    domain={[-35, 35]}
+                    domain={[rechartsBipolarMin(-35), rechartsBipolarMax(35)]}
                     tickLine={false}
                     axisLine={false}
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
                     unit=" kW"
                   />
+                  <ReferenceLine yAxisId="power" y={0} stroke="hsl(var(--border) / 0.6)" />
                   <Tooltip
                     content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null;

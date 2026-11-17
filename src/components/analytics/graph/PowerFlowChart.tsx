@@ -453,6 +453,7 @@ export function PowerFlowChart({
                 <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
                 <YAxis domain={pvYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
                 <Tooltip content={<CustomExactTooltip />} />
+                <ReferenceLine y={0} stroke="currentColor" className="opacity-35" />
                 <ReferenceLine
                   isFront
                   x={nowSlotStr}
@@ -491,6 +492,7 @@ export function PowerFlowChart({
                 <XAxis dataKey="hour" ticks={majorXTicks} stroke="currentColor" className="text-[9px] font-mono opacity-75" />
                 <YAxis domain={consumptionYDomain} stroke="currentColor" className="text-[9px] font-mono opacity-75" unit="kW" />
                 <Tooltip content={<CustomExactTooltip />} />
+                <ReferenceLine y={0} stroke="currentColor" className="opacity-35" />
                 <ReferenceLine
                   isFront
                   x={nowSlotStr}
