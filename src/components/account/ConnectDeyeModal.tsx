@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Zap,
   Radio,
@@ -15,17 +15,15 @@ import {
   ChevronDown,
   ChevronUp,
   X,
-  Shield,
-  Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useAccount } from '@/lib/account-context';
 import { useRole } from '@/lib/role-context';
 
 export function ConnectDeyeModal() {
   const { showConnectModal, setShowConnectModal } = useRole();
   const { refreshAccounts, selectAccountAndPlant } = useAccount();
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   const [name, setName] = useState('');
   const [appId, setAppId] = useState('');
@@ -38,6 +36,9 @@ export function ConnectDeyeModal() {
   const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const loadingRef = useRef(false);
+  loadingRef.current = loading;
+
   const [error, setError] = useState('');
   const [successData, setSuccessData] = useState<{
     plants: number;
@@ -45,7 +46,71 @@ export function ConnectDeyeModal() {
     accountName: string;
   } | null>(null);
 
-  if (!showConnectModal) return null;
+  const resetAndCloseState = useCallback(() => {
+    setShowConnectModal(false);
+    setError('');
+    setSuccessData(null);
+  }, [setShowConnectModal]);
+
+  const requestModalClose = useCallback(() => {
+    if (loadingRef.current) return;
+    const dialog = dialogRef.current;
+    if (dialog?.open) {
+      dialog.close();
+    } else {
+      resetAndCloseState();
+    }
+  }, [resetAndCloseState]);
+
+  // Sync top-layer modal open/closed state and closedby attribute
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    dialog.setAttribute('closedby', loading ? 'none' : 'any');
+
+    if (showConnectModal && !dialog.open) {
+      if (typeof dialog.showModal === 'function') {
+        dialog.showModal();
+      }
+    } else if (!showConnectModal && dialog.open) {
+      dialog.close();
+    }
+  }, [showConnectModal, loading]);
+
+  // Progressive fallback for browsers without <dialog closedby="any">
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog || 'closedBy' in HTMLDialogElement.prototype) return;
+
+    const outside = (e: PointerEvent) => {
+      const r = dialog.getBoundingClientRect();
+      return (
+        e.clientX < r.left ||
+        e.clientX > r.right ||
+        e.clientY < r.top ||
+        e.clientY > r.bottom
+      );
+    };
+
+    let pressedOutside = false;
+    const onPointerDown = (e: PointerEvent) => {
+      pressedOutside = dialog.open && !loadingRef.current && outside(e);
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      if (pressedOutside && dialog.open && !loadingRef.current && outside(e)) {
+        dialog.close();
+      }
+      pressedOutside = false;
+    };
+
+    dialog.addEventListener('pointerdown', onPointerDown);
+    dialog.addEventListener('pointerup', onPointerUp);
+    return () => {
+      dialog.removeEventListener('pointerdown', onPointerDown);
+      dialog.removeEventListener('pointerup', onPointerUp);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,30 +168,32 @@ export function ConnectDeyeModal() {
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialogRef}
       aria-labelledby="connect-modal-title"
-      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in-50"
+      onCancel={(e) => {
+        if (loadingRef.current) e.preventDefault();
+      }}
+      onClose={(e) => {
+        e.currentTarget.returnValue = '';
+        resetAndCloseState();
+      }}
+      className="vos-modal w-[calc(100%-2rem)] max-w-lg rounded-2xl bg-card border border-border/80 text-foreground p-6 sm:p-7 shadow-2xl overflow-y-auto"
     >
-      <div className="bg-card border border-border/80 rounded-2xl shadow-2xl w-full max-w-lg p-6 sm:p-7 relative overflow-hidden">
-        {/* Ambient Top Glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-20 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+      {showConnectModal && (
+        <div className="relative">
+          {/* Ambient Top Glow */}
+          <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-72 h-20 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
 
-        <button
-          onClick={() => {
-            if (!loading) {
-              setShowConnectModal(false);
-              setError('');
-              setSuccessData(null);
-            }
-          }}
-          disabled={loading}
-          aria-label="Close modal"
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-        >
-          <X size={16} />
-        </button>
+          <button
+            type="button"
+            onClick={requestModalClose}
+            disabled={loading}
+            aria-label="Close modal"
+            className="absolute -top-2 -right-2 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+          >
+            <X size={16} />
+          </button>
 
         {/* Modal Header */}
         <div className="flex items-center gap-3 mb-5">
@@ -201,6 +268,7 @@ export function ConnectDeyeModal() {
                 <input
                   id="connect-name"
                   type="text"
+                  autoFocus
                   placeholder="e.g. My Rooftop Solar"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -334,7 +402,7 @@ export function ConnectDeyeModal() {
                 type="button"
                 variant="outline"
                 disabled={loading}
-                onClick={() => setShowConnectModal(false)}
+                onClick={requestModalClose}
                 className="text-xs h-9"
               >
                 Cancel
@@ -356,7 +424,8 @@ export function ConnectDeyeModal() {
             </div>
           </form>
         )}
-      </div>
-    </div>
+        </div>
+      )}
+    </dialog>
   );
 }

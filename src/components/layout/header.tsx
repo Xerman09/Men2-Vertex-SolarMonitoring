@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { usePolling } from '@/lib/usePolling';
 import {
   Sun,
@@ -37,7 +38,6 @@ import { useRole } from '@/lib/role-context';
 import { ModeToggle } from '@/components/theme/ModeToggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ConnectDeyeModal } from '@/components/account/ConnectDeyeModal';
 
 import { InverterConfig } from '@/lib/types';
 
@@ -760,8 +760,8 @@ export function Header({
         </div>
       </div>
 
-      {/* Auth Modal (Sign In / Register) */}
-      {showAuthModal && (
+      {/* Auth Modal (Sign In / Register) rendered outside header backdrop-blur containing block */}
+      {showAuthModal && typeof document !== 'undefined' && createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -1030,11 +1030,9 @@ export function Header({
               </form>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-
-      {/* Connect DeyeCloud Account Modal */}
-      <ConnectDeyeModal />
     </header>
   );
 }

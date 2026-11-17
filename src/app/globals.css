@@ -722,3 +722,20 @@
     text-align: left;
   }
 }
+
+/* Native top-layer modal dialogs: restore UA viewport centering over Tailwind preflight and contain scroll */
+dialog.vos-modal:modal {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  height: fit-content;
+  max-height: calc(100dvh - 2rem);
+  overscroll-behavior: contain;
+}
+
+dialog.vos-modal::backdrop {
+  background: rgb(0 0 0 / 0.75);
+  backdrop-filter: blur(4px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
