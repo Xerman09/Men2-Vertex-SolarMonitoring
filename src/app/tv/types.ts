@@ -294,12 +294,85 @@ export function buildTvSlides(
         ? { accountId: scopedTree[0].account.id }
         : {};
 
-  // 1. Multi-account Fleet Portfolio Overview + separated Fleet Curve + Fleet 7D Analytics
+  // 1. PER ACCOUNTS: Separated Account Telemetry, Stations Roster (when >1), & Account 7D Analytics
+  if (!reqSta) {
+    for (const acc of scopedTree) {
+      if (scopedTree.length === 1 && acc.plants.length === 1) {
+        continue;
+      }
+      const accScope: HistoryScope = { accountId: acc.account.id };
+
+      slides.push({
+        id: `account-${acc.account.id}`,
+        kind: 'account',
+        title: `${acc.account.name} · Live Telemetry`,
+        scope: accScope,
+        account: acc,
+      });
+
+      if (acc.plants.length > 1) {
+        slides.push({
+          id: `account-stations-${acc.account.id}`,
+          kind: 'account-stations',
+          title: `${acc.account.name} · Stations`,
+          scope: accScope,
+          account: acc,
+        });
+      }
+
+      slides.push({
+        id: `financial-acc-${acc.account.id}`,
+        kind: 'financial',
+        title: `${acc.account.name} · 7D Analytics`,
+        scope: accScope,
+        scopeLabel: `${acc.plants.length} ${acc.plants.length === 1 ? 'Station' : 'Stations'}`,
+        liveSolarKw: acc.livePowerKw,
+        dailyYieldKwh: acc.dailyYieldKwh,
+        capacityKw: acc.capacityKw,
+        accounts: [acc],
+      });
+    }
+  }
+
+  // 2. PER STATION: Dedicated Per-Station Live Curve & Inverters + Station 7D Analytics
+  for (const acc of scopedTree) {
+    for (const plant of acc.plants) {
+      const stationId = String(plant.plant.stationId);
+      const stationScope: HistoryScope = {
+        accountId: acc.account.id,
+        stationId,
+      };
+
+      slides.push({
+        id: `station-${acc.account.id}-${stationId}`,
+        kind: 'station',
+        title: plant.plant.stationName,
+        accountName: acc.account.name,
+        accountId: acc.account.id,
+        scope: stationScope,
+        plant,
+      });
+
+      slides.push({
+        id: `financial-sta-${acc.account.id}-${stationId}`,
+        kind: 'financial',
+        title: `${plant.plant.stationName} · 7D Analytics`,
+        scope: stationScope,
+        scopeLabel: acc.account.name,
+        liveSolarKw: plant.livePowerKw,
+        dailyYieldKwh: plant.dailyYieldKwh,
+        capacityKw: plant.capacityKw,
+        accounts: [acc],
+      });
+    }
+  }
+
+  // 3. EXECUTIVE SUMMARY: Multi-account Consolidated Overview, Fleet Curve, & 7D Fleet Summary
   if (!reqSta && scopedTree.length > 1) {
     slides.push({
       id: 'overview',
       kind: 'overview',
-      title: 'Fleet Overview',
+      title: 'Fleet Summary',
       scope: {},
       accounts: scopedTree,
       plants: summary.allPlants,
@@ -335,7 +408,7 @@ export function buildTvSlides(
     slides.push({
       id: 'financial-fleet',
       kind: 'financial',
-      title: 'Fleet · 7D Analytics',
+      title: 'Fleet · 7D Summary',
       scope: {},
       scopeLabel: `${scopedTree.length} Accounts · ${summary.allPlants.length} Stations`,
       liveSolarKw: summary.liveSolarKw,
@@ -343,75 +416,6 @@ export function buildTvSlides(
       capacityKw: summary.capacityKw,
       accounts: scopedTree,
     });
-  }
-
-  // 2. Per-Account and Per-Station dynamic slides across ALL authorized accounts
-  for (const acc of scopedTree) {
-    const accScope: HistoryScope = { accountId: acc.account.id };
-
-    // Account-level separated rollup slides when account manages 2+ stations (or 0 mapped plants)
-    if (!reqSta && (acc.plants.length > 1 || acc.plants.length === 0)) {
-      slides.push({
-        id: `account-${acc.account.id}`,
-        kind: 'account',
-        title: `${acc.account.name} · Live Telemetry`,
-        scope: accScope,
-        account: acc,
-      });
-
-      if (acc.plants.length > 1) {
-        slides.push({
-          id: `account-stations-${acc.account.id}`,
-          kind: 'account-stations',
-          title: `${acc.account.name} · Stations`,
-          scope: accScope,
-          account: acc,
-        });
-      }
-
-      slides.push({
-        id: `financial-acc-${acc.account.id}`,
-        kind: 'financial',
-        title: `${acc.account.name} · 7D Analytics`,
-        scope: accScope,
-        scopeLabel: `${acc.plants.length} Stations`,
-        liveSolarKw: acc.livePowerKw,
-        dailyYieldKwh: acc.dailyYieldKwh,
-        capacityKw: acc.capacityKw,
-        accounts: [acc],
-      });
-    }
-
-    // Dedicated Per-Station slides (Live Curve & Inverters + Station 7D Analytics)
-    for (const plant of acc.plants) {
-      const stationId = String(plant.plant.stationId);
-      const stationScope: HistoryScope = {
-        accountId: acc.account.id,
-        stationId,
-      };
-
-      slides.push({
-        id: `station-${acc.account.id}-${stationId}`,
-        kind: 'station',
-        title: plant.plant.stationName,
-        accountName: acc.account.name,
-        accountId: acc.account.id,
-        scope: stationScope,
-        plant,
-      });
-
-      slides.push({
-        id: `financial-sta-${acc.account.id}-${stationId}`,
-        kind: 'financial',
-        title: `${plant.plant.stationName} · 7D Analytics`,
-        scope: stationScope,
-        scopeLabel: acc.account.name,
-        liveSolarKw: plant.livePowerKw,
-        dailyYieldKwh: plant.dailyYieldKwh,
-        capacityKw: plant.capacityKw,
-        accounts: [acc],
-      });
-    }
   }
 
   // 3. Dynamic triage slide strictly when genuine faults or offline assets exist in active scope

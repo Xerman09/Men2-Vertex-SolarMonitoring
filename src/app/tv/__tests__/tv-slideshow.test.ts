@@ -216,22 +216,24 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
       'STA:acc-hanvin:st-102',
     ]);
 
-    // Admin sees separated Fleet (overview, curve, financial) + every Account + every Station + triage
+    // Admin sees Per Accounts -> Per Stations -> Consolidated Fleet Summary -> Triage
     const adminSlides = buildTvSlides(accounts.slice(0, 2), nodes, {
       priorityStationId: 'st-202',
     });
     expect(adminSlides.map((s) => s.kind)).toEqual([
-      'overview',
-      'curve',
-      'financial',
       'account',
       'account-stations',
       'financial',
-      'station',
+      'account',
       'financial',
       'station',
       'financial',
       'station',
+      'financial',
+      'station',
+      'financial',
+      'overview',
+      'curve',
       'financial',
       'triage',
     ]);
@@ -366,7 +368,8 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     expect(hudHtml).not.toContain('aria-pressed');
     expect(hudHtml).toContain('Filter TV by account');
     expect(hudHtml).toContain('Filter TV by station');
-    // 13 slides > 12 => adaptive select jump control in footer instead of overflowing dot list
-    expect(hudHtml).toContain('1. Fleet Overview');
+    // 15 slides > 12 => adaptive select jump control in footer instead of overflowing dot list
+    expect(hudHtml).toContain('1. Hanvin Solar · Live Telemetry');
+    expect(hudHtml).toContain('Fleet Summary');
   });
 });
