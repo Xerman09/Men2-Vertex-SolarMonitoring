@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { HoverInfo } from '@/components/ui/tooltip';
 import { PlantSolarCurve } from './PlantSolarCurve';
 import { InverterSolarCurve } from './InverterSolarCurve';
 import {
@@ -50,6 +51,78 @@ interface FleetDetailWorkspaceProps {
     deviceSn: string,
     destination: '/hardware-telemetry' | '/energy-flow'
   ) => void;
+}
+
+interface HoverMetricRow {
+  label: string;
+  value: string;
+  accentClass?: string;
+}
+
+/** Compact tabular key-value list rendered inside title hover tooltips. */
+function ScopeHoverMetrics({ rows }: { rows: HoverMetricRow[] }) {
+  return (
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[11px] tabular-nums">
+      {rows.map((row) => (
+        <React.Fragment key={row.label}>
+          <dt className="text-muted-foreground">{row.label}</dt>
+          <dd className={`text-right font-semibold ${row.accentClass || 'text-foreground'}`}>
+            {row.value}
+          </dd>
+        </React.Fragment>
+      ))}
+    </dl>
+  );
+}
+
+/** Builds structured account sizing and yield rows for account hover tooltips. */
+function buildAccountHoverRows(acc: FleetAccountNode): HoverMetricRow[] {
+  return [
+    { label: 'Plants', value: String(acc.plants.length) },
+    { label: 'Inverters', value: String(acc.invertersCount) },
+    {
+      label: 'Installed',
+      value: acc.capacityKw > 0 ? `${acc.capacityKw.toFixed(0)} kWp` : '--',
+    },
+    {
+      label: 'Spec. Yield',
+      value:
+        acc.specificYieldKwhKwp !== null
+          ? `${acc.specificYieldKwhKwp.toFixed(2)} kWh/kWp`
+          : '--',
+    },
+  ];
+}
+
+/** Builds structured station sizing and yield rows for plant hover tooltips. */
+function buildPlantHoverRows(
+  plant: FleetPlantNode,
+  accountLabel?: string
+): HoverMetricRow[] {
+  return [
+    ...(accountLabel ? [{ label: 'Account', value: accountLabel }] : []),
+    { label: 'Inverters', value: String(plant.inverters.length) },
+    {
+      label: 'Installed',
+      value: plant.capacityKw > 0 ? `${plant.capacityKw.toFixed(0)} kWp` : '--',
+    },
+    {
+      label: 'Spec. Yield',
+      value:
+        plant.specificYieldKwhKwp !== null
+          ? `${plant.specificYieldKwhKwp.toFixed(2)} kWh/kWp`
+          : '--',
+    },
+    ...(typeof plant.batterySoc === 'number' && plant.batterySoc > 0
+      ? [
+          {
+            label: 'BESS SoC',
+            value: `${plant.batterySoc.toFixed(0)}%`,
+            accentClass: 'text-cyan-400',
+          },
+        ]
+      : []),
+  ];
 }
 
 export function FleetDetailWorkspace({
@@ -94,6 +167,13 @@ export function FleetDetailWorkspace({
             : 'border-border/70'
         }`}
       >
+        {/* Background overlay keeps full-card clicks working while scoping hover tooltip strictly to the title */}
+        <span
+          aria-hidden="true"
+          onClick={() => onSelectPlant(plant.accountId, String(plant.plant.stationId))}
+          className="absolute inset-0 z-0 rounded-2xl cursor-pointer"
+        />
+
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -102,16 +182,31 @@ export function FleetDetailWorkspace({
                 className="text-primary shrink-0"
                 aria-hidden="true"
               />
-              <h3 className="text-sm font-bold text-foreground truncate">
-                <button
-                  type="button"
-                  onClick={() =>
-                    onSelectPlant(plant.accountId, String(plant.plant.stationId))
+              <h3 className="text-sm font-bold text-foreground truncate max-w-full">
+                <HoverInfo
+                  title={plant.plant.stationName}
+                  side="bottom"
+                  align="start"
+                  className="relative z-10 cursor-pointer max-w-full"
+                  content={
+                    <ScopeHoverMetrics
+                      rows={buildPlantHoverRows(
+                        plant,
+                        showAccountSubtitle ? plant.accountName : undefined
+                      )}
+                    />
                   }
-                  className="text-left hover:text-primary transition-colors cursor-pointer after:absolute after:inset-0 after:z-0 focus-visible:outline-2 focus-visible:outline-ring rounded"
                 >
-                  {plant.plant.stationName}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onSelectPlant(plant.accountId, String(plant.plant.stationId))
+                    }
+                    className="text-left hover:text-primary transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring rounded truncate"
+                  >
+                    {plant.plant.stationName}
+                  </button>
+                </HoverInfo>
               </h3>
               {plant.status !== 'ONLINE' && (
                 <Badge
@@ -135,27 +230,6 @@ export function FleetDetailWorkspace({
                   <WifiOff size={9} aria-hidden="true" />
                   Logger offline
                 </Badge>
-              )}
-            </div>
-            <div className="text-[10.5px] font-mono text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap tabular-nums">
-              {showAccountSubtitle && (
-                <>
-                  <span className="truncate max-w-[140px]">{plant.accountName}</span>
-                  <span>·</span>
-                </>
-              )}
-              <span>{plant.inverters.length} Inv</span>
-              <span>·</span>
-              <span>
-                {plant.capacityKw > 0 ? `${plant.capacityKw.toFixed(0)} kWp` : '--'}
-              </span>
-              {plant.specificYieldKwhKwp !== null && (
-                <>
-                  <span>·</span>
-                  <span className="text-foreground font-semibold">
-                    {plant.specificYieldKwhKwp.toFixed(2)} kWh/kWp
-                  </span>
-                </>
               )}
             </div>
           </div>
@@ -226,8 +300,20 @@ export function FleetDetailWorkspace({
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base sm:text-lg font-bold text-foreground truncate">
-                  {selectedPlant.plant.stationName}
+                <h2 className="text-base sm:text-lg font-bold text-foreground truncate max-w-full">
+                  <HoverInfo
+                    title={selectedPlant.plant.stationName}
+                    side="bottom"
+                    align="start"
+                    className="max-w-full"
+                    content={
+                      <ScopeHoverMetrics
+                        rows={buildPlantHoverRows(selectedPlant, selectedAcc.account.name)}
+                      />
+                    }
+                  >
+                    <span className="truncate">{selectedPlant.plant.stationName}</span>
+                  </HoverInfo>
                 </h2>
                 {selectedPlant.status !== 'ONLINE' && (
                   <Badge
@@ -243,37 +329,6 @@ export function FleetDetailWorkspace({
                     {selectedPlant.status.toLowerCase()}
                   </Badge>
                 )}
-              </div>
-
-              <div className="text-[11px] font-mono text-muted-foreground flex items-center gap-2 flex-wrap tabular-nums">
-                <span>
-                  Capacity:{' '}
-                  <strong className="text-foreground">
-                    {selectedPlant.capacityKw > 0
-                      ? `${selectedPlant.capacityKw.toFixed(0)} kWp`
-                      : '--'}
-                  </strong>
-                </span>
-                <span>·</span>
-                <span>
-                  Specific Yield:{' '}
-                  <strong className="text-foreground">
-                    {selectedPlant.specificYieldKwhKwp !== null
-                      ? `${selectedPlant.specificYieldKwhKwp.toFixed(2)} kWh/kWp`
-                      : '--'}
-                  </strong>
-                </span>
-                <span>·</span>
-                <span>{selectedPlant.inverters.length} Inverters</span>
-                {typeof selectedPlant.batterySoc === 'number' &&
-                  selectedPlant.batterySoc > 0 && (
-                    <>
-                      <span>·</span>
-                      <span className="text-cyan-400 font-semibold">
-                        BESS {selectedPlant.batterySoc.toFixed(0)}%
-                      </span>
-                    </>
-                  )}
               </div>
             </div>
 
@@ -592,8 +647,16 @@ export function FleetDetailWorkspace({
 
               <div className="flex items-center gap-2 flex-wrap">
                 <Building2 size={16} className="text-primary shrink-0" aria-hidden="true" />
-                <h2 className="text-base sm:text-lg font-bold text-foreground truncate">
-                  {selectedAcc.account.name}
+                <h2 className="text-base sm:text-lg font-bold text-foreground truncate max-w-full">
+                  <HoverInfo
+                    title={selectedAcc.account.name}
+                    side="bottom"
+                    align="start"
+                    className="max-w-full"
+                    content={<ScopeHoverMetrics rows={buildAccountHoverRows(selectedAcc)} />}
+                  >
+                    <span className="truncate">{selectedAcc.account.name}</span>
+                  </HoverInfo>
                 </h2>
                 {selectedAcc.isDemo && (
                   <Badge variant="warning" className="text-[10px] font-mono py-0">
@@ -604,32 +667,6 @@ export function FleetDetailWorkspace({
                   <Badge variant="destructive" className="text-[10px] font-mono py-0">
                     Disabled
                   </Badge>
-                )}
-              </div>
-
-              <div className="text-[11px] font-mono text-muted-foreground flex items-center gap-2 flex-wrap tabular-nums">
-                <span>
-                  {selectedAcc.plants.length} Plants · {selectedAcc.invertersCount} Inverters
-                </span>
-                <span>·</span>
-                <span>
-                  Installed:{' '}
-                  <strong className="text-foreground">
-                    {selectedAcc.capacityKw > 0
-                      ? `${selectedAcc.capacityKw.toFixed(0)} kWp`
-                      : '--'}
-                  </strong>
-                </span>
-                {selectedAcc.specificYieldKwhKwp !== null && (
-                  <>
-                    <span>·</span>
-                    <span>
-                      Spec. Yield:{' '}
-                      <strong className="text-foreground">
-                        {selectedAcc.specificYieldKwhKwp.toFixed(2)} kWh/kWp
-                      </strong>
-                    </span>
-                  </>
                 )}
               </div>
             </div>
@@ -720,6 +757,13 @@ export function FleetDetailWorkspace({
                 key={acc.account.id}
                 className="relative rounded-2xl border border-border/70 bg-card hover:border-primary/50 transition-colors p-4 flex flex-col justify-between gap-2.5 shadow-xs group"
               >
+                {/* Background overlay keeps full-card clicks working while scoping hover tooltip strictly to the title */}
+                <span
+                  aria-hidden="true"
+                  onClick={() => onSelectAccount(acc.account.id)}
+                  className="absolute inset-0 z-0 rounded-2xl cursor-pointer"
+                />
+
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -728,14 +772,22 @@ export function FleetDetailWorkspace({
                         className="text-primary shrink-0"
                         aria-hidden="true"
                       />
-                      <h3 className="text-sm sm:text-base font-bold text-foreground truncate">
-                        <button
-                          type="button"
-                          onClick={() => onSelectAccount(acc.account.id)}
-                          className="text-left hover:text-primary transition-colors cursor-pointer after:absolute after:inset-0 after:z-0 focus-visible:outline-2 focus-visible:outline-ring rounded"
+                      <h3 className="text-sm sm:text-base font-bold text-foreground truncate max-w-full">
+                        <HoverInfo
+                          title={acc.account.name}
+                          side="bottom"
+                          align="start"
+                          className="relative z-10 cursor-pointer max-w-full"
+                          content={<ScopeHoverMetrics rows={buildAccountHoverRows(acc)} />}
                         >
-                          {acc.account.name}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => onSelectAccount(acc.account.id)}
+                            className="text-left hover:text-primary transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring rounded truncate"
+                          >
+                            {acc.account.name}
+                          </button>
+                        </HoverInfo>
                       </h3>
                       {acc.isDemo && (
                         <Badge
@@ -760,24 +812,6 @@ export function FleetDetailWorkspace({
                         >
                           {acc.faultCount} Fault
                         </Badge>
-                      )}
-                    </div>
-
-                    <div className="text-[10.5px] font-mono text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap tabular-nums">
-                      <span>{acc.plants.length} Plants</span>
-                      <span>·</span>
-                      <span>{acc.invertersCount} Inverters</span>
-                      <span>·</span>
-                      <span>
-                        {acc.capacityKw > 0 ? `${acc.capacityKw.toFixed(0)} kWp` : '--'}
-                      </span>
-                      {acc.specificYieldKwhKwp !== null && (
-                        <>
-                          <span>·</span>
-                          <span className="text-foreground font-semibold">
-                            {acc.specificYieldKwhKwp.toFixed(2)} kWh/kWp
-                          </span>
-                        </>
                       )}
                     </div>
                   </div>
