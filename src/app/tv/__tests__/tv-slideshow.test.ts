@@ -3,6 +3,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   buildTvSlides,
+  computeTvWeeklyProfitSummary,
   filterTvAuthorizedAccounts,
   getSlideTickerCommentary,
   getTvScopeKey,
@@ -410,5 +411,45 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     // 15 slides > 12 => adaptive select jump control in footer instead of overflowing dot list
     expect(hudHtml).toContain('1. Hanvin Solar · Live Telemetry');
     expect(hudHtml).toContain('Fleet Summary');
+
+    // Paired Solar vs Demand profit comparison on financial slide & ticker
+    const finSlide = slides.find((s) => s.kind === 'financial')!;
+    const weeklySeriesFixture = [
+      {
+        date: '2026-11-17',
+        dayLabel: 'Tue',
+        solarYieldKwh: 200,
+        loadDemandKwh: 250,
+        selfConsumptionKwh: 160,
+        batteryStoredKwh: 0,
+        batteryDischargedKwh: 0,
+        gridExportKwh: 40,
+        gridImportKwh: 90,
+        peakSolarKw: 48,
+        performanceRatioPct: 82,
+        specificYieldKwhKwp: 2.0,
+        savingsUsd: 40,
+        co2AvoidedKg: 142,
+      },
+    ];
+    const profit = computeTvWeeklyProfitSummary(weeklySeriesFixture, 10, 5);
+    expect(profit?.realizedProfitPhp).toBe(160 * 10 + 40 * 5);
+    expect(profit?.demandOffsetPct).toBe(64);
+    const finHtml = renderToStaticMarkup(
+      React.createElement(TvSlideDeck, {
+        slide: finSlide,
+        slideIndex: 2,
+        totalSlides: slides.length,
+        tariffRatePhp: 10,
+        exportCreditPhp: 5,
+        tariffLabel: 'DECORP',
+        weeklySeries: weeklySeriesFixture,
+      })
+    );
+    expect(finHtml).toContain('Daily Solar vs. Facility Demand');
+    expect(finHtml).toContain('64% offset');
+    expect(finHtml).toContain('₱2,500 → ₱900');
+    const finTicker = getSlideTickerCommentary(finSlide, 10, weeklySeriesFixture, null, 5);
+    expect(finTicker.headline).toContain('64% of 250 kWh demand offset');
   });
 });

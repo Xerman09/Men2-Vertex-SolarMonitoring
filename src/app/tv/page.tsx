@@ -82,6 +82,7 @@ export default function TvSlideshowPage() {
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const tariffRatePhp = activeTariff?.peakRate ?? 13.9;
+  const exportCreditPhp = activeTariff?.exportCredit ?? 0;
   const tariffLabel = activeTariff?.schedule?.shortName || 'Standard PHP';
 
   // Read optional initial URL scope (?accountId=...&stationId=...) safely client-side
@@ -539,8 +540,15 @@ export default function TvSlideshowPage() {
   const progressRatio = slides.length <= 1 ? 1 : elapsedMs / (intervalSec * 1000);
 
   const ticker = useMemo(
-    () => getSlideTickerCommentary(currentSlide, tariffRatePhp, currentWeeklySeries, brief),
-    [currentSlide, tariffRatePhp, currentWeeklySeries, brief]
+    () =>
+      getSlideTickerCommentary(
+        currentSlide,
+        tariffRatePhp,
+        currentWeeklySeries,
+        brief,
+        exportCreditPhp
+      ),
+    [currentSlide, tariffRatePhp, currentWeeklySeries, brief, exportCreditPhp]
   );
 
   return (
@@ -579,6 +587,7 @@ export default function TvSlideshowPage() {
             totalSlides={slides.length}
             direction={slideDirection}
             tariffRatePhp={tariffRatePhp}
+            exportCreditPhp={exportCreditPhp}
             tariffLabel={tariffLabel}
             weeklySeries={currentWeeklySeries}
             weeklyLoading={currentWeeklyLoading}

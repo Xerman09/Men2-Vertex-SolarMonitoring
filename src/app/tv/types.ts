@@ -476,6 +476,77 @@ export function buildTvSlides(
   return slides;
 }
 
+export interface TvWeeklyProfitSummary {
+  weekSolarKwh: number;
+  weekDemandKwh: number;
+  weekSelfConsumedKwh: number;
+  weekImportKwh: number;
+  weekExportKwh: number;
+  hasDemandData: boolean;
+  baselineBillPhp: number;
+  gridBillPhp: number;
+  realizedProfitPhp: number;
+  demandOffsetPct: number | null;
+}
+
+/**
+ * Computes 7-day solar vs. facility demand profit metrics strictly from verified
+ * DailyAnalyticsPoint telemetry and Philippine TOU/export tariff rates.
+ */
+export function computeTvWeeklyProfitSummary(
+  weeklySeries: DailyAnalyticsPoint[] | null,
+  tariffRatePhp: number,
+  exportCreditPhp = 0
+): TvWeeklyProfitSummary | null {
+  if (!weeklySeries || weeklySeries.length === 0) return null;
+
+  let weekSolarKwh = 0;
+  let weekDemandKwh = 0;
+  let weekSelfConsumedKwh = 0;
+  let weekImportKwh = 0;
+  let weekExportKwh = 0;
+
+  for (const d of weeklySeries.slice(-7)) {
+    const solar = Math.max(0, d.solarYieldKwh || 0);
+    const demand = Math.max(0, d.loadDemandKwh || 0);
+    const exp = Math.max(0, d.gridExportKwh || 0);
+    const self =
+      d.selfConsumptionKwh > 0
+        ? Math.min(solar, d.selfConsumptionKwh)
+        : Math.max(0, solar - exp);
+    const imp = Math.max(0, d.gridImportKwh || Math.max(0, demand - self));
+
+    weekSolarKwh += solar;
+    weekDemandKwh += demand;
+    weekSelfConsumedKwh += self;
+    weekImportKwh += imp;
+    weekExportKwh += exp;
+  }
+
+  const hasDemandData = weekDemandKwh > 0;
+  const baselineBillPhp = weekDemandKwh * tariffRatePhp;
+  const gridBillPhp = weekImportKwh * tariffRatePhp;
+  const realizedProfitPhp = hasDemandData
+    ? weekSelfConsumedKwh * tariffRatePhp + weekExportKwh * exportCreditPhp
+    : weekSolarKwh * tariffRatePhp;
+  const demandOffsetPct = hasDemandData
+    ? Math.min(100, Math.round((weekSelfConsumedKwh / weekDemandKwh) * 100))
+    : null;
+
+  return {
+    weekSolarKwh,
+    weekDemandKwh,
+    weekSelfConsumedKwh,
+    weekImportKwh,
+    weekExportKwh,
+    hasDemandData,
+    baselineBillPhp,
+    gridBillPhp,
+    realizedProfitPhp,
+    demandOffsetPct,
+  };
+}
+
 export interface TvTickerCommentary {
   headline: string;
   severity: TvBriefSeverity;
@@ -489,7 +560,8 @@ export function getSlideTickerCommentary(
   slide: TvSlide | null,
   tariffRatePhp: number,
   weeklySeries: DailyAnalyticsPoint[] | null,
-  fleetBrief: TvBriefResult | null
+  fleetBrief: TvBriefResult | null,
+  exportCreditPhp = 0
 ): TvTickerCommentary {
   if (!slide) {
     return {
@@ -591,11 +663,17 @@ export function getSlideTickerCommentary(
     }
 
     case 'financial': {
-      if (weeklySeries && weeklySeries.length > 0) {
-        const weekKwh = weeklySeries.reduce((s, d) => s + (d.solarYieldKwh || 0), 0);
-        const co2Kg = Math.round(weekKwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH);
+      const profit = computeTvWeeklyProfitSummary(weeklySeries, tariffRatePhp, exportCreditPhp);
+      if (profit) {
+        const co2Kg = Math.round(profit.weekSolarKwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH);
+        if (profit.hasDemandData && profit.demandOffsetPct !== null) {
+          return {
+            headline: `${slide.title}: ₱${Math.round(profit.realizedProfitPhp).toLocaleString('en-US')} bill profit (${profit.demandOffsetPct}% of ${profit.weekDemandKwh.toFixed(0)} kWh demand offset) · ${profit.weekSolarKwh.toFixed(0)} kWh solar`,
+            severity: 'normal',
+          };
+        }
         return {
-          headline: `${slide.title}: ${weekKwh.toFixed(0)} kWh harvested over 7D · ${formatSavings(weekKwh)} avoided cost · ${co2Kg.toLocaleString('en-US')} kg CO₂ offset`,
+          headline: `${slide.title}: ${profit.weekSolarKwh.toFixed(0)} kWh harvested over 7D · ₱${Math.round(profit.realizedProfitPhp).toLocaleString('en-US')} avoided cost · ${co2Kg.toLocaleString('en-US')} kg CO₂ offset`,
           severity: 'normal',
         };
       }
