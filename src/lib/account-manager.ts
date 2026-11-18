@@ -967,6 +967,15 @@ class DeyeAccountManager {
     return promise;
   }
 
+  private isInternalAdminLoginOnly(acc: DeyeAccountConfig): boolean {
+    if (Array.isArray(acc.plants) && acc.plants.length > 0) return false;
+    const client = this.getClient(acc.id) || new DeyeCloudClient(acc);
+    if (client.hasCredentials()) return false;
+    const emailLower = (acc.email || '').trim().toLowerCase();
+    const nameLower = (acc.name || '').trim().toLowerCase();
+    return Boolean(acc.admin || emailLower === 'admin' || nameLower === 'admin');
+  }
+
   private async performGetAccountsSummary(forceSync = false, sessionRole?: string): Promise<AccountSummary[]> {
     // Synchronize with Directus (or fallback to cache if offline)
     await this.syncWithDirectus(forceSync);
@@ -975,6 +984,7 @@ class DeyeAccountManager {
     if (rawAccounts.length === 0) {
       rawAccounts = this.loadAccounts(false);
     }
+    rawAccounts = rawAccounts.filter((acc) => !this.isInternalAdminLoginOnly(acc));
 
     const summaries: AccountSummary[] = await Promise.all(
       rawAccounts.map(async (acc) => {
@@ -1162,6 +1172,7 @@ class DeyeAccountManager {
     if (rawAccounts.length === 0) {
       rawAccounts = this.getAllRawAccounts(true);
     }
+    rawAccounts = rawAccounts.filter((acc) => !this.isInternalAdminLoginOnly(acc));
 
     // Ensure any stale (>5 min) live account discovers new DeyeCloud plants/inverters before fleet aggregation
     let refreshedTopology = false;

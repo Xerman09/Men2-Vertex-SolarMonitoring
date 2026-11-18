@@ -139,6 +139,14 @@ export function getTvScopeKey(scope: HistoryScope | undefined | null): string {
   return 'FLEET';
 }
 
+export function isInternalAdminOnlyAccount(acc: AccountSummary): boolean {
+  const hasPlants = acc.stationCount > 0 || (Array.isArray(acc.plants) && acc.plants.length > 0);
+  if (hasPlants || acc.isLive) return false;
+  const emailLower = (acc.email || '').trim().toLowerCase();
+  const nameLower = (acc.name || '').trim().toLowerCase();
+  return Boolean(acc.admin && (emailLower === 'admin' || nameLower === 'admin'));
+}
+
 /**
  * Enforces strict tenant isolation for TV slides so consumer accounts only see
  * their authorized accounts/stations and never leak another tenant's data.
@@ -149,7 +157,7 @@ export function filterTvAuthorizedAccounts(
 ): AccountSummary[] {
   if (!Array.isArray(accounts) || accounts.length === 0) return [];
 
-  let list = accounts;
+  let list = accounts.filter((acc) => !isInternalAdminOnlyAccount(acc));
   if (!auth.isAdmin) {
     list = list.filter((acc) => !acc.isDemo);
   }

@@ -452,4 +452,39 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     const finTicker = getSlideTickerCommentary(finSlide, 10, weeklySeriesFixture, null, 5);
     expect(finTicker.headline).toContain('64% of 250 kWh demand offset');
   });
+
+  it('excludes internal zero-plant admin login rows while keeping real admin-owned solar accounts', () => {
+    const { accounts } = makeMultiTenantFixture();
+    const withInternalAdmin: AccountSummary[] = [
+      { ...accounts[0], admin: true },
+      {
+        id: 'db-2',
+        directusId: '2',
+        name: 'admin',
+        email: 'admin',
+        admin: true,
+        isLive: false,
+        stationCount: 0,
+        deviceCount: 0,
+        inverterCount: 0,
+        loggerCount: 0,
+        liveSolarPowerKw: 0,
+        dailyYieldKwh: 0,
+        capacityKw: 0,
+        status: 'OFFLINE',
+        lastPingMs: 0,
+        plants: [],
+      },
+    ];
+
+    const authorized = filterTvAuthorizedAccounts(withInternalAdmin, {
+      isAdmin: true,
+      isConsumer: false,
+      user: null,
+    });
+
+    expect(authorized.map((a) => a.id)).toEqual(['acc-hanvin']);
+    const slides = buildTvSlides(authorized, []);
+    expect(slides.some((s) => s.id.includes('db-2'))).toBe(false);
+  });
 });
