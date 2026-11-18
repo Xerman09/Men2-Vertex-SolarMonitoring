@@ -308,7 +308,7 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     );
     expect(slideHtml).toContain('Dagupan Main');
     expect(slideHtml).toContain('Hanvin Solar');
-    expect(slideHtml).toContain('INV-101');
+    expect(slideHtml).not.toContain('INV-101');
     expect(slideHtml).toContain('-14.2');
     expect(slideHtml).toContain('₱');
     expect(slideHtml).toContain('aria-roledescription="slide"');

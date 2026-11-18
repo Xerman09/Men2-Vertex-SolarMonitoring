@@ -9,7 +9,6 @@ import {
   Layers,
   Leaf,
   Activity,
-  Cpu,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { HoverInfo } from '@/components/ui/tooltip';
@@ -497,40 +496,6 @@ export function TvSlideDeck({
                     />
                   )}
                 </div>
-
-                {slide.kind === 'station' && slide.plant.inverters.length > 0 && (
-                  <div className="mt-3 border-t border-border/50 pt-3 space-y-1.5 overflow-hidden">
-                    <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                      Inverters
-                    </div>
-                    {slide.plant.inverters.slice(0, 4).map((inv) => (
-                      <div
-                        key={inv.deviceSn}
-                        className="flex items-center justify-between gap-2 font-mono text-xs tabular-nums"
-                      >
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <Cpu size={12} className="text-muted-foreground shrink-0" aria-hidden="true" />
-                          <span className="truncate font-semibold text-foreground">{inv.deviceSn}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {inv.status === 'FAULT' && (
-                            <Badge variant="destructive" className="text-[10px]">
-                              Fault
-                            </Badge>
-                          )}
-                          {inv.status === 'OFFLINE' && (
-                            <Badge variant="warning" className="text-[10px]">
-                              Offline
-                            </Badge>
-                          )}
-                          <span className="font-bold text-amber-500">
-                            {inv.liveSolarPowerKw.toFixed(1)} kW
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
 
               <div className="lg:col-span-8 xl:col-span-9 flex flex-col min-h-[260px]">
