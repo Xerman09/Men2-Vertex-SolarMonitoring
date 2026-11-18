@@ -70,7 +70,7 @@ function SlideMetricRow({
   staggerIndex = 0,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   unit?: string;
   accentClass?: string;
   staggerIndex?: number;
@@ -711,14 +711,22 @@ export function TvSlideDeck({
                     staggerIndex={3}
                     label={hasDemand ? '7D Solar / Load' : '7D Solar Harvest'}
                     value={
-                      profit
-                        ? hasDemand
-                          ? `${profit.weekSolarKwh.toFixed(0)} / ${profit.weekDemandKwh.toFixed(0)}`
-                          : profit.weekSolarKwh.toFixed(0)
-                        : '--'
+                      profit ? (
+                        hasDemand ? (
+                          <>
+                            <span className="text-amber-500">{profit.weekSolarKwh.toFixed(0)}</span>
+                            <span className="text-muted-foreground"> / </span>
+                            <span className="text-indigo-400">{profit.weekDemandKwh.toFixed(0)}</span>
+                          </>
+                        ) : (
+                          profit.weekSolarKwh.toFixed(0)
+                        )
+                      ) : (
+                        '--'
+                      )
                     }
                     unit={profit ? 'kWh' : undefined}
-                    accentClass="text-amber-500"
+                    accentClass={hasDemand ? 'text-foreground' : 'text-amber-500'}
                   />
                   <SlideMetricRow
                     staggerIndex={4}
@@ -818,10 +826,16 @@ export function TvSlideDeck({
                             <div className="text-xs text-foreground font-semibold pt-1">
                               {day.date.slice(5)}
                             </div>
-                            <div className="text-[10px] text-muted-foreground leading-none">
-                              {hasDemand
-                                ? `${solarKwh.toFixed(0)}/${demandKwh.toFixed(0)}`
-                                : `${solarKwh.toFixed(0)} kWh`}
+                            <div className="text-[10px] leading-none">
+                              {hasDemand ? (
+                                <>
+                                  <span className="text-amber-400">{solarKwh.toFixed(0)}</span>
+                                  <span className="text-muted-foreground">/</span>
+                                  <span className="text-indigo-400">{demandKwh.toFixed(0)}</span>
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground">{solarKwh.toFixed(0)} kWh</span>
+                              )}
                             </div>
                           </div>
                         );
