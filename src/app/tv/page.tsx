@@ -251,8 +251,14 @@ export default function TvSlideshowPage() {
         qs.set('station_id', scope.stationId);
       }
 
-      const promise = fetch(`/api/deye/history?${qs.toString()}`)
-        .then(async (res) => {
+      const url = `/api/deye/history?${qs.toString()}`;
+      const promise = (async () => {
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          const res = await fetch(url);
+          if (res.status === 429 && attempt === 0) {
+            await new Promise((r) => setTimeout(r, 1_500));
+            continue;
+          }
           if (!res.ok) return;
           const json = (await res.json()) as { dailySeries?: DailyAnalyticsPoint[] | null };
           const nextSeries =
@@ -262,7 +268,9 @@ export default function TvSlideshowPage() {
           const entry: WeeklyCacheEntry = { series: nextSeries, ts: Date.now() };
           weeklyCacheRef.current[key] = entry;
           setWeeklyByScope((prev) => ({ ...prev, [key]: entry }));
-        })
+          return;
+        }
+      })()
         .catch(() => {
           // Retain last verified weekly series for this scope
         })

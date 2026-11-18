@@ -295,48 +295,18 @@ export function buildTvSlides(
         ? { accountId: scopedTree[0].account.id }
         : {};
 
-  // 1. PER ACCOUNTS: Separated Account Telemetry, Stations Roster (when >1), & Account 7D Analytics
-  if (!reqSta) {
-    for (const acc of scopedTree) {
-      if (scopedTree.length === 1 && acc.plants.length === 1) {
-        continue;
-      }
-      const accScope: HistoryScope = { accountId: acc.account.id };
-
+  // 1. STATIONS / PLANTS: Per-Station Live Curve & Inverters + Station 7D Analytics
+  for (const acc of scopedTree) {
+    if (!reqSta && acc.plants.length > 1) {
       slides.push({
-        id: `account-${acc.account.id}`,
-        kind: 'account',
-        title: `${acc.account.name} · Live Telemetry`,
-        scope: accScope,
+        id: `account-stations-${acc.account.id}`,
+        kind: 'account-stations',
+        title: `${acc.account.name} · Stations`,
+        scope: { accountId: acc.account.id },
         account: acc,
       });
-
-      if (acc.plants.length > 1) {
-        slides.push({
-          id: `account-stations-${acc.account.id}`,
-          kind: 'account-stations',
-          title: `${acc.account.name} · Stations`,
-          scope: accScope,
-          account: acc,
-        });
-      }
-
-      slides.push({
-        id: `financial-acc-${acc.account.id}`,
-        kind: 'financial',
-        title: `${acc.account.name} · 7D Analytics`,
-        scope: accScope,
-        scopeLabel: `${acc.plants.length} ${acc.plants.length === 1 ? 'Station' : 'Stations'}`,
-        liveSolarKw: acc.livePowerKw,
-        dailyYieldKwh: acc.dailyYieldKwh,
-        capacityKw: acc.capacityKw,
-        accounts: [acc],
-      });
     }
-  }
 
-  // 2. PER STATION: Dedicated Per-Station Live Curve & Inverters + Station 7D Analytics
-  for (const acc of scopedTree) {
     for (const plant of acc.plants) {
       const stationId = String(plant.plant.stationId);
       const stationScope: HistoryScope = {
@@ -363,6 +333,36 @@ export function buildTvSlides(
         liveSolarKw: plant.livePowerKw,
         dailyYieldKwh: plant.dailyYieldKwh,
         capacityKw: plant.capacityKw,
+        accounts: [acc],
+      });
+    }
+  }
+
+  // 2. ACCOUNTS: Account Rollups (Live Telemetry & Account 7D Analytics) after Stations/Plants
+  if (!reqSta) {
+    for (const acc of scopedTree) {
+      if (scopedTree.length === 1 && acc.plants.length === 1) {
+        continue;
+      }
+      const accScope: HistoryScope = { accountId: acc.account.id };
+
+      slides.push({
+        id: `account-${acc.account.id}`,
+        kind: 'account',
+        title: `${acc.account.name} · Live Telemetry`,
+        scope: accScope,
+        account: acc,
+      });
+
+      slides.push({
+        id: `financial-acc-${acc.account.id}`,
+        kind: 'financial',
+        title: `${acc.account.name} · 7D Analytics`,
+        scope: accScope,
+        scopeLabel: `${acc.plants.length} ${acc.plants.length === 1 ? 'Station' : 'Stations'}`,
+        liveSolarKw: acc.livePowerKw,
+        dailyYieldKwh: acc.dailyYieldKwh,
+        capacityKw: acc.capacityKw,
         accounts: [acc],
       });
     }

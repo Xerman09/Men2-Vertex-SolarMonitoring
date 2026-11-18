@@ -709,7 +709,7 @@ export function TvSlideDeck({
                   />
                   <SlideMetricRow
                     staggerIndex={3}
-                    label={hasDemand ? '7D Solar / Load' : '7D Solar Harvest'}
+                    label={hasDemand ? '7D Solar / Demand' : '7D Solar Harvest'}
                     value={
                       profit ? (
                         hasDemand ? (

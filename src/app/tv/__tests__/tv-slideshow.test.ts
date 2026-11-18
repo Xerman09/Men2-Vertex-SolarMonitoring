@@ -196,42 +196,42 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     const { accounts, nodes } = makeMultiTenantFixture();
 
     // Consumer scoped to healthy multi-station acc-hanvin:
-    // separated Account curve + Account Stations grid + Account 7D + per-station curves & 7D, zero triage
+    // Stations/Plants first (account-stations + per-station curves & 7D) -> Account rollup -> zero triage
     const consumerSlides = buildTvSlides([accounts[0]], nodes, { isConsumer: true });
     expect(consumerSlides.map((s) => s.kind)).toEqual([
-      'account',
       'account-stations',
-      'financial',
       'station',
       'financial',
       'station',
+      'financial',
+      'account',
       'financial',
     ]);
     expect(consumerSlides.map((s) => getTvScopeKey(s.scope))).toEqual([
       'ACC:acc-hanvin',
-      'ACC:acc-hanvin',
-      'ACC:acc-hanvin',
       'STA:acc-hanvin:st-101',
       'STA:acc-hanvin:st-101',
       'STA:acc-hanvin:st-102',
       'STA:acc-hanvin:st-102',
+      'ACC:acc-hanvin',
+      'ACC:acc-hanvin',
     ]);
 
-    // Admin sees Per Accounts -> Per Stations -> Consolidated Fleet Summary -> Triage
+    // Admin sees Stations/Plants first -> Accounts -> Consolidated Fleet Summary -> Triage
     const adminSlides = buildTvSlides(accounts.slice(0, 2), nodes, {
       priorityStationId: 'st-202',
     });
     expect(adminSlides.map((s) => s.kind)).toEqual([
-      'account',
       'account-stations',
+      'station',
+      'financial',
+      'station',
+      'financial',
+      'station',
       'financial',
       'account',
       'financial',
-      'station',
-      'financial',
-      'station',
-      'financial',
-      'station',
+      'account',
       'financial',
       'overview',
       'curve',
@@ -409,7 +409,7 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     expect(hudHtml).toContain('Filter TV by account');
     expect(hudHtml).toContain('Filter TV by station');
     // 15 slides > 12 => adaptive select jump control in footer instead of overflowing dot list
-    expect(hudHtml).toContain('1. Hanvin Solar · Live Telemetry');
+    expect(hudHtml).toContain('1. Hanvin Solar · Stations');
     expect(hudHtml).toContain('Fleet Summary');
 
     // Paired Solar vs Demand profit comparison on financial slide & ticker
