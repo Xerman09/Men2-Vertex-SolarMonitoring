@@ -345,11 +345,12 @@ export function buildTvSlides(
         continue;
       }
       const accScope: HistoryScope = { accountId: acc.account.id };
+      const stationCountLabel = `All ${acc.plants.length} ${acc.plants.length === 1 ? 'Station' : 'Stations'}`;
 
       slides.push({
         id: `account-${acc.account.id}`,
         kind: 'account',
-        title: `${acc.account.name} · Live Telemetry`,
+        title: `${acc.account.name} · Account Total (${stationCountLabel})`,
         scope: accScope,
         account: acc,
       });
@@ -357,9 +358,9 @@ export function buildTvSlides(
       slides.push({
         id: `financial-acc-${acc.account.id}`,
         kind: 'financial',
-        title: `${acc.account.name} · 7D Analytics`,
+        title: `${acc.account.name} · Account Total 7D`,
         scope: accScope,
-        scopeLabel: `${acc.plants.length} ${acc.plants.length === 1 ? 'Station' : 'Stations'}`,
+        scopeLabel: stationCountLabel,
         liveSolarKw: acc.livePowerKw,
         dailyYieldKwh: acc.dailyYieldKwh,
         capacityKw: acc.capacityKw,
@@ -616,7 +617,7 @@ export function getSlideTickerCommentary(
         };
       }
       return {
-        headline: `${acc.account.name}: ${acc.livePowerKw.toFixed(1)} kW live across ${acc.plants.length} ${acc.plants.length === 1 ? 'station' : 'stations'} · ${acc.dailyYieldKwh.toFixed(0)} kWh · ${formatSavings(acc.dailyYieldKwh)} saved`,
+        headline: `${acc.account.name} Total (All ${acc.plants.length} ${acc.plants.length === 1 ? 'Station' : 'Stations'}): ${acc.livePowerKw.toFixed(1)} kW live · ${acc.dailyYieldKwh.toFixed(0)} kWh · ${formatSavings(acc.dailyYieldKwh)} saved`,
         severity: 'normal',
       };
     }

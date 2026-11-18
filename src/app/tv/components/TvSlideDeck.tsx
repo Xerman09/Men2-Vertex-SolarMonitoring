@@ -49,7 +49,7 @@ function getSlideEyebrow(slide: TvSlide): string {
     case 'curve':
       return 'FLEET DIURNAL TELEMETRY';
     case 'account':
-      return 'ACCOUNT TELEMETRY';
+      return 'ACCOUNT TOTAL · ALL STATIONS';
     case 'account-stations':
       return 'STATION BENCHMARK';
     case 'station':
@@ -217,7 +217,7 @@ export function TvSlideDeck({
             {slide.kind === 'overview' || slide.kind === 'curve'
               ? `${slide.onlineInverters}/${slide.totalInverters} Online · ${slide.capacityKw.toFixed(0)} kWp`
               : slide.kind === 'account' || slide.kind === 'account-stations'
-                ? `${slide.account.plants.length} Stations · ${slide.account.capacityKw.toFixed(0)} kWp`
+                ? `All ${slide.account.plants.length} ${slide.account.plants.length === 1 ? 'Station' : 'Stations'} · ${slide.account.capacityKw.toFixed(0)} kWp`
                 : slide.kind === 'station'
                   ? `${slide.plant.inverters.length} Inverters · ${slide.plant.capacityKw.toFixed(0)} kWp`
                   : slide.kind === 'financial'
