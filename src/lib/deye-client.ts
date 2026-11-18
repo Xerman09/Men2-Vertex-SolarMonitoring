@@ -2010,12 +2010,25 @@ export class DeyeCloudClient {
         if (dateKey < opts.startDate || dateKey > opts.endDate) continue;
 
         const cur = byDate.get(dateKey) || { solar: 0, load: 0, exportKwh: 0, importKwh: 0, charge: 0, discharge: 0 };
-        cur.solar += Number(item.generationValue ?? 0) * ratio;
-        cur.load += Number(item.consumptionValue ?? 0) * ratio;
-        cur.exportKwh += Number(item.gridValue ?? 0) * ratio;
-        cur.importKwh += Number(item.purchaseValue ?? 0) * ratio;
-        cur.charge += Number(item.chargeValue ?? 0) * ratio;
-        cur.discharge += Number(item.dischargeValue ?? 0) * ratio;
+        const solarKwh = Number(item.generationValue ?? 0) * ratio;
+        const exportKwh = Number(item.gridValue ?? 0) * ratio;
+        const importKwh = Number(item.purchaseValue ?? 0) * ratio;
+        const chargeKwh = Number(item.chargeValue ?? 0) * ratio;
+        const dischargeKwh = Number(item.dischargeValue ?? 0) * ratio;
+        const rawLoadKwh = Number(item.consumptionValue ?? 0) * ratio;
+        const meteredLoadKwh =
+          rawLoadKwh > 0
+            ? rawLoadKwh
+            : exportKwh > 0 || importKwh > 0
+              ? Math.max(0, solarKwh - exportKwh + importKwh - chargeKwh + dischargeKwh)
+              : 0;
+
+        cur.solar += solarKwh;
+        cur.load += meteredLoadKwh;
+        cur.exportKwh += exportKwh;
+        cur.importKwh += importKwh;
+        cur.charge += chargeKwh;
+        cur.discharge += dischargeKwh;
         byDate.set(dateKey, cur);
       }
     }

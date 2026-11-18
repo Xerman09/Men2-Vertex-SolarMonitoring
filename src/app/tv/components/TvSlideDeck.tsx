@@ -656,11 +656,7 @@ export function TvSlideDeck({
             days.length > 0
               ? Math.max(
                   1,
-                  ...days.map((d) =>
-                    hasDemand
-                      ? Math.max(d.solarYieldKwh || 0, d.loadDemandKwh || 0)
-                      : d.solarYieldKwh || 0
-                  )
+                  ...days.map((d) => Math.max(d.solarYieldKwh || 0, d.loadDemandKwh || 0))
                 )
               : 1;
 
@@ -709,24 +705,20 @@ export function TvSlideDeck({
                   />
                   <SlideMetricRow
                     staggerIndex={3}
-                    label={hasDemand ? '7D Solar / Demand' : '7D Solar Harvest'}
+                    label="7D Solar / Demand"
                     value={
                       profit ? (
-                        hasDemand ? (
-                          <>
-                            <span className="text-amber-500">{profit.weekSolarKwh.toFixed(0)}</span>
-                            <span className="text-muted-foreground"> / </span>
-                            <span className="text-indigo-400">{profit.weekDemandKwh.toFixed(0)}</span>
-                          </>
-                        ) : (
-                          profit.weekSolarKwh.toFixed(0)
-                        )
+                        <>
+                          <span className="text-amber-500">{profit.weekSolarKwh.toFixed(0)}</span>
+                          <span className="text-muted-foreground"> / </span>
+                          <span className="text-indigo-400">{profit.weekDemandKwh.toFixed(0)}</span>
+                        </>
                       ) : (
                         '--'
                       )
                     }
                     unit={profit ? 'kWh' : undefined}
-                    accentClass={hasDemand ? 'text-foreground' : 'text-amber-500'}
+                    accentClass="text-foreground"
                   />
                   <SlideMetricRow
                     staggerIndex={4}
@@ -741,19 +733,17 @@ export function TvSlideDeck({
               <div className="lg:col-span-8 flex flex-col justify-between min-h-[260px]">
                 <div className="flex items-center justify-between gap-4 border-b border-border/40 pb-2.5">
                   <h2 className="font-sans text-base font-bold text-foreground">
-                    {hasDemand ? 'Daily Solar vs. Facility Demand' : 'Daily Solar Harvest'}
+                    Daily Solar vs. Facility Demand
                   </h2>
                   <div className="flex items-center gap-4 font-mono text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
                       <span className="h-2 w-2 rounded-full bg-amber-400" aria-hidden="true" />
                       Solar
                     </span>
-                    {hasDemand && (
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-indigo-400" aria-hidden="true" />
-                        Demand
-                      </span>
-                    )}
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-indigo-400" aria-hidden="true" />
+                      Demand
+                    </span>
                     <span>{tariffLabel}</span>
                   </div>
                 </div>
@@ -795,7 +785,10 @@ export function TvSlideDeck({
                             ? Math.min(100, Math.round((selfKwh / demandKwh) * 100))
                             : null;
                         const solarPct = Math.max(4, Math.min(100, (solarKwh / maxScaleKwh) * 100));
-                        const demandPct = Math.max(4, Math.min(100, (demandKwh / maxScaleKwh) * 100));
+                        const demandPct =
+                          demandKwh > 0
+                            ? Math.max(4, Math.min(100, (demandKwh / maxScaleKwh) * 100))
+                            : 2;
 
                         return (
                           <div
@@ -813,29 +806,25 @@ export function TvSlideDeck({
                             </div>
                             <div className="w-full max-w-[78px] flex-1 min-h-[100px] flex items-end justify-center gap-1.5">
                               <div
-                                className={`${hasDemand ? 'w-1/2' : 'w-full max-w-[68px]'} rounded-t-md bg-gradient-to-t from-amber-600 via-amber-500 to-amber-300 shadow-[0_0_20px_-6px_rgba(245,158,11,0.45)]`}
+                                className="w-1/2 rounded-t-md bg-gradient-to-t from-amber-600 via-amber-500 to-amber-300 shadow-[0_0_20px_-6px_rgba(245,158,11,0.45)]"
                                 style={{ height: `${solarPct}%` }}
                               />
-                              {hasDemand && (
-                                <div
-                                  className="w-1/2 rounded-t-md bg-gradient-to-t from-indigo-700/80 via-indigo-500/80 to-indigo-400/85"
-                                  style={{ height: `${demandPct}%` }}
-                                />
-                              )}
+                              <div
+                                className={`w-1/2 rounded-t-md ${
+                                  demandKwh > 0
+                                    ? 'bg-gradient-to-t from-indigo-700/80 via-indigo-500/80 to-indigo-400/85'
+                                    : 'bg-indigo-500/25'
+                                }`}
+                                style={{ height: `${demandPct}%` }}
+                              />
                             </div>
                             <div className="text-xs text-foreground font-semibold pt-1">
                               {day.date.slice(5)}
                             </div>
                             <div className="text-[10px] leading-none">
-                              {hasDemand ? (
-                                <>
-                                  <span className="text-amber-400">{solarKwh.toFixed(0)}</span>
-                                  <span className="text-muted-foreground">/</span>
-                                  <span className="text-indigo-400">{demandKwh.toFixed(0)}</span>
-                                </>
-                              ) : (
-                                <span className="text-muted-foreground">{solarKwh.toFixed(0)} kWh</span>
-                              )}
+                              <span className="text-amber-400">{solarKwh.toFixed(0)}</span>
+                              <span className="text-muted-foreground">/</span>
+                              <span className="text-indigo-400">{demandKwh.toFixed(0)}</span>
                             </div>
                           </div>
                         );
