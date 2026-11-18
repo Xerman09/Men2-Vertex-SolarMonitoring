@@ -77,11 +77,13 @@ export function PlantSolarCurve({
   const safeDailyYieldKwh = Number.isFinite(dailyYieldKwh) && dailyYieldKwh >= 0 ? dailyYieldKwh : 0;
 
   // "Now" follows Asia/Manila time (same zone as the history API) and ticks every minute.
-  const [nowHour, setNowHour] = useState<number>(() => getManilaNowParts().hourFloat);
+  const [nowParts, setNowParts] = useState(() => getManilaNowParts());
   useEffect(() => {
-    const timer = setInterval(() => setNowHour(getManilaNowParts().hourFloat), 60_000);
+    const timer = setInterval(() => setNowParts(getManilaNowParts()), 60_000);
     return () => clearInterval(timer);
   }, []);
+  const nowHour = nowParts.hourFloat;
+  const currentTimeStr = `${String(nowParts.hour).padStart(2, '0')}:${String(nowParts.minute).padStart(2, '0')}`;
 
   // No invented values: demand/grid come from telemetry, or are zero when none is reported.
   const currentDemand = demandKw !== undefined && Number.isFinite(demandKw) ? demandKw : 0;
@@ -339,8 +341,12 @@ export function PlantSolarCurve({
       >
         {hoveredPoint ? (
           <div className="flex items-center gap-2 sm:gap-3 font-mono flex-wrap">
-            <span className="flex items-center gap-1 font-bold text-foreground bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[8px] sm:text-[8.5px]">
-              <Clock className="size-2.5 sm:size-3 text-primary" />
+            <span
+              className={`flex items-center gap-1 font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded ${
+                isTv ? 'text-xs sm:text-sm' : 'text-[8px] sm:text-[8.5px]'
+              }`}
+            >
+              <Clock className={isTv ? 'size-3.5 text-primary' : 'size-2.5 sm:size-3 text-primary'} />
               {hoveredPoint.timeStr}
             </span>
             <div className="flex items-center gap-1">
@@ -379,6 +385,14 @@ export function PlantSolarCurve({
           </div>
         ) : showLabels ? (
           <div className="flex items-center gap-2 sm:gap-3 font-mono flex-wrap">
+            <span
+              className={`flex items-center gap-1 font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded ${
+                isTv ? 'text-xs sm:text-sm' : 'text-[8px] sm:text-[8.5px]'
+              }`}
+            >
+              <Clock className={isTv ? 'size-3.5 text-primary' : 'size-2.5 sm:size-3 text-primary'} />
+              {currentTimeStr}
+            </span>
             {/* Live Solar Harvest (Amber #f59e0b) - NOT GREEN */}
             <HoverInfo
               title="Solar Generation & Harvest"
@@ -428,6 +442,10 @@ export function PlantSolarCurve({
           </div>
         ) : (
           <div className="flex items-center gap-2 font-mono text-[7.5px] sm:text-[8px] text-muted-foreground/70">
+            <span className="flex items-center gap-1 font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[8px] sm:text-[8.5px]">
+              <Clock className="size-2.5 sm:size-3 text-primary" />
+              {currentTimeStr}
+            </span>
             <span className="size-1.5 rounded-full bg-amber-500/70 inline-block shrink-0" />
             <span>Solar: <strong className="text-amber-500">{(livePowerKw ?? 0).toFixed(1)} kW</strong></span>
             {dailyYieldKwh !== undefined && dailyYieldKwh > 0 && <span>({(dailyYieldKwh ?? 0).toFixed(1)} kWh)</span>}
@@ -741,68 +759,6 @@ export function PlantSolarCurve({
                     : historyStatus === 'error'
                       ? 'Telemetry reconnecting…'
                       : 'No live telemetry'}
-              </div>
-            )}
-
-            {/* Floating Glassmorphic Tooltip matching Analytics Recharts Tooltip */}
-            {hoveredPoint && (
-              <div
-                className="pointer-events-none absolute z-30 transition-all duration-75"
-                style={{
-                  left: hoveredPoint.isRightHalf ? undefined : `calc(${hoveredPoint.svgXPercent}% + 8px)`,
-                  right: hoveredPoint.isRightHalf ? `calc(${100 - hoveredPoint.svgXPercent}% + 8px)` : undefined,
-                  top: '4px',
-                }}
-              >
-                <div className="rounded-lg border border-border/80 bg-popover/95 px-2.5 py-1.5 text-[9px] shadow-xl backdrop-blur-md min-w-[135px] sm:min-w-[150px]">
-                  <div className="font-semibold text-foreground border-b border-border/60 pb-0.5 mb-1 flex items-center justify-between font-mono">
-                    <span>Interval: {hoveredPoint.timeStr}</span>
-                    <span className="text-[8px] text-amber-500 font-bold">5-min</span>
-                  </div>
-                  <div className="space-y-0.5 font-mono">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1 text-muted-foreground text-[8.5px]">
-                        <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_SOLAR }} />
-                        Solar:
-                      </span>
-                      <span className="font-bold text-amber-500">
-                        {(hoveredPoint.solar ?? 0).toFixed(2)} kW
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1 text-muted-foreground text-[8.5px]">
-                        <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_LOAD }} />
-                        Demand:
-                      </span>
-                      <span className="font-bold text-indigo-400">
-                        {(hoveredPoint.load ?? 0).toFixed(2)} kW
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1 text-muted-foreground text-[8.5px]">
-                        <span
-                          className="size-1.5 rounded-full inline-block shrink-0"
-                          style={{ backgroundColor: (hoveredPoint.gridNet ?? 0) >= 0 ? COLOR_GRID : COLOR_IMPORT }}
-                        />
-                        Grid Net:
-                      </span>
-                      <span className={`font-bold ${(hoveredPoint.gridNet ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
-                        {(hoveredPoint.gridNet ?? 0) >= 0 ? `+${(hoveredPoint.gridNet ?? 0).toFixed(2)}` : (hoveredPoint.gridNet ?? 0).toFixed(2)} kW
-                      </span>
-                    </div>
-                    {hasBatteryFlow && (
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1 text-muted-foreground text-[8.5px]">
-                          <span className="size-1.5 rounded-full inline-block shrink-0" style={{ backgroundColor: COLOR_BATTERY }} />
-                          Battery:
-                        </span>
-                        <span className="font-bold text-cyan-400">
-                          {(hoveredPoint.battery ?? 0) > 0 ? `+${(hoveredPoint.battery ?? 0).toFixed(2)}` : (hoveredPoint.battery ?? 0).toFixed(2)} kW
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
             )}
 
