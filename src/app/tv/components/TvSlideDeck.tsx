@@ -18,7 +18,12 @@ import {
   PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH,
 } from '@/lib/tariff-rates';
 import type { DailyAnalyticsPoint } from '@/lib/analytics-data';
-import { computeTvWeeklyProfitSummary, type TvSlide } from '../types';
+import { computeTvWeeklyProfitSummary, getTvScopeKey, type TvSlide } from '../types';
+
+interface WeeklyScopeCacheEntry {
+  series: DailyAnalyticsPoint[] | null;
+  ts: number;
+}
 
 interface TvSlideDeckProps {
   slide: TvSlide;
@@ -30,6 +35,8 @@ interface TvSlideDeckProps {
   tariffLabel: string;
   weeklySeries: DailyAnalyticsPoint[] | null;
   weeklyLoading?: boolean;
+  weeklySeriesByScope?: Record<string, WeeklyScopeCacheEntry>;
+  weeklyLoadingKeys?: Record<string, boolean>;
 }
 
 function formatPhp(amount: number): string {
@@ -110,6 +117,106 @@ function HeaderIcon({ slide }: { slide: TvSlide }) {
   }
 }
 
+function WeeklySolarDemandBars({
+  days,
+  hasDemand,
+  tariffRatePhp,
+  exportCreditPhp,
+  compact = false,
+}: {
+  days: DailyAnalyticsPoint[];
+  hasDemand: boolean;
+  tariffRatePhp: number;
+  exportCreditPhp: number;
+  compact?: boolean;
+}) {
+  const maxScaleKwh = Math.max(
+    1,
+    ...days.map((d) => Math.max(d.solarYieldKwh || 0, d.loadDemandKwh || 0))
+  );
+
+  return (
+    <div className={`relative flex-1 flex flex-col justify-end ${compact ? 'pt-2' : 'pt-6'}`}>
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-x-0 flex flex-col justify-between ${
+          compact ? 'top-6 bottom-7' : 'top-12 bottom-10'
+        }`}
+      >
+        <div className="border-t border-dashed border-border/35" />
+        <div className="border-t border-dashed border-border/35" />
+        <div className="border-t border-border/50" />
+      </div>
+
+      <div className={`relative z-10 grid grid-cols-7 items-end h-full ${compact ? 'gap-1.5' : 'gap-2.5 sm:gap-4'}`}>
+        {days.map((day, idx) => {
+          const solarKwh = Math.max(0, day.solarYieldKwh || 0);
+          const demandKwh = Math.max(0, day.loadDemandKwh || 0);
+          const expKwh = Math.max(0, day.gridExportKwh || 0);
+          const selfKwh =
+            day.selfConsumptionKwh > 0
+              ? Math.min(solarKwh, day.selfConsumptionKwh)
+              : Math.max(0, solarKwh - expKwh);
+          const daySavedPhp = hasDemand
+            ? selfKwh * tariffRatePhp + expKwh * exportCreditPhp
+            : solarKwh * tariffRatePhp;
+          const dayOffsetPct =
+            demandKwh > 0
+              ? Math.min(100, Math.round((selfKwh / demandKwh) * 100))
+              : null;
+          const solarPct = Math.max(4, Math.min(100, (solarKwh / maxScaleKwh) * 100));
+          const demandPct =
+            demandKwh > 0
+              ? Math.max(4, Math.min(100, (demandKwh / maxScaleKwh) * 100))
+              : 2;
+
+          return (
+            <div
+              key={day.date}
+              style={{ '--tv-stagger': idx } as React.CSSProperties}
+              className="tv-kpi-stagger h-full flex flex-col items-center justify-end gap-0.5 font-mono tabular-nums"
+            >
+              {!compact && (
+                <div className="text-sm sm:text-base font-bold text-emerald-400">
+                  {formatPhp(daySavedPhp)}
+                </div>
+              )}
+              <div className={compact ? 'text-[10px] font-semibold text-muted-foreground' : 'text-xs sm:text-sm font-semibold text-muted-foreground'}>
+                {dayOffsetPct !== null
+                  ? `${dayOffsetPct}%`
+                  : `${solarKwh.toFixed(0)}`}
+                {!compact && dayOffsetPct !== null ? ' offset' : !compact ? ' kWh' : ''}
+              </div>
+              <div className={`w-full flex-1 flex items-end justify-center ${compact ? 'max-w-[36px] min-h-[54px] gap-0.5' : 'max-w-[78px] min-h-[100px] gap-1.5'}`}>
+                <div
+                  className="w-1/2 rounded-t-md bg-gradient-to-t from-amber-600 via-amber-500 to-amber-300 shadow-[0_0_20px_-6px_rgba(245,158,11,0.45)]"
+                  style={{ height: `${solarPct}%` }}
+                />
+                <div
+                  className={`w-1/2 rounded-t-md ${
+                    demandKwh > 0
+                      ? 'bg-gradient-to-t from-indigo-700/80 via-indigo-500/80 to-indigo-400/85'
+                      : 'bg-indigo-500/25'
+                  }`}
+                  style={{ height: `${demandPct}%` }}
+                />
+              </div>
+              <div className={compact ? 'text-[10px] text-foreground font-semibold pt-0.5' : 'text-xs sm:text-sm text-foreground font-semibold pt-1'}>
+                {day.date.slice(5)}
+              </div>
+              <div className={compact ? 'text-[10px] leading-none' : 'text-xs sm:text-sm leading-none'}>
+                <span className="text-amber-400">{solarKwh.toFixed(0)}</span>
+                <span className="text-muted-foreground">/</span>
+                <span className="text-indigo-400">{demandKwh.toFixed(0)}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function TvSlideDeck({
   slide,
   slideIndex,
@@ -120,6 +227,8 @@ export function TvSlideDeck({
   tariffLabel,
   weeklySeries,
   weeklyLoading = false,
+  weeklySeriesByScope = {},
+  weeklyLoadingKeys = {},
 }: TvSlideDeckProps) {
   const chapterLabel = `${String(slideIndex + 1).padStart(2, '0')} / ${String(
     Math.max(1, totalSlides)
@@ -231,8 +340,8 @@ export function TvSlideDeck({
       <div className="flex flex-1 min-h-0 flex-col px-[clamp(1.5rem,3.5vw,3.5rem)] py-[clamp(1rem,2.4vh,2rem)]">
         {/* 1. MASTER A: FLEET OVERVIEW (Left Hero Metric + Right Portfolio Table) */}
         {slide.kind === 'overview' && (
-          <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-            <div className="lg:col-span-5 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-8">
+          <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 items-stretch">
+            <div className="lg:col-span-4 xl:col-span-3 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0">
               <div className="tv-kpi-stagger" style={{ '--tv-stagger': 0 } as React.CSSProperties}>
                 <div className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
                   Live Solar Generation
@@ -310,7 +419,7 @@ export function TvSlideDeck({
               </div>
             </div>
 
-            <div className="lg:col-span-7 flex flex-col justify-between min-h-0">
+            <div className="lg:col-span-8 xl:col-span-9 flex flex-col justify-between min-h-0">
               <div className="grid grid-cols-12 gap-3 border-b border-border/50 pb-2 font-mono text-xs sm:text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 <div className="col-span-5">Account</div>
                 <div className="col-span-3">Share</div>
@@ -499,25 +608,65 @@ export function TvSlideDeck({
               </div>
 
               <div className="lg:col-span-8 xl:col-span-9 flex flex-col min-h-[260px]">
-                <PlantSolarCurve
-                  capacityKw={capKw}
-                  livePowerKw={liveKw}
-                  dailyYieldKwh={yieldKwh}
-                  demandKw={demandKw}
-                  gridPowerKw={gridKw}
-                  utilizationPct={
-                    slide.kind === 'account'
-                      ? slide.account.utilizationPct
-                      : slide.kind === 'station'
-                        ? slide.plant.utilizationPct
-                        : undefined
-                  }
-                  scope={slide.scope}
-                  height="100%"
-                  className="w-full h-full flex-1 min-h-0"
-                  showLabels={true}
-                  variant="tv"
-                />
+                {slide.kind === 'account' && slide.account.plants.length > 0 ? (
+                  <div
+                    className={`grid flex-1 min-h-0 grid-cols-1 md:grid-cols-2 ${
+                      slide.account.plants.length > 4 ? 'xl:grid-cols-3' : ''
+                    } gap-3 auto-rows-fr`}
+                  >
+                    {slide.account.plants.map((plant) => {
+                      const stationId = String(plant.plant.stationId);
+                      return (
+                        <div
+                          key={stationId}
+                          className="flex flex-col min-h-0 rounded-xl border border-border/50 bg-card/40 p-3"
+                        >
+                          <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-border/40 mb-1.5 shrink-0">
+                            <span className="truncate font-sans text-sm sm:text-base font-bold text-foreground">
+                              {plant.plant.stationName}
+                            </span>
+                            <span className="font-mono text-xs sm:text-sm font-semibold text-amber-500 tabular-nums shrink-0">
+                              {plant.livePowerKw.toFixed(1)} / {plant.capacityKw.toFixed(0)} kWp
+                            </span>
+                          </div>
+                          <PlantSolarCurve
+                            capacityKw={plant.capacityKw}
+                            livePowerKw={plant.livePowerKw}
+                            dailyYieldKwh={plant.dailyYieldKwh}
+                            demandKw={plant.demandKw}
+                            gridPowerKw={plant.gridPowerKw}
+                            utilizationPct={plant.utilizationPct}
+                            scope={{ accountId: slide.account.account.id, stationId }}
+                            height="100%"
+                            className="w-full h-full flex-1 min-h-0"
+                            showLabels={true}
+                            variant="compact"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <PlantSolarCurve
+                    capacityKw={capKw}
+                    livePowerKw={liveKw}
+                    dailyYieldKwh={yieldKwh}
+                    demandKw={demandKw}
+                    gridPowerKw={gridKw}
+                    utilizationPct={
+                      slide.kind === 'account'
+                        ? slide.account.utilizationPct
+                        : slide.kind === 'station'
+                          ? slide.plant.utilizationPct
+                          : undefined
+                    }
+                    scope={slide.scope}
+                    height="100%"
+                    className="w-full h-full flex-1 min-h-0"
+                    showLabels={true}
+                    variant="tv"
+                  />
+                )}
               </div>
             </div>
           );
@@ -627,8 +776,8 @@ export function TvSlideDeck({
               : 1;
 
           return (
-            <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-              <div className="lg:col-span-4 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-8">
+            <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 items-stretch">
+              <div className="lg:col-span-4 xl:col-span-3 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0">
                 <div className="tv-kpi-stagger" style={{ '--tv-stagger': 0 } as React.CSSProperties}>
                   <div className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
                     {hasDemand ? '7-Day Realized Bill Savings' : '7-Day Avoided Cost'}
@@ -696,10 +845,12 @@ export function TvSlideDeck({
                 </div>
               </div>
 
-              <div className="lg:col-span-8 flex flex-col justify-between min-h-[260px]">
+              <div className="lg:col-span-8 xl:col-span-9 flex flex-col justify-between min-h-[260px]">
                 <div className="flex items-center justify-between gap-4 border-b border-border/40 pb-2.5">
                   <h2 className="font-sans text-base sm:text-lg font-bold text-foreground">
-                    Daily Solar vs. Facility Demand
+                    {slide.account && slide.account.plants.length > 0
+                      ? 'Stations 7D Solar vs. Facility Demand'
+                      : 'Daily Solar vs. Facility Demand'}
                   </h2>
                   <div className="flex items-center gap-4 font-mono text-xs sm:text-sm text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
@@ -714,7 +865,65 @@ export function TvSlideDeck({
                   </div>
                 </div>
 
-                {weeklyLoading && days.length === 0 ? (
+                {slide.account && slide.account.plants.length > 0 ? (
+                  <div
+                    className={`grid flex-1 min-h-0 grid-cols-1 md:grid-cols-2 ${
+                      slide.account.plants.length > 4 ? 'xl:grid-cols-3' : ''
+                    } gap-3 pt-3 auto-rows-fr`}
+                  >
+                    {slide.account.plants.map((plant) => {
+                      const stationId = String(plant.plant.stationId);
+                      const scopeKey = getTvScopeKey({
+                        accountId: slide.account!.account.id,
+                        stationId,
+                      });
+                      const plantDays = (weeklySeriesByScope[scopeKey]?.series ?? []).slice(-7);
+                      const plantLoading = Boolean(weeklyLoadingKeys[scopeKey]);
+                      const plantProfit = computeTvWeeklyProfitSummary(
+                        plantDays,
+                        tariffRatePhp,
+                        exportCreditPhp
+                      );
+                      const plantHasDemand = Boolean(plantProfit && plantProfit.weekDemandKwh > 0);
+
+                      return (
+                        <div
+                          key={stationId}
+                          className="flex flex-col min-h-0 rounded-xl border border-border/50 bg-card/40 p-3"
+                        >
+                          <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-border/40 shrink-0">
+                            <span className="truncate font-sans text-sm sm:text-base font-bold text-foreground">
+                              {plant.plant.stationName}
+                            </span>
+                            <span className="font-mono text-xs font-semibold text-emerald-400 tabular-nums shrink-0">
+                              {plantProfit ? formatPhp(plantProfit.realizedProfitPhp) : '--'}
+                              {plantProfit?.demandOffsetPct !== null && plantProfit?.demandOffsetPct !== undefined
+                                ? ` · ${plantProfit.demandOffsetPct}%`
+                                : ''}
+                            </span>
+                          </div>
+                          {plantLoading && plantDays.length === 0 ? (
+                            <div className="flex-1 flex items-center justify-center font-mono text-xs text-muted-foreground">
+                              Loading 7D…
+                            </div>
+                          ) : plantDays.length === 0 ? (
+                            <div className="flex-1 flex items-center justify-center font-mono text-xs text-muted-foreground">
+                              No 7D telemetry
+                            </div>
+                          ) : (
+                            <WeeklySolarDemandBars
+                              days={plantDays}
+                              hasDemand={plantHasDemand}
+                              tariffRatePhp={tariffRatePhp}
+                              exportCreditPhp={exportCreditPhp}
+                              compact
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : weeklyLoading && days.length === 0 ? (
                   <div className="flex-1 flex items-center justify-center font-mono text-sm text-muted-foreground">
                     Loading 7D DeyeCloud telemetry…
                   </div>
@@ -723,80 +932,12 @@ export function TvSlideDeck({
                     No weekly DeyeCloud telemetry recorded for this scope
                   </div>
                 ) : (
-                  <div className="relative flex-1 pt-6 flex flex-col justify-end">
-                    {/* Subtle architectural horizontal guides */}
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 top-12 bottom-10 flex flex-col justify-between"
-                    >
-                      <div className="border-t border-dashed border-border/35" />
-                      <div className="border-t border-dashed border-border/35" />
-                      <div className="border-t border-border/50" />
-                    </div>
-
-                    <div className="relative z-10 grid grid-cols-7 gap-2.5 sm:gap-4 items-end h-full">
-                      {days.map((day, idx) => {
-                        const solarKwh = Math.max(0, day.solarYieldKwh || 0);
-                        const demandKwh = Math.max(0, day.loadDemandKwh || 0);
-                        const expKwh = Math.max(0, day.gridExportKwh || 0);
-                        const selfKwh =
-                          day.selfConsumptionKwh > 0
-                            ? Math.min(solarKwh, day.selfConsumptionKwh)
-                            : Math.max(0, solarKwh - expKwh);
-                        const daySavedPhp = hasDemand
-                          ? selfKwh * tariffRatePhp + expKwh * exportCreditPhp
-                          : solarKwh * tariffRatePhp;
-                        const dayOffsetPct =
-                          demandKwh > 0
-                            ? Math.min(100, Math.round((selfKwh / demandKwh) * 100))
-                            : null;
-                        const solarPct = Math.max(4, Math.min(100, (solarKwh / maxScaleKwh) * 100));
-                        const demandPct =
-                          demandKwh > 0
-                            ? Math.max(4, Math.min(100, (demandKwh / maxScaleKwh) * 100))
-                            : 2;
-
-                        return (
-                          <div
-                            key={day.date}
-                            style={{ '--tv-stagger': idx } as React.CSSProperties}
-                            className="tv-kpi-stagger h-full flex flex-col items-center justify-end gap-1 font-mono tabular-nums"
-                          >
-                            <div className="text-sm sm:text-base font-bold text-emerald-400">
-                              {formatPhp(daySavedPhp)}
-                            </div>
-                            <div className="text-xs sm:text-sm font-semibold text-muted-foreground">
-                              {dayOffsetPct !== null
-                                ? `${dayOffsetPct}% offset`
-                                : `${solarKwh.toFixed(0)} kWh`}
-                            </div>
-                            <div className="w-full max-w-[78px] flex-1 min-h-[100px] flex items-end justify-center gap-1.5">
-                              <div
-                                className="w-1/2 rounded-t-md bg-gradient-to-t from-amber-600 via-amber-500 to-amber-300 shadow-[0_0_20px_-6px_rgba(245,158,11,0.45)]"
-                                style={{ height: `${solarPct}%` }}
-                              />
-                              <div
-                                className={`w-1/2 rounded-t-md ${
-                                  demandKwh > 0
-                                    ? 'bg-gradient-to-t from-indigo-700/80 via-indigo-500/80 to-indigo-400/85'
-                                    : 'bg-indigo-500/25'
-                                }`}
-                                style={{ height: `${demandPct}%` }}
-                              />
-                            </div>
-                            <div className="text-xs sm:text-sm text-foreground font-semibold pt-1">
-                              {day.date.slice(5)}
-                            </div>
-                            <div className="text-xs sm:text-sm leading-none">
-                              <span className="text-amber-400">{solarKwh.toFixed(0)}</span>
-                              <span className="text-muted-foreground">/</span>
-                              <span className="text-indigo-400">{demandKwh.toFixed(0)}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <WeeklySolarDemandBars
+                    days={days}
+                    hasDemand={hasDemand}
+                    tariffRatePhp={tariffRatePhp}
+                    exportCreditPhp={exportCreditPhp}
+                  />
                 )}
               </div>
             </div>

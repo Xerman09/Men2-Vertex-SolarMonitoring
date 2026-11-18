@@ -69,6 +69,7 @@ export default function TvSlideshowPage() {
   const [elapsedMs, setElapsedMs] = useState<number>(0);
 
   const [hudVisible, setHudVisible] = useState<boolean>(true);
+  const [hudLockedHidden, setHudLockedHidden] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [shiftIndex, setShiftIndex] = useState<number>(0);
   const [manilaClock, setManilaClock] = useState<string>(() => {
@@ -294,6 +295,14 @@ export default function TvSlideshowPage() {
   useEffect(() => {
     if (!currentSlide || currentSlide.kind !== 'financial') return;
     ensureWeeklySeriesForScope(currentSlide.scope);
+    if (currentSlide.account?.plants?.length) {
+      for (const plant of currentSlide.account.plants) {
+        ensureWeeklySeriesForScope({
+          accountId: currentSlide.account.account.id,
+          stationId: String(plant.plant.stationId),
+        });
+      }
+    }
   }, [currentSlide, ensureWeeklySeriesForScope]);
 
   // Manila clock ticker + anti-burn-in pixel shift every 10 minutes
@@ -533,6 +542,9 @@ export default function TvSlideshowPage() {
       } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         void toggleFullscreen();
+      } else if (e.key === 'h' || e.key === 'H') {
+        e.preventDefault();
+        setHudLockedHidden((h) => !h);
       }
     };
 
@@ -599,6 +611,8 @@ export default function TvSlideshowPage() {
             tariffLabel={tariffLabel}
             weeklySeries={currentWeeklySeries}
             weeklyLoading={currentWeeklyLoading}
+            weeklySeriesByScope={weeklyByScope}
+            weeklyLoadingKeys={weeklyLoadingKeys}
           />
         </section>
       )}
@@ -610,6 +624,7 @@ export default function TvSlideshowPage() {
         intervalSec={intervalSec}
         progressRatio={progressRatio}
         hudVisible={hudVisible}
+        hudLockedHidden={hudLockedHidden}
         isFullscreen={isFullscreen}
         isStale={isStale}
         manilaClock={manilaClock}
@@ -630,6 +645,7 @@ export default function TvSlideshowPage() {
           setElapsedMs(0);
         }}
         onToggleFullscreen={toggleFullscreen}
+        onToggleHudHidden={() => setHudLockedHidden((h) => !h)}
       />
     </main>
   );

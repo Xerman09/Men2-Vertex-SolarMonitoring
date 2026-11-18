@@ -105,6 +105,7 @@ export interface TvFinancialSlide {
   dailyYieldKwh: number;
   capacityKw: number;
   accounts: FleetAccountNode[];
+  account?: FleetAccountNode;
 }
 
 export type TvSlide =
@@ -366,13 +367,14 @@ export function buildTvSlides(
       slides.push({
         id: `financial-acc-${acc.account.id}`,
         kind: 'financial',
-        title: `${acc.account.name} · Account Total 7D`,
+        title: `${acc.account.name} · Stations 7D Analytics`,
         scope: accScope,
         scopeLabel: stationCountLabel,
         liveSolarKw: acc.livePowerKw,
         dailyYieldKwh: acc.dailyYieldKwh,
         capacityKw: acc.capacityKw,
         accounts: [acc],
+        account: acc,
       });
     }
   }
