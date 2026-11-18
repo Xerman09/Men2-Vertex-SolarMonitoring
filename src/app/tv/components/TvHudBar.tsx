@@ -248,7 +248,7 @@ export function TvHudBar({
             )}
             <p
               key={headline}
-              className="tv-kpi-stagger truncate font-mono text-xs sm:text-sm font-semibold text-foreground"
+              className="tv-kpi-stagger truncate font-mono text-sm sm:text-base font-semibold text-foreground"
             >
               {headline}
             </p>
@@ -305,7 +305,7 @@ export function TvHudBar({
           )}
 
           {/* Slide Counter & Manila Clock */}
-          <div className="flex items-center gap-3 font-mono text-xs sm:text-sm tabular-nums shrink-0 text-muted-foreground">
+          <div className="flex items-center gap-3 font-mono text-sm sm:text-base tabular-nums shrink-0 text-muted-foreground">
             <span>
               <strong className="text-foreground">{activeIndex + 1}</strong> / {slides.length}
             </span>

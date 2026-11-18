@@ -28,6 +28,7 @@ interface PlantSolarCurveProps {
   height?: number | string;
   className?: string;
   showLabels?: boolean;
+  variant?: 'compact' | 'tv';
   /**
    * Telemetry scope. Omit both ids for the whole fleet; set accountId for one account;
    * set accountId + stationId for one plant. The curve fetches its own scoped history.
@@ -61,8 +62,10 @@ export function PlantSolarCurve({
   height,
   className = '',
   showLabels = true,
+  variant = 'compact',
   scope,
 }: PlantSolarCurveProps) {
+  const isTv = variant === 'tv';
   const [hoveredPoint, setHoveredPoint] = useState<HoverData | null>(null);
   const { status: historyStatus, points: historyPoints } = useScopedHistory(scope);
 
@@ -327,7 +330,13 @@ export function PlantSolarCurve({
   return (
     <div className={`relative w-full select-none flex flex-col flex-1 h-full ${className}`}>
       {/* Telemetry Header Above Graph: Never covers the curve */}
-      <div className="flex items-center justify-between text-[8px] sm:text-[8.5px] text-muted-foreground mb-1.5 px-0.5 shrink-0 gap-1.5 flex-wrap min-h-[22px]">
+      <div
+        className={`flex items-center justify-between text-muted-foreground shrink-0 flex-wrap ${
+          isTv
+            ? 'text-xs sm:text-sm mb-2.5 px-0.5 gap-3 min-h-[28px]'
+            : 'text-[8px] sm:text-[8.5px] mb-1.5 px-0.5 gap-1.5 min-h-[22px]'
+        }`}
+      >
         {hoveredPoint ? (
           <div className="flex items-center gap-2 sm:gap-3 font-mono flex-wrap">
             <span className="flex items-center gap-1 font-bold text-foreground bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[8px] sm:text-[8.5px]">
@@ -428,17 +437,27 @@ export function PlantSolarCurve({
 
       {/* Full-height graph container covering the whole card */}
       <div
-        className="relative w-full overflow-hidden rounded-lg bg-card/70 border border-border/50 p-1.5 flex-1 flex flex-col justify-between min-h-0"
+        className={`relative w-full overflow-hidden flex-1 flex flex-col justify-between min-h-0 ${
+          isTv
+            ? 'bg-transparent p-0'
+            : 'rounded-lg bg-card/70 border border-border/50 p-1.5'
+        }`}
         style={heightStyle ? heightStyle : { minHeight: '100px' }}
       >
         {/* Main Plot Area: Y-Axis Column on Left + Chart Canvas in Center + Vertical Utilization on Right */}
-        <div className="flex flex-1 min-h-0 w-full gap-1 items-stretch">
+        <div className={`flex flex-1 min-h-0 w-full items-stretch ${isTv ? 'gap-2' : 'gap-1'}`}>
           {/* Y-Axis Column */}
-          <div className="flex flex-col shrink-0 select-none pb-4 pt-0.5 w-9 sm:w-10 border-r border-border/40 pr-1 text-[7.5px] sm:text-[8px] font-mono text-muted-foreground/80">
+          <div
+            className={`flex flex-col shrink-0 select-none pt-0.5 border-r border-border/40 font-mono text-muted-foreground/80 ${
+              isTv
+                ? 'pb-7 w-14 sm:w-16 pr-2.5 text-xs sm:text-sm'
+                : 'pb-4 w-9 sm:w-10 pr-1 text-[7.5px] sm:text-[8px]'
+            }`}
+          >
             <div className="relative flex-1 flex flex-col justify-between items-end w-full">
               <div className="flex items-center gap-0.5 justify-end w-full leading-none">
                 <span className="font-semibold text-foreground/90">{formatSignedKwLabel(yBounds.max)}</span>
-                <span className="text-[6.5px] text-muted-foreground">kW</span>
+                <span className={isTv ? 'text-[11px] text-muted-foreground' : 'text-[6.5px] text-muted-foreground'}>kW</span>
               </div>
               <div className="flex items-center justify-end w-full leading-none text-muted-foreground/75">
                 <span>{formatSignedKwLabel((yBounds.max + yBounds.min) * 0.5)}</span>
@@ -451,7 +470,9 @@ export function PlantSolarCurve({
                 zeroOffsetRatio * 100 <= 82 &&
                 Math.abs(zeroOffsetRatio * 100 - 50) > 14 && (
                   <span
-                    className="pointer-events-none absolute right-0 -translate-y-1/2 text-[7px] text-foreground/85 font-semibold leading-none"
+                    className={`pointer-events-none absolute right-0 -translate-y-1/2 text-foreground/85 font-semibold leading-none ${
+                      isTv ? 'text-xs' : 'text-[7px]'
+                    }`}
                     style={{ top: `${(zeroOffsetRatio * 100).toFixed(1)}%` }}
                   >
                     0
@@ -708,7 +729,11 @@ export function PlantSolarCurve({
             </svg>
 
             {historyStatus !== 'ready' && (
-              <div className="pointer-events-none absolute inset-x-0 top-0 bottom-5 flex items-center justify-center text-[9px] font-mono text-muted-foreground/80">
+              <div
+                className={`pointer-events-none absolute inset-x-0 top-0 bottom-5 flex items-center justify-center font-mono text-muted-foreground/80 ${
+                  isTv ? 'text-sm sm:text-base' : 'text-[9px]'
+                }`}
+              >
                 {historyStatus === 'loading'
                   ? 'Loading telemetry…'
                   : historyStatus === 'unauthorized'
@@ -782,7 +807,11 @@ export function PlantSolarCurve({
             )}
 
             {/* Time Axis Labels: accurately spaced across diurnal cycle */}
-            <div className="flex items-center justify-between text-[7.5px] font-mono text-muted-foreground/60 px-1 pt-1 border-t border-border/30">
+            <div
+              className={`flex items-center justify-between font-mono text-muted-foreground/70 px-1 border-t border-border/30 ${
+                isTv ? 'text-xs sm:text-sm pt-2' : 'text-[7.5px] pt-1'
+              }`}
+            >
               <span>00:00</span>
               <span>06:00</span>
               <span>12:00</span>
@@ -820,20 +849,36 @@ export function PlantSolarCurve({
               </div>
             }
           >
-            <div className="flex flex-col items-center justify-between shrink-0 select-none border-l border-border/40 pl-1 sm:pl-1.5 w-8 sm:w-9 h-full py-0.5 cursor-help">
-              <span className="text-[7.5px] sm:text-[8px] uppercase tracking-wider font-mono text-muted-foreground font-semibold leading-none">
+            <div
+              className={`flex flex-col items-center justify-between shrink-0 select-none border-l border-border/40 h-full py-0.5 cursor-help ${
+                isTv ? 'pl-2.5 w-12 sm:w-14' : 'pl-1 sm:pl-1.5 w-8 sm:w-9'
+              }`}
+            >
+              <span
+                className={`uppercase tracking-wider font-mono text-muted-foreground font-semibold leading-none ${
+                  isTv ? 'text-xs' : 'text-[7.5px] sm:text-[8px]'
+                }`}
+              >
                 Util
               </span>
 
               {/* Vertical Progress Gauge Track (Amber matching live solar harvest) */}
-              <div className="w-1.5 sm:w-2 flex-1 my-1 bg-muted/60 rounded-full overflow-hidden relative border border-border/30 flex flex-col justify-end">
+              <div
+                className={`flex-1 my-1 bg-muted/60 rounded-full overflow-hidden relative border border-border/30 flex flex-col justify-end ${
+                  isTv ? 'w-2.5' : 'w-1.5 sm:w-2'
+                }`}
+              >
                 <div
                   className="w-full bg-gradient-to-t from-amber-600 via-amber-500 to-amber-400 rounded-full transition-all duration-500"
                   style={{ height: `${Math.min(100, Math.max(0, currentUtil))}%` }}
                 />
               </div>
 
-              <span className="text-[8px] sm:text-[9px] font-bold font-mono text-amber-500 leading-none">
+              <span
+                className={`font-bold font-mono text-amber-500 leading-none ${
+                  isTv ? 'text-xs sm:text-sm' : 'text-[8px] sm:text-[9px]'
+                }`}
+              >
                 {(currentUtil ?? 0).toFixed(0)}%
               </span>
             </div>

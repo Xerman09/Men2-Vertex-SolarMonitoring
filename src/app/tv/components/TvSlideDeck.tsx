@@ -79,13 +79,13 @@ function SlideMetricRow({
       style={{ '--tv-stagger': staggerIndex } as React.CSSProperties}
       className="tv-kpi-stagger flex items-baseline justify-between gap-4 py-3"
     >
-      <span className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">
+      <span className="font-mono text-xs sm:text-sm uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </span>
-      <span className={`font-mono text-xl sm:text-2xl font-bold tabular-nums ${accentClass}`}>
+      <span className={`font-mono text-2xl sm:text-3xl font-bold tabular-nums ${accentClass}`}>
         {value}
         {unit && (
-          <span className="ml-1 text-xs font-semibold text-muted-foreground">{unit}</span>
+          <span className="ml-1 text-xs sm:text-sm font-semibold text-muted-foreground">{unit}</span>
         )}
       </span>
     </div>
@@ -147,7 +147,7 @@ export function TvSlideDeck({
             <HeaderIcon slide={slide} />
           </div>
           <div className="min-w-0">
-            <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-500/90 truncate">
+            <div className="font-mono text-xs sm:text-sm font-semibold uppercase tracking-[0.22em] text-amber-500/90 truncate">
               {chapterLabel} · {eyebrow}
             </div>
             <div className="flex items-center gap-2.5 min-w-0 mt-0.5">
@@ -210,10 +210,10 @@ export function TvSlideDeck({
         </div>
 
         <div className="hidden sm:flex flex-col items-end shrink-0 text-right">
-          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+          <span className="font-mono text-xs sm:text-sm font-semibold uppercase tracking-[0.26em] text-muted-foreground">
             VOSOLAR
           </span>
-          <span className="mt-1 font-mono text-sm font-bold text-foreground tabular-nums">
+          <span className="mt-1 font-mono text-sm sm:text-base font-bold text-foreground tabular-nums">
             {slide.kind === 'overview' || slide.kind === 'curve'
               ? `${slide.onlineInverters}/${slide.totalInverters} Online · ${slide.capacityKw.toFixed(0)} kWp`
               : slide.kind === 'account' || slide.kind === 'account-stations'
@@ -311,7 +311,7 @@ export function TvSlideDeck({
             </div>
 
             <div className="lg:col-span-7 flex flex-col justify-between min-h-0">
-              <div className="grid grid-cols-12 gap-3 border-b border-border/50 pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <div className="grid grid-cols-12 gap-3 border-b border-border/50 pb-2 font-mono text-xs sm:text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 <div className="col-span-5">Account</div>
                 <div className="col-span-3">Share</div>
                 <div className="col-span-2 text-right">Live</div>
@@ -348,7 +348,7 @@ export function TvSlideDeck({
                               </Badge>
                             )}
                           </div>
-                          <div className="text-[11px] text-muted-foreground">
+                          <div className="text-xs sm:text-sm text-muted-foreground">
                             {acc.plants.length}{' '}
                             {acc.plants.length === 1 ? 'Station' : 'Stations'} ·{' '}
                             {acc.capacityKw > 0 ? `${acc.capacityKw.toFixed(0)} kWp` : '--'}
@@ -364,15 +364,15 @@ export function TvSlideDeck({
                           </div>
                         </div>
 
-                        <div className="col-span-2 text-right text-base sm:text-lg font-bold text-amber-500">
-                          {acc.livePowerKw.toFixed(1)} <span className="text-[11px] text-muted-foreground">kW</span>
+                        <div className="col-span-2 text-right text-lg sm:text-xl font-bold text-amber-500">
+                          {acc.livePowerKw.toFixed(1)} <span className="text-xs sm:text-sm text-muted-foreground">kW</span>
                         </div>
 
                         <div className="col-span-2 text-right">
-                          <div className="text-sm sm:text-base font-bold text-emerald-400">
-                            {acc.dailyYieldKwh.toFixed(0)} <span className="text-[11px] text-muted-foreground">kWh</span>
+                          <div className="text-base sm:text-lg font-bold text-emerald-400">
+                            {acc.dailyYieldKwh.toFixed(0)} <span className="text-xs sm:text-sm text-muted-foreground">kWh</span>
                           </div>
-                          <div className="text-[11px] text-muted-foreground">
+                          <div className="text-xs sm:text-sm text-muted-foreground">
                             {formatPhp(acc.dailyYieldKwh * tariffRatePhp)}
                           </div>
                         </div>
@@ -516,6 +516,7 @@ export function TvSlideDeck({
                   height="100%"
                   className="w-full h-full flex-1 min-h-0"
                   showLabels={true}
+                  variant="tv"
                 />
               </div>
             </div>
@@ -697,10 +698,10 @@ export function TvSlideDeck({
 
               <div className="lg:col-span-8 flex flex-col justify-between min-h-[260px]">
                 <div className="flex items-center justify-between gap-4 border-b border-border/40 pb-2.5">
-                  <h2 className="font-sans text-base font-bold text-foreground">
+                  <h2 className="font-sans text-base sm:text-lg font-bold text-foreground">
                     Daily Solar vs. Facility Demand
                   </h2>
-                  <div className="flex items-center gap-4 font-mono text-xs text-muted-foreground">
+                  <div className="flex items-center gap-4 font-mono text-xs sm:text-sm text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
                       <span className="h-2 w-2 rounded-full bg-amber-400" aria-hidden="true" />
                       Solar
@@ -761,10 +762,10 @@ export function TvSlideDeck({
                             style={{ '--tv-stagger': idx } as React.CSSProperties}
                             className="tv-kpi-stagger h-full flex flex-col items-center justify-end gap-1 font-mono tabular-nums"
                           >
-                            <div className="text-xs sm:text-sm font-bold text-emerald-400">
+                            <div className="text-sm sm:text-base font-bold text-emerald-400">
                               {formatPhp(daySavedPhp)}
                             </div>
-                            <div className="text-[10px] font-semibold text-muted-foreground">
+                            <div className="text-xs sm:text-sm font-semibold text-muted-foreground">
                               {dayOffsetPct !== null
                                 ? `${dayOffsetPct}% offset`
                                 : `${solarKwh.toFixed(0)} kWh`}
@@ -783,10 +784,10 @@ export function TvSlideDeck({
                                 style={{ height: `${demandPct}%` }}
                               />
                             </div>
-                            <div className="text-xs text-foreground font-semibold pt-1">
+                            <div className="text-xs sm:text-sm text-foreground font-semibold pt-1">
                               {day.date.slice(5)}
                             </div>
-                            <div className="text-[10px] leading-none">
+                            <div className="text-xs sm:text-sm leading-none">
                               <span className="text-amber-400">{solarKwh.toFixed(0)}</span>
                               <span className="text-muted-foreground">/</span>
                               <span className="text-indigo-400">{demandKwh.toFixed(0)}</span>
