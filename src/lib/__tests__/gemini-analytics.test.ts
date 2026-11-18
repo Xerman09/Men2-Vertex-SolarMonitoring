@@ -176,5 +176,19 @@ describe('Gemini 3.5 AI Telemetry Analytics Engine', () => {
     );
     expect(emptyHtml).toContain('No live DeyeCloud telemetry to analyze');
     expect(emptyHtml).toContain('AI Telemetry Analysis');
+
+    // While telemetry fetch is still in flight (isPending=true), never show premature empty message
+    const pendingHtml = renderToStaticMarkup(
+      React.createElement(AiAnalyticsPanel, {
+        range: 'TODAY',
+        date: '2026-11-17',
+        historyIsLive: false,
+        noLiveData: true,
+        isPending: true,
+        tariff: facts.tariff,
+      })
+    );
+    expect(pendingHtml).not.toContain('No live DeyeCloud telemetry');
+    expect(pendingHtml).toContain('animate-pulse');
   });
 });

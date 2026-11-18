@@ -177,7 +177,7 @@ export default function AnalyticsDashboardPage() {
     syncLivePlants,
   } = useAccount();
 
-  const { isAdmin, isConsumer, user } = useRole();
+  const { isAdmin, isConsumer, user, isInitialized } = useRole();
 
   // Active temporal configurations
   const [dateSelection, setDateSelection] = useState<AnalyticsDatePickerValue>(() => ({
@@ -281,7 +281,7 @@ export default function AnalyticsDashboardPage() {
       const timer = setTimeout(() => {
         setIsPlantSwitching(false);
         setFetchingDeye(false, null);
-      }, 6000);
+      }, 15000);
       return () => clearTimeout(timer);
     }
   }, [isPlantSwitching, setIsPlantSwitching, setFetchingDeye]);
@@ -619,6 +619,7 @@ export default function AnalyticsDashboardPage() {
 
       try {
         setRefreshing(true);
+        setNoLiveData(false);
         const accountParam =
           !isFleetView && selectedAccountId && selectedAccountId !== 'ALL'
             ? `&accountId=${encodeURIComponent(selectedAccountId)}`
@@ -707,9 +708,10 @@ export default function AnalyticsDashboardPage() {
         setIsPlantSwitching(false);
         setFetchingDeye(false, null);
       } catch (err: unknown) {
-        if ((err as Error)?.name !== 'AbortError') {
-          log.error('Failed to load telemetry history for analytics', err);
+        if (controller.signal.aborted || (err as Error)?.name === 'AbortError') {
+          return;
         }
+        log.error('Failed to load telemetry history for analytics', err);
         setNoLiveData(true);
         setLiveCoverage(null);
         setHourlyData(createInitial24hDiurnalSlots());
@@ -737,11 +739,12 @@ export default function AnalyticsDashboardPage() {
   );
 
   useEffect(() => {
+    if (!isInitialized || accountLoading) return;
     fetchAnalyticsData(dateSelection);
     return () => {
       inFlightControllerRef.current?.abort();
     };
-  }, [fetchAnalyticsData, dateSelection, selectedInverterSn]);
+  }, [isInitialized, accountLoading, fetchAnalyticsData, dateSelection, selectedInverterSn]);
 
   // Telemetry from DeyeCloud is already in actual physical kW for the target scope (Fleet / Account / Plant / Inverter).
   // In accordance with AGENTS.md, all curves represent 100% genuine hardware telemetry with zero synthetic scaling (/ 120).
@@ -1110,12 +1113,63 @@ export default function AnalyticsDashboardPage() {
   // Customer onboarding check: if consumer has 0 accounts linked, show onboarding and prevent infinite overlay
   const isCustomerEmpty = isConsumer && !accountLoading && accounts.length === 0;
 
-  // Synchronization overlay check - never dismiss prematurely before accounts and telemetry settle
-  const isTargetPending = !isCustomerEmpty && (currentTargetKey !== displayedTargetKey || !isDataLoaded || accountLoading);
-  const showOverlay = !isCustomerEmpty && (isPlantSwitching || isTargetPending) && !isFetchingDeye && !syncing;
+  // Synchronization overlay check - never dismiss prematurely before auth, accounts, and telemetry settle
+  const isTargetPending =
+    !isCustomerEmpty &&
+    (!isInitialized ||
+      accountLoading ||
+      currentTargetKey !== displayedTargetKey ||
+      !isDataLoaded);
+  const showOverlay =
+    !isCustomerEmpty &&
+    (isPlantSwitching || isTargetPending || (refreshing && !historyIsLive)) &&
+    !isFetchingDeye &&
+    !syncing;
 
   return (
     <div className="relative flex flex-col gap-6 w-full max-w-[1700px] mx-auto pb-16">
+      {/* Whole-screen frosted loading overlay while auth, accounts, or scoped telemetry finish fetching */}
+      {showOverlay && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Synchronizing Analytics Telemetry"
+          className="fixed inset-0 z-50 bg-background/75 backdrop-blur-md flex items-center justify-center p-4 transition-all animate-in fade-in duration-200"
+        >
+          <div className="bg-card/95 border border-primary/30 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl flex flex-col items-center text-center space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="relative flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+              <div
+                className="absolute w-9 h-9 rounded-full border-2 border-amber-500/20 border-b-amber-500 animate-spin"
+                style={{ animationDirection: 'reverse' }}
+              />
+              <BarChart3 className="h-5 w-5 text-amber-500 absolute animate-pulse" aria-hidden="true" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base sm:text-lg font-bold text-foreground tracking-wide font-headline">
+                {fetchingStage ||
+                  (switchingPlantName
+                    ? `Synchronizing ${switchingPlantName}`
+                    : selectedPlant
+                      ? `Synchronizing ${selectedPlant.stationName}`
+                      : selectedAccount
+                        ? `Synchronizing ${selectedAccount.name}`
+                        : 'Synchronizing Analytics Telemetry')}
+              </h3>
+            </div>
+            <div className="w-full bg-muted/60 rounded-full h-1.5 overflow-hidden">
+              <div className="bg-gradient-to-r from-emerald-500 via-primary to-amber-500 h-full w-full animate-pulse" />
+            </div>
+            <div className="flex items-center justify-between w-full text-[11px] font-mono text-muted-foreground border-t border-border/40 pt-3">
+              <span>{isFleetView ? `${totalAccounts} Accounts Monitored` : selectedScopeTitle}</span>
+              <span className="font-semibold text-primary">
+                {dateSelection.preset === 'TODAY' ? 'Today' : dateSelection.preset}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Header Banner */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-4 border-b border-border/50">
         <div>
@@ -1201,11 +1255,9 @@ export default function AnalyticsDashboardPage() {
                 </div>
               )}
 
-              {(noLiveData || (liveCoverage && liveCoverage.responded < liveCoverage.expected)) && (
+              {!isTargetPending && !refreshing && liveCoverage && liveCoverage.responded < liveCoverage.expected && (
                 <div className="mt-2.5 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-mono">
-                  {noLiveData
-                    ? 'No live DeyeCloud telemetry for this selection'
-                    : `Partial fleet data: ${liveCoverage?.responded}/${liveCoverage?.expected} accounts reporting`}
+                  {`Partial fleet data: ${liveCoverage.responded}/${liveCoverage.expected} accounts reporting`}
                 </div>
               )}
             </div>

@@ -256,16 +256,7 @@ export function AiAnalyticsPanel({
       </CardHeader>
 
       <CardContent className="p-4 space-y-3" aria-live="polite">
-        {!historyIsLive || noLiveData ? (
-          <div className="py-3 text-center text-xs font-mono text-muted-foreground">
-            No live DeyeCloud telemetry to analyze for this selection
-          </div>
-        ) : errorMsg ? (
-          <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-400 font-mono">
-            <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-            <span>{errorMsg}</span>
-          </div>
-        ) : loading && !insights ? (
+        {isPending || (loading && !insights) ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
             {[1, 2, 3].map((i) => (
               <div
@@ -273,6 +264,15 @@ export function AiAnalyticsPanel({
                 className="h-20 rounded-xl border border-border/40 bg-muted/30 animate-pulse"
               />
             ))}
+          </div>
+        ) : !historyIsLive || noLiveData ? (
+          <div className="py-3 text-center text-xs font-mono text-muted-foreground">
+            No live DeyeCloud telemetry to analyze for this selection
+          </div>
+        ) : errorMsg ? (
+          <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-400 font-mono">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            <span>{errorMsg}</span>
           </div>
         ) : insights ? (
           <>
