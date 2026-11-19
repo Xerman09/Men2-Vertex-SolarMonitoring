@@ -71,7 +71,7 @@ const TV_BRIEF_JSON_SCHEMA: Record<string, unknown> = {
     headline: {
       type: 'string',
       description:
-        'Single concise status ticker line (max 90 chars) strictly citing verified telemetry metrics or faulted station names.',
+        'Single actionable NOC insight (max 140 chars) interpreting verified telemetry: diagnose faults/underperformers vs peers, demand coverage %, or grid import/export impact.',
     },
     severity: {
       type: 'string',
@@ -104,8 +104,8 @@ export function _resetTvBriefCacheForTesting(): void {
 
 function clampHeadline(raw: string): string {
   const normalized = raw.replace(/\s+/g, ' ').trim();
-  if (normalized.length <= 90) return normalized;
-  return `${normalized.slice(0, 87).trimEnd()}...`;
+  if (normalized.length <= 140) return normalized;
+  return `${normalized.slice(0, 137).trimEnd()}...`;
 }
 
 export function extractTvSnapshotFromAggregate(
@@ -214,11 +214,20 @@ export function buildDeterministicTvBrief(snapshot: TvTelemetrySnapshot): TvBrie
     headline = 'Awaiting live DeyeCloud station telemetry';
   } else {
     severity = 'normal';
-    const gridTag =
-      snapshot.gridNetKw >= 0
-        ? `+${snapshot.gridNetKw.toFixed(1)} kW export`
-        : `${snapshot.gridNetKw.toFixed(1)} kW import`;
-    headline = `Solar ${snapshot.liveSolarKw.toFixed(1)} kW · ${snapshot.dailyYieldKwh.toFixed(0)} kWh today · ₱${snapshot.estimatedSavingsPhp.toLocaleString('en-US')} saved · ${gridTag}`;
+    const coveragePct =
+      snapshot.facilityLoadKw > 0
+        ? Math.min(100, Math.round((snapshot.liveSolarKw / snapshot.facilityLoadKw) * 100))
+        : null;
+    const gridInsight =
+      snapshot.gridNetKw > 0.5
+        ? `exporting +${snapshot.gridNetKw.toFixed(1)} kW surplus`
+        : snapshot.gridNetKw < -0.5
+          ? `drawing ${Math.abs(snapshot.gridNetKw).toFixed(1)} kW from grid`
+          : 'balanced with grid';
+    headline =
+      coveragePct !== null
+        ? `Solar covering ${coveragePct}% of ${snapshot.facilityLoadKw.toFixed(1)} kW load (${gridInsight}) · ₱${snapshot.estimatedSavingsPhp.toLocaleString('en-US')} saved today`
+        : `Solar ${snapshot.liveSolarKw.toFixed(1)} kW (${gridInsight}) · ₱${snapshot.estimatedSavingsPhp.toLocaleString('en-US')} saved today`;
   }
 
   return {
@@ -251,9 +260,10 @@ export async function getCachedOrGenerateTvBrief(
 
   const promise = (async (): Promise<TvBriefResult> => {
     const systemInstruction =
-      'You write a single ultra-concise NOC TV ticker headline (<= 90 chars) strictly from verified Philippine solar telemetry JSON. ' +
-      'Never invent metrics, stations, or causes not present in the JSON. Format currency with ₱ (PHP). ' +
-      'Prioritize faults or offline loggers/inverters first; otherwise report live kW, today kWh, ₱ savings, or grid exchange.';
+      'You write a single actionable NOC TV ticker insight (<= 140 chars) strictly from verified Philippine solar telemetry JSON. ' +
+      'Do NOT merely repeat raw kW/kWh totals—interpret what matters: diagnose faulted/offline or underperforming stations vs peers, ' +
+      'quantify solar-to-demand coverage %, highlight grid import exposure or net-export surplus, and state bill-saving impact in ₱ (PHP). ' +
+      'Never invent metrics, stations, or causes not present in the JSON.';
 
     const inputPayload = JSON.stringify({
       manilaTimestamp: snapshot.manilaTimestamp,

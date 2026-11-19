@@ -323,9 +323,9 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     const triageSlide = slides.find((s) => s.kind === 'triage')!;
     const triageTicker = getSlideTickerCommentary(triageSlide, 13.9, null, null);
     expect(accTicker.headline).toContain('Hanvin Solar');
-    expect(accTicker.headline).toContain('68.5 kW');
+    expect(accTicker.headline).toContain('83%');
     expect(staTicker.headline).toContain('Dagupan Main');
-    expect(staTicker.headline).toContain('48.5 kW');
+    expect(staTicker.headline).toContain('77%');
     expect(triageTicker.severity).toBe('critical');
     expect(triageTicker.headline).toContain('Beta Plant');
 

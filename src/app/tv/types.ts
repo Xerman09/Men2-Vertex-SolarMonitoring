@@ -615,32 +615,53 @@ export function getSlideTickerCommentary(
       const acc = slide.account;
       if (acc.faultCount > 0) {
         return {
-          headline: `${acc.account.name}: ${acc.faultCount} inverter fault · ${acc.livePowerKw.toFixed(1)} kW live · ${acc.dailyYieldKwh.toFixed(0)} kWh today`,
+          headline: `Action needed on ${acc.account.name}: ${acc.faultCount} inverter fault reducing output · Check Asset Health Triage`,
           severity: 'critical',
         };
       }
-      if (acc.offlineCount > 0) {
-        return {
-          headline: `${acc.account.name}: ${acc.offlineCount} inverter offline · ${acc.livePowerKw.toFixed(1)} kW live · ${acc.dailyYieldKwh.toFixed(0)} kWh today`,
-          severity: 'warning',
-        };
-      }
+      const demand = acc.demandKw ?? 0;
+      const offsetPct =
+        demand > 0 ? Math.min(100, Math.round((acc.livePowerKw / demand) * 100)) : null;
+      const ranked = [...acc.plants]
+        .filter((p) => p.capacityKw > 0)
+        .sort((a, b) => b.utilizationPct - a.utilizationPct);
+      const best = ranked[0];
+      const lag = ranked.length > 1 ? ranked[ranked.length - 1] : null;
+      const spreadNote =
+        best && lag && best.utilizationPct - lag.utilizationPct >= 15
+          ? ` · ${best.plant.stationName} leads (${Math.round(best.utilizationPct)}% cap) while ${lag.plant.stationName} trails (${Math.round(lag.utilizationPct)}%)`
+          : best
+            ? ` · ${best.plant.stationName} leading at ${Math.round(best.utilizationPct)}% capacity`
+            : '';
       return {
-        headline: `${acc.account.name} Total (All ${acc.plants.length} ${acc.plants.length === 1 ? 'Station' : 'Stations'}): ${acc.livePowerKw.toFixed(1)} kW live · ${acc.dailyYieldKwh.toFixed(0)} kWh · ${formatSavings(acc.dailyYieldKwh)} saved`,
-        severity: 'normal',
+        headline:
+          offsetPct !== null
+            ? `${acc.account.name}: Solar offsetting ${offsetPct}% of ${demand.toFixed(1)} kW demand (${formatSavings(acc.dailyYieldKwh)} saved)${spreadNote}`
+            : `${acc.account.name}: ${formatSavings(acc.dailyYieldKwh)} saved across ${acc.plants.length} stations${spreadNote}`,
+        severity: acc.offlineCount > 0 ? 'warning' : 'normal',
       };
     }
 
     case 'account-stations': {
       const acc = slide.account;
-      const leader = [...acc.plants].sort((a, b) => b.livePowerKw - a.livePowerKw)[0];
+      const ranked = [...acc.plants].sort((a, b) => b.utilizationPct - a.utilizationPct);
+      const leader = ranked[0];
+      const laggard = ranked.length > 1 ? ranked[ranked.length - 1] : null;
       const sev: TvBriefSeverity =
         acc.faultCount > 0 ? 'critical' : acc.offlineCount > 0 ? 'warning' : 'normal';
-      const leadText = leader
-        ? `${leader.plant.stationName} leads at ${leader.livePowerKw.toFixed(1)} kW`
-        : `${acc.plants.length} stations`;
+      const spreadInsight =
+        leader && laggard && leader.utilizationPct - laggard.utilizationPct >= 15
+          ? `${leader.plant.stationName} leads at ${Math.round(leader.utilizationPct)}% utilization vs ${laggard.plant.stationName} at ${Math.round(laggard.utilizationPct)}%`
+          : leader
+            ? `${leader.plant.stationName} leads at ${leader.livePowerKw.toFixed(1)} kW (${Math.round(leader.utilizationPct)}% cap)`
+            : `${acc.plants.length} stations`;
+      const demand = acc.demandKw ?? 0;
+      const offsetNote =
+        demand > 0
+          ? ` · ${Math.min(100, Math.round((acc.livePowerKw / demand) * 100))}% of account demand covered`
+          : '';
       return {
-        headline: `${acc.account.name} Stations: ${leadText} · ${acc.dailyYieldKwh.toFixed(0)} kWh combined · ${formatSavings(acc.dailyYieldKwh)} saved`,
+        headline: `${acc.account.name} Benchmark: ${spreadInsight}${offsetNote}`,
         severity: sev,
       };
     }
@@ -651,23 +672,31 @@ export function getSlideTickerCommentary(
       const offlineInv = p.inverters.find((i) => i.status === 'OFFLINE');
       if (faultInv || p.status === 'FAULT') {
         return {
-          headline: `${p.plant.stationName}: FAULT on ${faultInv?.deviceSn || 'inverter'} · ${p.livePowerKw.toFixed(1)} kW live · ${p.dailyYieldKwh.toFixed(0)} kWh today`,
+          headline: `Action needed at ${p.plant.stationName}: Inverter ${faultInv?.deviceSn || ''} in FAULT — inspect hardware to restore lost harvest`,
           severity: 'critical',
         };
       }
-      if (offlineInv || p.hasOfflineLogger || p.status === 'OFFLINE') {
+      if (offlineInv || p.status === 'OFFLINE') {
         return {
-          headline: `${p.plant.stationName}: ${offlineInv ? `${offlineInv.deviceSn} offline` : 'Device/logger offline'} · ${p.livePowerKw.toFixed(1)} kW live`,
+          headline: `${p.plant.stationName}: ${offlineInv ? `Inverter ${offlineInv.deviceSn} offline` : 'Station offline'} — verify inverter & comms link`,
           severity: 'warning',
         };
       }
+      const demand = p.demandKw ?? 0;
       const gridVal = p.gridPowerKw ?? 0;
-      const gridStr =
-        gridVal >= 0
-          ? `+${gridVal.toFixed(1)} kW export`
-          : `${gridVal.toFixed(1)} kW import`;
+      const offsetPct =
+        demand > 0 ? Math.min(100, Math.round((p.livePowerKw / demand) * 100)) : null;
+      const gridInsight =
+        gridVal > 0.5
+          ? `exporting +${gridVal.toFixed(1)} kW surplus to grid`
+          : gridVal < -0.5
+            ? `importing ${Math.abs(gridVal).toFixed(1)} kW from grid`
+            : 'zero net grid draw';
       return {
-        headline: `${p.plant.stationName} (${slide.accountName}): ${p.livePowerKw.toFixed(1)} kW live · ${p.dailyYieldKwh.toFixed(0)} kWh today · ${gridStr} · ${formatSavings(p.dailyYieldKwh)} saved`,
+        headline:
+          offsetPct !== null
+            ? `${p.plant.stationName}: Covering ${offsetPct}% of ${demand.toFixed(1)} kW load (${gridInsight}) · ${formatSavings(p.dailyYieldKwh)} saved today`
+            : `${p.plant.stationName}: Operating at ${Math.round(p.utilizationPct)}% capacity (${gridInsight}) · ${formatSavings(p.dailyYieldKwh)} saved today`,
         severity: 'normal',
       };
     }
@@ -676,14 +705,21 @@ export function getSlideTickerCommentary(
       const profit = computeTvWeeklyProfitSummary(weeklySeries, tariffRatePhp, exportCreditPhp);
       if (profit) {
         const co2Kg = Math.round(profit.weekSolarKwh * PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH);
+        const days = (weeklySeries ?? []).slice(-7);
+        const peakDay = days.length > 0
+          ? [...days].sort((a, b) => (b.solarYieldKwh || 0) - (a.solarYieldKwh || 0))[0]
+          : null;
+        const peakNote = peakDay && peakDay.solarYieldKwh > 0
+          ? ` · Peak harvest on ${peakDay.date.slice(5)} (${peakDay.solarYieldKwh.toFixed(0)} kWh)`
+          : '';
         if (profit.hasDemandData && profit.demandOffsetPct !== null) {
           return {
-            headline: `${slide.title}: ₱${Math.round(profit.realizedProfitPhp).toLocaleString('en-US')} bill profit (${profit.demandOffsetPct}% of ${profit.weekDemandKwh.toFixed(0)} kWh demand offset) · ${profit.weekSolarKwh.toFixed(0)} kWh solar`,
+            headline: `${slide.title}: ₱${Math.round(profit.realizedProfitPhp).toLocaleString('en-US')} bill profit (${profit.demandOffsetPct}% of ${profit.weekDemandKwh.toFixed(0)} kWh demand offset)${peakNote}`,
             severity: 'normal',
           };
         }
         return {
-          headline: `${slide.title}: ${profit.weekSolarKwh.toFixed(0)} kWh harvested over 7D · ₱${Math.round(profit.realizedProfitPhp).toLocaleString('en-US')} avoided cost · ${co2Kg.toLocaleString('en-US')} kg CO₂ offset`,
+          headline: `${slide.title}: ₱${Math.round(profit.realizedProfitPhp).toLocaleString('en-US')} avoided cost over 7D (${co2Kg.toLocaleString('en-US')} kg CO₂ offset)${peakNote}`,
           severity: 'normal',
         };
       }
