@@ -788,6 +788,17 @@ dialog.vos-modal::backdrop {
   }
 }
 
+@keyframes tv-ticker-scroll {
+  0%,
+  14% {
+    transform: translateX(0);
+  }
+  86%,
+  100% {
+    transform: translateX(calc(var(--tv-ticker-overflow, 0px) * -1));
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .tv-pixel-shift-surface {
     transition: translate 900ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -814,5 +825,9 @@ dialog.vos-modal::backdrop {
   .tv-kpi-stagger {
     animation: tv-kpi-rise 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
     animation-delay: calc(var(--tv-stagger, 0) * 50ms);
+  }
+
+  .tv-ticker-scrolling {
+    animation: tv-ticker-scroll var(--tv-ticker-duration, 10s) linear infinite alternate;
   }
 }

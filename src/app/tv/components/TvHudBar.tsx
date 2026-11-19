@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ChevronLeft,
@@ -59,6 +59,53 @@ interface TvHudBarProps {
   onChangeInterval: (sec: TvIntervalSeconds) => void;
   onToggleFullscreen: () => void;
   onToggleHudHidden?: () => void;
+}
+
+function ScrollingTickerText({ text }: { text: string }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const textRef = useRef<HTMLParagraphElement | null>(null);
+  const [overflowPx, setOverflowPx] = useState(0);
+
+  useEffect(() => {
+    const measure = () => {
+      const container = containerRef.current;
+      const el = textRef.current;
+      if (!container || !el) return;
+      const diff = Math.ceil(el.scrollWidth - container.clientWidth);
+      setOverflowPx(diff > 4 ? diff : 0);
+    };
+
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    if (containerRef.current) ro.observe(containerRef.current);
+    if (textRef.current) ro.observe(textRef.current);
+    return () => ro.disconnect();
+  }, [text]);
+
+  const durationSec = Math.max(8, Math.min(26, Math.round(overflowPx / 38) + 6));
+
+  return (
+    <div ref={containerRef} className="min-w-0 flex-1 overflow-hidden">
+      <p
+        ref={textRef}
+        key={text}
+        className={`inline-block whitespace-nowrap font-mono text-sm sm:text-base font-semibold text-foreground ${
+          overflowPx > 0 ? 'tv-ticker-scrolling' : 'tv-kpi-stagger'
+        }`}
+        style={
+          overflowPx > 0
+            ? ({
+                '--tv-ticker-overflow': `${overflowPx}px`,
+                '--tv-ticker-duration': `${durationSec}s`,
+              } as React.CSSProperties)
+            : undefined
+        }
+      >
+        {text}
+      </p>
+    </div>
+  );
 }
 
 export function TvHudBar({
@@ -263,12 +310,7 @@ export function TvHudBar({
             ) : (
               <Radio size={15} className={`${tickerAccent} shrink-0`} aria-hidden="true" />
             )}
-            <p
-              key={headline}
-              className="tv-kpi-stagger truncate font-mono text-sm sm:text-base font-semibold text-foreground"
-            >
-              {headline}
-            </p>
+            <ScrollingTickerText text={headline} />
             {isStale && (
               <Badge variant="warning" className="font-mono text-[10px] shrink-0">
                 Stale
