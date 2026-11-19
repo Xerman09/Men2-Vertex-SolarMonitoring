@@ -384,62 +384,85 @@ export function PlantSolarCurve({
             )}
           </div>
         ) : showLabels ? (
-          <div className="flex items-center gap-2 sm:gap-3 font-mono flex-wrap">
-            <span
-              className={`flex items-center gap-1 font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded ${
-                isTv ? 'text-xs sm:text-sm' : 'text-[8px] sm:text-[8.5px]'
-              }`}
-            >
-              <Clock className={isTv ? 'size-3.5 text-primary' : 'size-2.5 sm:size-3 text-primary'} />
-              {currentTimeStr}
-            </span>
-            {/* Live Solar Harvest (Amber #f59e0b) - NOT GREEN */}
-            <HoverInfo
-              title="Solar Generation & Harvest"
-              content="Real-time photovoltaic solar generation output across active inverters and daily cumulative energy yield."
-            >
-              <div className="flex items-center gap-1 cursor-help">
-                <span className="size-1.5 rounded-full bg-amber-500 inline-block animate-pulse shrink-0" />
-                <span className="text-muted-foreground/80">Solar:</span>
-                <span className="font-bold text-amber-500 whitespace-nowrap">
-                  {(livePowerKw ?? 0).toFixed(1)} kW
+          isTv ? (
+            <div className="flex items-center gap-3 sm:gap-4 font-mono flex-wrap">
+              <span className="flex items-center gap-1 font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs sm:text-sm">
+                <Clock className="size-3.5 text-primary" />
+                {currentTimeStr}
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                <span className="size-2 rounded-full bg-amber-500 inline-block shrink-0" />
+                Solar
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                <span className="size-2 rounded-full bg-indigo-500 inline-block shrink-0" />
+                Demand
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                <span className="size-2 rounded-full bg-emerald-500 inline-block shrink-0" />
+                Grid Net
+              </span>
+              {hasBatteryFlow && (
+                <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                  <span className="size-2 rounded-full bg-cyan-400 inline-block shrink-0" />
+                  BESS
                 </span>
-                {dailyYieldKwh !== undefined && dailyYieldKwh > 0 && (
-                  <span className="text-amber-500/80 font-normal text-[7.5px] sm:text-[8px] whitespace-nowrap">
-                    ({(dailyYieldKwh ?? 0).toFixed(1)} kWh)
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 sm:gap-3 font-mono flex-wrap">
+              <span className="flex items-center gap-1 font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[8px] sm:text-[8.5px]">
+                <Clock className="size-2.5 sm:size-3 text-primary" />
+                {currentTimeStr}
+              </span>
+              {/* Live Solar Harvest (Amber #f59e0b) - NOT GREEN */}
+              <HoverInfo
+                title="Solar Generation & Harvest"
+                content="Real-time photovoltaic solar generation output across active inverters and daily cumulative energy yield."
+              >
+                <div className="flex items-center gap-1 cursor-help">
+                  <span className="size-1.5 rounded-full bg-amber-500 inline-block animate-pulse shrink-0" />
+                  <span className="text-muted-foreground/80">Solar:</span>
+                  <span className="font-bold text-amber-500 whitespace-nowrap">
+                    {(livePowerKw ?? 0).toFixed(1)} kW
                   </span>
-                )}
-              </div>
-            </HoverInfo>
+                  {dailyYieldKwh !== undefined && dailyYieldKwh > 0 && (
+                    <span className="text-amber-500/80 font-normal text-[7.5px] sm:text-[8px] whitespace-nowrap">
+                      ({(dailyYieldKwh ?? 0).toFixed(1)} kWh)
+                    </span>
+                  )}
+                </div>
+              </HoverInfo>
 
-            {/* Demand with numeric value (Indigo #6366f1) */}
-            <HoverInfo
-              title="Facility Demand (Load)"
-              content="Current facility electrical power demand required by connected equipment and industrial circuits."
-            >
-              <div className="flex items-center gap-1 cursor-help">
-                <span className="size-1.5 rounded-full bg-indigo-500 inline-block shrink-0" />
-                <span className="text-muted-foreground/80">Demand:</span>
-                <span className="font-bold text-indigo-400 whitespace-nowrap">
-                  {(currentDemand ?? 0).toFixed(1)} kW
-                </span>
-              </div>
-            </HoverInfo>
+              {/* Demand with numeric value (Indigo #6366f1) */}
+              <HoverInfo
+                title="Facility Demand (Load)"
+                content="Current facility electrical power demand required by connected equipment and industrial circuits."
+              >
+                <div className="flex items-center gap-1 cursor-help">
+                  <span className="size-1.5 rounded-full bg-indigo-500 inline-block shrink-0" />
+                  <span className="text-muted-foreground/80">Demand:</span>
+                  <span className="font-bold text-indigo-400 whitespace-nowrap">
+                    {(currentDemand ?? 0).toFixed(1)} kW
+                  </span>
+                </div>
+              </HoverInfo>
 
-            {/* Grid Net Exchange (Emerald Green #10b981) - Same as Analytics Dashboard */}
-            <HoverInfo
-              title="Grid Net Exchange"
-              content="Net exchange with utility grid (+ Export to grid / − Import from grid)."
-            >
-              <div className="flex items-center gap-1 cursor-help">
-                <span className="size-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
-                <span className="text-muted-foreground/80">Grid Net:</span>
-                <span className={`font-bold whitespace-nowrap ${(currentGridNet ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
-                  {(currentGridNet ?? 0) >= 0 ? `+${(currentGridNet ?? 0).toFixed(1)}` : (currentGridNet ?? 0).toFixed(1)} kW
-                </span>
-              </div>
-            </HoverInfo>
-          </div>
+              {/* Grid Net Exchange (Emerald Green #10b981) - Same as Analytics Dashboard */}
+              <HoverInfo
+                title="Grid Net Exchange"
+                content="Net exchange with utility grid (+ Export to grid / − Import from grid)."
+              >
+                <div className="flex items-center gap-1 cursor-help">
+                  <span className="size-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
+                  <span className="text-muted-foreground/80">Grid Net:</span>
+                  <span className={`font-bold whitespace-nowrap ${(currentGridNet ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>
+                    {(currentGridNet ?? 0) >= 0 ? `+${(currentGridNet ?? 0).toFixed(1)}` : (currentGridNet ?? 0).toFixed(1)} kW
+                  </span>
+                </div>
+              </HoverInfo>
+            </div>
+          )
         ) : (
           <div className="flex items-center gap-2 font-mono text-[7.5px] sm:text-[8px] text-muted-foreground/70">
             <span className="flex items-center gap-1 font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[8px] sm:text-[8.5px]">
@@ -776,7 +799,8 @@ export function PlantSolarCurve({
             </div>
           </div>
 
-          {/* Vertical Utilization Column Beside Graph */}
+          {/* Vertical Utilization Column Beside Graph (omitted on TV where left sidebar already shows Utilization) */}
+          {!isTv && (
           <HoverInfo
             title="Capacity Utilization Rate"
             content={
@@ -831,14 +855,13 @@ export function PlantSolarCurve({
               </div>
 
               <span
-                className={`font-bold font-mono text-amber-500 leading-none ${
-                  isTv ? 'text-xs sm:text-sm' : 'text-[8px] sm:text-[9px]'
-                }`}
+                className="font-bold font-mono text-amber-500 leading-none text-[8px] sm:text-[9px]"
               >
                 {(currentUtil ?? 0).toFixed(0)}%
               </span>
             </div>
           </HoverInfo>
+          )}
         </div>
 
 
