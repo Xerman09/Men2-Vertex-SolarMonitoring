@@ -1024,15 +1024,6 @@ export function TvSlideDeck({
                       <span className="text-amber-400 font-bold shrink-0">LOGGER OFFLINE</span>
                     </div>
                   ))}
-                  {entry.hasOfflineLogger && entry.offlineLoggers.length === 0 && (
-                    <div className="flex items-center justify-between gap-2 text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5">
-                        <WifiOff size={13} className="text-amber-400 shrink-0" aria-hidden="true" />
-                        <span>Data logger</span>
-                      </span>
-                      <span className="text-amber-400 font-bold shrink-0">OFFLINE</span>
-                    </div>
-                  )}
                 </div>
               </div>
             ))}

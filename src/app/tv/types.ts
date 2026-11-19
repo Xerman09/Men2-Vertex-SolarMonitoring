@@ -436,12 +436,11 @@ export function buildTvSlides(
     for (const plant of acc.plants) {
       const faultInvs = plant.inverters.filter((i) => i.status === 'FAULT');
       const offlineInvs = plant.inverters.filter((i) => i.status === 'OFFLINE');
-      const offlineLoggers = plant.loggers.filter((l) => l.status === 'OFFLINE');
+      const offlineLoggers = plant.loggers.filter((l) => l.status === 'OFFLINE' && Boolean(l.deviceSn));
       if (
         faultInvs.length > 0 ||
         offlineInvs.length > 0 ||
-        offlineLoggers.length > 0 ||
-        plant.hasOfflineLogger
+        offlineLoggers.length > 0
       ) {
         triageEntries.push({
           accountId: acc.account.id,
@@ -452,7 +451,7 @@ export function buildTvSlides(
           faultInverters: faultInvs,
           offlineInverters: offlineInvs,
           offlineLoggers,
-          hasOfflineLogger: plant.hasOfflineLogger || offlineLoggers.length > 0,
+          hasOfflineLogger: offlineLoggers.length > 0,
         });
       }
     }
