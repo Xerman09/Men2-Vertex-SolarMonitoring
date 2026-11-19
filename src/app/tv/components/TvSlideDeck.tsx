@@ -375,7 +375,7 @@ export function TvSlideDeck({
                   <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
                     Today Harvest
                   </div>
-                  <div className="mt-1 font-mono text-2xl sm:text-3xl font-bold text-emerald-400 tabular-nums">
+                  <div className="mt-1 font-mono text-2xl sm:text-3xl font-bold text-amber-400 tabular-nums">
                     {slide.dailyYieldKwh.toFixed(1)}
                     <span className="ml-1 text-xs font-semibold text-muted-foreground">kWh</span>
                   </div>
@@ -568,13 +568,13 @@ export function TvSlideDeck({
                     label="Today Harvest"
                     value={yieldKwh.toFixed(1)}
                     unit="kWh"
-                    accentClass="text-emerald-400"
+                    accentClass="text-amber-400"
                   />
                   <SlideMetricRow
                     staggerIndex={2}
                     label="Est. Savings"
                     value={formatPhp(yieldKwh * tariffRatePhp)}
-                    accentClass="text-primary"
+                    accentClass="text-emerald-400"
                   />
                   <SlideMetricRow
                     staggerIndex={3}
@@ -619,8 +619,8 @@ export function TvSlideDeck({
                             <span className="truncate font-sans text-sm sm:text-base font-bold text-foreground">
                               {plant.plant.stationName}
                             </span>
-                            <span className="font-mono text-xs sm:text-sm font-semibold text-amber-500 tabular-nums shrink-0">
-                              {plant.livePowerKw.toFixed(1)} / {plant.capacityKw.toFixed(0)} kWp
+                            <span className="font-mono text-xs sm:text-sm font-semibold text-muted-foreground tabular-nums shrink-0">
+                              {plant.capacityKw.toFixed(0)} kWp
                             </span>
                           </div>
                           <PlantSolarCurve
@@ -758,11 +758,11 @@ export function TvSlideDeck({
                       </div>
 
                       <div className="col-span-2 text-right">
-                        <div className="text-base font-bold text-emerald-400">
+                        <div className="text-base font-bold text-amber-400">
                           {plant.dailyYieldKwh.toFixed(0)}{' '}
                           <span className="text-xs text-muted-foreground">kWh</span>
                         </div>
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="text-[11px] text-emerald-400">
                           {formatPhp(plant.dailyYieldKwh * tariffRatePhp)}
                         </div>
                       </div>
@@ -836,9 +836,13 @@ export function TvSlideDeck({
                   )}
                   <SlideMetricRow
                     staggerIndex={2}
-                    label="Today Yield Value"
-                    value={formatPhp(slide.dailyYieldKwh * tariffRatePhp)}
-                    accentClass="text-primary"
+                    label="7D Avg / Day"
+                    value={
+                      profit && days.length > 0
+                        ? formatPhp(profit.realizedProfitPhp / days.length)
+                        : '--'
+                    }
+                    accentClass="text-emerald-400"
                   />
                   <SlideMetricRow
                     staggerIndex={3}
