@@ -298,12 +298,6 @@ export function TvSlideDeck({
                     {slide.account.faultCount} Fault
                   </Badge>
                 )}
-              {(slide.kind === 'account' || slide.kind === 'account-stations') &&
-                slide.account.offlineCount > 0 && (
-                  <Badge variant="warning" className="font-mono text-xs shrink-0">
-                    {slide.account.offlineCount} Offline
-                  </Badge>
-                )}
               {slide.kind === 'station' && slide.plant.status === 'FAULT' && (
                 <Badge variant="destructive" className="font-mono text-xs shrink-0">
                   Fault
@@ -675,9 +669,9 @@ export function TvSlideDeck({
         {/* 3. MASTER C: ACCOUNT STATIONS BENCHMARK MATRIX */}
         {slide.kind === 'account-stations' && (
           <div className="flex flex-1 min-h-0 flex-col justify-between">
-            <div className="grid grid-cols-12 gap-4 border-b border-border/50 pb-2.5 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            <div className="grid grid-cols-12 gap-4 border-b border-border/50 pb-2.5 font-mono text-xs sm:text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               <div className="col-span-4">Station</div>
-              <div className="col-span-3">Output Ratio</div>
+              <div className="col-span-3">Solar vs Demand</div>
               <div className="col-span-2 text-right">Live Solar</div>
               <div className="col-span-2 text-right">Today Yield</div>
               <div className="col-span-1 text-right">SoC / Util</div>
@@ -685,10 +679,18 @@ export function TvSlideDeck({
 
             <div className="flex-1 divide-y divide-border/40 overflow-y-auto">
               {(() => {
-                const maxKw = Math.max(1, ...slide.account.plants.map((p) => p.livePowerKw));
+                const maxKw = Math.max(
+                  1,
+                  ...slide.account.plants.map((p) => Math.max(p.livePowerKw, p.demandKw ?? 0))
+                );
                 const dense = slide.account.plants.length > 6;
                 return slide.account.plants.map((plant, idx) => {
-                  const barPct = Math.max(3, Math.min(100, (plant.livePowerKw / maxKw) * 100));
+                  const demandKw = plant.demandKw ?? 0;
+                  const solarBarPct = Math.max(2, Math.min(100, (plant.livePowerKw / maxKw) * 100));
+                  const demandBarPct =
+                    demandKw > 0 ? Math.max(2, Math.min(100, (demandKw / maxKw) * 100)) : 0;
+                  const offsetPct =
+                    demandKw > 0 ? Math.min(100, Math.round((plant.livePowerKw / demandKw) * 100)) : null;
                   const hasSoc = typeof plant.batterySoc === 'number' && plant.batterySoc > 0;
                   return (
                     <div
@@ -721,11 +723,31 @@ export function TvSlideDeck({
                         </div>
                       </div>
 
-                      <div className="col-span-3 pr-3">
-                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted/60">
+                      <div className="col-span-3 pr-3 space-y-1">
+                        <div className="flex items-center justify-between text-xs tabular-nums">
+                          <span>
+                            <span className="font-semibold text-amber-400">
+                              {plant.livePowerKw.toFixed(1)}
+                            </span>
+                            <span className="text-muted-foreground"> / </span>
+                            <span className="font-semibold text-indigo-400">
+                              {demandKw.toFixed(1)} kW
+                            </span>
+                          </span>
+                          {offsetPct !== null && (
+                            <span className="font-semibold text-emerald-400">{offsetPct}%</span>
+                          )}
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted/60">
                           <div
                             className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-300"
-                            style={{ width: `${barPct}%` }}
+                            style={{ width: `${solarBarPct}%` }}
+                          />
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted/60">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-indigo-400"
+                            style={{ width: `${demandBarPct}%` }}
                           />
                         </div>
                       </div>
