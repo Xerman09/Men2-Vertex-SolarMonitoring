@@ -670,29 +670,6 @@ export function FleetDetailWorkspace({
                 )}
               </div>
             </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              {isAdmin && (
-                <Button
-                  variant="outline"
-                  size="xs"
-                  onClick={() =>
-                    onToggleAccountEnabled(
-                      selectedAcc.account.id,
-                      selectedAcc.account.status
-                    )
-                  }
-                  className={`font-mono gap-1 ${
-                    isOffline
-                      ? 'border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10'
-                      : 'border-destructive/40 text-destructive hover:bg-destructive/10'
-                  }`}
-                >
-                  <Power size={11} aria-hidden="true" />
-                  <span>{isOffline ? 'Enable' : 'Disable'}</span>
-                </Button>
-              )}
-            </div>
           </div>
 
           <div className="w-full pt-1">
@@ -815,26 +792,6 @@ export function FleetDetailWorkspace({
                       )}
                     </div>
                   </div>
-
-                  {isAdmin && (
-                    <Button
-                      variant="outline"
-                      size="xs"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleAccountEnabled(acc.account.id, acc.account.status);
-                      }}
-                      aria-label={`${isOffline ? 'Enable' : 'Disable'} ${acc.account.name}`}
-                      className={`relative z-10 font-mono text-[10px] shrink-0 ${
-                        isOffline
-                          ? 'border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10'
-                          : 'border-destructive/40 text-destructive hover:bg-destructive/10'
-                      }`}
-                    >
-                      <Power size={10} aria-hidden="true" />
-                      <span>{isOffline ? 'Enable' : 'Disable'}</span>
-                    </Button>
-                  )}
                 </div>
 
                 <div className="relative z-10 w-full pt-0.5">

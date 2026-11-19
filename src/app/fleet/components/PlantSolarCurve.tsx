@@ -641,51 +641,45 @@ export function PlantSolarCurve({
                 />
               )}
 
-              {/* Clipped Curve Layers */}
+              {/* Clipped Curve Layers: render all translucent fills first, then all strokes on top so overlapping curves stay 100% visible */}
               <g clipPath={`url(#${gradId}-plot-clip)`}>
-                {/* Net Grid Exchange Area & Line (+Export Emerald / -Import Rose) */}
-                <path d={svgPaths.gridArea} fill={`url(#${gradId}-grid-fill)`} />
+                {/* 1. Translucent Area Fills (background layer) */}
+                <path d={svgPaths.gridArea} fill={`url(#${gradId}-grid-fill)`} fillOpacity="0.65" />
+                <path d={svgPaths.loadArea} fill={`url(#${gradId}-load)`} fillOpacity="0.6" />
+                <path d={svgPaths.solarArea} fill={`url(#${gradId}-solar)`} fillOpacity="0.6" />
+
+                {/* 2. Crisp Curve Strokes (foreground layer — never obscured by fills) */}
                 <path
                   d={svgPaths.gridLine}
                   fill="none"
                   stroke={yBounds.min < 0 ? `url(#${gradId}-grid-stroke)` : COLOR_GRID}
-                  strokeWidth="1.35"
+                  strokeWidth={isTv ? '2' : '1.6'}
                   strokeLinecap="round"
                   vectorEffect="non-scaling-stroke"
                 />
-
-                {/* Facility Demand Area & Line (Analytics colorLoad #6366f1) */}
-                <path d={svgPaths.loadArea} fill={`url(#${gradId}-load)`} />
                 <path
                   d={svgPaths.loadLine}
                   fill="none"
                   stroke={COLOR_LOAD}
-                  strokeWidth="1.25"
-                  strokeDasharray="2 2"
+                  strokeWidth={isTv ? '2' : '1.6'}
                   strokeLinecap="round"
                   vectorEffect="non-scaling-stroke"
                 />
-
-                {/* Battery ESS Flow Line when active (+Charge / -Discharge) */}
                 {hasBatteryFlow && (
                   <path
                     d={svgPaths.batteryLine}
                     fill="none"
                     stroke={COLOR_BATTERY}
-                    strokeWidth="1.25"
-                    strokeDasharray="1.5 1.5"
+                    strokeWidth={isTv ? '1.8' : '1.5'}
                     strokeLinecap="round"
                     vectorEffect="non-scaling-stroke"
                   />
                 )}
-
-                {/* Solar Generation Area & Line (Analytics colorSolar #f59e0b) */}
-                <path d={svgPaths.solarArea} fill={`url(#${gradId}-solar)`} />
                 <path
                   d={svgPaths.solarLine}
                   fill="none"
                   stroke={COLOR_SOLAR}
-                  strokeWidth="2.2"
+                  strokeWidth={isTv ? '2.4' : '2'}
                   strokeLinecap="round"
                   vectorEffect="non-scaling-stroke"
                 />
