@@ -197,6 +197,7 @@ export default function AnalyticsDashboardPage() {
   }, [dateSelection]);
 
   const [streamFilter, setStreamFilter] = useState<StreamFilter>('ALL');
+  const [aiModalSection, setAiModalSection] = useState<{ title: string; question: string } | null>(null);
   const [tableSearch, setTableSearch] = useState<string>('');
   const [tableFilter, setTableFilter] = useState<'ALL' | 'RECORDED'>('RECORDED');
   const [tablePage, setTablePage] = useState<number>(1);
@@ -1607,8 +1608,12 @@ export default function AnalyticsDashboardPage() {
         </Card>
       </div>
 
-      {/* AI Telemetry Analysis Card */}
+      {/* AI Business Analysis Pop-Up Modal (opens when a section is clicked) */}
       <AiAnalyticsPanel
+        isOpen={Boolean(aiModalSection)}
+        onClose={() => setAiModalSection(null)}
+        sectionTitle={aiModalSection?.title}
+        sectionQuestion={aiModalSection?.question}
         accountId={!isFleetView && selectedAccountId !== 'ALL' ? selectedAccountId : undefined}
         stationId={!isFleetView && selectedStationId !== 'ALL' ? selectedStationId : undefined}
         deviceSn={!isFleetView && selectedInverterSn !== 'ALL' ? selectedInverterSn : undefined}
@@ -1626,7 +1631,16 @@ export default function AnalyticsDashboardPage() {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
         {/* Main High-Resolution Generation Profile Chart (8 Cols) */}
         <Card className="xl:col-span-8 border-border/70 shadow-sm flex flex-col justify-between min-w-0 overflow-hidden relative">
-          <CardHeader className="pb-3 border-b border-border/40">
+          <CardHeader
+            className="pb-3 border-b border-border/40 cursor-pointer hover:bg-muted/20 transition-colors"
+            onClick={() =>
+              setAiModalSection({
+                title: 'Diurnal Generation Profile',
+                question:
+                  'Provide executive business insights for the Diurnal Generation Profile: evaluate intraday solar-to-demand alignment, midday export vs peak-tariff import exposure, and load-shifting opportunities in ₱.',
+              })
+            }
+          >
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
               <div>
                 <HoverInfo
@@ -2119,7 +2133,16 @@ export default function AnalyticsDashboardPage() {
 
         {/* Energy Distribution & Self-Consumption Sankey/Donut Card (4 Cols) */}
         <Card className="xl:col-span-4 border-border/70 shadow-sm flex flex-col justify-between min-w-0 overflow-hidden relative">
-          <CardHeader className="pb-2 border-b border-border/40">
+          <CardHeader
+            className="pb-2 border-b border-border/40 cursor-pointer hover:bg-muted/20 transition-colors"
+            onClick={() =>
+              setAiModalSection({
+                title: 'Energy Distribution & Autarky',
+                question:
+                  'Provide executive business insights for Energy Distribution & Autarky: evaluate self-consumption vs grid dependency, tariff arbitrage efficiency, and how to increase bill offset in ₱.',
+              })
+            }
+          >
             <HoverInfo
               title="Energy Partition & Autarky"
               content="Breakdown of solar partition, storage, and utility interaction."
@@ -2281,7 +2304,15 @@ export default function AnalyticsDashboardPage() {
                   content="Comparison of total production against consumption loads with surplus/deficit tracking."
                   showIcon
                 >
-                  <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-help">
+                <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-pointer"
+                  onClick={() =>
+                    setAiModalSection({
+                      title: timeRange === '12M' ? 'Yearly Seasonal Yield & Demand' : 'Historical Generation vs Demand',
+                      question:
+                        'Provide executive business insights for Historical Generation vs Demand Balance: evaluate multi-day/monthly harvest consistency, demand coverage trend, and financial yield trajectory in ₱.',
+                    })
+                  }
+                >
                     <TrendingUp className="w-5 h-5 text-emerald-500" />
                     {timeRange === '12M' ? 'Yearly Seasonal Yield & Demand (MWh)' : 'Historical Generation vs Demand Balance (kWh)'}
                   </CardTitle>
@@ -2404,7 +2435,15 @@ export default function AnalyticsDashboardPage() {
                   content="24-hour battery capacity utilization, cell temperature, and C-rate charge dynamics."
                   showIcon
                 >
-                  <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-help">
+                <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-pointer"
+                  onClick={() =>
+                    setAiModalSection({
+                      title: timeRange === '12M' ? 'Yearly Seasonal Yield & Demand' : 'Historical Generation vs Demand',
+                      question:
+                        'Provide executive business insights for Historical Generation vs Demand Balance: evaluate multi-day/monthly harvest consistency, demand coverage trend, and financial yield trajectory in ₱.',
+                    })
+                  }
+                >
                     <BatteryCharging className="w-5 h-5 text-cyan-400" />
                     ESS Cycling & State of Charge (SOC %)
                   </CardTitle>
@@ -2527,7 +2566,16 @@ export default function AnalyticsDashboardPage() {
                 content={`Exact 5-minute interval recordings across the 24-hour operational cycle, tariff rates, power flows, and verified solar yields${selectedInverter ? ` (Isolated to Inverter SN: ${selectedInverter.deviceSn} · Logger: ${selectedInverter.loggerSn})` : ''}.`}
                 showIcon
               >
-                <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-help">
+                <CardTitle
+                  className="text-base sm:text-lg font-bold flex items-center gap-2 cursor-pointer"
+                  onClick={() =>
+                    setAiModalSection({
+                      title: 'Interval Telemetry Log',
+                      question:
+                        'Provide executive business insights from the Interval Telemetry Log: identify peak-tariff import windows, generation anomalies, and prioritized operational actions.',
+                    })
+                  }
+                >
                   <Calendar className="w-5 h-5 text-primary" />
                   Interval Telemetry Log ({formatHumanDate(dateSelection.selectedDate)})
                 </CardTitle>

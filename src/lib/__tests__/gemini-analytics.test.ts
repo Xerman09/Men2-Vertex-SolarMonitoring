@@ -166,6 +166,8 @@ describe('Gemini 3.5 AI Telemetry Analytics Engine', () => {
 
     const emptyHtml = renderToStaticMarkup(
       React.createElement(AiAnalyticsPanel, {
+        isOpen: true,
+        onClose: () => {},
         range: 'TODAY',
         date: '2026-11-17',
         historyIsLive: false,
@@ -175,11 +177,13 @@ describe('Gemini 3.5 AI Telemetry Analytics Engine', () => {
       })
     );
     expect(emptyHtml).toContain('No live DeyeCloud telemetry to analyze');
-    expect(emptyHtml).toContain('AI Telemetry Analysis');
+    expect(emptyHtml).toContain('AI Business Analysis');
 
     // While telemetry fetch is still in flight (isPending=true), never show premature empty message
     const pendingHtml = renderToStaticMarkup(
       React.createElement(AiAnalyticsPanel, {
+        isOpen: true,
+        onClose: () => {},
         range: 'TODAY',
         date: '2026-11-17',
         historyIsLive: false,

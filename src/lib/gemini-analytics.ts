@@ -112,7 +112,7 @@ const ANALYTICS_INSIGHTS_JSON_SCHEMA: Record<string, unknown> = {
     summary: {
       type: 'string',
       description:
-        'Crisp 1-sentence executive summary (<= 175 chars) citing real kW, kWh, kWh/kWp, or ₱ values from the input.',
+        'Crisp 1-sentence executive business takeaway (<= 175 chars) interpreting ROI, bill-reduction impact in ₱, or operational priority—do not just restate raw totals.',
     },
     status: {
       type: 'string',
@@ -409,9 +409,12 @@ export async function getCachedOrGenerateAnalyticsInsights(
 
   const run = async (): Promise<AnalyticsInsightsResult> => {
     const systemInstruction =
-      'You are an engineering solar telemetry analyst for Philippine commercial & residential PV arrays. ' +
-      'Analyze ONLY the verified telemetry JSON provided. Never invent metrics, causes, weather, or assets absent from the JSON. ' +
-      'Format currency strictly in Philippine Pesos (₱). Return exactly 3 findings with categories "performance", "economics", and "action".';
+      'You are a senior commercial solar energy & financial advisor for Philippine facilities. ' +
+      'Analyze ONLY the verified telemetry JSON provided. Do NOT merely restate raw kW/kWh totals—deliver executive business insights: ' +
+      'quantify bill reduction impact, peak-tariff exposure (₱/kWh), yield efficiency vs rated capacity, load-shifting or self-consumption optimization opportunities, ' +
+      'and prioritized operational actions. Format currency strictly in Philippine Pesos (₱). ' +
+      'Never invent metrics, causes, weather, or assets absent from the JSON. ' +
+      'Return exactly 3 findings with categories "performance", "economics", and "action".';
 
     const inputPayload = JSON.stringify({
       scopeLabel: facts.scopeLabel,

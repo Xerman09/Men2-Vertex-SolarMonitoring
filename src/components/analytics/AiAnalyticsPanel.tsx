@@ -9,6 +9,7 @@ import {
   Sliders,
   Send,
   AlertTriangle,
+  X,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,10 @@ import type {
 } from '@/lib/gemini-analytics';
 
 interface AiAnalyticsPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  sectionTitle?: string;
+  sectionQuestion?: string;
   accountId?: string;
   stationId?: string;
   deviceSn?: string;
@@ -58,6 +63,10 @@ function findingMeta(category: AnalyticsFindingCategory) {
 }
 
 export function AiAnalyticsPanel({
+  isOpen,
+  onClose,
+  sectionTitle,
+  sectionQuestion,
   accountId,
   stationId,
   deviceSn,
@@ -150,17 +159,30 @@ export function AiAnalyticsPanel({
     ]
   );
 
-  // Automatically load cached/fresh analysis when live scope telemetry settles
+  // Close on Escape key when open
   useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
+
+  // Automatically load cached/fresh analysis only when modal is opened
+  useEffect(() => {
+    if (!isOpen) return;
     if (!historyIsLive || noLiveData || isPending) {
       setInsights(null);
       return;
     }
-    void runAnalysis({ force: false });
+    void runAnalysis({ force: false, userQuestion: sectionQuestion });
     return () => {
       if (abortRef.current) abortRef.current.abort();
     };
-  }, [runAnalysis, historyIsLive, noLiveData, isPending]);
+  }, [isOpen, sectionQuestion, runAnalysis, historyIsLive, noLiveData, isPending]);
+
+  if (!isOpen) return null;
 
   const handleAskSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,52 +192,88 @@ export function AiAnalyticsPanel({
   };
 
   return (
-    <Card className="border-border/70 shadow-sm overflow-hidden">
-      <CardHeader className="py-3 px-4 border-b border-border/40">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2 min-w-0">
-            <HoverInfo
-              title="AI Telemetry Analysis"
-              side="bottom"
-              align="start"
-              content={
-                <div className="space-y-1 text-[11px] max-w-[260px]">
-                  <p className="text-muted-foreground">
-                    Structured performance, ₱ tariff arbitrage, and asset triage analysis powered by Gemini 3.5 Flash-Lite strictly grounded in live DeyeCloud telemetry.
-                  </p>
-                  {insights && (
-                    <div className="pt-1 border-t border-border/50 font-mono text-[10px] flex justify-between gap-2">
-                      <span className="text-muted-foreground">Engine</span>
-                      <span className="font-semibold text-foreground">
-                        {insights.source === 'gemini' ? insights.model : 'Deterministic fallback'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              }
-              showIcon
-            >
-              <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2 cursor-help">
-                <Sparkles className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
-                <span>AI Telemetry Analysis</span>
-              </CardTitle>
-            </HoverInfo>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={sectionTitle ? `AI Business Analysis: ${sectionTitle}` : 'AI Business Analysis'}
+    >
+      <Card
+        className="w-full max-w-3xl max-h-[85vh] flex flex-col border-border/80 bg-card shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <CardHeader className="py-3 px-4 border-b border-border/40 shrink-0">
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <HoverInfo
+                title="AI Business Analysis"
+                side="bottom"
+                align="start"
+                content={
+                  <div className="space-y-1 text-[11px] max-w-[260px]">
+                    <p className="text-muted-foreground">
+                      Executive performance, ₱ tariff arbitrage, and operational insights powered by Gemini 3.5 Flash-Lite grounded in live DeyeCloud telemetry.
+                    </p>
+                    {insights && (
+                      <div className="pt-1 border-t border-border/50 font-mono text-[10px] flex justify-between gap-2">
+                        <span className="text-muted-foreground">Engine</span>
+                        <span className="font-semibold text-foreground">
+                          {insights.source === 'gemini' ? insights.model : 'Deterministic fallback'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                }
+              >
+                <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2 cursor-help truncate">
+                  <Sparkles className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
+                  <span className="truncate">
+                    {sectionTitle ? `AI Analysis · ${sectionTitle}` : 'AI Business Analysis'}
+                  </span>
+                </CardTitle>
+              </HoverInfo>
 
-            {insights?.status === 'critical' && (
-              <Badge variant="destructive" className="font-mono text-[10px]">
-                Critical
-              </Badge>
-            )}
-            {insights?.status === 'watch' && (
-              <Badge variant="warning" className="font-mono text-[10px]">
-                Watch
-              </Badge>
-            )}
+              {insights?.status === 'critical' && (
+                <Badge variant="destructive" className="font-mono text-[10px] shrink-0">
+                  Critical
+                </Badge>
+              )}
+              {insights?.status === 'watch' && (
+                <Badge variant="warning" className="font-mono text-[10px] shrink-0">
+                  Watch
+                </Badge>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={() => void runAnalysis({ force: true, userQuestion: sectionQuestion })}
+                disabled={loading || !historyIsLive || noLiveData || isPending}
+                aria-label="Refresh AI analysis"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={onClose}
+                aria-label="Close AI analysis"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
 
           <form
             onSubmit={handleAskSubmit}
-            className="flex items-center gap-2 w-full lg:w-auto"
+            className="flex items-center gap-2 w-full mt-2.5"
           >
             <label htmlFor={inputId} className="visually-hidden">
               Ask AI about this telemetry
@@ -240,22 +298,10 @@ export function AiAnalyticsPanel({
               <Send className="w-3 h-3" aria-hidden="true" />
               <span>Ask</span>
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-label="Refresh AI analysis"
-              onClick={() => void runAnalysis({ force: true, userQuestion: question.trim() || undefined })}
-              disabled={!historyIsLive || noLiveData || isPending || loading}
-              className="h-8 w-8 p-0 cursor-pointer shrink-0"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
-            </Button>
           </form>
-        </div>
-      </CardHeader>
+        </CardHeader>
 
-      <CardContent className="p-4 space-y-3" aria-live="polite">
+        <CardContent className="p-4 space-y-3 overflow-y-auto" aria-live="polite">
         {isPending || (loading && !insights) ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
             {[1, 2, 3].map((i) => (
@@ -313,7 +359,8 @@ export function AiAnalyticsPanel({
             </div>
           </>
         ) : null}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
