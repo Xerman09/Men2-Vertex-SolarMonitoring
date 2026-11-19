@@ -84,15 +84,15 @@ function SlideMetricRow({
   return (
     <div
       style={{ '--tv-stagger': staggerIndex } as React.CSSProperties}
-      className="tv-kpi-stagger flex items-baseline justify-between gap-4 py-3"
+      className="tv-kpi-stagger flex items-baseline justify-between gap-3 py-2.5"
     >
-      <span className="font-mono text-xs sm:text-sm uppercase tracking-[0.14em] text-muted-foreground">
+      <span className="font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap shrink-0">
         {label}
       </span>
-      <span className={`font-mono text-2xl sm:text-3xl font-bold tabular-nums ${accentClass}`}>
+      <span className={`font-mono text-lg sm:text-xl xl:text-2xl font-bold tabular-nums whitespace-nowrap text-right ${accentClass}`}>
         {value}
         {unit && (
-          <span className="ml-1 text-xs sm:text-sm font-semibold text-muted-foreground">{unit}</span>
+          <span className="ml-1 text-xs font-semibold text-muted-foreground">{unit}</span>
         )}
       </span>
     </div>
@@ -335,7 +335,7 @@ export function TvSlideDeck({
         {/* 1. MASTER A: FLEET OVERVIEW (Left Hero Metric + Right Portfolio Table) */}
         {slide.kind === 'overview' && (
           <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 items-stretch">
-            <div className="lg:col-span-4 xl:col-span-3 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0">
+            <div className="lg:col-span-4 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0">
               <div className="tv-kpi-stagger" style={{ '--tv-stagger': 0 } as React.CSSProperties}>
                 <div className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
                   Live Solar Generation
@@ -413,7 +413,7 @@ export function TvSlideDeck({
               </div>
             </div>
 
-            <div className="lg:col-span-8 xl:col-span-9 flex flex-col justify-between min-h-0">
+            <div className="lg:col-span-8 flex flex-col justify-between min-h-0">
               <div className="grid grid-cols-12 gap-3 border-b border-border/50 pb-2 font-mono text-xs sm:text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 <div className="col-span-5">Account</div>
                 <div className="col-span-3">Share</div>
@@ -535,7 +535,7 @@ export function TvSlideDeck({
 
           return (
             <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-              <div className="lg:col-span-4 xl:col-span-3 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0">
+              <div className="lg:col-span-4 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0">
                 <div>
                   <div className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
                     Live Solar
@@ -601,7 +601,7 @@ export function TvSlideDeck({
                 </div>
               </div>
 
-              <div className="lg:col-span-8 xl:col-span-9 flex flex-col min-h-[260px]">
+              <div className="lg:col-span-8 flex flex-col min-h-[260px]">
                 {slide.kind === 'account' && slide.account.plants.length > 0 ? (
                   <div
                     className={`grid flex-1 min-h-0 grid-cols-1 md:grid-cols-2 ${
@@ -799,7 +799,7 @@ export function TvSlideDeck({
 
           return (
             <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 items-stretch">
-              <div className="lg:col-span-4 xl:col-span-3 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0">
+              <div className="lg:col-span-4 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0">
                 <div className="tv-kpi-stagger" style={{ '--tv-stagger': 0 } as React.CSSProperties}>
                   <div className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
                     {hasDemand ? '7-Day Realized Bill Savings' : '7-Day Avoided Cost'}
@@ -867,7 +867,7 @@ export function TvSlideDeck({
                 </div>
               </div>
 
-              <div className="lg:col-span-8 xl:col-span-9 flex flex-col justify-between min-h-[260px]">
+              <div className="lg:col-span-8 flex flex-col justify-between min-h-[260px]">
                 <div className="flex items-center justify-between gap-4 border-b border-border/40 pb-2.5">
                   <h2 className="font-sans text-base sm:text-lg font-bold text-foreground">
                     {slide.account && slide.account.plants.length > 0
