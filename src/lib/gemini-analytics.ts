@@ -96,14 +96,14 @@ const findingSchema = z.object({
   category: z.enum(['performance', 'economics', 'action']),
   title: z.string().min(1).max(80),
   metric: z.string().min(1).max(60),
-  detail: z.string().min(1).max(180),
+  detail: z.string().min(1).max(260),
 });
 
 const analyticsInsightsOutputSchema = z.object({
-  summary: z.string().min(1).max(260),
+  summary: z.string().min(1).max(360),
   status: z.enum(['optimal', 'watch', 'critical']),
   findings: z.array(findingSchema).min(1).max(4),
-  answer: z.string().nullable().optional(),
+  answer: z.string().max(600).nullable().optional(),
 });
 
 const ANALYTICS_INSIGHTS_JSON_SCHEMA: Record<string, unknown> = {
@@ -112,7 +112,7 @@ const ANALYTICS_INSIGHTS_JSON_SCHEMA: Record<string, unknown> = {
     summary: {
       type: 'string',
       description:
-        'Crisp 1-sentence executive business takeaway (<= 175 chars) interpreting ROI, bill-reduction impact in ₱, or operational priority—do not just restate raw totals.',
+        'Executive business diagnosis (<= 300 chars) explaining WHAT the telemetry means for bill reduction, operational efficiency, or risk—never merely restate raw kW/kWh totals.',
     },
     status: {
       type: 'string',
@@ -128,9 +128,13 @@ const ANALYTICS_INSIGHTS_JSON_SCHEMA: Record<string, unknown> = {
         type: 'object',
         properties: {
           category: { type: 'string', enum: ['performance', 'economics', 'action'] },
-          title: { type: 'string', description: 'Short label <= 36 chars.' },
-          metric: { type: 'string', description: 'Headline metric value e.g. "2.41 kWh/kWp" or "₱8,420 saved".' },
-          detail: { type: 'string', description: 'Single factual finding <= 115 chars.' },
+          title: { type: 'string', description: 'Short business theme <= 40 chars.' },
+          metric: { type: 'string', description: 'Key indicator e.g. "74% Bill Offset" or "₱2,150/day Peak Exposure".' },
+          detail: {
+            type: 'string',
+            description:
+              'Business interpretation <= 220 chars explaining WHY this matters financially/operationally and what action to take—do not just repeat chart numbers.',
+          },
         },
         required: ['category', 'title', 'metric', 'detail'],
         additionalProperties: false,
@@ -139,7 +143,7 @@ const ANALYTICS_INSIGHTS_JSON_SCHEMA: Record<string, unknown> = {
     answer: {
       type: ['string', 'null'],
       description:
-        'Concise answer (<= 260 chars) strictly addressing userQuestion if provided, else null.',
+        'Executive business analysis (<= 500 chars) directly addressing userQuestion with diagnosis, ₱ financial impact, and concrete operational recommendations; null if no userQuestion.',
     },
   },
   required: ['summary', 'status', 'findings', 'answer'],
@@ -317,57 +321,80 @@ export function buildDeterministicAnalyticsInsights(
         ? 'watch'
         : 'optimal';
 
+  const totalBillBaselinePhp = facts.estimatedSavingsPhp + facts.estimatedImportCostPhp;
+  const billReductionPct =
+    totalBillBaselinePhp > 0
+      ? Math.round((facts.estimatedSavingsPhp / totalBillBaselinePhp) * 100)
+      : 0;
+  const peakExposurePhp = Math.round(facts.peakTariffImportKwh * facts.tariff.peakRatePhp);
+  const spreadPerKwh = Math.max(0, facts.tariff.peakRatePhp - facts.tariff.exportCreditPhp);
+  const loadShiftOpportunityPhp = Math.round(facts.gridExportKwh * spreadPerKwh);
+
+  const prVerdict =
+    facts.performanceRatioPct > 0 && facts.performanceRatioPct < 65
+      ? 'Array conversion is underperforming nameplate expectations—inspect for panel soiling, shading, or inverter derating.'
+      : facts.performanceRatioPct >= 78
+        ? 'Array is converting irradiance efficiently with minimal thermal or clipping losses.'
+        : 'Array conversion is moderate; scheduled panel cleaning and midday thermal checks can recover additional yield.';
+
   const summary = clampText(
-    `${facts.scopeLabel} generated ${facts.totalSolarYieldKwh.toFixed(1)} kWh (${facts.specificYieldKwhKwp.toFixed(2)} kWh/kWp) with ₱${facts.estimatedSavingsPhp.toLocaleString('en-US')} estimated solar savings.`,
-    180
+    facts.faultCount > 0
+      ? `Revenue at risk on ${facts.scopeLabel}: ${facts.faultCount} inverter fault is suppressing harvest—prioritize immediate field dispatch to protect ₱${facts.estimatedSavingsPhp.toLocaleString('en-US')} daily savings.`
+      : peakExposurePhp > 500
+        ? `Solar is cutting electricity spend by ${billReductionPct}%, but ₱${peakExposurePhp.toLocaleString('en-US')} in peak-tariff grid imports remains the largest controllable cost lever.`
+        : loadShiftOpportunityPhp > 300
+          ? `Solar cuts utility spend by ${billReductionPct}%; shifting flexible daytime loads into 10:00–14:00 can capture up to ₱${loadShiftOpportunityPhp.toLocaleString('en-US')} more value instead of exporting.`
+          : `${facts.scopeLabel} is delivering a ${billReductionPct}% electricity bill reduction with strong daytime solar-to-load alignment under ${facts.tariff.utilityName} rates.`,
+    300
   );
 
   const findings: AnalyticsFinding[] = [
     {
       category: 'performance',
-      title: 'Solar Yield & Peak',
-      metric:
-        facts.peakSolarHour
-          ? `${facts.peakSolarKw.toFixed(1)} kW @ ${facts.peakSolarHour}`
-          : `${facts.specificYieldKwhKwp.toFixed(2)} kWh/kWp`,
-      detail: clampText(
-        `Midday solar averaged ${facts.avgMiddaySolarKw.toFixed(1)} kW against ${facts.capacityKw.toFixed(0)} kWp (${facts.performanceRatioPct.toFixed(1)}% PR).`,
-        115
-      ),
+      title: 'Asset Utilization & Health',
+      metric: `${facts.performanceRatioPct.toFixed(0)}% PR · ${facts.specificYieldKwhKwp.toFixed(2)} kWh/kWp`,
+      detail: clampText(prVerdict, 220),
     },
     {
       category: 'economics',
-      title: `${facts.tariff.utilityName} Arbitrage`,
-      metric: `₱${facts.estimatedSavingsPhp.toLocaleString('en-US')} saved`,
+      title: 'Bill Reduction & Peak Risk',
+      metric: `${billReductionPct}% Bill Cut`,
       detail: clampText(
-        `Self-sufficiency ${facts.selfSufficiencyPct.toFixed(0)}%; peak-window grid import ${facts.peakTariffImportKwh.toFixed(1)} kWh (₱${facts.estimatedImportCostPhp.toLocaleString('en-US')} import).`,
-        115
+        peakExposurePhp > 0
+          ? `Peak-window grid draw (${facts.tariff.peakStartHour}:00–${facts.tariff.peakEndHour}:00) costs ~₱${peakExposurePhp.toLocaleString('en-US')} at ₱${facts.tariff.peakRatePhp.toFixed(2)}/kWh; reducing peak demand directly boosts ROI.`
+          : `Zero peak-window grid exposure—solar and self-consumption are fully shielding the facility from ₱${facts.tariff.peakRatePhp.toFixed(2)}/kWh peak rates.`,
+        220
       ),
     },
     {
       category: 'action',
-      title: facts.faultCount > 0 || facts.offlineCount > 0 ? 'Asset Attention' : 'Load Alignment',
+      title: facts.faultCount > 0 || facts.offlineCount > 0 ? 'Immediate Maintenance' : 'Profit Optimization',
       metric:
         facts.faultCount > 0
-          ? `${facts.faultCount} fault`
-          : facts.offlineCount > 0
-            ? `${facts.offlineCount} offline`
-            : `${facts.selfConsumptionPct.toFixed(0)}% self-used`,
+          ? `${facts.faultCount} Fault`
+          : loadShiftOpportunityPhp > 0
+            ? `+₱${loadShiftOpportunityPhp.toLocaleString('en-US')} Upside`
+            : `${facts.selfConsumptionPct.toFixed(0)}% Self-Used`,
       detail: clampText(
         facts.faultCount > 0 || facts.offlineCount > 0
-          ? `Inspect ${facts.faultCount} faulted and ${facts.offlineCount} offline device(s) in Fleet Monitoring.`
-          : facts.gridExportKwh > 20
-            ? `Shift flexible loads into 10:00–14:00 to absorb ${facts.gridExportKwh.toFixed(0)} kWh export locally.`
-            : `Maintain daytime load alignment during 10:00–14:00 (${facts.avgMiddaySolarKw.toFixed(1)} kW avg PV).`,
-        115
+          ? `Dispatch technicians to clear ${facts.faultCount} faulted and ${facts.offlineCount} offline unit(s) to recover lost kWh and prevent ongoing bill inflation.`
+          : loadShiftOpportunityPhp > 0
+            ? `Schedule heavy equipment (HVAC, pumps, compressors) during 10:00–14:00 to absorb ${facts.gridExportKwh.toFixed(0)} kWh surplus locally rather than exporting at lower credit.`
+            : `Self-consumption is already well-aligned with generation; consider battery peak-shaving if evening peak imports grow.`,
+        220
       ),
     },
   ];
 
   const answer = question?.trim()
     ? clampText(
-        `${facts.scopeLabel}: ${facts.totalSolarYieldKwh.toFixed(1)} kWh yield, ${facts.totalLoadDemandKwh.toFixed(1)} kWh demand, net grid ${facts.netGridBalanceKwh >= 0 ? '+' : ''}${facts.netGridBalanceKwh.toFixed(1)} kWh, est. ₱${facts.estimatedSavingsPhp.toLocaleString('en-US')} saved (${facts.tariff.utilityName}).`,
-        260
+        `Executive Takeaway (${facts.scopeLabel}): Solar currently offsets ${billReductionPct}% of electricity cost under ${facts.tariff.utilityName}. ` +
+          (peakExposurePhp > 0
+            ? `The primary cost leak is ₱${peakExposurePhp.toLocaleString('en-US')} in peak-hour grid imports—shifting discretionary loads to midday (10:00–14:00) or shaving peak demand will maximize ₱ ROI.`
+            : loadShiftOpportunityPhp > 0
+              ? `You have ₱${loadShiftOpportunityPhp.toLocaleString('en-US')} in untapped self-consumption upside by shifting flexible loads into midday solar surplus.`
+              : `Operations are well-optimized with minimal grid leakage; focus on maintaining ${facts.performanceRatioPct.toFixed(0)}% PR through routine panel maintenance.`),
+        500
       )
     : null;
 
