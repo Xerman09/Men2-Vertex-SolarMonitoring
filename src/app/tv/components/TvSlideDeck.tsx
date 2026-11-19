@@ -17,6 +17,7 @@ import {
   KG_CO2_PER_TREE_ANNUAL,
   PHILIPPINES_GRID_EMISSION_FACTOR_KG_PER_KWH,
 } from '@/lib/tariff-rates';
+import { getManilaToday } from '@/lib/manila-time';
 import type { DailyAnalyticsPoint } from '@/lib/analytics-data';
 import { computeTvWeeklyProfitSummary, getTvScopeKey, type TvSlide } from '../types';
 
@@ -532,6 +533,18 @@ export function TvSlideDeck({
                   : null;
           const utilPct =
             capKw > 0 ? Math.min(100, Math.round((liveKw / capKw) * 100)) : 0;
+          const todayDate = getManilaToday();
+          const todayPoint =
+            weeklySeries?.find((d) => d.date === todayDate) ??
+            (weeklySeries && weeklySeries.length > 0
+              ? weeklySeries[weeklySeries.length - 1]
+              : null);
+          const todayDemandKwh =
+            todayPoint && todayPoint.loadDemandKwh > 0 ? todayPoint.loadDemandKwh : null;
+          const todayGridNetKwh =
+            todayPoint && (todayPoint.gridExportKwh > 0 || todayPoint.gridImportKwh > 0)
+              ? todayPoint.gridExportKwh - todayPoint.gridImportKwh
+              : null;
 
           return (
             <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
@@ -572,23 +585,31 @@ export function TvSlideDeck({
                   />
                   <SlideMetricRow
                     staggerIndex={2}
-                    label="Est. Savings"
+                    label="Today Demand"
+                    value={todayDemandKwh !== null ? todayDemandKwh.toFixed(1) : '--'}
+                    unit={todayDemandKwh !== null ? 'kWh' : undefined}
+                    accentClass="text-indigo-400"
+                  />
+                  <SlideMetricRow
+                    staggerIndex={3}
+                    label="Today Savings"
                     value={formatPhp(yieldKwh * tariffRatePhp)}
                     accentClass="text-emerald-400"
                   />
                   <SlideMetricRow
-                    staggerIndex={3}
-                    label="Facility Load"
-                    value={demandKw.toFixed(1)}
-                    unit="kW"
-                    accentClass="text-indigo-400"
-                  />
-                  <SlideMetricRow
                     staggerIndex={4}
-                    label="Grid Net"
-                    value={formatSignedGridKw(gridKw)}
-                    unit="kW"
-                    accentClass={gridKw >= 0 ? 'text-emerald-500' : 'text-rose-400'}
+                    label="Today Grid Net"
+                    value={
+                      todayGridNetKwh !== null
+                        ? formatSignedGridKw(todayGridNetKwh)
+                        : '--'
+                    }
+                    unit={todayGridNetKwh !== null ? 'kWh' : undefined}
+                    accentClass={
+                      todayGridNetKwh !== null && todayGridNetKwh < 0
+                        ? 'text-rose-400'
+                        : 'text-emerald-500'
+                    }
                   />
                   {bessSoc !== null && (
                     <SlideMetricRow

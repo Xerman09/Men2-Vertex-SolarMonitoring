@@ -293,9 +293,17 @@ export default function TvSlideshowPage() {
   // Trigger weekly analytics load when displaying any financial slide
   const currentSlide = slides[activeIndex] || null;
   useEffect(() => {
-    if (!currentSlide || currentSlide.kind !== 'financial') return;
+    if (
+      !currentSlide ||
+      (currentSlide.kind !== 'financial' &&
+        currentSlide.kind !== 'station' &&
+        currentSlide.kind !== 'account' &&
+        currentSlide.kind !== 'curve')
+    ) {
+      return;
+    }
     ensureWeeklySeriesForScope(currentSlide.scope);
-    if (currentSlide.account?.plants?.length) {
+    if (currentSlide.kind === 'financial' && currentSlide.account?.plants?.length) {
       for (const plant of currentSlide.account.plants) {
         ensureWeeklySeriesForScope({
           accountId: currentSlide.account.account.id,
