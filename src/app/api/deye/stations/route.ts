@@ -1,0 +1,122 @@
+import { NextResponse } from 'next/server';
+import { accountManager } from '@/lib/account-manager';
+import { enforceTenantAccess } from '@/lib/session';
+import { withGate } from '@/lib/gate';
+import { RATE_LIMIT_CONFIGS } from '@/lib/rate-limit';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('StationsRoute');
+
+export const GET = withGate(
+  {
+    allowUnauthenticated: true,
+    rateLimit: {
+      keyPrefix: 'read_stations',
+      maxRequests: RATE_LIMIT_CONFIGS.READ_STATIONS.maxRequests,
+      windowMs: RATE_LIMIT_CONFIGS.READ_STATIONS.windowMs,
+    },
+  },
+  async (req, { session }) => {
+    const { searchParams } = new URL(req.url);
+    const accountId = searchParams.get('accountId') || undefined;
+
+    // Consumer role is strictly restricted to their assigned account
+    if (session?.role === 'consumer') {
+      if (!session.accountId) {
+        return NextResponse.json(
+          { error: 'Forbidden: Consumer account is not assigned to any solar station' },
+          { status: 403 }
+        );
+      }
+      if (accountId && accountId !== session.accountId && accountId !== 'ALL' && accountId !== 'ALL_FLEET') {
+        const cleanSessionId = session.accountId.startsWith('station-')
+          ? session.accountId.replace('station-', '')
+          : session.accountId;
+        const isMatch =
+          accountId === cleanSessionId ||
+          session.accountId === `station-${accountId}` ||
+          accountId === `station-${session.accountId}`;
+
+        if (!isMatch) {
+          return NextResponse.json(
+            { error: 'Forbidden: You do not have permission to view stations for this account' },
+            { status: 403 }
+          );
+        }
+      }
+      const client = accountManager.getClient(session.accountId);
+      if (!client) {
+        return NextResponse.json(
+          { error: `Assigned account "${session.accountId}" not found` },
+          { status: 404 }
+        );
+      }
+      const result = await client.getStationList();
+      return NextResponse.json({
+        ...result,
+        accountId: client.accountId,
+        accountName: client.accountName,
+      });
+    }
+
+    try {
+      if (accountId) {
+        const tenantCheck = enforceTenantAccess(session, accountId);
+        if (!tenantCheck.allowed) {
+          return NextResponse.json(
+            { error: tenantCheck.error || 'Access denied' },
+            { status: tenantCheck.status || 403 }
+          );
+        }
+
+        const client = accountManager.getClient(tenantCheck.targetAccountId);
+        if (!client) {
+          return NextResponse.json(
+            { error: `Account "${tenantCheck.targetAccountId}" not found` },
+            { status: 404 }
+          );
+        }
+        const result = await client.getStationList();
+        return NextResponse.json({
+          ...result,
+          accountId: client.accountId,
+          accountName: client.accountName,
+        });
+      }
+
+      // Query all accounts with Promise.allSettled for fault tolerance
+      const clients = accountManager.getAllClients();
+      const settled = await Promise.allSettled(clients.map((c) => c.getStationList()));
+      const allStations: Array<Record<string, unknown>> = [];
+      let anyLive = false;
+
+      settled.forEach((res, idx) => {
+        if (res.status === 'fulfilled') {
+          const l = res.value;
+          if (l.isLive) anyLive = true;
+          l.stations.forEach((s) => {
+            allStations.push({
+              ...s,
+              accountId: clients[idx].accountId,
+              accountName: clients[idx].accountName,
+            });
+          });
+        } else {
+          log.warn(`Failed querying station list for account ${clients[idx].accountId}`, { route: 'stations', accountId: clients[idx].accountId }, res.reason);
+        }
+      });
+
+      return NextResponse.json({
+        total: allStations.length,
+        stations: allStations,
+        isLive: anyLive,
+      });
+    } catch (error) {
+      log.error('Error querying stations', error, { route: 'stations' });
+      return NextResponse.json(
+        { error: 'Failed to query registered stations' },
+        { status: 500 }
+      );
+    }
+  }
+);

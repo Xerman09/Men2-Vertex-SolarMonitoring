@@ -1,0 +1,48 @@
+{
+  "name": "deye-solar-monitoring",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0 --port 3005",
+    "dev:lan": "next dev -H 0.0.0.0 --port 3005",
+    "build": "next build",
+    "start": "next start --port 3005",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "format:check": "prettier --check .",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@google/genai": "^3.4.0",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.563.0",
+    "next": "^16.2.1",
+    "next-themes": "^0.4.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "recharts": "^2.15.4",
+    "tailwind-merge": "^3.5.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^10.12.0",
+    "postcss": "^8",
+    "prettier": "^3.9.9",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "typescript-eslint": "^8.71.1",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
+  }
+}

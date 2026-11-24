@@ -1,0 +1,833 @@
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   VOS DESIGN TOKENS (LIGHT)
+   - Tinted canvas for enterprise depth
+   - Crisp white cards/elevations
+   - Soft borders
+   - Solar & Energy telemetry semantics
+ ============================================================ */
+:root {
+  color-scheme: light dark;
+
+  /* Core Canvas (Rich comfortable slate canvas - eliminates glare & blinding white) */
+  --background: 220 14% 96%;
+  --foreground: 222 47% 11%;
+
+  /* Surfaces & Cards (Solid crisp white elevated surfaces) */
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+
+  /* Primary Enterprise Brand */
+  --primary: 224 76% 48%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Neutral System Surfaces */
+  --secondary: 220 14% 92%;
+  --secondary-foreground: 222 47% 11%;
+
+  --muted: 220 14% 91%;
+  --muted-foreground: 220 13% 32%;
+
+  --accent: 220 14% 90%;
+  --accent-foreground: 222 47% 11%;
+
+  --destructive: 0 84% 50%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* Inputs & Borders (Solid, crisp structure instead of paper-thin) */
+  --border: 220 13% 80%;
+  --input: 220 13% 82%;
+  --ring: 224 76% 48%;
+
+  --radius: 0.75rem;
+
+  /* ===== Semantic Status Tokens (Light - Rich & High Contrast) ===== */
+  --success: 142 72% 30%;
+  --success-foreground: 0 0% 100%;
+  --success-bg: 142 60% 92%;
+
+  --warning: 32 95% 36%;
+  --warning-foreground: 20 14% 4%;
+  --warning-bg: 38 90% 92%;
+
+  --info: 199 89% 36%;
+  --info-foreground: 0 0% 100%;
+  --info-bg: 199 80% 92%;
+
+  /* ===== Solar & Energy Domain Tokens (Light - Deep, Saturated, Not Washed Out) ===== */
+  --solar: 32 95% 36%;
+  --solar-foreground: 20 14% 4%;
+  --solar-bg: 38 90% 92%;
+
+  --battery: 192 90% 32%;
+  --battery-foreground: 0 0% 100%;
+  --battery-bg: 192 70% 92%;
+
+  --grid: 142 72% 30%;
+  --grid-foreground: 0 0% 100%;
+  --grid-bg: 142 60% 92%;
+
+  --load: 243 75% 48%;
+  --load-foreground: 0 0% 100%;
+  --load-bg: 243 75% 94%;
+
+  /* Sidebar Tokens */
+  --sidebar: 220 14% 94%;
+  --sidebar-foreground: 222 47% 15%;
+  --sidebar-primary: 224 76% 48%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 220 14% 88%;
+  --sidebar-accent-foreground: 222 47% 10%;
+  --sidebar-border: 220 13% 80%;
+  --sidebar-ring: 224 76% 48%;
+}
+
+/* ============================================================
+   VOS DESIGN TOKENS (DARK)
+   - Deep canvas (240 10% 3.2%)
+   - Lifted cards (240 8% 6.5%)
+   - Subtle borders (240 4% 14%)
+   - High-contrast luminescent telemetry accents
+ ============================================================ */
+.dark {
+  color-scheme: dark;
+
+  /* Core Canvas */
+  --background: 240 10% 3.2%;
+  --foreground: 0 0% 98%;
+
+  /* Surfaces & Cards */
+  --card: 240 8% 6.5%;
+  --card-foreground: 0 0% 98%;
+
+  --popover: 240 8% 6.5%;
+  --popover-foreground: 0 0% 98%;
+
+  /* Primary Enterprise Brand */
+  --primary: 224 76% 56%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Neutral System Surfaces */
+  --secondary: 240 5% 12%;
+  --secondary-foreground: 0 0% 98%;
+
+  --muted: 240 5% 10.5%;
+  --muted-foreground: 240 6% 70%;
+
+  --accent: 240 5% 12.5%;
+  --accent-foreground: 0 0% 98%;
+
+  --destructive: 0 70% 48%;
+  --destructive-foreground: 0 0% 98%;
+
+  /* Inputs & Borders */
+  --border: 240 4% 14%;
+  --input: 240 4% 16%;
+  --ring: 224 76% 56%;
+
+  /* ===== Semantic Status Tokens (Dark) ===== */
+  --success: 142 70% 45%;
+  --success-foreground: 0 0% 100%;
+  --success-bg: 142 30% 12%;
+
+  --warning: 38 92% 55%;
+  --warning-foreground: 20 14% 4%;
+  --warning-bg: 38 30% 12%;
+
+  --info: 199 89% 55%;
+  --info-foreground: 0 0% 100%;
+  --info-bg: 199 30% 12%;
+
+  /* ===== Solar & Energy Domain Tokens (Dark) ===== */
+  --solar: 38 92% 55%;
+  --solar-foreground: 20 14% 4%;
+  --solar-bg: 38 30% 12%;
+
+  --battery: 188 86% 55%;
+  --battery-foreground: 0 0% 100%;
+  --battery-bg: 188 30% 12%;
+
+  --grid: 142 70% 48%;
+  --grid-foreground: 0 0% 100%;
+  --grid-bg: 142 30% 12%;
+
+  --load: 243 75% 68%;
+  --load-foreground: 0 0% 100%;
+  --load-bg: 243 30% 14%;
+
+  /* Sidebar Tokens */
+  --sidebar: 240 6% 7.5%;
+  --sidebar-foreground: 240 5% 92%;
+  --sidebar-primary: 224 76% 56%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 240 5% 12.5%;
+  --sidebar-accent-foreground: 0 0% 92%;
+  --sidebar-border: 240 4% 14%;
+  --sidebar-ring: 224 76% 56%;
+}
+
+/* ============================================================
+   TAILWIND V4 TOKEN MAPPING
+ ============================================================ */
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-success-bg: hsl(var(--success-bg));
+
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-warning-bg: hsl(var(--warning-bg));
+
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
+  --color-info-bg: hsl(var(--info-bg));
+
+  --color-solar: hsl(var(--solar));
+  --color-solar-foreground: hsl(var(--solar-foreground));
+  --color-solar-bg: hsl(var(--solar-bg));
+
+  --color-battery: hsl(var(--battery));
+  --color-battery-foreground: hsl(var(--battery-foreground));
+  --color-battery-bg: hsl(var(--battery-bg));
+
+  --color-grid: hsl(var(--grid));
+  --color-grid-foreground: hsl(var(--grid-foreground));
+  --color-grid-bg: hsl(var(--grid-bg));
+
+  --color-load: hsl(var(--load));
+  --color-load-foreground: hsl(var(--load-foreground));
+  --color-load-bg: hsl(var(--load-bg));
+
+  --radius: var(--radius);
+
+  --font-sans: 'Hanken Grotesk', 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-headline: 'Space Grotesk', sans-serif;
+
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  /* Custom HUD Scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/20 rounded-full transition-colors border-2 border-transparent bg-clip-content;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
+}
+
+/* ============================================================
+   VOS DESIGN SYSTEM UTILITIES
+ ============================================================ */
+@layer components {
+  /* Data Table / Grid styling helpers */
+  .data-grid {
+    @apply w-full overflow-hidden rounded-xl border bg-card text-card-foreground shadow-xs;
+  }
+
+  .data-grid thead {
+    @apply bg-muted/50 border-b;
+  }
+
+  .data-grid th {
+    @apply px-4 py-3 text-left text-xs font-semibold text-muted-foreground tracking-wider uppercase;
+  }
+
+  .data-grid td {
+    @apply px-4 py-3 text-sm;
+  }
+
+  .data-grid tbody tr {
+    @apply border-t transition-colors;
+  }
+
+  .data-grid tbody tr:hover {
+    @apply bg-muted/40;
+  }
+
+  .td-num {
+    @apply text-right tabular-nums font-mono;
+  }
+
+  /* VOS Status Badges */
+  .badge-neutral {
+    @apply border bg-muted text-foreground;
+  }
+
+  .badge-success {
+    @apply border-transparent bg-[hsl(var(--success-bg))] text-[hsl(var(--success))];
+  }
+
+  .badge-warning {
+    @apply border-transparent bg-[hsl(var(--warning-bg))] text-[hsl(var(--warning))];
+  }
+
+  .badge-info {
+    @apply border-transparent bg-[hsl(var(--info-bg))] text-[hsl(var(--info))];
+  }
+
+  .badge-destructive {
+    @apply border-transparent bg-destructive/10 text-destructive;
+  }
+
+  .badge-solar {
+    @apply border-transparent bg-[hsl(var(--solar-bg))] text-[hsl(var(--solar))];
+  }
+
+  .badge-battery {
+    @apply border-transparent bg-[hsl(var(--battery-bg))] text-[hsl(var(--battery))];
+  }
+
+  .badge-grid {
+    @apply border-transparent bg-[hsl(var(--grid-bg))] text-[hsl(var(--grid))];
+  }
+
+  .badge-load {
+    @apply border-transparent bg-[hsl(var(--load-bg))] text-[hsl(var(--load))];
+  }
+}
+
+/* ============================================================
+   LIGHT MODE CONTRAST & DENSITY ENHANCEMENTS
+   - Prevents washed out neon/light yellow/cyan on light backgrounds
+   - Deepens solar, battery, grid, and load telemetry for WCAG AAA contrast
+   - Strengthens faint transparent borders and semi-transparent cards
+   - Gives typography and monospace numbers crisp, legible weight
+ ============================================================ */
+:root:not(.dark) {
+  /* Telemetry text colors: rich, deep, high-contrast values */
+  .text-amber-500 {
+    color: #b45309 !important; /* amber-700: deep rich solar gold */
+  }
+  .text-cyan-500,
+  .text-cyan-400 {
+    color: #0e7490 !important; /* cyan-700: deep oceanic cyan */
+  }
+  .text-emerald-500,
+  .text-emerald-400 {
+    color: #047857 !important; /* emerald-700: crisp forest green */
+  }
+  .text-indigo-500 {
+    color: #4338ca !important; /* indigo-700: deep cobalt */
+  }
+
+  /* Status and telemetry badge / chip backgrounds */
+  .bg-amber-500\/10 {
+    background-color: rgba(180, 83, 9, 0.09) !important;
+  }
+  .bg-amber-500\/15 {
+    background-color: rgba(180, 83, 9, 0.15) !important;
+  }
+  .bg-cyan-500\/10 {
+    background-color: rgba(14, 116, 144, 0.09) !important;
+  }
+  .bg-cyan-500\/15 {
+    background-color: rgba(14, 116, 144, 0.15) !important;
+  }
+  .bg-emerald-500\/10 {
+    background-color: rgba(4, 120, 87, 0.09) !important;
+  }
+  .bg-emerald-500\/15 {
+    background-color: rgba(4, 120, 87, 0.15) !important;
+  }
+  .bg-indigo-500\/10 {
+    background-color: rgba(67, 56, 202, 0.09) !important;
+  }
+
+  /* Badge and chip borders */
+  .border-amber-500\/20,
+  .border-amber-500\/30,
+  .border-amber-500\/40,
+  .border-amber-500\/50 {
+    border-color: rgba(180, 83, 9, 0.35) !important;
+  }
+  .border-cyan-500\/20,
+  .border-cyan-500\/30,
+  .border-cyan-500\/40,
+  .border-cyan-500\/60 {
+    border-color: rgba(14, 116, 144, 0.35) !important;
+  }
+  .border-emerald-500\/20,
+  .border-emerald-500\/30,
+  .border-emerald-500\/40 {
+    border-color: rgba(4, 120, 87, 0.35) !important;
+  }
+  .border-indigo-500\/20,
+  .border-indigo-500\/40 {
+    border-color: rgba(67, 56, 202, 0.35) !important;
+  }
+
+  /* Card and container borders: prevent razor-thin faint borders */
+  .border-border\/30,
+  .border-border\/40,
+  .border-border\/50 {
+    border-color: hsl(220 13% 84%) !important;
+  }
+  .border-border\/60,
+  .border-border\/70,
+  .border-border\/80 {
+    border-color: hsl(220 13% 76%) !important;
+  }
+
+  /* Give cards real body and clear elevation instead of washed-out transparency */
+  .bg-card\/70,
+  .bg-card\/80 {
+    background-color: hsl(0 0% 100%) !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Table styling */
+  .data-grid {
+    border-color: hsl(220 13% 78%);
+    background-color: hsl(0 0% 100%);
+  }
+  .data-grid thead {
+    background-color: hsl(220 14% 94%);
+    border-bottom-color: hsl(220 13% 78%);
+  }
+  .data-grid th {
+    color: hsl(220 13% 28%);
+    font-weight: 700;
+  }
+  .data-grid td {
+    color: hsl(222 47% 11%);
+  }
+  .data-grid tbody tr {
+    border-top-color: hsl(220 13% 84%);
+  }
+  .data-grid tbody tr:hover {
+    background-color: hsl(220 14% 95%);
+  }
+
+  /* Monospace metrics and data tables */
+  .td-num {
+    font-weight: 600;
+  }
+  .font-mono {
+    letter-spacing: -0.01em;
+  }
+}
+
+/* ============================================================
+   SYNOPTIC ENERGY FLOW ANIMATIONS
+ ============================================================ */
+@keyframes flowDash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.animate-flow-pv {
+  stroke-dasharray: 6 6;
+  animation: flowDash 1.2s linear infinite;
+}
+
+.animate-flow-battery-charge {
+  stroke-dasharray: 6 6;
+  animation: flowDash 1.5s linear infinite;
+}
+
+.animate-flow-grid {
+  stroke-dasharray: 6 6;
+  animation: flowDash 1.8s linear infinite;
+}
+
+.animate-flow-load {
+  stroke-dasharray: 6 6;
+  animation: flowDash 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-flow-pv,
+  .animate-flow-battery-charge,
+  .animate-flow-grid,
+  .animate-flow-load {
+    animation: none !important;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.8s infinite;
+}
+
+/* Ensure chart labels and reference markers are never clipped by SVG viewport */
+.recharts-surface {
+  overflow: visible !important;
+}
+
+/* Fleet 3-Column Drill-Down Grid Alignment */
+@media (min-width: 1024px) {
+  .fleet-cell {
+    grid-column: var(--cell-col);
+    grid-row: var(--cell-row);
+  }
+}
+
+/* ============================================================
+   ACCESSIBILITY & MODERN FLEET NOC PRIMITIVES
+   ============================================================ */
+.visually-hidden:where(:not(:focus-within, :active)) {
+  position: absolute !important;
+  clip-path: inset(50%) !important;
+  overflow: hidden !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  white-space: nowrap !important;
+}
+
+.fleet-containment {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
+@supports not (content-visibility: auto) {
+  .fleet-containment {
+    contain: layout style paint;
+  }
+}
+
+/* Fleet Control Toolbar */
+[data-fleet-toolbar] button,
+[data-fleet-toolbar] select {
+  min-inline-size: 24px;
+  min-block-size: 28px;
+}
+
+@media (pointer: coarse) {
+  [data-fleet-toolbar] button,
+  [data-fleet-toolbar] select {
+    min-block-size: 2.5rem;
+  }
+}
+
+[data-fleet-toolbar] button:focus-visible,
+[data-fleet-toolbar] select:focus-visible,
+.fleet-table-wrapper:focus-visible,
+.fleet-noc-table th button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+[data-fleet-toolbar] button[aria-pressed="true"] {
+  border-color: hsl(var(--primary) / 0.55);
+  box-shadow: inset 0 -2px 0 0 hsl(var(--primary));
+}
+
+@media (forced-colors: active) {
+  [data-fleet-toolbar] button[aria-pressed="true"] {
+    outline: 2px solid Highlight;
+  }
+  [data-fleet-toolbar] [role="separator"] {
+    border-inline-start: 1px solid ButtonText;
+  }
+}
+
+/* Responsive & Sortable Fleet NOC Matrix Table */
+.fleet-table-wrapper {
+  overflow: auto;
+  max-inline-size: 100%;
+  max-block-size: min(680px, 75vh);
+  container-type: inline-size;
+}
+
+.fleet-noc-table {
+  width: 100%;
+  min-inline-size: 860px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.fleet-noc-table thead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  background-color: hsl(var(--muted));
+}
+
+.fleet-noc-table th:has(> button) {
+  padding: 0;
+}
+
+.fleet-noc-table th > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  min-block-size: 36px;
+  padding: 0.55rem 0.75rem;
+  font: inherit;
+  text-align: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.fleet-noc-table th[data-align="right"] > button {
+  justify-content: flex-end;
+}
+
+/* Visual sort icon state driven purely by th[aria-sort] */
+.fleet-noc-table th [data-sort-indicator] {
+  opacity: 0.25;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.fleet-noc-table th[aria-sort] [data-sort-indicator] {
+  opacity: 1;
+  color: hsl(var(--primary));
+}
+
+.fleet-noc-table th[aria-sort="descending"] [data-sort-indicator] {
+  transform: rotate(180deg);
+}
+
+.fleet-noc-table tbody th[scope="row"] {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background-color: hsl(var(--card));
+}
+
+@media (hover: hover) {
+  .fleet-noc-table tbody tr:hover,
+  .fleet-noc-table tbody tr:hover th[scope="row"] {
+    background-color: hsl(var(--muted) / 0.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fleet-noc-table th [data-sort-indicator] {
+    transition: none;
+  }
+}
+
+@container (width < 680px) {
+  .fleet-noc-table {
+    min-inline-size: 0;
+  }
+  .fleet-noc-table,
+  .fleet-noc-table thead,
+  .fleet-noc-table tbody,
+  .fleet-noc-table tr,
+  .fleet-noc-table th,
+  .fleet-noc-table td {
+    display: block;
+  }
+  .fleet-noc-table thead {
+    display: none;
+  }
+  .fleet-noc-table tbody tr {
+    margin-block-end: 0.75rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+  .fleet-noc-table tbody th[scope="row"] {
+    position: sticky;
+    inset-block-start: 0;
+    inset-inline-start: auto;
+    z-index: 2;
+    background-color: hsl(var(--muted) / 0.65);
+    border-block-end: 1px solid hsl(var(--border) / 0.6);
+  }
+  .fleet-noc-table tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.45rem 0.75rem;
+    text-align: right;
+    border-top: 1px solid hsl(var(--border) / 0.35);
+  }
+  .fleet-noc-table tbody td[data-label]::before {
+    content: attr(data-label) ": ";
+    font-weight: 600;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+    text-align: left;
+  }
+}
+
+/* Native top-layer modal dialogs: restore UA viewport centering over Tailwind preflight and contain scroll */
+dialog.vos-modal:modal {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  height: fit-content;
+  max-height: calc(100dvh - 2rem);
+  overscroll-behavior: contain;
+}
+
+dialog.vos-modal::backdrop {
+  background: rgb(0 0 0 / 0.75);
+  backdrop-filter: blur(4px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+/* TV Slideshow: 10-foot presentation atmosphere & compositor-only directional transitions */
+.tv-stage-atmosphere {
+  background-image:
+    radial-gradient(ellipse 75% 42% at 15% -5%, hsl(var(--primary) / 0.08), transparent 65%),
+    radial-gradient(ellipse 65% 38% at 88% -8%, hsl(var(--solar) / 0.07), transparent 60%);
+}
+
+.tv-pixel-shift-surface {
+  translate: 0 0;
+}
+
+@keyframes tv-enter-forward {
+  from {
+    opacity: 0;
+    translate: 36px 0;
+    scale: 0.986;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+@keyframes tv-enter-backward {
+  from {
+    opacity: 0;
+    translate: -36px 0;
+    scale: 0.986;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+    scale: 1;
+  }
+}
+
+@keyframes tv-kpi-rise {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes tv-ticker-scroll {
+  0%,
+  14% {
+    transform: translateX(0);
+  }
+  86%,
+  100% {
+    transform: translateX(calc(var(--tv-ticker-overflow, 0px) * -1));
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tv-pixel-shift-surface {
+    transition: translate 900ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .tv-hud-fade {
+    transition:
+      opacity 260ms cubic-bezier(0.22, 1, 0.36, 1),
+      translate 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .tv-progress-fill {
+    transition: transform 250ms linear;
+  }
+
+  .tv-slide-stage[data-direction='forward'] {
+    animation: tv-enter-forward 440ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .tv-slide-stage[data-direction='backward'] {
+    animation: tv-enter-backward 440ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .tv-kpi-stagger {
+    animation: tv-kpi-rise 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(var(--tv-stagger, 0) * 50ms);
+  }
+
+  .tv-ticker-scrolling {
+    animation: tv-ticker-scroll var(--tv-ticker-duration, 10s) linear infinite alternate;
+  }
+}

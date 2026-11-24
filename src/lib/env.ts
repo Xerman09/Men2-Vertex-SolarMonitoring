@@ -1,0 +1,179 @@
+import { z } from 'zod';
+import { createLogger } from './logger';
+
+const log = createLogger('Env');
+
+const KNOWN_DEV_SESSION_SECRETS = new Set([
+  'deye_solar_monitoring_session_secret_2026_default',
+  'dev_dsm_session_secret_local_testing_32_chars_ok',
+]);
+
+const WEAK_PINS = new Set(['8888', '0000', '1234', '1111', '123456']);
+
+const DEV_SESSION_GLOBAL_KEY = '__dsmDevSessionSecret';
+
+/**
+ * Dynamic fallback generator for non-production environments.
+ * Prevents hardcoding static secrets in git repository while sharing one ephemeral
+ * dev secret across Next.js workers, Node proxy guards, and HMR reloads.
+ */
+function getNonProdSessionSecret(): string {
+  if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 16) {
+    return process.env.SESSION_SECRET;
+  }
+
+  const g = globalThis as Record<string, unknown>;
+  if (typeof g[DEV_SESSION_GLOBAL_KEY] === 'string' && (g[DEV_SESSION_GLOBAL_KEY] as string).length >= 16) {
+    return g[DEV_SESSION_GLOBAL_KEY] as string;
+  }
+
+  const canUseDevDiskCache =
+    typeof process !== 'undefined' &&
+    Boolean(process.versions?.node) &&
+    process.env.NODE_ENV === 'development';
+
+  if (canUseDevDiskCache) {
+    try {
+      const fsMod = eval('require')('fs') as typeof import('fs');
+      const pathMod = eval('require')('path') as typeof import('path');
+      const cacheDir = pathMod.resolve(process.cwd(), '.next');
+      const secretFile = pathMod.join(cacheDir, '.dsm-dev-session-secret');
+      if (fsMod.existsSync(secretFile)) {
+        const persisted = fsMod.readFileSync(secretFile, 'utf8').trim();
+        if (persisted.length >= 32) {
+          g[DEV_SESSION_GLOBAL_KEY] = persisted;
+          process.env.SESSION_SECRET = persisted;
+          return persisted;
+        }
+      }
+      const buf = new Uint8Array(32);
+      crypto.getRandomValues(buf);
+      const generated = Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+      fsMod.mkdirSync(cacheDir, { recursive: true });
+      fsMod.writeFileSync(secretFile, generated, { mode: 0o600 });
+      g[DEV_SESSION_GLOBAL_KEY] = generated;
+      process.env.SESSION_SECRET = generated;
+      return generated;
+    } catch {
+      // Fallback cleanly to in-memory random secret if disk cache is unavailable
+    }
+  }
+
+  // Generate a random 32-byte hex string in-memory for local dev/test if unset
+  const buf = new Uint8Array(32);
+  crypto.getRandomValues(buf);
+  const generated = Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+  g[DEV_SESSION_GLOBAL_KEY] = generated;
+  if (typeof process !== 'undefined' && process.env) {
+    process.env.SESSION_SECRET = generated;
+  }
+  return generated;
+}
+
+const envSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    DEYE_BASE_URL: z.string().url().default('https://api.deyecloud.com'),
+    DEYE_APP_ID: z.string().optional().default(''),
+    DEYE_APP_SECRET: z.string().optional().default(''),
+    DEYE_EMAIL: z.string().optional().default(''),
+    DEYE_PASSWORD: z.string().optional().default(''),
+    DEYE_DEFAULT_STATION_ID: z.string().default('SP_04'),
+    DEYE_DEFAULT_DEVICE_SN: z.string().default('2209X891104'),
+    DEYE_API_TIMEOUT_MS: z.coerce.number().int().min(3000).max(60000).default(15000),
+    DIRECTUS_BASE_URL: z.string().url().default('http://localhost:8056'),
+    DIRECTUS_API_TOKEN: z.string().optional().default(''),
+    DIRECTUS_COLLECTION: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/).default('iot_solar_accounts'),
+    ADMIN_ACCESS_PIN: z.string().optional(),
+    SESSION_SECRET: z.string().min(16).default(getNonProdSessionSecret),
+    ALLOWED_DEV_ORIGINS: z.string().optional(),
+    GEMINI_API_KEY: z.string().optional().default(''),
+    ALLOW_INSECURE_INTERNAL: z
+      .enum(['0', '1', 'true', 'false'])
+      .optional()
+      .default('0')
+      .transform((v) => v === '1' || v === 'true'),
+  })
+  .superRefine((data, ctx) => {
+    if (data.NODE_ENV === 'production') {
+      // 1. Session secret check
+      if (
+        !data.SESSION_SECRET ||
+        KNOWN_DEV_SESSION_SECRETS.has(data.SESSION_SECRET) ||
+        data.SESSION_SECRET.startsWith('change_me') ||
+        data.SESSION_SECRET.startsWith('dev_') ||
+        data.SESSION_SECRET.length < 32
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['SESSION_SECRET'],
+          message:
+            'SESSION_SECRET must be set to a strong random string of at least 32 characters in production',
+        });
+      }
+
+      // 2. Admin access PIN check
+      if (!data.ADMIN_ACCESS_PIN || WEAK_PINS.has(data.ADMIN_ACCESS_PIN)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['ADMIN_ACCESS_PIN'],
+          message:
+            'ADMIN_ACCESS_PIN must be configured with a secure non-default PIN in production',
+        });
+      }
+
+      // 3. Directus base URL HTTPS enforcement (bypassable only with explicit ALLOW_INSECURE_INTERNAL=1)
+      try {
+        const directusUrl = new URL(data.DIRECTUS_BASE_URL);
+        if (directusUrl.protocol !== 'https:' && !data.ALLOW_INSECURE_INTERNAL) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['DIRECTUS_BASE_URL'],
+            message:
+              'DIRECTUS_BASE_URL must use HTTPS in production (or set ALLOW_INSECURE_INTERNAL=1 for internal HTTP deployments)',
+          });
+        }
+      } catch {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['DIRECTUS_BASE_URL'],
+          message: 'DIRECTUS_BASE_URL is not a valid URL',
+        });
+      }
+    }
+  });
+
+export type Env = z.infer<typeof envSchema>;
+
+function getValidatedEnv(): Env {
+  const isBuildPhase =
+    process.env.NEXT_PHASE === 'phase-production-build' ||
+    process.env.npm_lifecycle_event === 'build' ||
+    process.env.SKIP_ENV_VALIDATION === '1';
+
+  const result = envSchema.safeParse(process.env);
+  if (!result.success) {
+    const errorDetails = result.error.format();
+
+    if (process.env.NODE_ENV === 'production' && !isBuildPhase) {
+      log.error('Invalid environment variables', errorDetails);
+      throw new Error(
+        `[Fatal] Invalid production environment configuration: ${JSON.stringify(errorDetails)}`
+      );
+    }
+
+    if (!isBuildPhase) {
+      log.error('Invalid environment variables', errorDetails);
+    }
+
+    // In dev/test or during build phase, fallback with defaults
+    const parsedDefault = envSchema.safeParse({ ...process.env, NODE_ENV: 'development' });
+    if (parsedDefault.success) {
+      return parsedDefault.data;
+    }
+    throw new Error('Default environment schema fallback failed');
+  }
+  return result.data;
+}
+
+export const env = getValidatedEnv();

@@ -1,0 +1,44 @@
+{
+  "accounts": [
+    {
+      "id": "men2-facility-1",
+      "name": "MEN2 Facility 1 (F1)",
+      "enabled": true,
+      "baseUrl": "https://eu1-developer.deyecloud.com",
+      "appId": "YOUR_APP_ID_1",
+      "appSecret": "YOUR_APP_SECRET_1",
+      "email": "facility1@example.com",
+      "password": "your_password",
+      "defaultStationId": "SP_04",
+      "defaultDeviceSn": "2209X891104",
+      "inverters": [
+        {
+          "sn": "2209X891104",
+          "name": "F1 Hybrid Inverter #1",
+          "model": "SUN-120K-SG01HP3-EU-AM2",
+          "ratedKw": 120
+        }
+      ]
+    },
+    {
+      "id": "men2-warehouse-1",
+      "name": "MEN2 Warehouse 1 (W1)",
+      "enabled": true,
+      "baseUrl": "https://eu1-developer.deyecloud.com",
+      "appId": "YOUR_APP_ID_2",
+      "appSecret": "YOUR_APP_SECRET_2",
+      "email": "warehouse1@example.com",
+      "password": "your_password",
+      "defaultStationId": "SP_W1",
+      "defaultDeviceSn": "2208X710291",
+      "inverters": [
+        {
+          "sn": "2208X710291",
+          "name": "W1 Rooftop Inverter #1",
+          "model": "SUN-100K-SG01HP3-EU-AM2",
+          "ratedKw": 100
+        }
+      ]
+    }
+  ]
+}

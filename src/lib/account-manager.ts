@@ -1,0 +1,1220 @@
+import fs from 'fs';
+import path from 'path';
+import {
+  DeyeAccountConfig,
+  AccountSummary,
+  AggregatedFleetSummary,
+  PlantInfo,
+  DeviceInfo,
+  SolarDeyeCloudConfig,
+  SolarStationRecord,
+  SolarDeviceRecord,
+  SolarUser,
+  SolarInverterControlLog,
+  SolarUserStationPermission,
+} from './types';
+import {
+  DeyeCloudClient,
+  extractDeviceDailyYieldKwh,
+  extractDeviceSolarPowerWatts,
+} from './deye-client';
+import { sanitizeDeyeBaseUrl, sanitizeDirectusBaseUrl } from './url-validator';
+import { hashPassword } from './auth-crypto';
+import { env } from './env';
+import { createLogger } from './logger';
+import { FileAccountCache } from './file-account-cache';
+import { directusTransport, DirectusTransport, DIRECTUS_COLLECTIONS as COLLECTIONS } from './directus-transport';
+import { clientRegistry, ClientRegistry } from './client-registry';
+import { fleetAggregator, FleetAggregator } from './fleet-aggregator';
+
+export { COLLECTIONS };
+
+const log = createLogger('DeyeAccountManager');
+
+/**
+ * ARCHITECTURAL VERDICT & FACADE DESIGN REVIEW (v7 SlopRecs Finale):
+ * 
+ * DeyeAccountManager is the verified top-level Facade (GoF Facade Pattern)
+ * that orchestrates four dedicated, isolated domain subsystems:
+ * 
+ * 1. FileAccountCache (src/lib/file-account-cache.ts)
+ *    - Owns local JSON file I/O, disk schema migrations, atomic write safeguards.
+ * 2. DirectusTransport (src/lib/directus-transport.ts)
+ *    - Owns REST transport to Directus CMS, collection CRUD, and immutable control auditing.
+ * 3. ClientRegistry (src/lib/client-registry.ts)
+ *    - Owns instantiation, caching, token management, and lifecycle of DeyeCloudClient instances.
+ * 4. FleetAggregator (src/lib/fleet-aggregator.ts)
+ *    - Owns cross-station rollups, concurrent plant polling, matrix normalization, and fleet totals.
+ * 
+ * Responsibilities retained directly inside DeyeAccountManager are exclusively:
+ * - High-level multi-stage workflows combining disk + remote + cache (e.g. syncWithDirectus).
+ * - Backward-compatible public API delegation shims so existing routes remain stable.
+ * - Credential lifecycle coordination (salting/hashing passwords across cache and Directus).
+ */
+class DeyeAccountManager {
+  private accountsCache: DeyeAccountConfig[] | null = null;
+  private cachedFleetSummary: Map<string, { data: AggregatedFleetSummary; timestamp: number }> = new Map();
+  private inFlightFleetSummary: Map<string, Promise<AggregatedFleetSummary>> = new Map();
+  private inFlightAccountsSummary: Map<string, Promise<AccountSummary[]>> = new Map();
+  private inFlightDynamicSync: Map<string, Promise<boolean>> = new Map();
+  private clientRegistry: ClientRegistry = clientRegistry;
+  private fleetAggregator: FleetAggregator = fleetAggregator;
+  private lastLoadedAt: number = 0;
+  private lastDirectusSyncAt: number = 0;
+  private directusTransport: DirectusTransport = directusTransport;
+
+  private getConfigPath(): string {
+    return FileAccountCache.getConfigPath();
+  }
+
+  private getEnabledOrAllAccounts(accounts: DeyeAccountConfig[]): DeyeAccountConfig[] {
+    const enabled = accounts.filter((a) => a.enabled !== false);
+    if (enabled.length > 0) {
+      return enabled;
+    }
+    return accounts;
+  }
+
+  public getDirectusHealth() {
+    return this.directusTransport.getHealth();
+  }
+
+  public getDirectusCollection(): string {
+    return this.directusTransport.getDirectusCollection();
+  }
+
+  /**
+   * Generic Directus collection reader for the normalized schema
+   */
+  public async fetchCollection<T = unknown>(collection: string, query = '?limit=-1'): Promise<T[] | null> {
+    return this.directusTransport.fetchCollection<T>(collection, query);
+  }
+
+  /**
+   * Generic create helper for any Directus collection
+   */
+  public async createItem<T = Record<string, unknown>>(collection: string, payload: Record<string, unknown>): Promise<T | null> {
+    return this.directusTransport.createItem<T>(collection, payload);
+  }
+
+  /**
+   * Generic update helper for any Directus collection
+   */
+  public async updateItem(collection: string, id: string | number, payload: Record<string, unknown>): Promise<boolean> {
+    return this.directusTransport.updateItem(collection, id, payload);
+  }
+
+  /**
+   * Generic delete helper for any Directus collection
+   */
+  public async deleteItem(collection: string, id: string | number): Promise<boolean> {
+    return this.directusTransport.deleteItem(collection, id);
+  }
+
+  /**
+   * Record an immutable audit log when workmode or grid charge controls are dispatched
+   */
+  public async logInverterControl(logEntry: SolarInverterControlLog): Promise<boolean> {
+    return this.directusTransport.logInverterControl(logEntry);
+  }
+
+  /**
+   * Query Directus REST API with a resilient timeout (fallback compatibility)
+   */
+  public async fetchFromDirectus(): Promise<Record<string, unknown>[] | null> {
+    return this.directusTransport.fetchFromDirectus();
+  }
+
+  /**
+   * Synchronize accounts from Directus into the local accounts list and cache.
+   * Priority:
+   * 1. Normalized tables: iot_solar_deye_cloud_configs + iot_solar_stations + iot_solar_devices
+   * 2. Legacy collection: iot_solar_accounts
+   * 3. Local disk cache: deye-accounts.json
+   */
+  public async syncWithDirectus(force = false): Promise<DeyeAccountConfig[]> {
+    if (force) {
+      this.cachedFleetSummary.clear();
+    }
+    const now = Date.now();
+    if (!force && this.accountsCache && this.accountsCache.length > 0 && now - this.lastDirectusSyncAt < 10000) {
+      return this.accountsCache;
+    }
+
+    const diskAccounts = this.getAllRawAccounts(true);
+
+    // 1. Try reading from the normalized tables (iot_solar_deye_cloud_configs, stations, devices)
+    try {
+      const [configs, stations, devices] = await Promise.all([
+        this.fetchCollection<SolarDeyeCloudConfig>(COLLECTIONS.CONFIGS),
+        this.fetchCollection<SolarStationRecord>(COLLECTIONS.STATIONS),
+        this.fetchCollection<SolarDeviceRecord>(COLLECTIONS.DEVICES),
+      ]);
+
+      if (configs !== null && configs.length > 0) {
+        const mergedAccounts: DeyeAccountConfig[] = [];
+
+        for (const cfg of configs) {
+          const cfgId = String(cfg.id);
+          const existing = diskAccounts.find(
+            (d) => d.directusId === cfgId || d.email.toLowerCase() === cfg.account_email.toLowerCase()
+          );
+
+          // Find stations associated with this config
+          const configStations = Array.isArray(stations)
+            ? stations.filter((s) => s.deye_config_id === cfg.id || (!s.deye_config_id && (stations.length === 1 || configs.length === 1)))
+            : [];
+
+          const plants: PlantInfo[] = configStations.map((st) => {
+            const stDevices = Array.isArray(devices)
+              ? devices.filter((dev) => dev.station_id === st.station_id)
+              : [];
+
+            const mappedDevices: DeviceInfo[] = stDevices.map((dev) => ({
+              deviceSn: dev.device_sn,
+              deviceType: dev.device_type,
+              name: dev.name || `Device (${dev.device_sn})`,
+              model: dev.model,
+              ratedKw: Number(dev.rated_kw) || 0,
+              loggerSn: dev.logger_sn,
+              status: dev.status,
+              lastSeen: dev.last_seen_at,
+            }));
+
+            return {
+              stationId: st.station_id,
+              stationName: st.name,
+              installedCapacityKw: Number(st.installed_capacity_kw) || 0,
+              address: st.address || '',
+              devices: mappedDevices,
+            };
+          });
+
+          // Merge plants without clobbering newer DeyeCloud auto-discovery with stale Directus DB rows.
+          const cfgSyncMs = cfg.last_checked_at ? new Date(cfg.last_checked_at).getTime() : 0;
+          const existingSyncMs =
+            existing?.autoDiscovered && existing?.lastSyncedAt
+              ? new Date(existing.lastSyncedAt).getTime()
+              : 0;
+          const diskIsNewer =
+            Boolean(existing?.autoDiscovered) &&
+            Array.isArray(existing?.plants) &&
+            existing.plants.length > 0 &&
+            existingSyncMs > cfgSyncMs;
+
+          const plantMap = new Map<string, PlantInfo>();
+          if (diskIsNewer) {
+            plants.forEach((p) => plantMap.set(String(p.stationId), p));
+            (existing?.plants || []).forEach((p) => {
+              const dbPlant = plantMap.get(String(p.stationId));
+              // Preserve fresher live discovery devices while filling any missing logger metadata
+              if (!dbPlant || p.devices.length >= dbPlant.devices.length) {
+                plantMap.set(String(p.stationId), p);
+              }
+            });
+          } else {
+            (existing?.plants || []).forEach((p) => plantMap.set(String(p.stationId), p));
+            plants.forEach((p) => {
+              const diskPlant = plantMap.get(String(p.stationId));
+              // If disk already has more devices for this station and Directus lacks a fresh sync timestamp, preserve union
+              if (diskPlant && !cfg.last_checked_at && diskPlant.devices.length > p.devices.length) {
+                const seenSns = new Set(p.devices.map((d) => d.deviceSn));
+                const mergedDevices = [
+                  ...p.devices,
+                  ...diskPlant.devices.filter((d) => !seenSns.has(d.deviceSn)),
+                ];
+                plantMap.set(String(p.stationId), { ...p, devices: mergedDevices });
+              } else {
+                plantMap.set(String(p.stationId), p);
+              }
+            });
+          }
+          const finalPlants = plantMap.size > 0 ? Array.from(plantMap.values()) : [];
+          const firstInverter = finalPlants[0]?.devices?.find((d) => d.deviceType === 'INVERTER');
+
+          const accountName = (cfg.profile_name && cfg.profile_name !== 'EU/Asia Developer Gateway' && cfg.profile_name !== 'New Solar Gateway')
+            ? cfg.profile_name
+            : (existing?.name || cfg.profile_name || cfg.account_email);
+
+          const accountConfig: DeyeAccountConfig = {
+            id: existing ? existing.id : `deye-cfg-${cfgId}`,
+            directusId: cfgId,
+            name: accountName,
+            enabled: cfg.status !== 'OFFLINE',
+            admin: true,
+            baseUrl: sanitizeDeyeBaseUrl(cfg.base_url),
+            appId: cfg.app_id || existing?.appId || '',
+            appSecret: cfg.app_secret || existing?.appSecret || '',
+            email: cfg.account_email || existing?.email || '',
+            password: cfg.account_password || existing?.password || '',
+            defaultStationId: finalPlants[0]?.stationId || existing?.defaultStationId || '',
+            defaultDeviceSn: firstInverter?.deviceSn || existing?.defaultDeviceSn || '',
+            autoDiscovered: Boolean(existing?.autoDiscovered || finalPlants.length > 0),
+            lastSyncedAt: cfg.last_checked_at || existing?.lastSyncedAt,
+            plants: finalPlants,
+            source: 'directus',
+          };
+
+          mergedAccounts.push(accountConfig);
+        }
+
+        // Also preserve local/cached disk accounts that aren't linked to a Directus config
+        for (const disk of diskAccounts) {
+          if (!mergedAccounts.some((m) => m.id === disk.id || (disk.directusId && m.directusId === disk.directusId))) {
+            mergedAccounts.push({
+              ...disk,
+              source: disk.source || 'cache',
+            });
+          }
+        }
+
+        if (mergedAccounts.length > 0) {
+          this.saveAccountsToFile(mergedAccounts);
+          this.lastDirectusSyncAt = now;
+          this.accountsCache = this.getEnabledOrAllAccounts(mergedAccounts);
+          this.syncClients();
+          return this.accountsCache;
+        }
+      }
+    } catch (err) {
+      log.warn('Normalized table sync skipped, trying legacy collection', {}, err);
+    }
+
+    // 2. Fallback to legacy single collection (iot_solar_accounts)
+    const directusRows = await this.fetchFromDirectus();
+
+    if (directusRows !== null && directusRows.length > 0) {
+      const mergedAccounts: DeyeAccountConfig[] = [];
+
+      for (const row of directusRows) {
+        const rowId = row.id !== undefined && row.id !== null ? String(row.id) : undefined;
+        const rowEmail = String(row.email || '').trim().toLowerCase();
+
+        const existing = diskAccounts.find(
+          (d) =>
+            (rowId && (d.directusId === rowId || String(d.id) === rowId || String(d.id) === `directus-${rowId}`)) ||
+            (rowEmail && d.email.trim().toLowerCase() === rowEmail)
+        );
+
+        const appId = String(row.app_id || row.appId || existing?.appId || '').trim();
+        const appSecret = String(row.app_secret || row.appSecret || existing?.appSecret || '').trim();
+        const baseUrl = sanitizeDeyeBaseUrl(String(row.base_url || row.baseUrl || existing?.baseUrl || ''));
+        const isEnabled =
+          row.enabled !== undefined
+            ? Boolean(row.enabled !== false && row.enabled !== 0 && row.enabled !== 'false' && row.enabled !== '0')
+            : (existing?.enabled ?? true);
+
+        const isAdmin = Boolean(
+          row.admin === true ||
+          row.admin === 1 ||
+          row.admin === 'true' ||
+          row.admin === '1' ||
+          row.is_admin === true ||
+          row.is_admin === 1 ||
+          row.is_admin === 'true' ||
+          row.is_admin === '1' ||
+          (rowEmail === 'admin')
+        );
+
+        const accountConfig: DeyeAccountConfig = {
+          id: existing ? existing.id : (rowId ? `db-${rowId}` : `acc-${Date.now().toString(36)}`),
+          directusId: rowId,
+          name: String(row.name || existing?.name || row.email || 'Solar Site'),
+          enabled: isEnabled,
+          admin: isAdmin,
+          baseUrl,
+          appId,
+          appSecret,
+          email: String(row.email || existing?.email || ''),
+          password: String(row.password || existing?.password || ''),
+          defaultStationId: String(row.default_station_id || row.defaultStationId || existing?.defaultStationId || ''),
+          defaultDeviceSn: String(row.default_device_sn || row.defaultDeviceSn || existing?.defaultDeviceSn || ''),
+          autoDiscovered: existing?.autoDiscovered ?? false,
+          lastSyncedAt: existing?.lastSyncedAt,
+          plants: existing?.plants || [],
+          inverters: existing?.inverters || [],
+          source: 'directus',
+        };
+
+        mergedAccounts.push(accountConfig);
+      }
+
+      for (const disk of diskAccounts) {
+        if (!mergedAccounts.some((m) => m.id === disk.id || m.email.toLowerCase() === disk.email.toLowerCase())) {
+          mergedAccounts.push({
+            ...disk,
+            source: 'cache',
+          });
+        }
+      }
+
+      this.saveAccountsToFile(mergedAccounts);
+      this.lastDirectusSyncAt = now;
+      this.accountsCache = this.getEnabledOrAllAccounts(mergedAccounts);
+      this.syncClients();
+      return this.accountsCache;
+    }
+
+    // 3. Directus unreachable or empty: fallback to disk cache
+    if (diskAccounts.length > 0) {
+      this.accountsCache = this.getEnabledOrAllAccounts(diskAccounts).map((a) => ({
+        ...a,
+        source: a.source || ('cache' as const),
+      }));
+      this.syncClients();
+      this.lastLoadedAt = now;
+      return this.accountsCache;
+    }
+
+    return this.loadAccounts(true);
+  }
+
+  /**
+   * Return ALL accounts from file, including enabled and disabled
+   */
+  public getAllRawAccounts(forceReload = false): DeyeAccountConfig[] {
+    return FileAccountCache.getAllRawAccounts(forceReload);
+  }
+
+  /**
+   * Save accounts list to deye-accounts.json with atomic write
+   */
+  public saveAccountsToFile(accounts: DeyeAccountConfig[]): boolean {
+    this.cachedFleetSummary.clear();
+    const success = FileAccountCache.saveAccountsToFile(accounts);
+    if (success) {
+      this.accountsCache = this.getEnabledOrAllAccounts(accounts);
+      this.lastLoadedAt = Date.now();
+      this.syncClients();
+    }
+    return success;
+  }
+
+  /**
+   * Load active enabled accounts with caching
+   */
+  public loadAccounts(forceReload = false): DeyeAccountConfig[] {
+    const now = Date.now();
+    if (!forceReload && this.accountsCache && this.accountsCache.length > 0 && now - this.lastLoadedAt < 5000) {
+      return this.accountsCache;
+    }
+
+    const all = this.getAllRawAccounts(forceReload);
+    if (all.length > 0) {
+      this.accountsCache = this.getEnabledOrAllAccounts(all);
+      this.syncClients();
+      this.lastLoadedAt = now;
+      return this.accountsCache;
+    }
+
+    // Fallback: build from environment variables
+    const fallbackAccount: DeyeAccountConfig = {
+      id: 'default-site',
+      name: 'Primary Facility',
+      enabled: true,
+      baseUrl: sanitizeDeyeBaseUrl(env.DEYE_BASE_URL),
+      appId: env.DEYE_APP_ID || '',
+      appSecret: env.DEYE_APP_SECRET || '',
+      email: env.DEYE_EMAIL || '',
+      password: env.DEYE_PASSWORD || '',
+      defaultStationId: env.DEYE_DEFAULT_STATION_ID || 'SP_04',
+      defaultDeviceSn: env.DEYE_DEFAULT_DEVICE_SN || '2209X891104',
+      plants: [],
+    };
+
+    this.accountsCache = [fallbackAccount];
+    this.syncClients();
+    this.lastLoadedAt = now;
+    return this.accountsCache;
+  }
+
+  /**
+   * Synchronize active DeyeCloudClient instances with enabled accounts
+   * Preserves existing instances so in-memory token caches are retained.
+   */
+  private syncClients() {
+    this.clientRegistry.syncClients(this.accountsCache || []);
+  }
+
+  /**
+   * Get client for specific account.
+   * If accountId is provided, returns that account's client or null if not found (preventing cross-tenant leaks).
+   * If accountId is omitted, returns the primary/first configured client or null.
+   */
+  public getClient(accountId?: string): DeyeCloudClient | null {
+    this.loadAccounts();
+    return this.clientRegistry.getClient(accountId);
+  }
+
+  public getAllClients(): DeyeCloudClient[] {
+    this.loadAccounts();
+    return this.clientRegistry.getAllClients();
+  }
+
+  /**
+   * Add a new account and automatically discover its plants and devices
+   */
+  public async addAccount(data: Partial<DeyeAccountConfig>): Promise<{
+    success: boolean;
+    account: DeyeAccountConfig;
+    plantsDiscovered: number;
+    devicesDiscovered: number;
+  }> {
+    let directusId: string | undefined;
+    const safeBaseUrl = sanitizeDeyeBaseUrl(data.baseUrl);
+
+    // 1. Try to create in normalized iot_solar_deye_cloud_configs table
+    try {
+      const configPayload = {
+        profile_name: data.name?.trim() || data.email?.trim() || 'New Solar Gateway',
+        base_url: safeBaseUrl,
+        app_id: data.appId?.trim() || '',
+        app_secret: data.appSecret?.trim() || '',
+        account_email: data.email?.trim() || '',
+        account_password: data.password?.trim() || '',
+        user_id: data.userId ? Number(data.userId) || null : null,
+        status: (data.enabled ?? true) ? 'OPTIMAL' : 'OFFLINE',
+      };
+
+      const createdCfg = await this.createItem(COLLECTIONS.CONFIGS, configPayload);
+      if (createdCfg?.id) {
+        directusId = String(createdCfg.id);
+      } else {
+        // Fallback to legacy single collection if needed
+        const legacyPayload = {
+          name: data.name?.trim() || data.email?.trim() || 'New Solar Site',
+          email: data.email?.trim() || '',
+          password: data.password?.trim() || '',
+          app_id: data.appId?.trim() || '',
+          app_secret: data.appSecret?.trim() || '',
+          base_url: safeBaseUrl,
+          enabled: data.enabled ?? true,
+        };
+        const createdLegacy = await this.createItem(this.getDirectusCollection(), legacyPayload);
+        if (createdLegacy?.id) {
+          directusId = String(createdLegacy.id);
+        }
+      }
+    } catch (err) {
+      log.warn('Failed to post new account to Directus, caching locally', {}, err);
+    }
+
+    const id = directusId ? `directus-${directusId}` : (data.id?.trim() || `acc-${Date.now().toString(36)}`);
+    const newAccount: DeyeAccountConfig = {
+      id,
+      directusId,
+      userId: data.userId,
+      name: data.name?.trim() || 'New Deye Site',
+      enabled: data.enabled ?? true,
+      baseUrl: safeBaseUrl,
+      appId: data.appId?.trim() || '',
+      appSecret: data.appSecret?.trim() || '',
+      email: data.email?.trim() || '',
+      password: data.password?.trim() || '',
+      defaultStationId: data.defaultStationId?.trim() || '',
+      defaultDeviceSn: data.defaultDeviceSn?.trim() || '',
+      autoDiscovered: true,
+      lastSyncedAt: new Date().toISOString(),
+      plants: data.plants || [],
+      inverters: data.inverters || [],
+      source: directusId ? 'directus' : 'cache',
+    };
+
+    // Auto-discover plants from DeyeCloud OpenAPI
+    const tempClient = new DeyeCloudClient(newAccount);
+    const discovery = await tempClient.discoverPlantsAndDevices();
+    newAccount.plants = discovery.plants;
+
+    if (newAccount.plants.length > 0) {
+      if (!newAccount.defaultStationId) {
+        newAccount.defaultStationId = newAccount.plants[0].stationId;
+      }
+      const firstInverter = newAccount.plants[0].devices.find(
+        (d) => d.deviceType === 'INVERTER'
+      );
+      if (firstInverter && !newAccount.defaultDeviceSn) {
+        newAccount.defaultDeviceSn = firstInverter.deviceSn;
+      }
+
+      await this.persistDiscoveredTopologyToDirectus(newAccount, newAccount.plants, newAccount.lastSyncedAt || new Date().toISOString());
+    }
+
+    // Persist registered user into iot_solar_users with hashed password (skip if consumer linking)
+    if (data.email && !data.skipUserCreation) {
+      try {
+        await this.createItem(COLLECTIONS.USERS, {
+          email: data.email.trim().toLowerCase(),
+          username: data.email.split('@')[0],
+          password_hash: hashPassword(data.password || 'password'),
+          full_name: data.name || data.email,
+          role: 'consumer',
+          is_active: 1,
+        });
+      } catch (e) {
+        // User creation non-fatal
+      }
+    }
+
+    const all = this.getAllRawAccounts(true);
+    // Replace if exists, else append
+    const existingIndex = all.findIndex((a) => a.id === id || (directusId && a.directusId === directusId));
+    if (existingIndex >= 0) {
+      all[existingIndex] = newAccount;
+    } else {
+      all.push(newAccount);
+    }
+
+    this.saveAccountsToFile(all);
+
+    let totalDevices = 0;
+    for (const p of newAccount.plants) {
+      totalDevices += p.devices.length;
+    }
+
+    return {
+      success: true,
+      account: newAccount,
+      plantsDiscovered: newAccount.plants.length,
+      devicesDiscovered: totalDevices,
+    };
+  }
+
+  /**
+   * Update an existing account with mass-assignment protection
+   */
+  public async updateAccount(
+    id: string,
+    updates: Partial<DeyeAccountConfig>
+  ): Promise<{ success: boolean; account?: DeyeAccountConfig }> {
+    const all = this.getAllRawAccounts(true);
+    const index = all.findIndex((a) => a.id === id || (a.directusId && String(a.directusId) === id));
+    if (index === -1) {
+      return { success: false };
+    }
+
+    const target = all[index];
+    const directusId = target.directusId || (target.id.startsWith('directus-') ? target.id.replace('directus-', '') : undefined);
+
+    // Filter allowed fields to prevent mass-assignment privilege escalation
+    const safeUpdates: Partial<DeyeAccountConfig> = {};
+    if (updates.name !== undefined) safeUpdates.name = updates.name.trim();
+    if (updates.email !== undefined) safeUpdates.email = updates.email.trim();
+    if (updates.password !== undefined) safeUpdates.password = updates.password.trim();
+    if (updates.baseUrl !== undefined) safeUpdates.baseUrl = sanitizeDeyeBaseUrl(updates.baseUrl);
+    if (updates.appId !== undefined) safeUpdates.appId = updates.appId.trim();
+    if (updates.appSecret !== undefined) safeUpdates.appSecret = updates.appSecret.trim();
+    if (updates.enabled !== undefined) safeUpdates.enabled = Boolean(updates.enabled);
+    if (updates.defaultStationId !== undefined) safeUpdates.defaultStationId = updates.defaultStationId.trim();
+    if (updates.defaultDeviceSn !== undefined) safeUpdates.defaultDeviceSn = updates.defaultDeviceSn.trim();
+
+    // Sync update to Directus
+    if (directusId) {
+      try {
+        const patchPayload: Record<string, unknown> = {};
+        if (safeUpdates.name !== undefined) {
+          patchPayload.name = safeUpdates.name;
+          patchPayload.profile_name = safeUpdates.name;
+        }
+        if (safeUpdates.email !== undefined) {
+          patchPayload.email = safeUpdates.email;
+          patchPayload.account_email = safeUpdates.email;
+        }
+        if (safeUpdates.password !== undefined) {
+          patchPayload.password = safeUpdates.password;
+          patchPayload.account_password = safeUpdates.password;
+        }
+        if (safeUpdates.appId !== undefined) patchPayload.app_id = safeUpdates.appId;
+        if (safeUpdates.appSecret !== undefined) patchPayload.app_secret = safeUpdates.appSecret;
+        if (safeUpdates.baseUrl !== undefined) patchPayload.base_url = safeUpdates.baseUrl;
+        if (safeUpdates.enabled !== undefined) {
+          patchPayload.enabled = safeUpdates.enabled ? 1 : 0;
+          patchPayload.status = safeUpdates.enabled ? 'OPTIMAL' : 'OFFLINE';
+        }
+
+        await this.updateItem(COLLECTIONS.CONFIGS, directusId, patchPayload);
+        await this.updateItem(this.getDirectusCollection(), directusId, patchPayload);
+      } catch (err) {
+        log.warn(`Failed to patch Directus item ${directusId}`, { directusId }, err);
+      }
+    }
+
+    const updated: DeyeAccountConfig = {
+      ...all[index],
+      ...safeUpdates,
+    };
+    all[index] = updated;
+
+    this.saveAccountsToFile(all);
+    return { success: true, account: updated };
+  }
+
+  /**
+   * Delete an account
+   */
+  public async deleteAccount(id: string): Promise<{ success: boolean }> {
+    const all = this.getAllRawAccounts(true);
+    const target = all.find((a) => a.id === id || (a.directusId && String(a.directusId) === id));
+
+    if (!target) {
+      return { success: false };
+    }
+
+    // Sync delete to Directus
+    const directusId = target.directusId || (target.id.startsWith('directus-') ? target.id.replace('directus-', '') : undefined);
+    if (directusId) {
+      try {
+        await this.deleteItem(COLLECTIONS.CONFIGS, directusId);
+        await this.deleteItem(this.getDirectusCollection(), directusId);
+      } catch (err) {
+        log.warn(`Failed to delete Directus item ${directusId}`, { directusId }, err);
+      }
+    }
+
+    const filtered = all.filter((a) => a.id !== target.id);
+    this.saveAccountsToFile(filtered);
+    this.clientRegistry.removeClient(target.id);
+    return { success: true };
+  }
+
+  /**
+   * Trigger automatic plant & hardware discovery for an account
+   */
+  public async syncAccount(
+    id: string
+  ): Promise<{ success: boolean; plants: PlantInfo[]; isLive: boolean }> {
+    const all = this.getAllRawAccounts(true);
+    const target = all.find((a) => a.id === id);
+    if (!target) {
+      return { success: false, plants: [], isLive: false };
+    }
+
+    const client = new DeyeCloudClient(target);
+    const discovery = await client.discoverPlantsAndDevices();
+
+    target.plants = discovery.plants;
+    target.autoDiscovered = true;
+    target.lastSyncedAt = new Date().toISOString();
+
+    if (discovery.plants.length > 0) {
+      if (!target.defaultStationId) {
+        target.defaultStationId = discovery.plants[0].stationId;
+      }
+      const firstInverter = discovery.plants[0].devices.find(
+        (d) => d.deviceType === 'INVERTER'
+      );
+      if (firstInverter && !target.defaultDeviceSn) {
+        target.defaultDeviceSn = firstInverter.deviceSn;
+      }
+
+      await this.persistDiscoveredTopologyToDirectus(target, discovery.plants, target.lastSyncedAt);
+    }
+
+    this.saveAccountsToFile(all);
+
+    return {
+      success: true,
+      plants: discovery.plants,
+      isLive: discovery.isLive,
+    };
+  }
+
+  /**
+   * Idempotently upsert discovered stations, devices, and sync timestamp into Directus
+   * so Directus tables stay synchronized with live DeyeCloud discovery.
+   */
+  private async persistDiscoveredTopologyToDirectus(
+    acc: DeyeAccountConfig,
+    plants: PlantInfo[],
+    syncedAtIso: string
+  ): Promise<void> {
+    try {
+      const [existingStations, existingDevices] = await Promise.all([
+        this.fetchCollection<SolarStationRecord>(COLLECTIONS.STATIONS),
+        this.fetchCollection<SolarDeviceRecord>(COLLECTIONS.DEVICES),
+      ]);
+
+      // Skip gracefully when Directus is offline or schema unavailable
+      if (existingStations === null || existingDevices === null) {
+        return;
+      }
+
+      const directusId = acc.directusId ? Number(acc.directusId) || null : null;
+      const stationByExternalId = new Map<string, SolarStationRecord>();
+      for (const s of existingStations) {
+        stationByExternalId.set(String(s.station_id), s);
+      }
+      const deviceBySn = new Map<string, SolarDeviceRecord>();
+      for (const d of existingDevices) {
+        deviceBySn.set(String(d.device_sn), d);
+      }
+
+      for (const p of plants) {
+        const stationKey = String(p.stationId);
+        const existingSt = stationByExternalId.get(stationKey);
+        if (!existingSt) {
+          await this.createItem(COLLECTIONS.STATIONS, {
+            station_id: stationKey,
+            name: p.stationName,
+            installed_capacity_kw: p.installedCapacityKw,
+            address: p.address || '',
+            deye_config_id: directusId,
+            grid_type: '3-PHASE',
+            is_active: 1,
+            last_synced_at: syncedAtIso,
+          });
+        } else if (
+          existingSt.name !== p.stationName ||
+          Math.abs(Number(existingSt.installed_capacity_kw || 0) - Number(p.installedCapacityKw || 0)) > 0.05 ||
+          (existingSt.address || '') !== (p.address || '')
+        ) {
+          await this.updateItem(COLLECTIONS.STATIONS, existingSt.id, {
+            name: p.stationName,
+            installed_capacity_kw: p.installedCapacityKw,
+            address: p.address || '',
+            last_synced_at: syncedAtIso,
+          });
+        }
+
+        for (const d of p.devices) {
+          const existingDev = deviceBySn.get(String(d.deviceSn));
+          if (!existingDev) {
+            await this.createItem(COLLECTIONS.DEVICES, {
+              device_sn: d.deviceSn,
+              station_id: stationKey,
+              device_type: d.deviceType,
+              name: d.name,
+              model: d.model || '',
+              rated_kw: d.ratedKw || 0,
+              logger_sn: d.loggerSn || null,
+              status: d.status || 'ONLINE',
+              last_seen_at: d.lastSeen || syncedAtIso,
+            });
+          } else {
+            const capDiffers =
+              Math.abs(Number(existingDev.rated_kw || 0) - Number(d.ratedKw || 0)) > 0.05;
+            const loggerDiffers = (existingDev.logger_sn || '') !== (d.loggerSn || '');
+            const stationDiffers = String(existingDev.station_id) !== stationKey;
+            const modelDiffers = d.model && existingDev.model !== d.model;
+            const statusDiffers = d.status && existingDev.status !== d.status;
+            if (capDiffers || loggerDiffers || stationDiffers || modelDiffers || statusDiffers) {
+              await this.updateItem(COLLECTIONS.DEVICES, existingDev.id, {
+                station_id: stationKey,
+                device_type: d.deviceType,
+                name: d.name,
+                model: d.model || existingDev.model || '',
+                rated_kw: d.ratedKw || 0,
+                logger_sn: d.loggerSn || null,
+                status: d.status || 'ONLINE',
+                last_seen_at: d.lastSeen || syncedAtIso,
+              });
+            }
+          }
+        }
+      }
+
+      if (directusId) {
+        await this.updateItem(COLLECTIONS.CONFIGS, directusId, {
+          last_checked_at: syncedAtIso,
+          status: 'OPTIMAL',
+        });
+      }
+    } catch (err) {
+      log.warn('Non-fatal error persisting discovered topology to Directus', { accountId: acc.id }, err);
+    }
+  }
+
+  /**
+   * Manually add or update a plant inside an account
+   */
+  public async addPlant(
+    accountId: string,
+    plant: PlantInfo
+  ): Promise<{ success: boolean; plants: PlantInfo[] }> {
+    const all = this.getAllRawAccounts(true);
+    const target = all.find((a) => a.id === accountId);
+    if (!target) {
+      return { success: false, plants: [] };
+    }
+
+    if (!Array.isArray(target.plants)) {
+      target.plants = [];
+    }
+
+    const pIndex = target.plants.findIndex(
+      (p) => p.stationId === plant.stationId
+    );
+    if (pIndex >= 0) {
+      target.plants[pIndex] = plant;
+    } else {
+      target.plants.push(plant);
+    }
+
+    this.saveAccountsToFile(all);
+    return { success: true, plants: target.plants };
+  }
+
+  /**
+   * Dynamically synchronize plant names, capacity, addresses, and devices from Deye Cloud OpenAPI
+   * and persist discovered topology to both deye-accounts.json and Directus.
+   */
+  public async syncDynamicPlantMetadata(
+    acc: DeyeAccountConfig,
+    client: DeyeCloudClient
+  ): Promise<boolean> {
+    const existingLock = this.inFlightDynamicSync.get(acc.id);
+    if (existingLock) return existingLock;
+
+    const promise = this.performDynamicPlantSync(acc, client).finally(() => {
+      this.inFlightDynamicSync.delete(acc.id);
+    });
+    this.inFlightDynamicSync.set(acc.id, promise);
+    return promise;
+  }
+
+  private async performDynamicPlantSync(
+    acc: DeyeAccountConfig,
+    client: DeyeCloudClient
+  ): Promise<boolean> {
+    try {
+      const discovery = await client.discoverPlantsAndDevices();
+      if (!discovery.isLive || !discovery.plants || discovery.plants.length === 0) {
+        return false;
+      }
+
+      let changed = false;
+      if (!acc.plants) acc.plants = [];
+
+      for (const livePlant of discovery.plants) {
+        const existing = acc.plants.find((p) => p.stationId === livePlant.stationId);
+        if (existing) {
+          if (existing.stationName !== livePlant.stationName) {
+            log.info(
+              `Dynamic plant name update: "${existing.stationName}" -> "${livePlant.stationName}" (Station ID: ${livePlant.stationId})`,
+              { stationId: livePlant.stationId }
+            );
+            existing.stationName = livePlant.stationName;
+            changed = true;
+          }
+          if (existing.installedCapacityKw !== livePlant.installedCapacityKw) {
+            existing.installedCapacityKw = livePlant.installedCapacityKw;
+            changed = true;
+          }
+          if (existing.address !== livePlant.address) {
+            existing.address = livePlant.address;
+            changed = true;
+          }
+          if (livePlant.devices && livePlant.devices.length > 0) {
+            existing.devices = livePlant.devices;
+            changed = true;
+          }
+        } else {
+          log.info(
+            `Discovered new plant dynamically: "${livePlant.stationName}" (Station ID: ${livePlant.stationId})`,
+            { stationId: livePlant.stationId }
+          );
+          acc.plants.push(livePlant);
+          changed = true;
+        }
+      }
+
+      // If plants on Deye Cloud were deleted or re-assigned
+      const liveIds = new Set(discovery.plants.map((p) => p.stationId));
+      if (acc.plants.length > discovery.plants.length) {
+        acc.plants = acc.plants.filter((p) => liveIds.has(p.stationId));
+        changed = true;
+      }
+
+      const syncedAtIso = new Date().toISOString();
+      acc.lastSyncedAt = syncedAtIso;
+      acc.autoDiscovered = true;
+
+      // Persist dynamic updates to Directus and deye-accounts.json
+      await this.persistDiscoveredTopologyToDirectus(acc, acc.plants, syncedAtIso);
+
+      const all = this.getAllRawAccounts(true);
+      const targetIdx = all.findIndex((a) => a.id === acc.id);
+      if (targetIdx >= 0) {
+        all[targetIdx].plants = acc.plants;
+        all[targetIdx].lastSyncedAt = syncedAtIso;
+        all[targetIdx].autoDiscovered = true;
+        this.saveAccountsToFile(all);
+      }
+
+      return changed;
+    } catch (e) {
+      log.warn(`Dynamic plant sync failed for account ${acc.id}`, { accountId: acc.id }, e);
+      return false;
+    }
+  }
+
+  /**
+   * Get sanitized summary of all accounts with their discovered plants and hardware counts.
+   * Dynamically synchronizes plant names and devices from live Deye Cloud on a 5-minute TTL or when forced.
+   */
+  public async getAccountsSummary(forceSync = false, sessionRole?: string): Promise<AccountSummary[]> {
+    const inFlightKey = `${forceSync ? 'force' : 'normal'}:${sessionRole || 'admin'}`;
+    if (!forceSync) {
+      const existing = this.inFlightAccountsSummary.get(inFlightKey);
+      if (existing) {
+        return existing;
+      }
+    }
+
+    const promise = this.performGetAccountsSummary(forceSync, sessionRole).finally(() => {
+      this.inFlightAccountsSummary.delete(inFlightKey);
+    });
+    this.inFlightAccountsSummary.set(inFlightKey, promise);
+    return promise;
+  }
+
+  private isInternalAdminLoginOnly(acc: DeyeAccountConfig): boolean {
+    if (Array.isArray(acc.plants) && acc.plants.length > 0) return false;
+    const client = this.getClient(acc.id) || new DeyeCloudClient(acc);
+    if (client.hasCredentials()) return false;
+    const emailLower = (acc.email || '').trim().toLowerCase();
+    const nameLower = (acc.name || '').trim().toLowerCase();
+    return Boolean(acc.admin || emailLower === 'admin' || nameLower === 'admin');
+  }
+
+  private async performGetAccountsSummary(forceSync = false, sessionRole?: string): Promise<AccountSummary[]> {
+    // Synchronize with Directus (or fallback to cache if offline)
+    await this.syncWithDirectus(forceSync);
+
+    let rawAccounts = this.getAllRawAccounts(true);
+    if (rawAccounts.length === 0) {
+      rawAccounts = this.loadAccounts(false);
+    }
+    rawAccounts = rawAccounts.filter((acc) => !this.isInternalAdminLoginOnly(acc));
+
+    const summaries: AccountSummary[] = await Promise.all(
+      rawAccounts.map(async (acc) => {
+        const client = this.getClient(acc.id) || new DeyeCloudClient(acc);
+        let isLive = false;
+        let pingMs = 25;
+        let liveKw = 0;
+        let dailyYield = 0;
+        let gridPowerKw: number | undefined = undefined;
+        let consumptionPowerKw: number | undefined = undefined;
+        let batterySoc: number | undefined = undefined;
+        let stationCapacityKw = 0;
+
+        if (acc.enabled !== false && client.hasCredentials()) {
+          try {
+            const health = await client.getHealth();
+            isLive = health.isLive;
+            pingMs = health.pingMs;
+
+            if (isLive) {
+              // Dynamic auto-sync: refresh plant names & devices every 5 minutes or on explicit forceSync
+              const lastSyncTime = acc.lastSyncedAt ? new Date(acc.lastSyncedAt).getTime() : 0;
+              const needsSync = forceSync || !acc.lastSyncedAt || (Date.now() - lastSyncTime > 300_000);
+              if (needsSync) {
+                await this.syncDynamicPlantMetadata(acc, client);
+              }
+
+              const activePlants = acc.plants || [];
+              const activeInvSns = activePlants
+                .flatMap((p) => p.devices)
+                .filter((d) => d.deviceType === 'INVERTER')
+                .map((d) => d.deviceSn);
+
+              const [stSummary, batchDev] = await Promise.all([
+                client.getStationSummary(),
+                activeInvSns.length > 0 ? client.getBatchDeviceLatest(activeInvSns) : Promise.resolve(new Map()),
+              ]);
+              liveKw = stSummary.data.liveSolarPowerKw;
+              gridPowerKw = stSummary.data.gridPowerKw;
+              consumptionPowerKw = stSummary.data.loadPowerKw;
+              batterySoc = stSummary.data.batterySoc;
+              stationCapacityKw = stSummary.data.capacityKw;
+
+              // Sum daily yield from real inverter telemetry and enrich per-plant live telemetry
+              for (const [, devData] of batchDev) {
+                dailyYield += extractDeviceDailyYieldKwh(devData);
+              }
+
+              for (const p of activePlants) {
+                const plantSum = stSummary.data.plantsSummary?.find(
+                  (ps) => String(ps.stationId) === String(p.stationId)
+                );
+                const plantInvs = (p.devices || []).filter((d) => d.deviceType === 'INVERTER');
+                let pDaily = 0;
+                let pSolar = 0;
+                for (const inv of plantInvs) {
+                  const devData = batchDev.get(inv.deviceSn);
+                  if (devData) {
+                    pDaily += extractDeviceDailyYieldKwh(devData);
+                    pSolar += extractDeviceSolarPowerWatts(devData) / 1000;
+                  }
+                }
+                if (plantSum) {
+                  p.liveSolarPowerKw = parseFloat(
+                    (plantSum.liveSolarPowerKw > 0 ? plantSum.liveSolarPowerKw : pSolar).toFixed(2)
+                  );
+                  p.dailyYieldKwh = parseFloat(
+                    (pDaily > 0 ? pDaily : (plantSum.dailyYieldKwh || 0)).toFixed(2)
+                  );
+                  p.consumptionPowerKw = plantSum.loadPowerKw;
+                  p.gridPowerKw = plantSum.gridPowerKw;
+                  p.batterySoc = plantSum.batterySoc;
+                  if (plantSum.capacityKw > 0) {
+                    p.installedCapacityKw = plantSum.capacityKw;
+                  }
+                } else if (pSolar > 0 || pDaily > 0) {
+                  p.liveSolarPowerKw = parseFloat(pSolar.toFixed(2));
+                  p.dailyYieldKwh = parseFloat(pDaily.toFixed(2));
+                }
+              }
+            }
+          } catch {
+            isLive = false;
+          }
+        }
+
+        const plants = acc.plants || [];
+        let inverterCount = 0;
+        let loggerCount = 0;
+        let capacity = 0;
+
+        for (const p of plants) {
+          capacity += p.installedCapacityKw || 0;
+          for (const d of p.devices) {
+            if (d.deviceType === 'INVERTER') inverterCount++;
+            if (d.deviceType === 'LOGGER') loggerCount++;
+          }
+        }
+
+        const effectiveCapacity = stationCapacityKw > 0 ? stationCapacityKw : capacity;
+
+        return {
+          id: acc.id,
+          directusId: acc.directusId,
+          userId: acc.userId,
+          name: acc.name,
+          email: acc.email,
+          enabled: acc.enabled !== false,
+          admin: acc.admin,
+          isDemo: Boolean(acc.isDemo),
+          isLive,
+          stationCount: plants.length,
+          deviceCount: inverterCount + loggerCount,
+          inverterCount,
+          loggerCount,
+          liveSolarPowerKw: parseFloat(liveKw.toFixed(2)),
+          dailyYieldKwh: parseFloat(dailyYield.toFixed(2)),
+          gridPowerKw,
+          consumptionPowerKw,
+          batterySoc,
+          capacityKw: parseFloat(effectiveCapacity.toFixed(1)),
+          status: acc.enabled === false
+            ? 'OFFLINE'
+            : isLive
+            ? 'ONLINE'
+            : 'OFFLINE',
+          lastPingMs: pingMs,
+          plants,
+          autoDiscovered: acc.autoDiscovered,
+          lastSyncedAt: acc.lastSyncedAt,
+          source: acc.source || (acc.directusId ? 'directus' : 'cache'),
+        };
+      })
+    );
+
+    if (sessionRole && sessionRole !== 'admin') {
+      const nonDemo = summaries.filter((s) => !s.isDemo);
+      if (nonDemo.length > 0 || summaries.every((s) => s.isDemo)) {
+        return nonDemo;
+      }
+    }
+
+    return summaries;
+  }
+
+  /**
+   * Poll all accounts (or specific allowed accounts), plants, and inverters concurrently to compute fleet aggregate.
+   * Cached for 20s in server memory with in-flight deduplication to eliminate redundant DeyeCloud API traffic.
+   */
+  public async getAggregatedFleetSummary(accountIds?: string[], sessionRole?: string): Promise<AggregatedFleetSummary> {
+    const roleKey = sessionRole || 'admin';
+    const accKey = (accountIds || []).slice().sort().join(',');
+    const cacheKey = `${roleKey}:${accKey}`;
+    const now = Date.now();
+    const TTL_MS = 20000; // 20-second cache window
+
+    const cached = this.cachedFleetSummary.get(cacheKey);
+    if (cached && cached.data.totalAccounts > 0 && cached.data.accounts.length > 0 && now - cached.timestamp < TTL_MS) {
+      return cached.data;
+    }
+
+    const existingInFlight = this.inFlightFleetSummary.get(cacheKey);
+    if (existingInFlight) {
+      return existingInFlight;
+    }
+
+    const fetchPromise = this.performAggregatedFleetFetch(accountIds, sessionRole, cacheKey, now).finally(() => {
+      this.inFlightFleetSummary.delete(cacheKey);
+    });
+    this.inFlightFleetSummary.set(cacheKey, fetchPromise);
+    return fetchPromise;
+  }
+
+  private async performAggregatedFleetFetch(
+    accountIds: string[] | undefined,
+    sessionRole: string | undefined,
+    cacheKey: string,
+    now: number
+  ): Promise<AggregatedFleetSummary> {
+    if (!this.accountsCache || this.accountsCache.length === 0 || now - this.lastDirectusSyncAt > 10000) {
+      await this.syncWithDirectus(false);
+    }
+
+    let rawAccounts = this.loadAccounts(false);
+    if (rawAccounts.length === 0) {
+      rawAccounts = this.getAllRawAccounts(true);
+    }
+    rawAccounts = rawAccounts.filter((acc) => !this.isInternalAdminLoginOnly(acc));
+
+    // Ensure any stale (>5 min) live account discovers new DeyeCloud plants/inverters before fleet aggregation
+    let refreshedTopology = false;
+    await Promise.all(
+      rawAccounts.map(async (acc) => {
+        if (acc.enabled === false) return;
+        const client = this.getClient(acc.id);
+        if (!client || !client.hasCredentials()) return;
+        const lastSyncMs = acc.lastSyncedAt ? new Date(acc.lastSyncedAt).getTime() : 0;
+        if (!lastSyncMs || Date.now() - lastSyncMs > 300_000) {
+          const health = await client.getHealth();
+          if (health.isLive) {
+            const changed = await this.syncDynamicPlantMetadata(acc, client);
+            if (changed) refreshedTopology = true;
+          }
+        }
+      })
+    );
+
+    if (refreshedTopology) {
+      rawAccounts = this.loadAccounts(true);
+    }
+    const clients = this.getAllClients();
+    
+    // Demo accounts only accessible by admin account
+    let effectiveRaw = rawAccounts;
+    if (sessionRole && sessionRole !== 'admin') {
+      const nonDemo = rawAccounts.filter((a) => !a.isDemo);
+      if (nonDemo.length > 0) {
+        effectiveRaw = nonDemo;
+      }
+    }
+    const result = await this.fleetAggregator.aggregateFleet(clients, effectiveRaw, accountIds);
+    if (result.totalAccounts > 0) {
+      this.cachedFleetSummary.set(cacheKey, { data: result, timestamp: Date.now() });
+    }
+    return result;
+  }
+
+  public invalidateFleetCache(): void {
+    this.cachedFleetSummary.clear();
+  }
+}
+
+export const accountManager = new DeyeAccountManager();

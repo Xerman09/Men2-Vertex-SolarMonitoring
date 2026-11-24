@@ -1,0 +1,457 @@
+'use client';
+
+import React, { useState, useMemo, useId } from 'react';
+import { HoverInfo } from '@/components/ui/tooltip';
+import { Clock } from 'lucide-react';
+import { getManilaNowParts } from '@/lib/manila-time';
+import {
+  computeSignedYAxisBounds,
+  formatSignedKwLabel,
+  valueToSvgY,
+} from '@/lib/chart-domain';
+import { useScopedHistory, type HistoryScope } from './useScopedHistory';
+
+// Exact Color Palette from Analytics Dashboard (src/app/analytics/page.tsx)
+const COLOR_SOLAR = '#f59e0b'; // Amber-500 / Solar Gold
+
+interface InverterSolarCurveProps {
+  ratedKw: number;
+  liveSolarPowerKw: number;
+  dailyYieldKwh?: number;
+  height?: number;
+  className?: string;
+  isFault?: boolean;
+  isStandby?: boolean;
+  loadPct?: number;
+  scope?: HistoryScope;
+}
+
+export function InverterSolarCurve({
+  ratedKw,
+  liveSolarPowerKw,
+  dailyYieldKwh = 0,
+  height = 68,
+  className = '',
+  isFault = false,
+  isStandby = false,
+  loadPct,
+  scope,
+}: InverterSolarCurveProps) {
+  const [hoveredPoint, setHoveredPoint] = useState<{ label: string; power: number; x: number; y: number } | null>(null);
+  const { status: historyStatus, points: historyPoints } = useScopedHistory(scope || {});
+  const rawId = useId();
+  const gradId = `invSolarGrad-${rawId.replace(/:/g, '')}`;
+
+  const safeRatedKw = Number.isFinite(ratedKw) && ratedKw > 0 ? ratedKw : 10;
+  const safeLiveSolarPowerKw = Number.isFinite(liveSolarPowerKw) ? liveSolarPowerKw : 0;
+  const safeDailyYieldKwh = Number.isFinite(dailyYieldKwh) && dailyYieldKwh >= 0 ? dailyYieldKwh : 0;
+
+  const currentLoadPct = loadPct !== undefined && Number.isFinite(loadPct)
+    ? Math.max(0, loadPct)
+    : (safeRatedKw > 0 ? Math.min(100, Math.max(0, (safeLiveSolarPowerKw / safeRatedKw) * 100)) : 0);
+
+  const nowHour = useMemo(() => getManilaNowParts().hourFloat, []);
+
+  // Real 5-minute historical telemetry points for this inverter (supports signed negative readings)
+  const points = useMemo(() => {
+    if (!historyPoints || historyPoints.length === 0) return [];
+    return historyPoints.map((pt) => {
+      const parts = String(pt.hour || '00:00').split(':');
+      const h = parseInt(parts[0], 10) || 0;
+      const m = parseInt(parts[1], 10) || 0;
+      const hourFloat = h + m / 60;
+      const isFuture = hourFloat > nowHour;
+      const power =
+        pt.solarYieldKw !== null && pt.solarYieldKw !== undefined && Number.isFinite(pt.solarYieldKw)
+          ? pt.solarYieldKw
+          : 0;
+
+      return {
+        hour: hourFloat,
+        label: pt.hour || `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+        power: parseFloat(power.toFixed(2)),
+        isNow: Math.abs(hourFloat - nowHour) <= 0.05,
+        isFuture,
+      };
+    });
+  }, [historyPoints, nowHour]);
+
+  const width = 240;
+  const svgHeight = 42;
+  const paddingX = 4;
+  const paddingY = 3;
+  const plotWidth = width - paddingX * 2;
+  const plotHeight = svgHeight - paddingY * 2;
+
+  // Signed [min, max] bounds so negative inverter readings plot cleanly below 0 kW
+  const yBounds = useMemo(() => {
+    const setKw = Math.max(safeRatedKw || 10, 10);
+    return computeSignedYAxisBounds(
+      [safeLiveSolarPowerKw, ...points.filter((p) => !p.isFuture).map((p) => p.power)],
+      setKw,
+      0.1
+    );
+  }, [safeRatedKw, safeLiveSolarPowerKw, points]);
+
+  const zeroY = useMemo(
+    () => valueToSvgY(0, yBounds.min, yBounds.max, paddingY, plotHeight),
+    [yBounds, paddingY, plotHeight]
+  );
+
+  const zeroOffsetRatio = useMemo(() => {
+    const raw = (zeroY - paddingY) / plotHeight;
+    return Math.max(0, Math.min(1, Number.isFinite(raw) ? raw : 1));
+  }, [zeroY, paddingY, plotHeight]);
+
+  const coords = useMemo(() => {
+    const list = points.length > 0 ? points : [
+      { hour: 0, label: '00:00', power: 0, isNow: false, isFuture: false },
+      { hour: Math.max(0.1, nowHour), label: 'Now', power: safeLiveSolarPowerKw, isNow: true, isFuture: false },
+    ];
+    return list.map((p) => {
+      const validHour = Number.isFinite(p.hour) ? Math.min(24, Math.max(0, p.hour)) : 0;
+      const x = paddingX + (validHour / 24) * plotWidth;
+      const validPower = Number.isFinite(p.power) ? p.power : 0;
+      const y = valueToSvgY(validPower, yBounds.min, yBounds.max, paddingY, plotHeight);
+      return { ...p, x, y };
+    });
+  }, [points, yBounds, plotWidth, plotHeight, paddingX, paddingY, nowHour, safeLiveSolarPowerKw]);
+
+  // Elapsed curve coordinates only up to current moment (no future values!)
+  const elapsedCoords = useMemo(() => {
+    const elapsed = coords.filter((c) => c.hour <= nowHour);
+    if (elapsed.length === 0) {
+      const nowY = valueToSvgY(safeLiveSolarPowerKw, yBounds.min, yBounds.max, paddingY, plotHeight);
+      return [
+        { hour: 0, label: '00:00', power: 0, isNow: false, isFuture: false, x: paddingX, y: zeroY },
+        { hour: nowHour, label: 'Now', power: safeLiveSolarPowerKw, isNow: true, isFuture: false, x: paddingX + (nowHour / 24) * plotWidth, y: nowY },
+      ];
+    }
+    if (elapsed.length === 1) {
+      return [
+        { hour: 0, label: '00:00', power: 0, isNow: false, isFuture: false, x: paddingX, y: zeroY },
+        elapsed[0],
+      ];
+    }
+    return elapsed;
+  }, [coords, nowHour, paddingX, plotWidth, paddingY, plotHeight, yBounds, zeroY, safeLiveSolarPowerKw]);
+
+  const nowCoord = elapsedCoords.length > 0 ? elapsedCoords[elapsedCoords.length - 1] : null;
+
+  const svgPaths = useMemo(() => {
+    if (elapsedCoords.length === 0) return { linePath: '', areaPath: '' };
+
+    let linePath = `M ${elapsedCoords[0].x} ${elapsedCoords[0].y}`;
+    for (let i = 1; i < elapsedCoords.length; i++) {
+      const prev = elapsedCoords[i - 1];
+      const curr = elapsedCoords[i];
+      const midX = (prev.x + curr.x) / 2;
+      linePath += ` C ${midX} ${prev.y}, ${midX} ${curr.y}, ${curr.x} ${curr.y}`;
+    }
+
+    const first = elapsedCoords[0];
+    const last = elapsedCoords[elapsedCoords.length - 1];
+    const areaPath = `${linePath} L ${last.x} ${zeroY} L ${first.x} ${zeroY} Z`;
+
+    return { linePath, areaPath };
+  }, [elapsedCoords, zeroY]);
+
+  return (
+    <div className={`relative w-full select-none ${className}`}>
+      {/* Telemetry Header Above Graph: Never covers the curve */}
+      <div className="flex items-center justify-between text-[7.5px] sm:text-[8px] font-mono text-muted-foreground mb-1 px-0.5 shrink-0 min-h-[16px] leading-tight">
+        {hoveredPoint ? (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="flex items-center gap-1 font-bold text-foreground bg-primary/10 text-primary px-1 py-0.2 rounded text-[7.5px]">
+              <Clock className="size-2 text-primary" />
+              {hoveredPoint.label}
+            </span>
+            <div className="flex items-center gap-1">
+              <span className="size-1.5 rounded-full inline-block shrink-0 bg-[#f59e0b]" />
+              <span className="text-muted-foreground/80">PV:</span>
+              <span className="font-bold text-amber-500">{(hoveredPoint.power ?? 0).toFixed(2)} kW</span>
+            </div>
+            {dailyYieldKwh !== undefined && dailyYieldKwh > 0 && (
+              <span className="text-muted-foreground/70">
+                (Yield: <strong className="text-foreground/90 font-semibold">{(dailyYieldKwh ?? 0).toFixed(1)} kWh</strong>)
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1">
+              <span className={`size-1.5 rounded-full inline-block shrink-0 ${safeLiveSolarPowerKw > 0 ? 'bg-amber-500 animate-pulse' : 'bg-muted-foreground/60'}`} />
+              <span className="text-muted-foreground/80">Live:</span>
+              <span className="font-bold text-amber-500">{(liveSolarPowerKw ?? 0).toFixed(1)} kW</span>
+              {dailyYieldKwh !== undefined && dailyYieldKwh > 0 && (
+                <span className="text-amber-500/80 font-normal text-[7px]">
+                  ({(dailyYieldKwh ?? 0).toFixed(1)} kWh)
+                </span>
+              )}
+            </div>
+            {points.length === 0 && (
+              <span className="text-[7px] text-muted-foreground/60 font-mono">
+                {safeLiveSolarPowerKw === 0 ? 'Standby · No data' : 'No history frames'}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div
+        className="relative w-full overflow-hidden rounded-md bg-card/70 border border-border/40 p-1 flex items-stretch gap-1"
+        style={{ height: `${height}px`, minHeight: `${height}px` }}
+      >
+        {/* Inverter Mini Y-Axis Column */}
+        <div className="flex flex-col shrink-0 select-none pb-3 pt-0.5 w-7 sm:w-8 border-r border-border/30 pr-1 text-[7px] font-mono text-muted-foreground/80">
+          <div className="relative flex-1 flex flex-col justify-between items-end w-full">
+            <div className="flex items-center justify-end w-full leading-none">
+              <span className="font-semibold text-foreground/90">{formatSignedKwLabel(yBounds.max)}</span>
+            </div>
+            <div className="flex items-center justify-end w-full leading-none text-muted-foreground/70">
+              <span>{formatSignedKwLabel((yBounds.max + yBounds.min) * 0.5)}</span>
+            </div>
+            <div className="flex items-center justify-end w-full leading-none text-muted-foreground/70">
+              <span>{formatSignedKwLabel(yBounds.min)}</span>
+            </div>
+            {yBounds.min < 0 &&
+              zeroOffsetRatio * 100 >= 18 &&
+              zeroOffsetRatio * 100 <= 82 &&
+              Math.abs(zeroOffsetRatio * 100 - 50) > 16 && (
+                <span
+                  className="pointer-events-none absolute right-0 -translate-y-1/2 text-[6.5px] text-foreground/85 font-semibold leading-none"
+                  style={{ top: `${(zeroOffsetRatio * 100).toFixed(1)}%` }}
+                >
+                  0
+                </span>
+              )}
+          </div>
+        </div>
+
+        {/* Chart Drawing Area + Mini Time Hints */}
+        <div className="relative flex-1 min-w-0 min-h-0 flex flex-col justify-between">
+          <svg
+            viewBox={`0 0 ${width} ${svgHeight}`}
+            preserveAspectRatio="none"
+            className="w-full flex-1 overflow-visible cursor-crosshair block"
+            onMouseLeave={() => setHoveredPoint(null)}
+          >
+            <defs>
+              {/* Exact colorSolar from Analytics Dashboard: #f59e0b (0.8 opacity down to 0) */}
+              <linearGradient
+                id={gradId}
+                gradientUnits="userSpaceOnUse"
+                x1="0"
+                y1={paddingY}
+                x2="0"
+                y2={paddingY + plotHeight}
+              >
+                <stop offset="0%" stopColor={COLOR_SOLAR} stopOpacity={0.75} />
+                <stop offset={`${(zeroOffsetRatio * 100).toFixed(2)}%`} stopColor={COLOR_SOLAR} stopOpacity={0.0} />
+                {yBounds.min < 0 && <stop offset="100%" stopColor={COLOR_SOLAR} stopOpacity={0.45} />}
+              </linearGradient>
+
+              {/* Plot boundary clip path to guarantee paths never leak outside */}
+              <clipPath id={`${gradId}-inv-clip`}>
+                <rect x={paddingX} y={paddingY} width={plotWidth} height={plotHeight} rx={1} />
+              </clipPath>
+            </defs>
+
+            {/* Top limit grid line */}
+            <line
+              x1={paddingX}
+              y1={paddingY}
+              x2={width - paddingX}
+              y2={paddingY}
+              stroke="hsl(var(--border) / 0.15)"
+              strokeDasharray="2 3"
+              strokeWidth="1"
+              vectorEffect="non-scaling-stroke"
+            />
+
+            {/* Dotted reference line matching Analytics */}
+            <line
+              x1={paddingX}
+              y1={paddingY + plotHeight * 0.5}
+              x2={width - paddingX}
+              y2={paddingY + plotHeight * 0.5}
+              stroke="hsl(var(--border) / 0.3)"
+              strokeDasharray="2 3"
+              strokeWidth="1"
+              vectorEffect="non-scaling-stroke"
+            />
+
+            {/* Baseline reference */}
+            <line
+              x1={paddingX}
+              y1={paddingY + plotHeight}
+              x2={width - paddingX}
+              y2={paddingY + plotHeight}
+              stroke="hsl(var(--border) / 0.4)"
+              strokeWidth="1"
+              vectorEffect="non-scaling-stroke"
+            />
+            {yBounds.min < 0 && (
+              <line
+                x1={paddingX}
+                y1={zeroY}
+                x2={width - paddingX}
+                y2={zeroY}
+                stroke="hsl(var(--border) / 0.75)"
+                strokeWidth="1"
+                vectorEffect="non-scaling-stroke"
+              />
+            )}
+
+            {/* Clipped Curve Layers */}
+            <g clipPath={`url(#${gradId}-inv-clip)`}>
+              {/* Area Fill */}
+              <path
+                d={svgPaths.areaPath}
+                fill={`url(#${gradId})`}
+              />
+
+              {/* Power Curve Line */}
+              <path
+                d={svgPaths.linePath}
+                fill="none"
+                stroke={COLOR_SOLAR}
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </g>
+
+            {/* Vertical 'Now' Reference Line */}
+            {nowCoord && Number.isFinite(nowCoord.x) && Number.isFinite(nowCoord.y) && (
+              <>
+                <line
+                  x1={nowCoord.x}
+                  y1={paddingY}
+                  x2={nowCoord.x}
+                  y2={paddingY + plotHeight}
+                  stroke="#94a3b8"
+                  strokeDasharray="2 2"
+                  strokeWidth="1"
+                  vectorEffect="non-scaling-stroke"
+                />
+
+                {/* Current Live Operating Point */}
+                <g transform={`translate(${nowCoord.x}, ${nowCoord.y})`}>
+                  <circle r="3" fill={COLOR_SOLAR} className="animate-ping opacity-60" />
+                  <circle r="2" fill={COLOR_SOLAR} stroke="hsl(var(--background))" strokeWidth="1" />
+                </g>
+              </>
+            )}
+
+            {/* Interactive Hover Hit Areas (only elapsed hours, no future values!) */}
+            {coords.filter((c) => !c.isFuture).map((c) => (
+              <rect
+                key={c.hour}
+                x={c.x - plotWidth / 48}
+                y={0}
+                width={plotWidth / 24}
+                height={svgHeight}
+                fill="transparent"
+                className="cursor-pointer"
+                onMouseEnter={() =>
+                  setHoveredPoint({ label: c.label, power: c.power, x: c.x, y: c.y })
+                }
+              />
+            ))}
+
+            {/* Hover Indicator */}
+            {hoveredPoint && (
+              <g transform={`translate(${hoveredPoint.x}, ${hoveredPoint.y})`}>
+                <line
+                  x1={0}
+                  y1={paddingY - hoveredPoint.y}
+                  x2={0}
+                  y2={plotHeight + paddingY - hoveredPoint.y}
+                  stroke={COLOR_SOLAR}
+                  strokeWidth="1"
+                  strokeDasharray="2 2"
+                  vectorEffect="non-scaling-stroke"
+                />
+                <circle r="2.5" fill="hsl(var(--background))" stroke={COLOR_SOLAR} strokeWidth="1.5" />
+              </g>
+            )}
+          </svg>
+
+          {/* Mini time hints */}
+          <div className="flex items-center justify-between text-[6.5px] font-mono text-muted-foreground/50 px-0.5 pt-0.5 border-t border-border/20 leading-none">
+            <span>06:00</span>
+            <span>12:00</span>
+            <span>18:00</span>
+          </div>
+        </div>
+
+        {/* Vertical Utilization Column Beside Graph with Hover Tooltip */}
+        <HoverInfo
+          title="Inverter Operating Status"
+          content={
+            <div className="text-[11px] space-y-1 min-w-[150px]">
+              <p className="text-muted-foreground">Inverter load utilization relative to rated capacity.</p>
+              <div className="pt-1 border-t border-border/50 flex justify-between font-mono">
+                <span className="text-muted-foreground">Live Power:</span>
+                <span className="font-bold text-amber-500">{(liveSolarPowerKw ?? 0).toFixed(2)} kW</span>
+              </div>
+              {dailyYieldKwh !== undefined && dailyYieldKwh > 0 && (
+                <div className="flex justify-between font-mono">
+                  <span className="text-muted-foreground">Daily Yield:</span>
+                  <span className="font-bold text-foreground">{(dailyYieldKwh ?? 0).toFixed(1)} kWh</span>
+                </div>
+              )}
+              {ratedKw !== undefined && ratedKw > 0 && (
+                <div className="flex justify-between font-mono">
+                  <span className="text-muted-foreground">Rated Cap:</span>
+                  <span className="font-semibold text-foreground">{ratedKw} kW</span>
+                </div>
+              )}
+              <div className="flex justify-between font-mono pt-0.5 border-t border-border/40">
+                <span className="text-muted-foreground">Utilization:</span>
+                <span
+                  className={`font-bold ${
+                    isFault ? 'text-destructive' : isStandby ? 'text-amber-500' : 'text-emerald-500'
+                  }`}
+                >
+                  {(currentLoadPct ?? 0).toFixed(1)}%
+                </span>
+              </div>
+            </div>
+          }
+        >
+          <div className="flex flex-col items-center justify-between shrink-0 select-none border-l border-border/30 pl-1 sm:pl-1.5 w-7 sm:w-8 h-full py-0.5 cursor-help">
+            <span className="text-[7px] uppercase tracking-wider font-mono text-muted-foreground font-semibold leading-none">
+              Util
+            </span>
+
+            {/* Vertical Progress Gauge Track */}
+            <div className="w-1.5 sm:w-2 flex-1 my-1 bg-muted/60 rounded-full overflow-hidden relative border border-border/20 flex flex-col justify-end">
+              <div
+                className={`w-full rounded-full transition-all duration-300 ${
+                  isFault
+                    ? 'bg-destructive'
+                    : isStandby
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+                }`}
+                style={{ height: `${Math.max(4, Math.min(100, currentLoadPct ?? 0))}%` }}
+              />
+            </div>
+
+            <span
+              className={`text-[7.5px] sm:text-[8px] font-mono font-bold leading-none ${
+                isFault ? 'text-destructive' : isStandby ? 'text-amber-500' : 'text-emerald-500'
+              }`}
+            >
+              {(currentLoadPct ?? 0).toFixed(0)}%
+            </span>
+          </div>
+        </HoverInfo>
+
+
+      </div>
+    </div>
+  );
+}

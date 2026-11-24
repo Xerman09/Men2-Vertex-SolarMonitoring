@@ -1,0 +1,32 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#181b24" />
+      <stop offset="100%" stop-color="#0c0e14" />
+    </linearGradient>
+    <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Container Box matching sidebar icon button: rounded-xl, dark slate, amber border -->
+  <rect x="0" y="0" width="512" height="512" rx="112.64" fill="url(#bgGrad)" />
+  <rect x="20.48" y="20.48" width="471.04" height="471.04" rx="101.376" fill="none" stroke="#f59e0b" stroke-width="20.48" stroke-opacity="0.45" />
+  <circle cx="256" cy="256" r="215.04" fill="url(#sunGlow)" />
+
+  <!-- Lucide Sun Icon in amber-500 (#f59e0b) -->
+  <g stroke="#f59e0b" stroke-width="42.666666666666664" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <circle cx="256" cy="256" r="92.16" fill="#f59e0b" fill-opacity="0.18" />
+    <!-- Vertical / Horizontal Rays -->
+    <line x1="256" y1="61.44" x2="256" y2="117.75999999999999" />
+    <line x1="256" y1="394.24" x2="256" y2="450.56" />
+    <line x1="61.44" y1="256" x2="117.75999999999999" y2="256" />
+    <line x1="394.24" y1="256" x2="450.56" y2="256" />
+    <!-- Diagonal Rays -->
+    <line x1="118.4253048832" y1="118.4253048832" x2="158.24955873279998" y2="158.24955873279998" />
+    <line x1="353.7504412672" y1="353.7504412672" x2="393.5746951168" y2="393.5746951168" />
+    <line x1="118.4253048832" y1="393.5746951168" x2="158.24955873279998" y2="353.7504412672" />
+    <line x1="353.7504412672" y1="158.24955873279998" x2="393.5746951168" y2="118.4253048832" />
+  </g>
+</svg>
