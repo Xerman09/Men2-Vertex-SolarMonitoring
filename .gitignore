@@ -11,11 +11,12 @@ node_modules/
 build/
 dist/
 
-# Environment Variables & Account Credentials
+# Environment Variables, Data & Account Credentials
 .env*
 !.env.example
-deye-accounts.json
-deye-history-cache.json
+data/
+deye-*.json
+!deye-accounts.example.json
 deployment-bundle*.zip
 *.tmp.*
 
