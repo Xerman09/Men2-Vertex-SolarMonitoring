@@ -1,8 +1,0 @@
-# Reverse proxy with automatic HTTPS for Deye Solar Monitoring (DSM)
-# Set DSM_DOMAIN in .env.local (e.g. solar.yourdomain.com for automatic Let's Encrypt,
-# or :443 with `tls internal` for internal LAN/VPN HTTPS).
-{$DSM_DOMAIN:localhost} {
-  reverse_proxy deye-solar-monitoring:3005 {
-    header_up X-Forwarded-Proto https
-  }
-}
