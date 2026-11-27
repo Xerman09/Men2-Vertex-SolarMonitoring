@@ -40,7 +40,6 @@ interface TvHudBarProps {
   intervalSec: TvIntervalSeconds;
   progressRatio: number;
   hudVisible: boolean;
-  hudLockedHidden?: boolean;
   isFullscreen: boolean;
   isStale: boolean;
   manilaClock: string;
@@ -58,7 +57,7 @@ interface TvHudBarProps {
   onTogglePause: () => void;
   onChangeInterval: (sec: TvIntervalSeconds) => void;
   onToggleFullscreen: () => void;
-  onToggleHudHidden?: () => void;
+  onHideHud?: () => void;
 }
 
 function ScrollingTickerText({ text }: { text: string }) {
@@ -115,7 +114,6 @@ export function TvHudBar({
   intervalSec,
   progressRatio,
   hudVisible,
-  hudLockedHidden = false,
   isFullscreen,
   isStale,
   manilaClock,
@@ -133,9 +131,9 @@ export function TvHudBar({
   onTogglePause,
   onChangeInterval,
   onToggleFullscreen,
-  onToggleHudHidden,
+  onHideHud,
 }: TvHudBarProps) {
-  const showOverlay = !hudLockedHidden && (hudVisible || paused);
+  const showOverlay = hudVisible;
   const showAccountFilter = scopeAccountOptions.length > 1 && Boolean(onSelectAccount);
   const showStationFilter = scopeStationOptions.length > 1 && Boolean(onSelectStation);
 
@@ -269,12 +267,12 @@ export function TvHudBar({
           )}
         </button>
 
-        {onToggleHudHidden && (
+        {onHideHud && (
           <button
             type="button"
-            onClick={onToggleHudHidden}
-            title="Hide top bar (H)"
-            aria-label="Hide top control bar"
+            onClick={onHideHud}
+            title="Hide top bar (H) — move pointer to show"
+            aria-label="Hide top control bar (move pointer to show again)"
             className="inline-flex min-h-[34px] min-w-[34px] items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-ring touch-manipulation"
           >
             <EyeOff size={15} aria-hidden="true" />

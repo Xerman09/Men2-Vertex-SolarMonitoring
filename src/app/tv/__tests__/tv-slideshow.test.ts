@@ -454,6 +454,43 @@ describe('TV Slideshow Mode View Model, Isolation & UI', () => {
     expect(finTicker.headline).toContain('64% of 250 kWh demand offset');
   });
 
+  it('hides the top control bar on idle state and restores it on activity', () => {
+    const common = {
+      slides: [] as [],
+      activeIndex: 0,
+      intervalSec: DEFAULT_TV_INTERVAL_SEC,
+      progressRatio: 0.5,
+      isFullscreen: false,
+      isStale: false,
+      manilaClock: '14:25 PHT',
+      headline: 'Hanvin Solar 68.5 kW live',
+      severity: 'normal' as const,
+      onPrev: () => {},
+      onNext: () => {},
+      onSelectSlide: () => {},
+      onTogglePause: () => {},
+      onChangeInterval: () => {},
+      onToggleFullscreen: () => {},
+      onHideHud: () => {},
+    };
+
+    const visibleHtml = renderToStaticMarkup(
+      React.createElement(TvHudBar, { ...common, paused: false, hudVisible: true })
+    );
+    expect(visibleHtml).toContain('opacity-100 translate-y-0');
+    expect(visibleHtml).toContain('move pointer to show');
+
+    const idleHtml = renderToStaticMarkup(
+      React.createElement(TvHudBar, { ...common, paused: false, hudVisible: false })
+    );
+    expect(idleHtml).toContain('opacity-0 -translate-y-1.5 pointer-events-none');
+
+    const hiddenWhilePausedHtml = renderToStaticMarkup(
+      React.createElement(TvHudBar, { ...common, paused: true, hudVisible: false })
+    );
+    expect(hiddenWhilePausedHtml).toContain('opacity-0 -translate-y-1.5 pointer-events-none');
+  });
+
   it('excludes internal zero-plant admin login rows while keeping real admin-owned solar accounts', () => {
     const { accounts } = makeMultiTenantFixture();
     const withInternalAdmin: AccountSummary[] = [

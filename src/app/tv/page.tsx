@@ -69,7 +69,6 @@ export default function TvSlideshowPage() {
   const [elapsedMs, setElapsedMs] = useState<number>(0);
 
   const [hudVisible, setHudVisible] = useState<boolean>(true);
-  const [hudLockedHidden, setHudLockedHidden] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [shiftIndex, setShiftIndex] = useState<number>(0);
   const [manilaClock, setManilaClock] = useState<string>(() => {
@@ -387,13 +386,17 @@ export default function TvSlideshowPage() {
     }
   }, []);
 
-  // Auto-hide HUD after 3s of pointer inactivity
   const bumpHud = useCallback(() => {
     setHudVisible(true);
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     idleTimerRef.current = setTimeout(() => {
       setHudVisible(false);
     }, HUD_IDLE_HIDE_MS);
+  }, []);
+
+  const hideHud = useCallback(() => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    setHudVisible(false);
   }, []);
 
   useEffect(() => {
@@ -552,13 +555,13 @@ export default function TvSlideshowPage() {
         void toggleFullscreen();
       } else if (e.key === 'h' || e.key === 'H') {
         e.preventDefault();
-        setHudLockedHidden((h) => !h);
+        hideHud();
       }
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [goPrev, goNext, toggleFullscreen]);
+  }, [goPrev, goNext, toggleFullscreen, hideHud]);
 
   const currentScopeKey = currentSlide ? getTvScopeKey(currentSlide.scope) : 'FLEET';
   const currentWeeklySeries = weeklyByScope[currentScopeKey]?.series ?? null;
@@ -632,7 +635,6 @@ export default function TvSlideshowPage() {
         intervalSec={intervalSec}
         progressRatio={progressRatio}
         hudVisible={hudVisible}
-        hudLockedHidden={hudLockedHidden}
         isFullscreen={isFullscreen}
         isStale={isStale}
         manilaClock={manilaClock}
@@ -653,7 +655,7 @@ export default function TvSlideshowPage() {
           setElapsedMs(0);
         }}
         onToggleFullscreen={toggleFullscreen}
-        onToggleHudHidden={() => setHudLockedHidden((h) => !h)}
+        onHideHud={hideHud}
       />
     </main>
   );
