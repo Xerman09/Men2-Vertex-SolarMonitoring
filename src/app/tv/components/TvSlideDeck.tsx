@@ -90,7 +90,7 @@ function SlideMetricRow({
       <span className="font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap shrink-0">
         {label}
       </span>
-      <span className={`font-mono text-lg sm:text-xl xl:text-2xl font-bold tabular-nums whitespace-nowrap text-right ${accentClass}`}>
+      <span className={`font-mono text-sm sm:text-lg xl:text-xl font-bold tabular-nums text-right min-w-0 break-words ${accentClass}`}>
         {value}
         {unit && (
           <span className="ml-1 text-xs font-semibold text-muted-foreground">{unit}</span>
@@ -336,7 +336,7 @@ export function TvSlideDeck({
         {/* 1. MASTER A: FLEET OVERVIEW (Left Hero Metric + Right Portfolio Table) */}
         {slide.kind === 'overview' && (
           <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 items-stretch">
-            <div className="lg:col-span-4 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0">
+            <div className="lg:col-span-4 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0 min-w-0">
               <div className="tv-kpi-stagger" style={{ '--tv-stagger': 0 } as React.CSSProperties}>
                 <div className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
                   Live Solar Generation
@@ -548,7 +548,7 @@ export function TvSlideDeck({
 
           return (
             <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-              <div className="lg:col-span-4 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0">
+              <div className="lg:col-span-4 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0 min-w-0">
                 <div>
                   <div className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
                     Live Solar
@@ -820,12 +820,12 @@ export function TvSlideDeck({
 
           return (
             <div className="grid flex-1 min-h-0 grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 items-stretch">
-              <div className="lg:col-span-4 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0">
+              <div className="lg:col-span-4 flex flex-col justify-between lg:border-r lg:border-border/50 lg:pr-6 min-h-0 min-w-0">
                 <div className="tv-kpi-stagger" style={{ '--tv-stagger': 0 } as React.CSSProperties}>
                   <div className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
                     {hasDemand ? '7-Day Realized Bill Savings' : '7-Day Avoided Cost'}
                   </div>
-                  <div className="mt-2 font-mono text-[clamp(2.25rem,1.45rem+2.5vw,3.9rem)] font-bold leading-none tracking-tight text-emerald-400 tabular-nums">
+                  <div className="mt-2 font-mono text-[clamp(1.75rem,1.1rem+2.2vw,3.9rem)] font-bold leading-none tracking-tight text-emerald-400 tabular-nums break-words">
                     {profit ? formatPhp(profit.realizedProfitPhp) : '--'}
                   </div>
                   {hasDemand && profit && profit.demandOffsetPct !== null && (
